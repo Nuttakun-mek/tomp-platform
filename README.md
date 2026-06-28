@@ -102,3 +102,13 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+## Sprint 1 Scope
+
+Sprint 1 adds the Project and Mission kernel foundation:
+
+- Initial Supabase/PostgreSQL migration SQL under `database/migrations`.
+- Shared TypeScript domain types and Zod validation schemas under `packages/types`.
+- Project list, create project form, project detail placeholder, create mission form, and mission list placeholder in `apps/web`.
+
+Sprint 1 does not implement live GPS, incident, recovery, analytics, AI, customer portal, vendor portal, accounting, CRM, payroll, fleet maintenance, or database-backed UI behavior.
