@@ -1,5 +1,14 @@
 import type { TimelineSource } from "@tomp/types/domain";
 
+export const TIMELINE_EVENTS = {
+  PROJECT_CREATED: "PROJECT_CREATED",
+  MISSION_CREATED: "MISSION_CREATED",
+  ASSIGNMENT_CREATED: "ASSIGNMENT_CREATED",
+  DRIVER_CREATED: "DRIVER_CREATED",
+  VEHICLE_CREATED: "VEHICLE_CREATED",
+  ASSIGNMENT_STATUS_CHANGED: "ASSIGNMENT_STATUS_CHANGED"
+} as const;
+
 export interface CreateTimelineEventInput {
   projectId: string;
   objectType: string;

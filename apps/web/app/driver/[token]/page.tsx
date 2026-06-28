@@ -15,6 +15,9 @@ export default async function DriverTokenPage({ params }: DriverTokenPageProps) 
         title="Assignment Access"
         description={`Token placeholder: ${token}. Validation is deliberately deferred.`}
       />
+      <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
+        Sprint 7 placeholder: this token is not validated yet and must not be treated as production access control.
+      </div>
       <DriverCard />
     </>
   );

@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/ui/status-badge";
 
-const exceptions = ["Pending driver confirmation", "Vehicle photo not captured"];
+const exceptions = ["Driver not ready", "Vehicle not ready", "Missing vehicle photo", "Missing GPS consent placeholder"];
 
 export function ExceptionList() {
   return (

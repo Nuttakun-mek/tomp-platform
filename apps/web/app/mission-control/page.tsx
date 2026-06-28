@@ -4,8 +4,12 @@ import { MapPlaceholder } from "@/components/mission-control/map-placeholder";
 import { ReadinessBoard } from "@/components/mission-control/readiness-board";
 import { TimelineFeed } from "@/components/mission-control/timeline-feed";
 import { PageHeader } from "@/components/page-header";
+import { demoProject } from "@/lib/demo/demo-kernel";
+import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
 
-export default function MissionControlPage() {
+export default async function MissionControlPage() {
+  const events = await getTimelineEventsByProjectId(demoProject.id);
+
   return (
     <>
       <PageHeader
@@ -17,7 +21,7 @@ export default function MissionControlPage() {
         <ReadinessBoard />
         <FleetBoard />
         <ExceptionList />
-        <TimelineFeed />
+        <TimelineFeed events={events} />
       </div>
       <div className="mt-6">
         <MapPlaceholder />

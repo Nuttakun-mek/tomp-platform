@@ -1,6 +1,29 @@
-export function CreateMissionForm() {
+"use client";
+
+import { useState } from "react";
+import { createMissionSchema } from "@/lib/validation";
+
+export function CreateMissionForm({ projectId = "10000000-0000-4000-8000-000000000003" }: { projectId?: string }) {
+  const [message, setMessage] = useState<string | null>(null);
+
+  function handleSubmit(formData: FormData) {
+    const parsed = createMissionSchema.safeParse({
+      projectId,
+      projectDayId: "10000000-0000-4000-8000-000000000004",
+      missionCode: formData.get("missionCode"),
+      missionName: formData.get("missionName"),
+      missionType: formData.get("missionType"),
+      priority: formData.get("priority"),
+      plannedStartTime: formData.get("plannedStartTime") || null,
+      plannedEndTime: formData.get("plannedEndTime") || null,
+      serviceCommitment: formData.get("serviceCommitment") || null
+    });
+
+    setMessage(parsed.success ? "Mission draft validated. Write is deferred." : "Please complete required mission fields.");
+  }
+
   return (
-    <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
       <div>
         <h2 className="text-lg font-semibold text-ink">Create Mission</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">Mission is a service activity. Submission will be wired after project persistence exists.</p>
@@ -40,7 +63,8 @@ export function CreateMissionForm() {
         Service commitment
         <textarea className="min-h-24 rounded-md border border-slate-300 px-3 py-2" name="serviceCommitment" placeholder="Pickup target, location, service level, success criteria" />
       </label>
-      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="button">
+      {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
+      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">
         Save Draft Mission
       </button>
     </form>

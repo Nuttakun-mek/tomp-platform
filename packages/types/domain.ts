@@ -10,6 +10,8 @@ export type TimelineSource = "system" | "operation_user" | "driver_qr" | "coordi
 export type DriverActivationStatus = "pending" | "ready" | "blocked";
 export type CheckinStatus = "pending" | "confirmed" | "rejected";
 export type DriverIssueSeverity = "info" | "warning" | "urgent";
+export type ReadinessStatus = "ready" | "warning" | "blocked";
+export type OperationalRiskLevel = "low" | "medium" | "high";
 
 export interface BaseRecord {
   id: Id;
@@ -170,4 +172,31 @@ export interface DriverIssueReport {
   severity: DriverIssueSeverity;
   message?: string | null;
   metadata: Record<string, unknown>;
+}
+
+export interface ReadinessCheckItem {
+  label: string;
+  status: ReadinessStatus;
+  required: boolean;
+}
+
+export interface DriverReadiness {
+  driverId: Id;
+  score: number;
+  status: ReadinessStatus;
+  checks: ReadinessCheckItem[];
+}
+
+export interface VehicleReadiness {
+  vehicleId: Id;
+  score: number;
+  status: ReadinessStatus;
+  checks: ReadinessCheckItem[];
+}
+
+export interface AssignmentReadiness {
+  assignmentId: Id;
+  status: ReadinessStatus;
+  riskLevel: OperationalRiskLevel;
+  missingItems: string[];
 }

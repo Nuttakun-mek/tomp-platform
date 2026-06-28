@@ -1,3 +1,5 @@
+import type { Assignment } from "@tomp/types/domain";
+import { AssignmentSummaryCard } from "@/components/assignments/assignment-summary-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 const assignments = [
@@ -5,7 +7,18 @@ const assignments = [
   { callSign: "B-02", mission: "Venue shuttle standby", driver: "Pending", vehicle: "Pending", status: "Planning" }
 ];
 
-export function AssignmentBoardPlaceholder() {
+export function AssignmentBoardPlaceholder({ assignments: liveAssignments }: { assignments?: Assignment[] }) {
+  if (liveAssignments?.length) {
+    return (
+      <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-ink">Assignment Board</h2>
+        <div className="mt-4 grid gap-3">
+          {liveAssignments.map((assignment) => <AssignmentSummaryCard key={assignment.id} assignment={assignment} />)}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 p-5">

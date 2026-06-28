@@ -1,5 +1,28 @@
-import { ActionCard } from "@/components/ui/action-card";
+import { ReadinessScoreCard } from "@/components/readiness/readiness-score-card";
+import { getDriverReadinessScore, getVehicleReadinessScore } from "@/lib/domain/driver-readiness";
 
 export function ReadinessBoard() {
-  return <ActionCard meta="Readiness" title="Readiness Board" description="Projects, drivers, vehicles, and assignments will surface readiness status here. Static sample only." />;
+  const driverScore = getDriverReadinessScore({
+    confirmedName: true,
+    confirmedPhone: false,
+    confirmedVehicle: true,
+    vehiclePhotoCaptured: false,
+    platePhotoCaptured: false,
+    gpsConsent: false
+  });
+  const vehicleScore = getVehicleReadinessScore({
+    vehicleType: "van",
+    plateNumber: "DEMO-1001",
+    capacity: 8,
+    outOfService: false,
+    photoCaptured: false,
+    platePhotoCaptured: false
+  });
+
+  return (
+    <section className="grid gap-4 md:grid-cols-2">
+      <ReadinessScoreCard title="Driver readiness" score={driverScore} status="warning" />
+      <ReadinessScoreCard title="Vehicle readiness" score={vehicleScore} status="warning" />
+    </section>
+  );
 }

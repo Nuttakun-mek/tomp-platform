@@ -1,33 +1,15 @@
-import Link from "next/link";
+import type { Project } from "@tomp/types/domain";
+import { ProjectSummaryCard } from "./project-summary-card";
 
-const projectPlaceholders = [
-  {
-    id: "demo-project",
-    code: "TOMP-2026-001",
-    name: "Global Summit Transport",
-    status: "Draft",
-    dates: "2026-08-12 to 2026-08-14"
-  }
-];
-
-export function ProjectList() {
+export function ProjectList({ projects }: { projects: Project[] }) {
   return (
-    <section className="rounded-md border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 p-5">
+    <section className="rounded-md border border-slate-200 bg-slate-50 p-5 shadow-sm">
+      <div className="mb-4">
         <h2 className="text-lg font-semibold text-ink">Project List</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Placeholder data until Supabase data access is introduced.</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">Read-only Supabase data when configured, demo fallback otherwise.</p>
       </div>
-      <div className="divide-y divide-slate-200">
-        {projectPlaceholders.map((project) => (
-          <Link key={project.id} href={`/projects/${project.id}`} className="grid gap-2 p-5 hover:bg-slate-50 md:grid-cols-[1fr_auto]">
-            <div>
-              <p className="text-sm font-semibold text-operation">{project.code}</p>
-              <h3 className="mt-1 text-base font-semibold text-ink">{project.name}</h3>
-              <p className="mt-1 text-sm text-slate-600">{project.dates}</p>
-            </div>
-            <span className="h-fit rounded-md border border-slate-200 px-3 py-1 text-sm font-medium text-slate-700">{project.status}</span>
-          </Link>
-        ))}
+      <div className="grid gap-3">
+        {projects.map((project) => <ProjectSummaryCard key={project.id} project={project} />)}
       </div>
     </section>
   );

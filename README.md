@@ -112,3 +112,28 @@ Sprint 1 adds the Project and Mission kernel foundation:
 - Project list, create project form, project detail placeholder, create mission form, and mission list placeholder in `apps/web`.
 
 Sprint 1 does not implement live GPS, incident, recovery, analytics, AI, customer portal, vendor portal, accounting, CRM, payroll, fleet maintenance, or database-backed UI behavior.
+
+## Current Stage
+
+The repository now contains Sprint 0 through Sprint 7 foundations:
+
+- Next.js app shell.
+- Supabase schema, seed, and temporary RLS placeholders.
+- Read-only Supabase data access with demo fallback.
+- Project, Mission, Assignment, Resource, Driver Card, and Mission Control UI foundations.
+- Server action placeholders with Zod validation.
+- Readiness and QR access placeholder utilities.
+
+## What Is Not Implemented
+
+- Production authentication and project-scoped RBAC.
+- Live database writes from UI.
+- Publish/change baseline.
+- Production QR token validation.
+- Realtime Mission Control.
+- Live production GPS streaming.
+- AI, route optimization, analytics, vendor/customer portals, accounting, CRM, payroll, or fleet maintenance.
+
+## Next Recommended Sprint
+
+Sprint 9: Real Supabase write integration for Projects, Missions, and Assignments with safe server-side data access and no additional auth complexity beyond the current environment.
