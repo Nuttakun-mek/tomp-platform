@@ -1,0 +1,18 @@
+{
+  "name": "tomp-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @tomp/web",
+    "build": "npm run build -w @tomp/web",
+    "lint": "npm run lint -w @tomp/web",
+    "typecheck": "npm run typecheck -w @tomp/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

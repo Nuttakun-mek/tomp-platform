@@ -75,3 +75,30 @@ Start with:
 5. `docs/07-api/700-api-blueprint.md`
 
 Then create the first working kernel: authentication, organization, project, mission, assignment, call sign, vehicle, driver, timeline.
+
+## Sprint 0 Local Development
+
+Sprint 0 initializes the web application shell only. It does not implement database logic, incident recovery, analytics, AI, vendor portal, customer portal, fleet maintenance, CRM, accounting, or payroll.
+
+Requirements:
+
+- Node.js 20 or newer.
+- npm.
+
+Setup:
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+The web app runs from `apps/web`. By default, Next.js starts at `http://localhost:3000`.
+
+Environment variables:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
