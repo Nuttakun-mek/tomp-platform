@@ -3,10 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./domain": "./domain.ts",
-    "./schemas": "./schemas.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./domain": {
+      "types": "./domain.ts",
+      "default": "./domain.ts"
+    },
+    "./schemas": {
+      "types": "./schemas.ts",
+      "default": "./schemas.ts"
+    }
   },
   "dependencies": {
     "zod": "^3.24.1"

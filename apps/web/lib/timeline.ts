@@ -1,4 +1,4 @@
-import type { TimelineSource } from "@tomp/types";
+import type { TimelineSource } from "@tomp/types/domain";
 
 export interface CreateTimelineEventInput {
   projectId: string;

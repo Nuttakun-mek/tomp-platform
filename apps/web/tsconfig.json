@@ -27,6 +27,12 @@
       ],
       "@tomp/types": [
         "../../packages/types/src"
+      ],
+      "@tomp/types/domain": [
+        "../../packages/types/domain.ts"
+      ],
+      "@tomp/types/schemas": [
+        "../../packages/types/schemas.ts"
       ]
     },
     "plugins": [
