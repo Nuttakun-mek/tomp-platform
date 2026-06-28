@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./domain": "./domain.ts",
+    "./schemas": "./schemas.ts"
   },
   "dependencies": {
     "zod": "^3.24.1"

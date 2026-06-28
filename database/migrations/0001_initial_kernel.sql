@@ -36,7 +36,7 @@ create table public.organizations (
   constraint organizations_status_check check (status in ('active', 'inactive', 'archived'))
 );
 
-create table public.users (
+create table public.profiles (
   id uuid primary key default gen_random_uuid(),
   auth_user_id uuid unique references auth.users(id) on delete set null,
   organization_id uuid references public.organizations(id) on delete set null,
@@ -51,13 +51,13 @@ create table public.users (
   archived_at timestamptz,
   deleted_at timestamptz,
   metadata jsonb not null default '{}'::jsonb,
-  constraint users_status_check check (status in ('active', 'inactive', 'invited', 'archived'))
+  constraint profiles_status_check check (status in ('active', 'inactive', 'invited', 'archived'))
 );
 
 create table public.projects (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete restrict,
-  owner_user_id uuid references public.users(id) on delete set null,
+  owner_profile_id uuid references public.profiles(id) on delete set null,
   project_code text not null unique,
   project_name text not null,
   start_date date not null,
@@ -255,11 +255,9 @@ create table public.timeline_events (
   constraint timeline_events_source_check check (source in ('system', 'operation_user', 'driver_qr', 'coordinator', 'organizer', 'import'))
 );
 
-create index organizations_status_idx on public.organizations(status) where deleted_at is null;
-create index users_auth_user_id_idx on public.users(auth_user_id);
-create index users_organization_id_idx on public.users(organization_id);
+create index profiles_auth_user_id_idx on public.profiles(auth_user_id);
+create index profiles_organization_id_idx on public.profiles(organization_id);
 create index projects_organization_id_idx on public.projects(organization_id);
-create index projects_status_idx on public.projects(status) where deleted_at is null;
 create index project_days_project_id_idx on public.project_days(project_id);
 create index sessions_project_day_id_idx on public.sessions(project_day_id);
 create index missions_project_id_idx on public.missions(project_id);
@@ -270,62 +268,25 @@ create index vehicles_organization_id_idx on public.vehicles(organization_id);
 create index drivers_organization_id_idx on public.drivers(organization_id);
 create index assignments_project_id_idx on public.assignments(project_id);
 create index assignments_mission_id_idx on public.assignments(mission_id);
-create index assignments_driver_window_idx on public.assignments(driver_id, start_time, end_time) where deleted_at is null;
-create index assignments_vehicle_window_idx on public.assignments(vehicle_id, start_time, end_time) where deleted_at is null;
 create index assignment_versions_assignment_id_idx on public.assignment_versions(assignment_id);
 create index timeline_events_project_created_at_idx on public.timeline_events(project_id, created_at desc);
 create index timeline_events_object_idx on public.timeline_events(object_type, object_id);
 
-create trigger organizations_set_updated_at
-before update on public.organizations
-for each row execute function public.set_updated_at();
-
-create trigger users_set_updated_at
-before update on public.users
-for each row execute function public.set_updated_at();
-
-create trigger projects_set_updated_at
-before update on public.projects
-for each row execute function public.set_updated_at();
-
-create trigger project_days_set_updated_at
-before update on public.project_days
-for each row execute function public.set_updated_at();
-
-create trigger sessions_set_updated_at
-before update on public.sessions
-for each row execute function public.set_updated_at();
-
-create trigger missions_set_updated_at
-before update on public.missions
-for each row execute function public.set_updated_at();
-
-create trigger call_signs_set_updated_at
-before update on public.call_signs
-for each row execute function public.set_updated_at();
-
-create trigger vehicles_set_updated_at
-before update on public.vehicles
-for each row execute function public.set_updated_at();
-
-create trigger drivers_set_updated_at
-before update on public.drivers
-for each row execute function public.set_updated_at();
-
-create trigger assignments_set_updated_at
-before update on public.assignments
-for each row execute function public.set_updated_at();
-
-create trigger timeline_events_prevent_update
-before update on public.timeline_events
-for each row execute function public.prevent_timeline_event_mutation();
-
-create trigger timeline_events_prevent_delete
-before delete on public.timeline_events
-for each row execute function public.prevent_timeline_event_mutation();
+create trigger organizations_set_updated_at before update on public.organizations for each row execute function public.set_updated_at();
+create trigger profiles_set_updated_at before update on public.profiles for each row execute function public.set_updated_at();
+create trigger projects_set_updated_at before update on public.projects for each row execute function public.set_updated_at();
+create trigger project_days_set_updated_at before update on public.project_days for each row execute function public.set_updated_at();
+create trigger sessions_set_updated_at before update on public.sessions for each row execute function public.set_updated_at();
+create trigger missions_set_updated_at before update on public.missions for each row execute function public.set_updated_at();
+create trigger call_signs_set_updated_at before update on public.call_signs for each row execute function public.set_updated_at();
+create trigger vehicles_set_updated_at before update on public.vehicles for each row execute function public.set_updated_at();
+create trigger drivers_set_updated_at before update on public.drivers for each row execute function public.set_updated_at();
+create trigger assignments_set_updated_at before update on public.assignments for each row execute function public.set_updated_at();
+create trigger timeline_events_prevent_update before update on public.timeline_events for each row execute function public.prevent_timeline_event_mutation();
+create trigger timeline_events_prevent_delete before delete on public.timeline_events for each row execute function public.prevent_timeline_event_mutation();
 
 alter table public.organizations enable row level security;
-alter table public.users enable row level security;
+alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
 alter table public.project_days enable row level security;
 alter table public.sessions enable row level security;
@@ -336,21 +297,3 @@ alter table public.drivers enable row level security;
 alter table public.assignments enable row level security;
 alter table public.assignment_versions enable row level security;
 alter table public.timeline_events enable row level security;
-
-grant usage on schema public to authenticated;
-grant select, insert, update on
-  public.organizations,
-  public.users,
-  public.projects,
-  public.project_days,
-  public.sessions,
-  public.missions,
-  public.call_signs,
-  public.vehicles,
-  public.drivers,
-  public.assignments,
-  public.assignment_versions,
-  public.timeline_events
-to authenticated;
-
-grant select on public.timeline_events to anon;

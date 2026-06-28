@@ -6,7 +6,6 @@ export type SessionStatus = "draft" | "ready" | "operating" | "closed" | "archiv
 export type MissionPriority = "low" | "normal" | "high" | "critical";
 export type MissionStatus = "draft" | "planned" | "published" | "active" | "completed" | "cancelled" | "archived";
 export type AssignmentStatus = "draft" | "planned" | "published" | "active" | "completed" | "cancelled" | "archived";
-export type ResourceStatus = "available" | "assigned" | "inactive" | "out_of_service" | "archived";
 export type TimelineSource = "system" | "operation_user" | "driver_qr" | "coordinator" | "organizer" | "import";
 
 export interface BaseRecord {
@@ -22,7 +21,7 @@ export interface BaseRecord {
 
 export interface Project extends BaseRecord {
   organizationId: Id;
-  ownerUserId?: Id | null;
+  ownerProfileId?: Id | null;
   projectCode: string;
   projectName: string;
   startDate: string;
@@ -107,17 +106,6 @@ export interface Assignment extends BaseRecord {
   endTime?: string | null;
   commitmentId?: Id | null;
   currentVersion: number;
-}
-
-export interface AssignmentVersion {
-  id: Id;
-  assignmentId: Id;
-  versionNumber: number;
-  changeReason?: string | null;
-  beforeData?: Record<string, unknown> | null;
-  afterData: Record<string, unknown>;
-  createdBy?: Id | null;
-  createdAt: string;
 }
 
 export interface TimelineEvent {
