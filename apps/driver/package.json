@@ -1,0 +1,10 @@
+{
+  "name": "@tomp/driver",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"Driver app is documented but not scaffolded yet.\"",
+    "build": "echo \"Driver app is documented but not scaffolded yet.\"",
+    "typecheck": "echo \"Driver app is documented but not scaffolded yet.\""
+  }
+}

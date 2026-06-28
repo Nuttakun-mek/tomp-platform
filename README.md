@@ -61,13 +61,24 @@ scripts/               Local automation and maintenance scripts
 ## Documentation Index
 
 - [Product Constitution](docs/00-foundation/product-constitution.md)
+- [Numbered Product Constitution](docs/00-foundation/000-product-constitution.md)
 - [Architecture Principles](docs/00-foundation/architecture-principles.md)
+- [Vision and Philosophy](docs/00-foundation/001-vision-and-philosophy.md)
 - [Business Canon](docs/01-business/business-canon.md)
+- [Business Rules](docs/01-business/105-business-rules.md)
+- [Decision Library](docs/01-business/106-decision-library.md)
+- [Domain Core Objects](docs/03-domain/300-core-objects.md)
 - [Roadmap](docs/03-product/roadmap.md)
+- [Product Workspaces](docs/03-product/handbook/400-product-workspaces.md)
+- [Mission Control](docs/03-product/handbook/401-mission-control.md)
+- [Driver Card](docs/03-product/handbook/402-driver-card.md)
+- [Data Blueprint](docs/05-data/handbook/600-data-blueprint.md)
+- [API Blueprint](docs/06-api/handbook/700-api-blueprint.md)
 - [ADR Index](docs/07-engineering/adr/index.md)
 - [Coding Convention](docs/07-engineering/coding-convention.md)
 - [Repository Convention](docs/07-engineering/repository-convention.md)
 - [Zero-Cost-First Strategy](docs/09-deployment/zero-cost-first-strategy.md)
+- [Handbook Completeness Review](docs/00-foundation/handbook-completeness-review.md)
 
 ## Local Development
 

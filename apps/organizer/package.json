@@ -1,0 +1,10 @@
+{
+  "name": "@tomp/organizer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"Organizer app is documented but not scaffolded yet.\"",
+    "build": "echo \"Organizer app is documented but not scaffolded yet.\"",
+    "typecheck": "echo \"Organizer app is documented but not scaffolded yet.\""
+  }
+}
