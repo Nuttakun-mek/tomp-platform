@@ -7,6 +7,9 @@ export type MissionPriority = "low" | "normal" | "high" | "critical";
 export type MissionStatus = "draft" | "planned" | "published" | "active" | "completed" | "cancelled" | "archived";
 export type AssignmentStatus = "draft" | "planned" | "published" | "active" | "completed" | "cancelled" | "archived";
 export type TimelineSource = "system" | "operation_user" | "driver_qr" | "coordinator" | "organizer" | "import";
+export type DriverActivationStatus = "pending" | "ready" | "blocked";
+export type CheckinStatus = "pending" | "confirmed" | "rejected";
+export type DriverIssueSeverity = "info" | "warning" | "urgent";
 
 export interface BaseRecord {
   id: Id;
@@ -120,5 +123,51 @@ export interface TimelineEvent {
   afterData?: Record<string, unknown> | null;
   reason?: string | null;
   createdAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AssignmentVersion {
+  id: Id;
+  assignmentId: Id;
+  versionNumber: number;
+  changeReason?: string | null;
+  beforeData?: Record<string, unknown> | null;
+  afterData: Record<string, unknown>;
+  createdBy?: Id | null;
+  createdAt: string;
+}
+
+export interface DriverActivation {
+  assignmentId: Id;
+  driverId: Id;
+  status: DriverActivationStatus;
+  confirmedName: boolean;
+  confirmedPhone: boolean;
+  confirmedVehicle: boolean;
+  vehiclePhotoCaptured: boolean;
+  platePhotoCaptured: boolean;
+  gpsConsent: boolean;
+}
+
+export interface VehicleCheckin {
+  id: Id;
+  projectId: Id;
+  assignmentId: Id;
+  vehicleId: Id;
+  driverId?: Id | null;
+  status: CheckinStatus;
+  checkedAt?: string | null;
+  photoUrl?: string | null;
+  platePhotoUrl?: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface DriverIssueReport {
+  projectId: Id;
+  assignmentId: Id;
+  driverId?: Id | null;
+  issueType: string;
+  severity: DriverIssueSeverity;
+  message?: string | null;
   metadata: Record<string, unknown>;
 }

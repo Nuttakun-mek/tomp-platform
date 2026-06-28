@@ -5,7 +5,9 @@ const navItems = [
   { href: "/projects", label: "Projects" },
   { href: "/mission-control", label: "Mission Control" },
   { href: "/resources", label: "Resources" },
-  { href: "/driver", label: "Driver" },
+  { href: "/resources/drivers", label: "Drivers" },
+  { href: "/resources/vehicles", label: "Vehicles" },
+  { href: "/driver", label: "Driver Demo" },
   { href: "/admin", label: "Admin" }
 ];
 

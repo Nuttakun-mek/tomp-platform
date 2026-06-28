@@ -50,8 +50,75 @@ export const createAssignmentSchema = z.object({
   metadata: metadataSchema
 });
 
+export const updateAssignmentSchema = createAssignmentSchema.partial();
+
+export const createCallSignSchema = z.object({
+  projectId: uuidSchema,
+  callSign: z.string().trim().min(1).max(40),
+  groupName: z.string().trim().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const createVehicleSchema = z.object({
+  organizationId: optionalUuidSchema,
+  vendorId: optionalUuidSchema,
+  plateNumber: z.string().trim().min(1).max(40),
+  vehicleType: z.string().trim().min(1).max(80),
+  capacity: z.coerce.number().int().min(0).default(0),
+  metadata: metadataSchema
+});
+
+export const createDriverSchema = z.object({
+  organizationId: optionalUuidSchema,
+  vendorId: optionalUuidSchema,
+  fullName: z.string().trim().min(2).max(160),
+  phone: z.string().trim().min(3).max(40),
+  licenseType: z.string().trim().optional().nullable(),
+  languages: z.array(z.string().trim()).default([]),
+  metadata: metadataSchema
+});
+
+export const driverActivationSchema = z.object({
+  assignmentId: uuidSchema,
+  driverId: uuidSchema,
+  confirmedName: z.boolean().default(false),
+  confirmedPhone: z.boolean().default(false),
+  confirmedVehicle: z.boolean().default(false),
+  vehiclePhotoCaptured: z.boolean().default(false),
+  platePhotoCaptured: z.boolean().default(false),
+  gpsConsent: z.boolean().default(false)
+});
+
+export const vehicleCheckinSchema = z.object({
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  vehicleId: uuidSchema,
+  driverId: optionalUuidSchema,
+  status: z.enum(["pending", "confirmed", "rejected"]).default("pending"),
+  photoUrl: z.string().trim().url().optional().nullable(),
+  platePhotoUrl: z.string().trim().url().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const driverIssueReportSchema = z.object({
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  driverId: optionalUuidSchema,
+  issueType: z.string().trim().min(1).max(80),
+  severity: z.enum(["info", "warning", "urgent"]).default("warning"),
+  message: z.string().trim().optional().nullable(),
+  metadata: metadataSchema
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type CreateMissionInput = z.infer<typeof createMissionSchema>;
 export type UpdateMissionInput = z.infer<typeof updateMissionSchema>;
 export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;
+export type UpdateAssignmentInput = z.infer<typeof updateAssignmentSchema>;
+export type CreateCallSignInput = z.infer<typeof createCallSignSchema>;
+export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
+export type CreateDriverInput = z.infer<typeof createDriverSchema>;
+export type DriverActivationInput = z.infer<typeof driverActivationSchema>;
+export type VehicleCheckinInput = z.infer<typeof vehicleCheckinSchema>;
+export type DriverIssueReportInput = z.infer<typeof driverIssueReportSchema>;

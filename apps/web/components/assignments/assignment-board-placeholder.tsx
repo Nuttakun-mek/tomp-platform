@@ -1,0 +1,27 @@
+import { StatusBadge } from "@/components/ui/status-badge";
+
+const assignments = [
+  { callSign: "A-01", mission: "Airport pickup wave 1", driver: "Demo Driver", vehicle: "DEMO-1001", status: "Draft" },
+  { callSign: "B-02", mission: "Venue shuttle standby", driver: "Pending", vehicle: "Pending", status: "Planning" }
+];
+
+export function AssignmentBoardPlaceholder() {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 p-5">
+        <h2 className="text-lg font-semibold text-ink">Assignment Board</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">Static planning board. Conflict checks and persistence come later.</p>
+      </div>
+      <div className="divide-y divide-slate-200">
+        {assignments.map((assignment) => (
+          <div key={assignment.callSign} className="grid gap-3 p-5 md:grid-cols-[0.5fr_1fr_1fr_auto] md:items-center">
+            <p className="font-semibold text-operation">{assignment.callSign}</p>
+            <p className="text-sm text-slate-700">{assignment.mission}</p>
+            <p className="text-sm text-slate-600">{assignment.driver} / {assignment.vehicle}</p>
+            <StatusBadge label={assignment.status} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
