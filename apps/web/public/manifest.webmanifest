@@ -1,0 +1,10 @@
+{
+  "name": "TOMP Enterprise Platform",
+  "short_name": "TOMP",
+  "description": "Transportation Operations Management Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "icons": []
+}
