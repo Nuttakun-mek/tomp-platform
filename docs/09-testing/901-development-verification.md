@@ -11,6 +11,13 @@ Run date: 2026-06-30.
 | `npm.cmd run lint` | Passed |
 | `npm.cmd run test` | Passed: 6 test files, 13 tests |
 | `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed after clearing stale `.next`; 17 routes generated |
+| Supabase migration `0011_driver_live_location_pilot.sql` | Applied to hosted Supabase project |
+| Driver token page with real token | Passed; real Assignment rendered |
+| Driver token page with `demo-token` | Passed; rejected as invalid |
+| `POST /api/driver/location` with real token | Passed; inserted row into `gps_locations` |
+| `POST /api/driver/location` with invalid token | Passed; rejected with 403 |
+| `GET /api/mission-control/locations` | Passed; returned latest real driver location |
+| `/mission-control?projectId=<real-project-id>` | Passed; rendered with real project data |
 
 ## What Passed
 
@@ -20,6 +27,7 @@ Run date: 2026-06-30.
 - Vitest completed with 6 passing files and 13 passing tests.
 - Next.js production build completed and generated 17 routes, including driver location and Mission Control location APIs.
 - Thai-first UI and driver live location pilot build successfully.
+- Driver live location pilot was verified against hosted Supabase with a real project, assignment, token hash, and `gps_locations` row.
 
 ## Notes From This Verification
 
@@ -29,13 +37,13 @@ Run date: 2026-06-30.
 
 ## Not Tested Yet
 
-- Full Thai pilot scenario with real operation users and drivers.
+- Full Thai pilot scenario with real operation users and drivers on mobile devices.
 - RLS behavior with real authenticated users.
 - Supabase seed `database/seed/0002_thai_pilot_scenario.sql` against a freshly reset database.
 - Production deployment environment variable validation.
 - Real Supabase Auth session persistence across browser refreshes.
 - Supabase Storage bucket policy and signed URL review.
-- Supabase Realtime delivery and reconnect behavior under real operations.
+- Supabase Realtime delivery and reconnect behavior under multiple real mobile devices.
 - Real mobile browser geolocation on a Vercel HTTPS deployment.
 - Driver QR token expiry and revoke UX with real tokens.
 - End-to-end browser automation for the Thai pilot path.

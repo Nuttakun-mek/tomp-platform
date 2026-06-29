@@ -6,13 +6,11 @@ import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 type ShareState = "idle" | "requesting" | "sharing" | "error";
 
 interface LastLocation {
-  latitude: number;
-  longitude: number;
   accuracy: number | null;
   sentAt: string;
 }
 
-export function DriverLocationShare({ driverAccess }: { driverAccess?: DriverAccessAssignment }) {
+export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAccessAssignment }) {
   const [state, setState] = useState<ShareState>("idle");
   const [message, setMessage] = useState("ยังไม่ได้แชร์ตำแหน่ง");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
@@ -21,16 +19,16 @@ export function DriverLocationShare({ driverAccess }: { driverAccess?: DriverAcc
 
   async function sendLocation(position: GeolocationPosition, trackingEvent: "sharing_started" | "location_ping" | "sharing_stopped") {
     const payload = {
-      token: driverAccess?.token || "demo-token",
+      token: driverAccess.token,
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
       accuracy: position.coords.accuracy ?? null,
       recordedAt: new Date(position.timestamp).toISOString(),
       trackingEvent,
       metadata: {
-        assignmentId: driverAccess?.assignment.id,
-        callSign: driverAccess?.callSign.callSign,
-        driverName: driverAccess?.driver.fullName
+        assignmentId: driverAccess.assignment.id,
+        callSign: driverAccess.callSign.callSign,
+        driverName: driverAccess.driver.fullName
       }
     };
 
@@ -39,20 +37,17 @@ export function DriverLocationShare({ driverAccess }: { driverAccess?: DriverAcc
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const result = (await response.json()) as { success?: boolean; error?: string; mode?: string };
+    const result = (await response.json()) as { success?: boolean; error?: string };
 
     if (!response.ok || !result.success) {
       throw new Error(result.error || "ส่งตำแหน่งไม่สำเร็จ");
     }
 
     setLastLocation({
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
       accuracy: position.coords.accuracy ?? null,
       sentAt: new Date().toLocaleTimeString("th-TH")
     });
-
-    setMessage(result.mode === "demo" ? "แชร์ตำแหน่งในโหมดข้อมูลตัวอย่าง" : "ส่งตำแหน่งล่าสุดแล้ว");
+    setMessage("ส่งตำแหน่งล่าสุดแล้ว");
   }
 
   function startSharing() {
@@ -89,7 +84,7 @@ export function DriverLocationShare({ driverAccess }: { driverAccess?: DriverAcc
     );
   }
 
-  function stopSharing() {
+  async function stopSharing() {
     if (watchIdRef.current != null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
     }

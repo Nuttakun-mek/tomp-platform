@@ -49,8 +49,9 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
   }, [projectId]);
 
   const mapUrl = useMemo(() => {
-    const lat = latest?.latitude ?? 13.7563;
-    const lng = latest?.longitude ?? 100.5018;
+    if (!latest) return null;
+    const lat = latest.latitude;
+    const lng = latest.longitude;
     const delta = 0.02;
     return `https://www.openstreetmap.org/export/embed.html?bbox=${lng - delta}%2C${lat - delta}%2C${lng + delta}%2C${lat + delta}&layer=mapnik&marker=${lat}%2C${lng}`;
   }, [latest]);
@@ -69,9 +70,11 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
         </span>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-md border border-slate-200">
-        <iframe className="h-80 w-full" loading="lazy" referrerPolicy="no-referrer" src={mapUrl} title="แผนที่ตำแหน่งคนขับ" />
-      </div>
+      {mapUrl ? (
+        <div className="mt-4 overflow-hidden rounded-md border border-slate-200">
+          <iframe className="h-80 w-full" loading="lazy" referrerPolicy="no-referrer" src={mapUrl} title="แผนที่ตำแหน่งคนขับ" />
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3">
         {locations.length ? (
@@ -86,9 +89,7 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
               <p className="mt-1 text-sm text-slate-600">
                 {String(location.metadata.driverName || "คนขับ")} | {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
-                ความแม่นยำ {location.accuracy ? `${Math.round(location.accuracy)} เมตร` : "ไม่ระบุ"} {location.source === "demo" ? "| ข้อมูลตัวอย่าง" : ""}
-              </p>
+              <p className="mt-1 text-xs text-slate-500">ความแม่นยำ {location.accuracy ? `${Math.round(location.accuracy)} เมตร` : "ไม่ระบุ"}</p>
             </div>
           ))
         ) : (

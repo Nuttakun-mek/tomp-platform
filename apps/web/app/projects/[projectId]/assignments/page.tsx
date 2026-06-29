@@ -1,6 +1,6 @@
 import { AssignmentBoardPlaceholder } from "@/components/assignments/assignment-board-placeholder";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
-import { DriverAccessQrPlaceholder } from "@/components/driver/driver-access-qr-placeholder";
+import { DriverAccessGenerator } from "@/components/driver/driver-access-generator";
 import { PageHeader } from "@/components/page-header";
 import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
@@ -26,7 +26,7 @@ export default async function AssignmentsPage({ params }: AssignmentsPageProps) 
         <CreateAssignmentForm projectId={projectId} />
         <div className="grid gap-6">
           <AssignmentBoardPlaceholder assignments={assignments} />
-          <DriverAccessQrPlaceholder accessUrl={`/driver/demo-token?project=${projectId}`} />
+          <DriverAccessGenerator assignments={assignments} projectId={projectId} />
         </div>
       </div>
     </>

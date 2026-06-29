@@ -1,5 +1,4 @@
 import type { DriverLocation } from "@tomp/types/domain";
-import { demoAssignment, demoDriver, demoProject, demoVehicle } from "@/lib/demo/demo-kernel";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 type LocationRow = Record<string, unknown>;
@@ -47,7 +46,7 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
   const client = getSupabaseServerDataClient();
 
   if (!client) {
-    return getDemoDriverLocations();
+    return [];
   }
 
   const { data, error } = await client
@@ -58,7 +57,7 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
     .limit(50);
 
   if (error || !data?.length) {
-    return getDemoDriverLocations();
+    return [];
   }
 
   const latestByAssignment = new Map<string, DriverLocation>();
@@ -70,30 +69,4 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
   });
 
   return Array.from(latestByAssignment.values());
-}
-
-export function getDemoDriverLocations(): DriverLocation[] {
-  const now = new Date().toISOString();
-
-  return [
-    {
-      id: "demo-location-1",
-      projectId: demoProject.id,
-      assignmentId: demoAssignment.id,
-      driverId: demoDriver.id,
-      vehicleId: demoVehicle.id,
-      latitude: 13.7563,
-      longitude: 100.5018,
-      accuracy: 25,
-      recordedAt: now,
-      source: "demo",
-      createdAt: now,
-      metadata: {
-        callSign: "A-01",
-        driverName: "สมชาย ใจดี",
-        vehicleLabel: "กท 1001",
-        demo: true
-      }
-    }
-  ];
 }

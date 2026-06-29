@@ -88,6 +88,14 @@ https://<your-vercel-domain>/auth/callback
 7. Open `/mission-control` from an admin browser.
 8. Confirm the driver marker appears in `แผนที่ตำแหน่งคนขับ`.
 
+For a specific project, open:
+
+```text
+/mission-control?projectId=<project-id>
+```
+
+Do not use `/driver/demo-token`; invalid tokens are intentionally rejected.
+
 ## Current Pilot Limitations
 
 - This is browser-based foreground location sharing.

@@ -1,28 +1,12 @@
 import { ReadinessScoreCard } from "@/components/readiness/readiness-score-card";
-import { getDriverReadinessScore, getVehicleReadinessScore } from "@/lib/domain/driver-readiness";
 
-export function ReadinessBoard() {
-  const driverScore = getDriverReadinessScore({
-    confirmedName: true,
-    confirmedPhone: false,
-    confirmedVehicle: true,
-    vehiclePhotoCaptured: false,
-    platePhotoCaptured: false,
-    gpsConsent: false
-  });
-  const vehicleScore = getVehicleReadinessScore({
-    vehicleType: "van",
-    plateNumber: "DEMO-1001",
-    capacity: 8,
-    outOfService: false,
-    photoCaptured: false,
-    platePhotoCaptured: false
-  });
+export function ReadinessBoard({ assignmentCount, liveLocationCount }: { assignmentCount: number; liveLocationCount: number }) {
+  const locationScore = assignmentCount ? Math.round((liveLocationCount / assignmentCount) * 100) : 0;
 
   return (
     <section className="grid gap-4 md:grid-cols-2">
-      <ReadinessScoreCard title="ความพร้อมคนขับ" score={driverScore} status="warning" />
-      <ReadinessScoreCard title="ความพร้อมรถ" score={vehicleScore} status="warning" />
+      <ReadinessScoreCard title="Assignment ที่มีตำแหน่งล่าสุด" score={locationScore} status={locationScore === 100 ? "ready" : "warning"} />
+      <ReadinessScoreCard title="ตำแหน่งคนขับที่รับล่าสุด" score={liveLocationCount ? 100 : 0} status={liveLocationCount ? "ready" : "warning"} />
     </section>
   );
 }

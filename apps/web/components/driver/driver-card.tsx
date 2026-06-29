@@ -7,14 +7,12 @@ import { DriverContactStrip } from "./driver-contact-strip";
 import { DriverLocationShare } from "./driver-location-share";
 import { DriverQuickActions } from "./driver-quick-actions";
 
-export function DriverCard({ driverAccess }: { driverAccess?: DriverAccessAssignment }) {
-  const pickupLabel = "จุดรับผู้โดยสาร";
-  const dropoffLabel = "จุดส่งปลายทาง";
+export function DriverCard({ driverAccess }: { driverAccess: DriverAccessAssignment }) {
+  const pickupLabel = String(driverAccess.assignment.metadata.pickupLocation || driverAccess.assignment.metadata.pickup_location || "ยังไม่ระบุจุดรับ");
+  const dropoffLabel = String(driverAccess.assignment.metadata.dropoffLocation || driverAccess.assignment.metadata.dropoff_location || "ยังไม่ระบุจุดส่ง");
+  const commitmentTime = String(driverAccess.assignment.metadata.commitmentTime || driverAccess.assignment.metadata.commitment_time || "ยังไม่ระบุเวลา");
   const mapsUrl = buildGoogleMapsDirectionsUrl(dropoffLabel, pickupLabel);
-  const projectName = driverAccess?.project.projectName ?? "ข้อมูลตัวอย่าง: งานรับส่งผู้ร่วมงาน";
-  const callSign = driverAccess?.callSign.callSign ?? "A-01";
-  const assignment = driverAccess?.assignment;
-  const statusLabel = assignment?.status ? formatStatusTh(assignment.status) : "รอเริ่มงาน";
+  const statusLabel = formatStatusTh(driverAccess.assignment.status);
 
   return (
     <div className="mx-auto grid max-w-3xl gap-5">
@@ -22,8 +20,8 @@ export function DriverCard({ driverAccess }: { driverAccess?: DriverAccessAssign
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-operation">งานของคุณวันนี้</p>
-            <h2 className="mt-2 text-3xl font-semibold text-ink">Call Sign {callSign}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{projectName}</p>
+            <h2 className="mt-2 text-3xl font-semibold text-ink">Call Sign {driverAccess.callSign.callSign}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{driverAccess.project.projectName}</p>
           </div>
           <StatusBadge label={statusLabel} tone="warning" />
         </div>
@@ -31,7 +29,7 @@ export function DriverCard({ driverAccess }: { driverAccess?: DriverAccessAssign
         <div className="mt-5 grid gap-3">
           <InfoRow label="จุดรับ" value={pickupLabel} />
           <InfoRow label="จุดส่ง" value={dropoffLabel} />
-          <InfoRow label="เวลาที่ต้องถึง" value="ถึงจุดรับภายใน 08:30 ICT" />
+          <InfoRow label="เวลาที่ต้องถึง" value={commitmentTime} />
           <InfoRow label="สถานะงาน" value={statusLabel} />
         </div>
 

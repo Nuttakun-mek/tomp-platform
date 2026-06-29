@@ -11,6 +11,7 @@
 - server ตรวจ token ที่ผูกกับ Assignment
 - server บันทึกตำแหน่งลง `gps_locations`
 - Mission Control แสดงตำแหน่งล่าสุดบนแผนที่ และ refresh ผ่าน Realtime หรือ polling fallback
+- token ที่ไม่ถูกต้องหรือหมดอายุจะถูกปฏิเสธ ไม่แสดงข้อมูลงานตัวอย่างแทน
 
 ## สิ่งที่ต้องมีใน Supabase
 
@@ -45,6 +46,16 @@ DRIVER_ACCESS_TOKEN_SECRET=<shared-token-secret>
 5. กด `เริ่มแชร์ตำแหน่ง`
 6. เปิด `/mission-control`
 7. ตรวจว่าตำแหน่งล่าสุดขึ้นในส่วน `แผนที่ตำแหน่งคนขับ`
+
+## ผลทดสอบล่าสุด
+
+- Apply migration `0011_driver_live_location_pilot.sql` กับ hosted Supabase สำเร็จ
+- สร้างข้อมูล Project, Mission, Assignment, Driver, Vehicle และ Driver Access Token จริงใน Supabase
+- เปิด `/driver/[token]` ด้วย token จริงแล้วแสดง Assignment จริง
+- เปิด `/driver/demo-token` แล้วถูกปฏิเสธ
+- `POST /api/driver/location` ด้วย token จริงแล้ว insert ลง `gps_locations`
+- `POST /api/driver/location` ด้วย token ไม่ถูกต้องแล้วถูกปฏิเสธ
+- `/mission-control?projectId=<real-project-id>` แสดงข้อมูลโครงการจริงและตำแหน่งล่าสุดได้
 
 ## ขอบเขตที่ยังไม่ใช่ production
 

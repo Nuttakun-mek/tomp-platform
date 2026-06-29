@@ -21,14 +21,6 @@ export async function POST(request: Request) {
 
   const { client, error } = getSupabaseWriteClient();
   if (!client) {
-    if (parsed.data.token === "demo-token") {
-      return NextResponse.json({
-        success: true,
-        mode: "demo",
-        message: "รับตำแหน่งในโหมดข้อมูลตัวอย่าง แต่ยังไม่ได้บันทึกลง Supabase"
-      });
-    }
-
     return NextResponse.json({ success: false, error: error || "ยังไม่ได้ตั้งค่า Supabase สำหรับรับตำแหน่ง" }, { status: 503 });
   }
 
