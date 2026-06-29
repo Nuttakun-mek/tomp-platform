@@ -4,7 +4,9 @@ import { CreateMissionForm } from "@/components/missions/create-mission-form";
 import { MissionListPlaceholder } from "@/components/missions/mission-list-placeholder";
 import { PageHeader } from "@/components/page-header";
 import { PublishActionCard } from "@/components/publish/publish-action-card";
+import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
 import { PublishReadinessPanel } from "@/components/publish/publish-readiness-panel";
+import { ProjectScopeCard } from "@/components/auth/project-scope-card";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getProjectById } from "@/lib/data/projects";
@@ -33,11 +35,15 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
       <PageHeader
         eyebrow="Project Detail"
         title={project?.projectName ?? "Project Kernel"}
-        description={`Project detail for ${project?.projectCode ?? projectId}. Reads Supabase when configured and demo fallback otherwise.`}
+        description={`Operational workspace for ${project?.projectCode ?? projectId}. Plan, publish, and control changes from one baseline.`}
       />
+      <PublishedLockBanner project={project} />
       <Link className="mb-6 inline-flex rounded-md border border-operation px-4 py-2 text-sm font-semibold text-operation" href={`/projects/${projectId}/assignments`}>
         Open assignment planning
       </Link>
+      <div className="mb-6">
+        <ProjectScopeCard projectId={projectId} />
+      </div>
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <CreateMissionForm projectId={projectId} />
         <MissionListPlaceholder missions={missions} />

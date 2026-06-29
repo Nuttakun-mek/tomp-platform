@@ -2,7 +2,9 @@ import { AssignmentBoardPlaceholder } from "@/components/assignments/assignment-
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
 import { DriverAccessQrPlaceholder } from "@/components/driver/driver-access-qr-placeholder";
 import { PageHeader } from "@/components/page-header";
+import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
+import { getProjectById } from "@/lib/data/projects";
 
 interface AssignmentsPageProps {
   params: Promise<{ projectId: string }>;
@@ -10,15 +12,16 @@ interface AssignmentsPageProps {
 
 export default async function AssignmentsPage({ params }: AssignmentsPageProps) {
   const { projectId } = await params;
-  const assignments = await getAssignmentsByProjectId(projectId);
+  const [project, assignments] = await Promise.all([getProjectById(projectId), getAssignmentsByProjectId(projectId)]);
 
   return (
     <>
       <PageHeader
         eyebrow="Assignment Kernel"
         title="Assignments"
-        description={`Planning foundation for project ${projectId}. No live database writes are performed from this page.`}
+        description={`Assign missions, call signs, drivers, vehicles, and time windows for ${project?.projectCode ?? projectId}.`}
       />
+      <PublishedLockBanner project={project} />
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <CreateAssignmentForm projectId={projectId} />
         <div className="grid gap-6">

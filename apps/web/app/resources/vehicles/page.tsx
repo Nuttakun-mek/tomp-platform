@@ -8,7 +8,7 @@ export default async function VehiclesPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Resources" title="Vehicles" description="Vehicle resource foundation. No fleet maintenance workflow is implemented." />
+      <PageHeader eyebrow="Resources" title="Vehicles" description="Vehicle resource foundation for assignment readiness and operational coordination." />
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <CreateVehicleForm />
         <section className="grid gap-3">

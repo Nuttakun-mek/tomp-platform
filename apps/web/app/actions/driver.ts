@@ -8,7 +8,7 @@ import {
 } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
-import { uploadDriverEvidencePhoto } from "@/lib/storage/photo-upload";
+import { uploadPlatePhoto, uploadVehiclePhoto } from "@/lib/storage/checkin-photos";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 export async function driverCheckinAction(input: unknown): Promise<ActionResult> {
@@ -82,10 +82,10 @@ export async function vehiclePhotoUploadAction(formData: FormData): Promise<Acti
 
   const uploads: Record<string, unknown> = {};
   if (vehicleFile instanceof File && vehicleFile.size > 0) {
-    uploads.vehicle = await uploadDriverEvidencePhoto({ projectId, assignmentId, kind: "vehicle", file: vehicleFile });
+    uploads.vehicle = await uploadVehiclePhoto(projectId, assignmentId, vehicleFile);
   }
   if (plateFile instanceof File && plateFile.size > 0) {
-    uploads.plate = await uploadDriverEvidencePhoto({ projectId, assignmentId, kind: "plate", file: plateFile });
+    uploads.plate = await uploadPlatePhoto(projectId, assignmentId, plateFile);
   }
 
   if (!uploads.vehicle && !uploads.plate) {

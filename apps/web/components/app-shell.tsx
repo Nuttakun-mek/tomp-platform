@@ -1,44 +1,39 @@
 import Link from "next/link";
+import { AppNav } from "@/components/app-nav";
 import { AuthStatus } from "@/components/auth/auth-status";
-
-const navItems = [
-  { href: "/", label: "Dashboard" },
-  { href: "/projects", label: "Projects" },
-  { href: "/mission-control", label: "Mission Control" },
-  { href: "/resources", label: "Resources" },
-  { href: "/resources/drivers", label: "Drivers" },
-  { href: "/resources/vehicles", label: "Vehicles" },
-  { href: "/driver", label: "Driver Demo" },
-  { href: "/login", label: "Login" },
-  { href: "/admin", label: "Admin" }
-];
 
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="min-h-screen bg-slate-50 text-ink">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <Link href="/" className="flex flex-col">
+    <div className="min-h-screen text-ink">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1600px] lg:grid-cols-[280px_1fr]">
+        <aside className="hidden border-r border-slate-200 bg-white/90 px-5 py-6 shadow-sm lg:block">
+          <Link href="/" className="flex flex-col rounded-md border border-slate-200 bg-slate-50 p-4">
             <span className="text-sm font-semibold uppercase tracking-wide text-operation">TOMP</span>
-            <span className="text-lg font-semibold">Transportation Operations Management Platform</span>
+            <span className="mt-1 text-base font-semibold">Operations Platform</span>
           </Link>
-          <div className="flex flex-col gap-3 lg:items-end">
-            <AuthStatus />
-            <nav className="flex flex-wrap gap-2" aria-label="Primary navigation">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-operation hover:text-operation"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+          <div className="mt-6">
+            <AppNav />
           </div>
+          <div className="mt-6">
+            <AuthStatus />
+          </div>
+        </aside>
+        <div className="min-w-0">
+          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur lg:hidden">
+            <div className="flex flex-col gap-3 px-5 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <Link href="/" className="flex flex-col">
+                  <span className="text-sm font-semibold uppercase tracking-wide text-operation">TOMP</span>
+                  <span className="text-base font-semibold">Operations Platform</span>
+                </Link>
+                <AuthStatus />
+              </div>
+              <AppNav />
+            </div>
+          </header>
+          <main className="mx-auto w-full max-w-7xl px-5 py-8 lg:px-8">{children}</main>
         </div>
-      </header>
-      <main className="mx-auto w-full max-w-7xl px-5 py-8">{children}</main>
+      </div>
     </div>
   );
 }

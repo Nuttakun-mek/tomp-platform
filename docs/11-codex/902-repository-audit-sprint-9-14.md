@@ -32,7 +32,7 @@ Migrations need a real Supabase apply test. Server actions should later enforce 
 | `npm install` | Passed after dependency install approval; lockfile updated |
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
-| `npm run test` | Passed: 4 files, 10 tests |
+| `npm run test` | Current suite passed: 6 files, 13 tests |
 | `NEXT_TELEMETRY_DISABLED=1 npm run build` | Passed |
 
 ## Files Created

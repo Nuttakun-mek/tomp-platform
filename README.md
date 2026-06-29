@@ -115,7 +115,7 @@ Sprint 1 does not implement live GPS, incident, recovery, analytics, AI, custome
 
 ## Current Stage
 
-The repository now contains Sprint 0 through Sprint 20 foundations:
+The repository now contains Sprint 0 through Sprint 24 internal pilot foundations:
 
 - Next.js app shell.
 - Supabase schema, seed, and temporary RLS placeholders.
@@ -133,10 +133,11 @@ The repository now contains Sprint 0 through Sprint 20 foundations:
 - Secure driver QR token generation and hashing.
 - Supabase Storage photo upload foundation.
 - Mission Control Realtime subscription foundation.
+- Pilot UI shell, design system primitives, and internal pilot guide.
 
 ## What Is Not Implemented
 
-- Production authentication and project-scoped RBAC enforcement.
+- Production-hardened authentication and project-scoped RBAC enforcement.
 - Production-hardened auth cookies and session refresh.
 - Production-hardened write transactions.
 - Fully audited publish/change application side effects.
@@ -146,9 +147,16 @@ The repository now contains Sprint 0 through Sprint 20 foundations:
 - Live production GPS streaming.
 - AI, route optimization, analytics, vendor/customer portals, accounting, CRM, payroll, or fleet maintenance.
 
+## Internal Pilot
+
+- Pilot setup guide: `docs/09-testing/904-internal-pilot-guide.md`
+- Manual smoke tests: `docs/09-testing/905-manual-smoke-test-checklist.md`
+- UX checklist: `docs/05-ux/502-pilot-ux-checklist.md`
+- Sprint 15-24 audit: `docs/11-codex/905-repository-audit-sprint-15-24.md`
+
 ## Next Recommended Sprint
 
-Sprint 21: Supabase SSR Session Hardening, followed by RLS tests and transactional publish/change hardening.
+Sprint 25: Real project onboarding, followed by organizer and coordinator workflows.
 
 ## Quality Checks
 

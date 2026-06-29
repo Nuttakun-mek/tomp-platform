@@ -12,7 +12,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   vendor: ["assignment.read", "driver.read", "vehicle.read"]
 };
 
-export function hasPermission(roleKey: string, permissionKey: string): boolean {
+export function roleHasPermission(roleKey: string, permissionKey: string): boolean {
   const permissions = ROLE_PERMISSIONS[roleKey] || [];
   return permissions.includes("*") || permissions.includes(permissionKey);
 }
+
+export const hasPermissionForRole = roleHasPermission;

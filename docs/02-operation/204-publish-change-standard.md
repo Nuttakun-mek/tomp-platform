@@ -16,5 +16,4 @@ Every publish or change action must create or prepare a timeline event. Timeline
 
 ## Deferred
 
-Full approval workflows, publish locking enforcement, change application side effects, and recovery workflows are deferred.
-
+Full approval workflows, transactional change application, and recovery workflows are deferred. Publish lock enforcement exists as an internal pilot foundation, but must be tested with real project data before production.

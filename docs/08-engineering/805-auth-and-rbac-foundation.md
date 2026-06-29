@@ -6,6 +6,17 @@ Sprint 10 prepares project-scoped access without implementing enterprise SSO.
 
 Email and Google login are the first planned options because they are available in Supabase Auth and fit the zero-cost pilot strategy. Keycloak and enterprise SSO are deferred until real organization requirements justify the operational overhead.
 
+## Current Auth Flow
+
+- `/login` renders email login and Google OAuth actions.
+- `/auth/callback` exchanges the Supabase callback code and returns the user to Projects.
+- `AuthStatus` resolves the current Supabase user and linked profile when available.
+- Development fallback remains explicit and must not be used as production authorization.
+
+## Future Keycloak Option
+
+Keycloak or another enterprise IdP can be added later through Supabase supported SSO/OIDC patterns. It is not implemented in the internal pilot.
+
 ## Project-Scoped RBAC
 
 Access is designed around `profiles`, `roles`, `permissions`, `role_permissions`, `project_members`, and `user_role_assignments`.
@@ -20,5 +31,12 @@ Sprint 10 introduces project-member select policies for project-owned operationa
 
 ## Risks
 
-The app still has a development fallback user. Service-role usage is server-only but must be protected in deployment environments. Role enforcement in server actions is prepared but not hardened.
+The app still has a development fallback user. Service-role usage is server-only but must be protected in deployment environments. Role enforcement exists in server actions but still needs automated RLS tests.
 
+## Production Hardening Checklist
+
+- Add cookie-aware SSR session handling.
+- Create real profiles for authenticated users.
+- Verify project memberships with RLS tests.
+- Rotate keys after pilot setup if secrets were shared during configuration.
+- Disable development fallback in production deployments.

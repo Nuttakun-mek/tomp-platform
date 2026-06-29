@@ -15,12 +15,22 @@ export default async function DriverTokenPage({ params }: DriverTokenPageProps) 
       <PageHeader
         eyebrow="Driver Card"
         title="Assignment Access"
-        description={`Token placeholder: ${token}. Validation is deliberately deferred.`}
+        description={driverAccess.tokenValidated ? "Assignment-scoped access verified for this driver card." : "Demo or invalid token access. Production QR tokens must be generated from assignment planning."}
       />
-      <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
-        Sprint 7 placeholder: this token is not validated yet and must not be treated as production access control.
-      </div>
-      <DriverCard driverAccess={driverAccess} />
+      {!driverAccess.tokenValidated && token.startsWith("tomp_") ? (
+        <section className="rounded-md border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-900">
+          This driver access link is invalid, expired, or revoked. Please contact operations for a new QR link.
+        </section>
+      ) : (
+        <>
+          {!driverAccess.tokenValidated ? (
+            <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
+              Demo token mode is active. Generate an assignment-scoped QR token before pilot use.
+            </div>
+          ) : null}
+          <DriverCard driverAccess={driverAccess} />
+        </>
+      )}
     </>
   );
 }

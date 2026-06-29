@@ -6,11 +6,11 @@ Run date: 2026-06-29.
 
 | Command | Result |
 | --- | --- |
-| `npm install` | Passed |
+| `npm install` | Passed; npm audit still reports 7 dependency findings requiring separate review |
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
 | `npm run test` | Passed: 6 test files, 13 tests |
-| `NEXT_TELEMETRY_DISABLED=1 npm run build` | Passed |
+| `NEXT_TELEMETRY_DISABLED=1 npm run build` | Passed after stopping local dev server and clearing stale generated `.next` output; 14 routes generated |
 
 ## What Passed
 
@@ -19,7 +19,7 @@ Run date: 2026-06-29.
 - ESLint completed with no errors.
 - Next.js production build completed.
 - App routes render as static or dynamic placeholder pages without a database connection.
-- Unit tests now cover assignment rules, driver readiness, publish readiness, RBAC permissions, driver access URL generation, and driver token hashing.
+- Unit tests cover assignment rules, driver readiness, publish readiness, RBAC permissions, driver access URL generation, and driver token hashing.
 - Next.js build generated 14 routes, including `/auth/callback`, `/login`, `/driver/[token]`, `/projects/[projectId]`, and `/projects/[projectId]/assignments`.
 
 ## What Failed And Was Fixed

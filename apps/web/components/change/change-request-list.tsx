@@ -1,3 +1,5 @@
+import { ChangeStatusBadge } from "@/components/change/change-status-badge";
+
 export function ChangeRequestList() {
   const examples = [
     { id: "CR-demo-1", status: "requested", summary: "Move pickup wave by 15 minutes after baseline." },
@@ -12,11 +14,10 @@ export function ChangeRequestList() {
           <article key={item.id} className="rounded-md border border-slate-200 p-3">
             <p className="text-sm font-semibold text-ink">{item.id}</p>
             <p className="text-sm text-slate-600">{item.summary}</p>
-            <p className="mt-1 text-xs uppercase tracking-wide text-operation">{item.status}</p>
+            <div className="mt-2"><ChangeStatusBadge status={item.status} /></div>
           </article>
         ))}
       </div>
     </section>
   );
 }
-
