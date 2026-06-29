@@ -3,10 +3,11 @@ export interface ActionResult<TData = unknown> {
   data?: TData;
   error?: string;
   fieldErrors?: Record<string, string[]>;
+  warning?: string;
 }
 
-export function actionSuccess<TData>(data: TData): ActionResult<TData> {
-  return { success: true, data };
+export function actionSuccess<TData>(data: TData, warning?: string): ActionResult<TData> {
+  return { success: true, data, warning };
 }
 
 export function actionFailure(error: string, fieldErrors?: Record<string, string[]>): ActionResult<never> {

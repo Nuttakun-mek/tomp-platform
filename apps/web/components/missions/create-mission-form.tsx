@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { createMissionAction } from "@/app/actions/missions";
 import { createMissionSchema } from "@/lib/validation";
 
 export function CreateMissionForm({ projectId = "10000000-0000-4000-8000-000000000003" }: { projectId?: string }) {
   const [message, setMessage] = useState<string | null>(null);
 
-  function handleSubmit(formData: FormData) {
+  async function handleSubmit(formData: FormData) {
     const parsed = createMissionSchema.safeParse({
       projectId,
       projectDayId: "10000000-0000-4000-8000-000000000004",
@@ -19,14 +20,20 @@ export function CreateMissionForm({ projectId = "10000000-0000-4000-8000-0000000
       serviceCommitment: formData.get("serviceCommitment") || null
     });
 
-    setMessage(parsed.success ? "Mission draft validated. Write is deferred." : "Please complete required mission fields.");
+    if (!parsed.success) {
+      setMessage("Please complete required mission fields.");
+      return;
+    }
+
+    const result = await createMissionAction(parsed.data);
+    setMessage(result.success ? result.warning || "Mission created and timeline prepared." : result.error || "Mission create failed.");
   }
 
   return (
     <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
       <div>
         <h2 className="text-lg font-semibold text-ink">Create Mission</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Mission is a service activity. Submission will be wired after project persistence exists.</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">Mission is a service activity. Writes are server-side and create a timeline event when configured.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-slate-700">

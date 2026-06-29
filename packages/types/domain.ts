@@ -12,6 +12,10 @@ export type CheckinStatus = "pending" | "confirmed" | "rejected";
 export type DriverIssueSeverity = "info" | "warning" | "urgent";
 export type ReadinessStatus = "ready" | "warning" | "blocked";
 export type OperationalRiskLevel = "low" | "medium" | "high";
+export type PublishStatus = "draft" | "published" | "superseded" | "archived";
+export type ChangeStatus = "requested" | "approved" | "applied" | "rejected" | "cancelled";
+export type ChangeSeverity = "low" | "medium" | "high" | "critical";
+export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export interface BaseRecord {
   id: Id;
@@ -199,4 +203,77 @@ export interface AssignmentReadiness {
   status: ReadinessStatus;
   riskLevel: OperationalRiskLevel;
   missingItems: string[];
+}
+
+export interface Role extends BaseRecord {
+  roleKey: string;
+  roleName: string;
+  description?: string | null;
+}
+
+export interface Permission extends BaseRecord {
+  permissionKey: string;
+  permissionName: string;
+  description?: string | null;
+}
+
+export interface ProjectMember extends BaseRecord {
+  projectId: Id;
+  profileId: Id;
+  roleId: Id;
+  status: "active" | "inactive" | "invited" | "removed";
+}
+
+export interface PublishSnapshot {
+  id: Id;
+  projectId: Id;
+  objectType: string;
+  objectId?: Id | null;
+  status: PublishStatus;
+  reason?: string | null;
+  snapshotData: Record<string, unknown>;
+  createdBy?: Id | null;
+  createdAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ChangeRequest {
+  id: Id;
+  projectId: Id;
+  objectType: string;
+  objectId?: Id | null;
+  status: ChangeStatus;
+  severity: ChangeSeverity;
+  reason: string;
+  impactSummary?: string | null;
+  requestedBy?: Id | null;
+  approvedBy?: Id | null;
+  appliedBy?: Id | null;
+  beforeData?: Record<string, unknown> | null;
+  afterData?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ChangeImpact {
+  id: Id;
+  changeRequestId: Id;
+  impactType: string;
+  impactSummary: string;
+  severity: ChangeSeverity;
+  metadata: Record<string, unknown>;
+}
+
+export interface Approval {
+  id: Id;
+  projectId: Id;
+  changeRequestId?: Id | null;
+  status: ApprovalStatus;
+  requestedBy?: Id | null;
+  decidedBy?: Id | null;
+  reason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  metadata: Record<string, unknown>;
 }

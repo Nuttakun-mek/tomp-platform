@@ -115,25 +115,39 @@ Sprint 1 does not implement live GPS, incident, recovery, analytics, AI, custome
 
 ## Current Stage
 
-The repository now contains Sprint 0 through Sprint 7 foundations:
+The repository now contains Sprint 0 through Sprint 14 foundations:
 
 - Next.js app shell.
 - Supabase schema, seed, and temporary RLS placeholders.
 - Read-only Supabase data access with demo fallback.
 - Project, Mission, Assignment, Resource, Driver Card, and Mission Control UI foundations.
-- Server action placeholders with Zod validation.
+- Server-side Supabase write actions with Zod validation.
 - Readiness and QR access placeholder utilities.
+- Auth/RBAC migration and UI placeholders.
+- Publish/change baseline foundations.
+- Driver activation persistence actions.
+- Vitest unit test baseline.
 
 ## What Is Not Implemented
 
-- Production authentication and project-scoped RBAC.
-- Live database writes from UI.
-- Publish/change baseline.
+- Production authentication and project-scoped RBAC enforcement.
+- Production-hardened write transactions.
+- Publish locking and change application side effects.
 - Production QR token validation.
+- Photo upload storage.
 - Realtime Mission Control.
 - Live production GPS streaming.
 - AI, route optimization, analytics, vendor/customer portals, accounting, CRM, payroll, or fleet maintenance.
 
 ## Next Recommended Sprint
 
-Sprint 9: Real Supabase write integration for Projects, Missions, and Assignments with safe server-side data access and no additional auth complexity beyond the current environment.
+Sprint 15: Real Auth Flow and Session Handling, followed by project-scoped RBAC hardening and secure driver token validation.
+
+## Quality Checks
+
+```bash
+npm run typecheck
+npm run lint
+npm run test
+NEXT_TELEMETRY_DISABLED=1 npm run build
+```

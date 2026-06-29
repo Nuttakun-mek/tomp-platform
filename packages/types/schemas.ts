@@ -110,6 +110,59 @@ export const driverIssueReportSchema = z.object({
   metadata: metadataSchema
 });
 
+export const driverCheckinSchema = z.object({
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  driverId: uuidSchema,
+  status: z.enum(["pending", "ready", "blocked"]).default("pending"),
+  confirmedName: z.boolean().default(false),
+  confirmedPhone: z.boolean().default(false),
+  confirmedVehicle: z.boolean().default(false),
+  gpsConsent: z.boolean().default(false),
+  metadata: metadataSchema
+});
+
+export const assignmentStatusUpdateSchema = z.object({
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  driverId: optionalUuidSchema,
+  status: z.enum(["ready", "arrived_pickup", "passenger_onboard", "completed", "blocked"]),
+  source: z.enum(["driver_qr", "operation_user", "coordinator", "system"]).default("driver_qr"),
+  metadata: metadataSchema
+});
+
+export const publishProjectSchema = z.object({
+  projectId: uuidSchema,
+  reason: z.string().trim().min(2).max(500),
+  snapshotData: z.record(z.unknown()).default({}),
+  metadata: metadataSchema
+});
+
+export const createChangeRequestSchema = z.object({
+  projectId: uuidSchema,
+  objectType: z.string().trim().min(1).max(80),
+  objectId: optionalUuidSchema,
+  severity: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  reason: z.string().trim().min(2).max(1000),
+  impactSummary: z.string().trim().optional().nullable(),
+  beforeData: z.record(z.unknown()).optional().nullable(),
+  afterData: z.record(z.unknown()).optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const approveChangeRequestSchema = z.object({
+  changeRequestId: uuidSchema,
+  projectId: uuidSchema,
+  reason: z.string().trim().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const applyChangeRequestSchema = approveChangeRequestSchema.extend({
+  afterData: z.record(z.unknown()).default({})
+});
+
+export const rejectChangeRequestSchema = approveChangeRequestSchema;
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type CreateMissionInput = z.infer<typeof createMissionSchema>;
@@ -122,3 +175,10 @@ export type CreateDriverInput = z.infer<typeof createDriverSchema>;
 export type DriverActivationInput = z.infer<typeof driverActivationSchema>;
 export type VehicleCheckinInput = z.infer<typeof vehicleCheckinSchema>;
 export type DriverIssueReportInput = z.infer<typeof driverIssueReportSchema>;
+export type DriverCheckinInput = z.infer<typeof driverCheckinSchema>;
+export type AssignmentStatusUpdateInput = z.infer<typeof assignmentStatusUpdateSchema>;
+export type PublishProjectInput = z.infer<typeof publishProjectSchema>;
+export type CreateChangeRequestInput = z.infer<typeof createChangeRequestSchema>;
+export type ApproveChangeRequestInput = z.infer<typeof approveChangeRequestSchema>;
+export type ApplyChangeRequestInput = z.infer<typeof applyChangeRequestSchema>;
+export type RejectChangeRequestInput = z.infer<typeof rejectChangeRequestSchema>;

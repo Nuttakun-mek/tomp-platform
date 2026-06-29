@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { createProjectAction } from "@/app/actions/projects";
 import { createProjectSchema } from "@/lib/validation";
 
 export function CreateProjectForm() {
   const [message, setMessage] = useState<string | null>(null);
 
-  function handleSubmit(formData: FormData) {
+  async function handleSubmit(formData: FormData) {
     const parsed = createProjectSchema.safeParse({
       organizationId: "10000000-0000-4000-8000-000000000001",
       projectCode: formData.get("projectCode"),
@@ -17,14 +18,20 @@ export function CreateProjectForm() {
       serviceLevel: formData.get("serviceLevel")
     });
 
-    setMessage(parsed.success ? "Project draft validated. Write is deferred." : "Please complete required project fields.");
+    if (!parsed.success) {
+      setMessage("Please complete required project fields.");
+      return;
+    }
+
+    const result = await createProjectAction(parsed.data);
+    setMessage(result.success ? result.warning || "Project created and timeline prepared." : result.error || "Project create failed.");
   }
 
   return (
     <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
       <div>
         <h2 className="text-lg font-semibold text-ink">Create Project</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Sprint 1 form foundation only. Submission is not wired to the database yet.</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">Creates a draft project through the server-side write action when Supabase is configured.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-slate-700">

@@ -10,7 +10,9 @@
     "dev": "npm run dev -w @tomp/web",
     "build": "npm run build -w @tomp/web",
     "lint": "npm run lint -w @tomp/web",
-    "typecheck": "npm run typecheck -w @tomp/web"
+    "typecheck": "npm run typecheck -w @tomp/web",
+    "test": "npm run test -w @tomp/web",
+    "test:watch": "npm run test:watch -w @tomp/web"
   },
   "engines": {
     "node": ">=20"

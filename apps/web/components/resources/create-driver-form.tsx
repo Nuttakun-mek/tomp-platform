@@ -1,21 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import { createDriverAction } from "@/app/actions/resources";
 import { createDriverSchema } from "@/lib/validation";
 
 export function CreateDriverForm() {
   const [message, setMessage] = useState<string | null>(null);
 
-  function handleSubmit(formData: FormData) {
+  async function handleSubmit(formData: FormData) {
     const parsed = createDriverSchema.safeParse({
       organizationId: "10000000-0000-4000-8000-000000000001",
       fullName: formData.get("fullName"),
       phone: formData.get("phone"),
       licenseType: formData.get("licenseType") || null,
-      languages: []
+      languages: [],
+      metadata: {
+        projectId: "10000000-0000-4000-8000-000000000003"
+      }
     });
 
-    setMessage(parsed.success ? "Driver draft validated. Write is deferred." : "Please complete required driver fields.");
+    if (!parsed.success) {
+      setMessage("Please complete required driver fields.");
+      return;
+    }
+
+    const result = await createDriverAction(parsed.data);
+    setMessage(result.success ? result.warning || "Driver created and timeline prepared." : result.error || "Driver create failed.");
   }
 
   return (
@@ -25,7 +35,7 @@ export function CreateDriverForm() {
       <input className="rounded-md border border-slate-300 px-3 py-2" name="phone" placeholder="Phone" />
       <input className="rounded-md border border-slate-300 px-3 py-2" name="licenseType" placeholder="License type" />
       {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
-      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">Save Draft Driver</button>
+      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">Create Driver</button>
     </form>
   );
 }
