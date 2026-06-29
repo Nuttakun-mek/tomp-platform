@@ -9,9 +9,9 @@ export default async function ProjectsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Planning"
-        title="Projects"
-        description="Project is the main container for operational data. Sprint 1 establishes the UI foundation without database reads or writes."
+        eyebrow="การวางแผน"
+        title="โครงการ"
+        description="โครงการคือพื้นที่หลักสำหรับรวมภารกิจ ทรัพยากร Assignment และ Timeline ของงานปฏิบัติการขนส่ง"
       />
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <CreateProjectForm />

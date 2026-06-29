@@ -1,164 +1,38 @@
-# TOMP Enterprise Handbook
+# TOMP Enterprise Platform
 
-Version: 0.1  
-Date: 2026-06-28  
-Purpose: Master package for Codex, product design, engineering, UX, database, API, testing, and deployment.
+TOMP คือ **Transportation Operations Management Platform** สำหรับวางแผน เตรียมความพร้อม ประกาศใช้แผน ปฏิบัติการ กู้คืนสถานการณ์ และทบทวนผลงานขนส่งแบบ event-based
 
-## What is TOMP?
+TOMP ไม่ใช่ fleet maintenance, ERP, CRM, payroll, accounting หรือระบบ route optimization จุดโฟกัสคือ operations management: Project, Mission, Assignment, Call Sign, Driver Card, Timeline, Publish และ Change Request
 
-TOMP stands for **Transportation Operations Management Platform**.
+## สถานะปัจจุบัน
 
-TOMP is not a general fleet-management system, not an ERP, not a CRM, and not only a GPS tracking tool. TOMP is a **Transportation Operations Standard Platform** designed to support professional event-based transportation operations from planning to execution, recovery, reporting, and knowledge capture.
+Repository นี้ผ่าน Sprint 0-30 ในระดับ internal pilot foundation แล้ว โดย Sprint 25-30 เปลี่ยน UI หลักเป็น Thai-first และเพิ่ม flow สำหรับทดสอบ Pilot ภายใน
 
-## North Star
+สิ่งที่ใช้งานและทดสอบได้ตอนนี้:
 
-TOMP exists to make transportation operations predictable, scalable, and easier to operate while preserving the company's professional service standards.
+- หน้าเว็บ Next.js + TypeScript + Tailwind CSS
+- Supabase schema, migrations, seed และ read/write helpers ฝั่ง server
+- โครงการ ภารกิจ Assignment ทรัพยากร คนขับ รถ และ Driver Card
+- Publish baseline และ Change Request foundation
+- Timeline แบบ immutable ไม่มี UI สำหรับแก้ไขหรือลบเหตุการณ์
+- QR/driver access foundation แบบ assignment-scoped
+- Driver activation พร้อม checklist, status update และ photo upload foundation
+- Mission Control พร้อม readiness, exception list, Timeline และ Realtime fallback
+- หน้า `ทดสอบ Pilot` สำหรับเดิน flow end-to-end เป็นภาษาไทย
 
-## Primary Business Objectives
+## วิธีรันในเครื่อง
 
-1. Reduce repeated phone calls and scattered communication.
-2. Reduce manual work and dependency on highly skilled operators.
-3. Improve readiness before operations start.
-4. Make live operations visible and actionable.
-5. Enable faster recovery when plans change.
-6. Capture operational knowledge inside the company.
-7. Allow the same team to manage more projects without reducing service quality.
-8. Start with zero or near-zero technology cost and scale progressively.
-
-## Product Philosophy
-
-TOMP follows this operating cycle:
-
-```text
-Plan -> Prepare -> Publish -> Operate -> Recover -> Review -> Learn -> Improve
-```
-
-## Core Design Philosophy
-
-**Full Vision, Progressive Delivery**
-
-The architecture must be designed for long-term growth, but the product must be released in controlled phases. The company has the full vision, but features are opened progressively based on value, readiness, and cost discipline.
-
-## Recommended First Technology Stack
-
-- Frontend: Next.js, TypeScript, Tailwind CSS
-- App Strategy: PWA-first
-- Hosting: Vercel
-- Backend/Data: Supabase
-- Database: PostgreSQL
-- Realtime: Supabase Realtime
-- Storage: Supabase Storage
-- Authentication: Supabase Auth, Google login, email/password, QR access
-- Maps: Google Maps deep links for navigation; free map layer for operations tracking
-- Architecture: Domain-driven modular monolith
-
-## Repository Structure
-
-```text
-docs/           Enterprise handbook and specifications
-apps/           Future application shells
-packages/       Shared packages
-database/       Schema, migrations, seed data
-api/            API contracts and examples
-assets/         Visual and reference assets
-scripts/        Automation scripts
-```
-
-## Codex Usage
-
-Start with:
-
-1. `docs/11-codex/900-codex-master-prompt.md`
-2. `docs/00-foundation/000-product-constitution.md`
-3. `docs/03-domain/300-core-objects.md`
-4. `docs/06-data/600-data-blueprint.md`
-5. `docs/07-api/700-api-blueprint.md`
-
-Then create the first working kernel: authentication, organization, project, mission, assignment, call sign, vehicle, driver, timeline.
-
-## Sprint 0 Local Development
-
-Sprint 0 initializes the web application shell only. It does not implement database logic, incident recovery, analytics, AI, vendor portal, customer portal, fleet maintenance, CRM, accounting, or payroll.
-
-Requirements:
-
-- Node.js 20 or newer.
-- npm.
-
-Setup:
+ต้องใช้ Node.js 20+ และ npm
 
 ```bash
 npm install
 cp .env.example .env.local
-npm run dev
+npm run dev -- --port 7000
 ```
 
-The web app runs from `apps/web`. By default, Next.js starts at `http://localhost:3000`.
+เปิดระบบที่ `http://localhost:7000`
 
-Environment variables:
-
-```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-## Sprint 1 Scope
-
-Sprint 1 adds the Project and Mission kernel foundation:
-
-- Initial Supabase/PostgreSQL migration SQL under `database/migrations`.
-- Shared TypeScript domain types and Zod validation schemas under `packages/types`.
-- Project list, create project form, project detail placeholder, create mission form, and mission list placeholder in `apps/web`.
-
-Sprint 1 does not implement live GPS, incident, recovery, analytics, AI, customer portal, vendor portal, accounting, CRM, payroll, fleet maintenance, or database-backed UI behavior.
-
-## Current Stage
-
-The repository now contains Sprint 0 through Sprint 24 internal pilot foundations:
-
-- Next.js app shell.
-- Supabase schema, seed, and temporary RLS placeholders.
-- Read-only Supabase data access with demo fallback.
-- Project, Mission, Assignment, Resource, Driver Card, and Mission Control UI foundations.
-- Server-side Supabase write actions with Zod validation.
-- Readiness and QR access placeholder utilities.
-- Auth/RBAC migration and UI placeholders.
-- Publish/change baseline foundations.
-- Driver activation persistence actions.
-- Vitest unit test baseline.
-- Supabase Auth flow foundation.
-- RBAC checks on server-side write actions.
-- Publish lock and change application foundation.
-- Secure driver QR token generation and hashing.
-- Supabase Storage photo upload foundation.
-- Mission Control Realtime subscription foundation.
-- Pilot UI shell, design system primitives, and internal pilot guide.
-
-## What Is Not Implemented
-
-- Production-hardened authentication and project-scoped RBAC enforcement.
-- Production-hardened auth cookies and session refresh.
-- Production-hardened write transactions.
-- Fully audited publish/change application side effects.
-- Token revocation UX and full QR operational controls.
-- Storage evidence gallery and signed URL review.
-- Realtime Mission Control hardening.
-- Live production GPS streaming.
-- AI, route optimization, analytics, vendor/customer portals, accounting, CRM, payroll, or fleet maintenance.
-
-## Internal Pilot
-
-- Pilot setup guide: `docs/09-testing/904-internal-pilot-guide.md`
-- Manual smoke tests: `docs/09-testing/905-manual-smoke-test-checklist.md`
-- UX checklist: `docs/05-ux/502-pilot-ux-checklist.md`
-- Sprint 15-24 audit: `docs/11-codex/905-repository-audit-sprint-15-24.md`
-
-## Next Recommended Sprint
-
-Sprint 25: Real project onboarding, followed by organizer and coordinator workflows.
-
-## Quality Checks
+คำสั่งตรวจคุณภาพ:
 
 ```bash
 npm run typecheck
@@ -166,3 +40,42 @@ npm run lint
 npm run test
 NEXT_TELEMETRY_DISABLED=1 npm run build
 ```
+
+## Supabase
+
+ตั้งค่า environment variables ใน `.env.local` เท่านั้น ห้าม commit secret key หรือ service-role key ขึ้น Git
+
+ค่าหลัก:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+DRIVER_ACCESS_TOKEN_SECRET=
+NEXT_PUBLIC_APP_URL=http://localhost:7000
+```
+
+คู่มือ Supabase local: `docs/10-deployment/1001-supabase-local-setup.md`
+
+Seed สำหรับ Pilot ภาษาไทย: `database/seed/0002_thai_pilot_scenario.sql`
+
+## สิ่งที่ยังไม่ใช่ production-ready
+
+- Auth/RBAC ต้อง harden กับผู้ใช้จริงและ RLS ที่ตรวจครบ
+- QR token security ต้องทดสอบ expiry, revoke และ secret rotation จริง
+- Photo upload ต้องตรวจ bucket policy และ signed URL
+- Realtime Mission Control ยังเป็น foundation ไม่ใช่ live production GPS
+- Publish/change application ยังต้อง audit side effects เพิ่ม
+- ยังไม่มี E2E test ครบทุก flow
+- ยังไม่เปิด AI, route optimization, accounting, CRM, payroll, fleet maintenance, vendor portal หรือ customer portal
+
+## เอกสารสำคัญ
+
+- Product constitution: `docs/00-foundation/000-product-constitution.md`
+- Thai pilot scenario: `docs/09-testing/906-thai-internal-pilot-scenario.md`
+- Thai UI audit: `docs/05-ux/503-thai-ui-audit.md`
+- Thai pilot repository audit: `docs/11-codex/907-repository-audit-thai-ui-pilot.md`
+
+## ขั้นตอนถัดไป
+
+แนะนำ Sprint 31: Thai internal pilot hardening โดยทดสอบกับผู้ใช้จริง 3 บทบาท ได้แก่ operation manager, coordinator และ driver พร้อมเก็บ feedback เรื่องภาษาไทย, flow หน้างาน, QR, Timeline และ Mission Control

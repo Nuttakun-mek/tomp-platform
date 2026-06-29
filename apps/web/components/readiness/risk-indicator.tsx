@@ -1,9 +1,9 @@
 import type { OperationalRiskLevel } from "@tomp/types/domain";
 
 const labels: Record<OperationalRiskLevel, string> = {
-  low: "Low Risk",
-  medium: "Medium Risk",
-  high: "High Risk"
+  low: "ความเสี่ยงต่ำ",
+  medium: "ความเสี่ยงปานกลาง",
+  high: "ความเสี่ยงสูง"
 };
 
 export function RiskIndicator({ risk }: { risk: OperationalRiskLevel }) {

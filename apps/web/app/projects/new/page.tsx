@@ -5,9 +5,9 @@ export default function NewProjectPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Planning"
-        title="New Project"
-        description="Create the project container. This Sprint 1 form is isolated from live database writes."
+        eyebrow="การวางแผน"
+        title="สร้างโครงการ"
+        description="สร้างพื้นที่หลักสำหรับจัดการภารกิจ ทรัพยากร และแผนปฏิบัติการ"
       />
       <CreateProjectForm />
     </>

@@ -33,13 +33,13 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   return (
     <>
       <PageHeader
-        eyebrow="Project Detail"
-        title={project?.projectName ?? "Project Kernel"}
-        description={`Operational workspace for ${project?.projectCode ?? projectId}. Plan, publish, and control changes from one baseline.`}
+        eyebrow="รายละเอียดโครงการ"
+        title={project?.projectName ?? "ข้อมูลตัวอย่าง: โครงการปฏิบัติการ"}
+        description={`พื้นที่ทำงานของ ${project?.projectCode ?? projectId} สำหรับวางแผน ประกาศใช้แผน และควบคุมการเปลี่ยนแปลงจาก baseline เดียวกัน`}
       />
       <PublishedLockBanner project={project} />
       <Link className="mb-6 inline-flex rounded-md border border-operation px-4 py-2 text-sm font-semibold text-operation" href={`/projects/${projectId}/assignments`}>
-        Open assignment planning
+        เปิดหน้าจัดสรรงาน
       </Link>
       <div className="mb-6">
         <ProjectScopeCard projectId={projectId} />

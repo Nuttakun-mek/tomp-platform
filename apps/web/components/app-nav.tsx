@@ -5,14 +5,15 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/", label: "Dashboard" },
-  { href: "/projects", label: "Projects" },
-  { href: "/mission-control", label: "Mission Control" },
-  { href: "/resources", label: "Resources" },
-  { href: "/resources/drivers", label: "Drivers" },
-  { href: "/resources/vehicles", label: "Vehicles" },
-  { href: "/driver", label: "Driver" },
-  { href: "/login", label: "Login" }
+  { href: "/", label: "ภาพรวม" },
+  { href: "/projects", label: "โครงการ" },
+  { href: "/mission-control", label: "ศูนย์ควบคุมปฏิบัติการ" },
+  { href: "/resources", label: "ทรัพยากร" },
+  { href: "/resources/drivers", label: "คนขับ" },
+  { href: "/resources/vehicles", label: "รถ" },
+  { href: "/driver", label: "หน้าคนขับ" },
+  { href: "/pilot-checklist", label: "ทดสอบ Pilot" },
+  { href: "/login", label: "เข้าสู่ระบบ" }
 ];
 
 export function AppNav() {
@@ -22,9 +23,9 @@ export function AppNav() {
   return (
     <div className="grid gap-3">
       <button className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 lg:hidden" onClick={() => setOpen((current) => !current)} type="button">
-        Menu
+        เมนู
       </button>
-      <nav className={`${open ? "grid" : "hidden"} gap-1 lg:grid`} aria-label="Primary navigation">
+      <nav className={`${open ? "grid" : "hidden"} gap-1 lg:grid`} aria-label="เมนูหลัก">
         {navItems.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (
@@ -41,4 +42,3 @@ export function AppNav() {
     </div>
   );
 }
-

@@ -11,13 +11,16 @@ export function FleetBoard() {
   });
 
   return (
-    <AssignmentReadinessPanel
-      readiness={{
-        assignmentId: "10000000-0000-4000-8000-000000000010",
-        status: getAssignmentReadinessStatus(missingItems),
-        riskLevel: "medium",
-        missingItems
-      }}
-    />
+    <section className="grid gap-3">
+      <h2 className="text-lg font-semibold text-ink">สถานะรถและคนขับ</h2>
+      <AssignmentReadinessPanel
+        readiness={{
+          assignmentId: "10000000-0000-4000-8000-000000000010",
+          status: getAssignmentReadinessStatus(missingItems),
+          riskLevel: "medium",
+          missingItems
+        }}
+      />
+    </section>
   );
 }

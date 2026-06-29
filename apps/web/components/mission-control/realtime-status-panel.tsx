@@ -19,14 +19,14 @@ export function RealtimeStatusPanel({ projectId }: { projectId: string }) {
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-operation">Realtime Foundation</p>
+      <p className="text-xs font-semibold text-operation">สถานะการเชื่อมต่อ</p>
       <div className="mt-2 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-ink">{enabled ? "Listening for operational changes" : "Realtime subscribe-ready"}</h2>
+        <h2 className="text-lg font-semibold text-ink">{enabled ? "กำลังรับข้อมูลการเปลี่ยนแปลง" : "พร้อมเชื่อมต่อ Realtime"}</h2>
         <RealtimeStatus state={enabled ? "Live" : "Fallback"} />
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">Subscribes to timeline, assignment status, and driver issue changes when Supabase browser env is configured. This is not production GPS streaming.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">เมื่อกำหนดค่า Supabase แล้ว หน้านี้สามารถรับเหตุการณ์ Timeline สถานะ Assignment และเรื่องแจ้งจากคนขับได้ โดยยังไม่ใช่ระบบติดตาม GPS แบบ production</p>
       <div className="mt-4 grid gap-2 text-sm text-slate-600">
-        {events.length ? events.map((event, index) => <p key={`${event.table}-${index}`}>{event.eventType} on {event.table}</p>) : <p>No realtime events received in this session.</p>}
+        {events.length ? events.map((event, index) => <p key={`${event.table}-${index}`}>{event.eventType} จาก {event.table}</p>) : <p>ยังไม่มีเหตุการณ์ Realtime ในรอบการใช้งานนี้</p>}
       </div>
     </section>
   );

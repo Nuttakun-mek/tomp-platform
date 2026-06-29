@@ -21,8 +21,8 @@ export function ReadinessBoard() {
 
   return (
     <section className="grid gap-4 md:grid-cols-2">
-      <ReadinessScoreCard title="Driver readiness" score={driverScore} status="warning" />
-      <ReadinessScoreCard title="Vehicle readiness" score={vehicleScore} status="warning" />
+      <ReadinessScoreCard title="ความพร้อมคนขับ" score={driverScore} status="warning" />
+      <ReadinessScoreCard title="ความพร้อมรถ" score={vehicleScore} status="warning" />
     </section>
   );
 }

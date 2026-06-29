@@ -20,22 +20,22 @@ export function CreateDriverForm() {
     });
 
     if (!parsed.success) {
-      setMessage("Please complete required driver fields.");
+      setMessage("กรุณากรอกข้อมูลคนขับที่จำเป็นให้ครบถ้วน");
       return;
     }
 
     const result = await createDriverAction(parsed.data);
-    setMessage(result.success ? result.warning || "Driver created and timeline prepared." : result.error || "Driver create failed.");
+    setMessage(result.success ? result.warning || "บันทึกข้อมูลคนขับและเตรียม Timeline แล้ว" : result.error || "สร้างข้อมูลคนขับไม่สำเร็จ");
   }
 
   return (
     <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-ink">Create Driver</h2>
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="fullName" placeholder="Full name" />
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="phone" placeholder="Phone" />
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="licenseType" placeholder="License type" />
+      <h2 className="text-lg font-semibold text-ink">เพิ่มคนขับ</h2>
+      <input className="rounded-md border border-slate-300 px-3 py-2" name="fullName" placeholder="ชื่อ-นามสกุล" />
+      <input className="rounded-md border border-slate-300 px-3 py-2" name="phone" placeholder="เบอร์โทรศัพท์" />
+      <input className="rounded-md border border-slate-300 px-3 py-2" name="licenseType" placeholder="ประเภทใบขับขี่" />
       {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
-      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">Create Driver</button>
+      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">บันทึกคนขับ</button>
     </form>
   );
 }

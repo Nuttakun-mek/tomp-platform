@@ -8,11 +8,11 @@ export default async function VehiclesPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Resources" title="Vehicles" description="Vehicle resource foundation for assignment readiness and operational coordination." />
+      <PageHeader eyebrow="ทรัพยากร" title="รถ" description="จัดการข้อมูลรถสำหรับการจัดสรรงาน ความพร้อม และการประสานงานปฏิบัติการ" />
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <CreateVehicleForm />
         <section className="grid gap-3">
-          {vehicles.map((vehicle) => <VehicleCardSummary key={vehicle.id} vehicle={vehicle} />)}
+          {vehicles.length ? vehicles.map((vehicle) => <VehicleCardSummary key={vehicle.id} vehicle={vehicle} />) : <p className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-600">ยังไม่มีข้อมูลรถ</p>}
         </section>
       </div>
     </>

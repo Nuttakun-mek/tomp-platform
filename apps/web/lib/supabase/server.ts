@@ -1,6 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export function getSupabaseServerClient(): SupabaseClient | null {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return null;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -17,6 +21,10 @@ export function getSupabaseServerClient(): SupabaseClient | null {
 }
 
 export function getSupabaseServerDataClient(): SupabaseClient | null {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return null;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServerKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

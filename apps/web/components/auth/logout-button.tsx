@@ -12,16 +12,15 @@ export function LogoutButton() {
       window.location.href = "/login";
       return;
     }
-    setMessage(result.error || "Logout failed.");
+    setMessage(result.error || "ออกจากระบบไม่สำเร็จ");
   }
 
   return (
     <div className="grid gap-1">
       <button className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-operation hover:text-operation" onClick={handleLogout} type="button">
-        Logout
+        ออกจากระบบ
       </button>
       {message ? <span className="text-xs text-red-700">{message}</span> : null}
     </div>
   );
 }
-

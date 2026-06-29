@@ -7,7 +7,7 @@ export function PublishedLockBanner({ project }: { project?: Project | null }) {
   if (mode === "draft_edit") {
     return (
       <section className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
-        Draft planning mode is active. Direct edits are allowed until the project is published.
+        โหมดวางแผนยังเป็นร่าง สามารถแก้ไขข้อมูลได้จนกว่าจะประกาศใช้แผน
       </section>
     );
   }
@@ -15,15 +15,14 @@ export function PublishedLockBanner({ project }: { project?: Project | null }) {
   if (mode === "published_change_request") {
     return (
       <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        This project is published and locked. Operational changes must go through a change request and timeline event.
+        โครงการนี้ประกาศใช้แผนแล้ว การเปลี่ยนแปลงหลังจากนี้ต้องทำผ่านคำขอเปลี่ยนแปลงและบันทึกลง Timeline
       </section>
     );
   }
 
   return (
     <section className="mb-6 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-      This project is read-only.
+      โครงการนี้อยู่ในโหมดอ่านอย่างเดียว
     </section>
   );
 }
-

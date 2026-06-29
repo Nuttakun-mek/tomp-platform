@@ -5,12 +5,12 @@ export default function DriverPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Field access demo"
-        title="Driver"
-        description="QR-based driver access placeholder. Demo route only; no token validation or assignment reads are implemented."
+        eyebrow="หน้าคนขับ"
+        title="เข้าถึงงานด้วย QR"
+        description="ใช้สำหรับทดสอบการเปิดงานของคนขับแบบ assignment-scoped ใน Pilot ภายใน"
       />
       <Link className="inline-flex rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" href="/driver/demo-token">
-        Open demo driver card
+        เปิดหน้าคนขับข้อมูลตัวอย่าง
       </Link>
     </>
   );

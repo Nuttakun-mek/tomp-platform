@@ -13,19 +13,19 @@ export default async function DriverTokenPage({ params }: DriverTokenPageProps) 
   return (
     <>
       <PageHeader
-        eyebrow="Driver Card"
-        title="Assignment Access"
-        description={driverAccess.tokenValidated ? "Assignment-scoped access verified for this driver card." : "Demo or invalid token access. Production QR tokens must be generated from assignment planning."}
+        eyebrow="หน้าคนขับ"
+        title="เข้าถึงงาน Assignment"
+        description={driverAccess.tokenValidated ? "ตรวจสอบสิทธิ์เข้าถึงเฉพาะ Assignment นี้แล้ว" : "กำลังใช้ข้อมูลตัวอย่างหรือ token ไม่ถูกต้อง ต้องสร้าง QR จากหน้าจัดสรรงานก่อนใช้งานจริง"}
       />
       {!driverAccess.tokenValidated && token.startsWith("tomp_") ? (
         <section className="rounded-md border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-900">
-          This driver access link is invalid, expired, or revoked. Please contact operations for a new QR link.
+          ลิงก์เข้าถึงงานนี้ไม่ถูกต้อง หมดอายุ หรือถูกยกเลิกแล้ว กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR ใหม่
         </section>
       ) : (
         <>
           {!driverAccess.tokenValidated ? (
             <div className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-900">
-              Demo token mode is active. Generate an assignment-scoped QR token before pilot use.
+              กำลังใช้โหมดข้อมูลตัวอย่าง ก่อนทดสอบ Pilot ควรสร้าง QR ที่ผูกกับ Assignment จริง
             </div>
           ) : null}
           <DriverCard driverAccess={driverAccess} />

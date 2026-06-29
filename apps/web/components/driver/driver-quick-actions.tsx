@@ -9,7 +9,7 @@ export function DriverQuickActions({ driverAccess, mapsUrl = "https://www.google
 
   async function updateStatus(status: "ready" | "arrived_pickup" | "passenger_onboard" | "completed") {
     if (!driverAccess) {
-      setMessage("Driver access data is not available.");
+      setMessage("ไม่พบข้อมูลงานของคนขับ กรุณาขอ QR ใหม่จากผู้ประสานงาน");
       return;
     }
 
@@ -20,12 +20,18 @@ export function DriverQuickActions({ driverAccess, mapsUrl = "https://www.google
       status,
       source: "driver_qr"
     });
-    setMessage(result.success ? `Status updated: ${status}` : result.error || "Status update failed.");
+    const statusText: Record<typeof status, string> = {
+      ready: "พร้อมเริ่มงาน",
+      arrived_pickup: "ถึงจุดรับแล้ว",
+      passenger_onboard: "รับผู้โดยสารแล้ว",
+      completed: "เสร็จสิ้นงาน"
+    };
+    setMessage(result.success ? `อัปเดตสถานะแล้ว: ${statusText[status]}` : result.error || "อัปเดตสถานะไม่สำเร็จ");
   }
 
   async function reportIssue() {
     if (!driverAccess) {
-      setMessage("Driver access data is not available.");
+      setMessage("ไม่พบข้อมูลงานของคนขับ กรุณาขอ QR ใหม่จากผู้ประสานงาน");
       return;
     }
 
@@ -35,24 +41,24 @@ export function DriverQuickActions({ driverAccess, mapsUrl = "https://www.google
       driverId: driverAccess.driver.id,
       issueType: "driver_report",
       severity: "warning",
-      message: "Driver reported an issue from the Driver Card."
+      message: "คนขับแจ้งปัญหาจากหน้าคนขับ"
     });
-    setMessage(result.success ? "Issue reported." : result.error || "Issue report failed.");
+    setMessage(result.success ? "ส่งเรื่องให้ศูนย์ควบคุมแล้ว" : result.error || "แจ้งปัญหาไม่สำเร็จ");
   }
 
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <button className="rounded-md bg-operation px-4 py-3 text-sm font-semibold text-white" onClick={() => updateStatus("ready")} type="button">Ready</button>
-        <button className="rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("arrived_pickup")} type="button">Arrived Pickup</button>
-        <button className="rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("passenger_onboard")} type="button">Passenger Onboard</button>
-        <button className="rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("completed")} type="button">Completed</button>
-        <a className="rounded-md border border-route px-4 py-3 text-center text-sm font-semibold text-route" href={mapsUrl}>Open Google Maps</a>
+        <button className="min-h-12 rounded-md bg-operation px-4 py-3 text-sm font-semibold text-white" onClick={() => updateStatus("ready")} type="button">พร้อมเริ่มงาน</button>
+        <button className="min-h-12 rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("arrived_pickup")} type="button">ถึงจุดรับแล้ว</button>
+        <button className="min-h-12 rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("passenger_onboard")} type="button">รับผู้โดยสารแล้ว</button>
+        <button className="min-h-12 rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("completed")} type="button">เสร็จสิ้นงาน</button>
+        <a className="min-h-12 rounded-md border border-route px-4 py-3 text-center text-sm font-semibold text-route" href={mapsUrl}>เปิด Google Maps</a>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <button className="rounded-md border border-amber-300 px-4 py-3 text-sm font-semibold text-amber-800" onClick={reportIssue} type="button">Report issue</button>
-        <a className="rounded-md border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700" href="tel:+6620000000">Call coordinator</a>
-        <a className="rounded-md border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700" href="tel:+6621111111">Call operation</a>
+        <button className="min-h-12 rounded-md border border-amber-300 px-4 py-3 text-sm font-semibold text-amber-800" onClick={reportIssue} type="button">แจ้งปัญหา</button>
+        <a className="min-h-12 rounded-md border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700" href="tel:+6620000000">โทรหาผู้ประสานงาน</a>
+        <a className="min-h-12 rounded-md border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700" href="tel:+6621111111">โทรศูนย์ควบคุม</a>
       </div>
       {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
     </div>

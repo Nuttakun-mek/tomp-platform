@@ -10,7 +10,7 @@ export function ResourceListPlaceholder({ title, items }: ResourceListPlaceholde
     <section className="rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 p-5">
         <h2 className="text-lg font-semibold text-ink">{title}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Static placeholder records. Live resource data is deferred.</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">ข้อมูลตัวอย่างสำหรับตรวจหน้าทรัพยากร เมื่อเชื่อมต่อ Supabase แล้วจะแสดงข้อมูลจริง</p>
       </div>
       <div className="divide-y divide-slate-200">
         {items.map((item) => (

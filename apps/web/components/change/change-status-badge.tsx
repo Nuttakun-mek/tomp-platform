@@ -6,6 +6,11 @@ const toneByStatus: Record<string, string> = {
 };
 
 export function ChangeStatusBadge({ status }: { status: string }) {
-  return <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${toneByStatus[status] || "border-slate-200 bg-slate-50 text-slate-700"}`}>{status}</span>;
+  const labels: Record<string, string> = {
+    requested: "รอพิจารณา",
+    approved: "อนุมัติแล้ว",
+    applied: "นำไปใช้แล้ว",
+    rejected: "ปฏิเสธ"
+  };
+  return <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${toneByStatus[status] || "border-slate-200 bg-slate-50 text-slate-700"}`}>{labels[status] ?? status}</span>;
 }
-

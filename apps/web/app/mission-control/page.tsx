@@ -14,9 +14,9 @@ export default async function MissionControlPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Operate"
-        title="Mission Control"
-        description="Operations foundation without realtime. Timeline is treated as immutable operational memory."
+        eyebrow="ศูนย์ควบคุมปฏิบัติการ"
+        title="Mission Control สำหรับทีมปฏิบัติการ"
+        description="หน้ารวมสถานะความพร้อม รถ คนขับ รายการที่ต้องติดตาม และ Timeline ที่แก้ไขย้อนหลังไม่ได้"
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <ReadinessBoard />

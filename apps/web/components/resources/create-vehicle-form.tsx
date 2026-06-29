@@ -19,22 +19,22 @@ export function CreateVehicleForm() {
     });
 
     if (!parsed.success) {
-      setMessage("Please complete required vehicle fields.");
+      setMessage("กรุณากรอกข้อมูลรถที่จำเป็นให้ครบถ้วน");
       return;
     }
 
     const result = await createVehicleAction(parsed.data);
-    setMessage(result.success ? result.warning || "Vehicle created and timeline prepared." : result.error || "Vehicle create failed.");
+    setMessage(result.success ? result.warning || "บันทึกข้อมูลรถและเตรียม Timeline แล้ว" : result.error || "สร้างข้อมูลรถไม่สำเร็จ");
   }
 
   return (
     <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-ink">Create Vehicle</h2>
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="plateNumber" placeholder="Plate number" />
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="vehicleType" placeholder="Vehicle type" />
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="capacity" placeholder="Capacity" type="number" />
+      <h2 className="text-lg font-semibold text-ink">เพิ่มรถ</h2>
+      <input className="rounded-md border border-slate-300 px-3 py-2" name="plateNumber" placeholder="ทะเบียนรถ" />
+      <input className="rounded-md border border-slate-300 px-3 py-2" name="vehicleType" placeholder="ประเภทรถ" />
+      <input className="rounded-md border border-slate-300 px-3 py-2" name="capacity" placeholder="จำนวนที่นั่ง" type="number" />
       {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
-      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">Create Vehicle</button>
+      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">บันทึกรถ</button>
     </form>
   );
 }

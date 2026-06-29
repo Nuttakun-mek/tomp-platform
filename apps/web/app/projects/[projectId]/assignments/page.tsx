@@ -17,9 +17,9 @@ export default async function AssignmentsPage({ params }: AssignmentsPageProps) 
   return (
     <>
       <PageHeader
-        eyebrow="Assignment Kernel"
-        title="Assignments"
-        description={`Assign missions, call signs, drivers, vehicles, and time windows for ${project?.projectCode ?? projectId}.`}
+        eyebrow="จัดสรรงาน"
+        title="Assignment"
+        description={`จัดสรรภารกิจ Call Sign คนขับ รถ และช่วงเวลาปฏิบัติงานสำหรับ ${project?.projectCode ?? projectId}`}
       />
       <PublishedLockBanner project={project} />
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">

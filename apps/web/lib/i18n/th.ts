@@ -1,0 +1,30 @@
+export const th = {
+  dashboard: "ภาพรวม",
+  projects: "โครงการ",
+  missionControl: "ศูนย์ควบคุมปฏิบัติการ",
+  resources: "ทรัพยากร",
+  drivers: "คนขับ",
+  vehicles: "รถ",
+  driver: "หน้าคนขับ",
+  login: "เข้าสู่ระบบ",
+  logout: "ออกจากระบบ",
+  project: "โครงการ",
+  mission: "ภารกิจ",
+  assignment: "Assignment",
+  callSign: "Call Sign",
+  vehicle: "รถ",
+  coordinator: "ผู้ประสานงาน",
+  organizer: "ผู้จัดงาน",
+  timeline: "Timeline",
+  readiness: "ความพร้อม",
+  publish: "ประกาศใช้แผน",
+  changeRequest: "คำขอเปลี่ยนแปลง",
+  recovery: "กู้คืนสถานการณ์",
+  status: "สถานะ",
+  priority: "ความสำคัญ",
+  gps: "GPS",
+  qr: "QR",
+  googleMaps: "Google Maps"
+} as const;
+
+export type ThaiCopyKey = keyof typeof th;
