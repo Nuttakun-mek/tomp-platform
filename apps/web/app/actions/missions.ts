@@ -3,8 +3,10 @@
 import { createMissionSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { mapMission } from "@/lib/data/mappers";
+import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createMissionTimelineEvent } from "@/lib/timeline";
+import { assertPlanEditable } from "@/lib/domain/publish-locking";
 
 export async function createMissionAction(input: unknown): Promise<ActionResult> {
   const parsed = createMissionSchema.safeParse(input);
@@ -16,6 +18,13 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
   if (!client) {
     return actionFailure(error || "Supabase is not configured for writes.");
   }
+
+  const permission = await requirePermission(parsed.data.projectId, "mission.create");
+  if (!permission.allowed && mode !== "service_role") {
+    return actionFailure(permission.reason || "Missing permission: mission.create");
+  }
+  const editable = await assertPlanEditable(parsed.data.projectId);
+  if (!editable.editable) return actionFailure(editable.reason || "Project is locked.");
 
   const { data, error: insertError } = await client
     .from("missions")

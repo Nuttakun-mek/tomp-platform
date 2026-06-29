@@ -8,6 +8,7 @@ import {
 } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
+import { requirePermission } from "@/lib/auth/rbac";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 async function appendChangeTimeline(projectId: string, objectId: string, eventType: string, reason?: string | null, afterData?: Record<string, unknown> | null) {
@@ -30,6 +31,8 @@ export async function createChangeRequestAction(input: unknown): Promise<ActionR
 
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
+  const permission = await requirePermission(parsed.data.projectId, "change.create");
+  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: change.create");
 
   const { data, error: insertError } = await client
     .from("change_requests")
@@ -74,6 +77,8 @@ export async function rejectChangeRequestAction(input: unknown): Promise<ActionR
 async function updateChangeStatus(projectId: string, changeRequestId: string, status: string, eventType: string, reason?: string | null, afterData?: Record<string, unknown>): Promise<ActionResult> {
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
+  const permission = await requirePermission(projectId, status === "applied" ? "change.apply" : "change.approve");
+  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing change permission");
 
   const { data, error: updateError } = await client
     .from("change_requests")
@@ -85,6 +90,26 @@ async function updateChangeStatus(projectId: string, changeRequestId: string, st
 
   if (updateError) return actionFailure(`Change request update failed: ${updateError.message}`);
 
+  let appliedObject: unknown = null;
+  if (status === "applied" && data?.object_type && data?.object_id && data?.after_data && typeof data.after_data === "object") {
+    const tableByType: Record<string, string> = {
+      project: "projects",
+      mission: "missions",
+      assignment: "assignments"
+    };
+    const table = tableByType[String(data.object_type)];
+    if (table) {
+      const { data: updatedObject, error: applyError } = await client
+        .from(table)
+        .update(data.after_data as Record<string, unknown>)
+        .eq("id", data.object_id)
+        .select()
+        .single();
+      if (applyError) return actionFailure(`Change request status updated, but target application failed: ${applyError.message}`);
+      appliedObject = updatedObject;
+    }
+  }
+
   const timelineResult = await appendChangeTimeline(projectId, changeRequestId, eventType, reason, data);
-  return actionSuccess({ mode, changeRequest: data, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
+  return actionSuccess({ mode, changeRequest: data, appliedObject, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
 }

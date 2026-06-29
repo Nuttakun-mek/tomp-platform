@@ -3,6 +3,7 @@
 import { createDriverSchema, createVehicleSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { mapDriver, mapVehicle } from "@/lib/data/mappers";
+import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -15,6 +16,11 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
     return actionFailure(error || "Supabase is not configured for writes.");
+  }
+  const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
+  if (projectId) {
+    const permission = await requirePermission(projectId, "driver.create");
+    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: driver.create");
   }
 
   const { data, error: insertError } = await client
@@ -36,10 +42,10 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
   }
 
   const driver = mapDriver(data);
-  const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : null;
-  const timelineResult = projectId
+  const timelineProjectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : null;
+  const timelineResult = timelineProjectId
     ? await createTimelineEvent({
-        projectId,
+        projectId: timelineProjectId,
         objectType: "driver",
         objectId: driver.id,
         eventType: TIMELINE_EVENTS.DRIVER_CREATED,
@@ -65,6 +71,11 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
   if (!client) {
     return actionFailure(error || "Supabase is not configured for writes.");
   }
+  const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
+  if (projectId) {
+    const permission = await requirePermission(projectId, "vehicle.create");
+    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: vehicle.create");
+  }
 
   const { data, error: insertError } = await client
     .from("vehicles")
@@ -84,10 +95,10 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
   }
 
   const vehicle = mapVehicle(data);
-  const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : null;
-  const timelineResult = projectId
+  const timelineProjectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : null;
+  const timelineResult = timelineProjectId
     ? await createTimelineEvent({
-        projectId,
+        projectId: timelineProjectId,
         objectType: "vehicle",
         objectId: vehicle.id,
         eventType: TIMELINE_EVENTS.VEHICLE_CREATED,

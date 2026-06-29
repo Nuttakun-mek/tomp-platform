@@ -8,6 +8,7 @@ import {
 } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
+import { uploadDriverEvidencePhoto } from "@/lib/storage/photo-upload";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 export async function driverCheckinAction(input: unknown): Promise<ActionResult> {
@@ -71,6 +72,29 @@ export async function vehicleCheckinAction(input: unknown): Promise<ActionResult
   return actionSuccess({ mode, checkin: data, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
 }
 
+export async function vehiclePhotoUploadAction(formData: FormData): Promise<ActionResult> {
+  const projectId = String(formData.get("projectId") || "");
+  const assignmentId = String(formData.get("assignmentId") || "");
+  const vehicleFile = formData.get("vehiclePhoto");
+  const plateFile = formData.get("platePhoto");
+
+  if (!projectId || !assignmentId) return actionFailure("projectId and assignmentId are required.");
+
+  const uploads: Record<string, unknown> = {};
+  if (vehicleFile instanceof File && vehicleFile.size > 0) {
+    uploads.vehicle = await uploadDriverEvidencePhoto({ projectId, assignmentId, kind: "vehicle", file: vehicleFile });
+  }
+  if (plateFile instanceof File && plateFile.size > 0) {
+    uploads.plate = await uploadDriverEvidencePhoto({ projectId, assignmentId, kind: "plate", file: plateFile });
+  }
+
+  if (!uploads.vehicle && !uploads.plate) {
+    return actionSuccess({ mode: "placeholder", uploads }, "No files were selected; stored checklist metadata only.");
+  }
+
+  return actionSuccess({ uploads });
+}
+
 export async function assignmentStatusUpdateAction(input: unknown): Promise<ActionResult> {
   const parsed = assignmentStatusUpdateSchema.safeParse(input);
   if (!parsed.success) return actionFailure("Assignment status update validation failed.", parsed.error.flatten().fieldErrors);
@@ -127,4 +151,3 @@ export async function driverIssueReportAction(input: unknown): Promise<ActionRes
   });
   return actionSuccess({ mode, issueReport: data, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
 }
-

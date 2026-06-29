@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { driverCheckinAction, vehicleCheckinAction } from "@/app/actions/driver";
+import { driverCheckinAction, vehicleCheckinAction, vehiclePhotoUploadAction } from "@/app/actions/driver";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 
 export function DriverActivationChecklist({ driverAccess }: { driverAccess?: DriverAccessAssignment }) {
@@ -41,8 +41,16 @@ export function DriverActivationChecklist({ driverAccess }: { driverAccess?: Dri
         platePhotoPlaceholder: formData.get("platePhotoCaptured") === "on"
       }
     });
+    const photoFormData = new FormData();
+    photoFormData.set("projectId", driverAccess.project.id);
+    photoFormData.set("assignmentId", driverAccess.assignment.id);
+    const vehiclePhoto = formData.get("vehiclePhoto");
+    const platePhoto = formData.get("platePhoto");
+    if (vehiclePhoto instanceof File) photoFormData.set("vehiclePhoto", vehiclePhoto);
+    if (platePhoto instanceof File) photoFormData.set("platePhoto", platePhoto);
+    const photoResult = await vehiclePhotoUploadAction(photoFormData);
 
-    setMessage(driverResult.success && vehicleResult.success ? "Activation submitted." : driverResult.error || vehicleResult.error || "Activation failed.");
+    setMessage(driverResult.success && vehicleResult.success && photoResult.success ? photoResult.warning || "Activation submitted." : driverResult.error || vehicleResult.error || photoResult.error || "Activation failed.");
   }
 
   const checklist = [
@@ -64,6 +72,16 @@ export function DriverActivationChecklist({ driverAccess }: { driverAccess?: Dri
             {label}
           </label>
         ))}
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-medium text-slate-700">
+          Vehicle photo
+          <input className="rounded-md border border-slate-300 px-3 py-2" name="vehiclePhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-slate-700">
+          Plate photo
+          <input className="rounded-md border border-slate-300 px-3 py-2" name="platePhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+        </label>
       </div>
       {message ? <p className="mt-3 text-sm font-medium text-slate-700">{message}</p> : null}
       <button className="mt-4 rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">

@@ -75,11 +75,39 @@ export async function getProjectMembership(projectId: string): Promise<ProjectMe
       projectId,
       profileId: profile.id,
       roleKey: "project_manager",
-      permissions: ["project.read", "project.create", "mission.read", "assignment.read", "timeline.read"],
+      permissions: ["project.read", "project.create", "project.publish", "mission.read", "mission.create", "assignment.read", "assignment.create", "driver.create", "vehicle.create", "timeline.read", "timeline.create", "change.create", "change.approve", "change.apply"],
       isDevelopmentFallback: true
     };
   }
 
-  return null;
-}
+  const supabase = getSupabaseServerClient();
+  if (!supabase) return null;
 
+  const { data } = await supabase
+    .from("project_members")
+    .select("project_id, profile_id, role_id")
+    .eq("project_id", projectId)
+    .eq("profile_id", profile.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  const roleId = typeof data?.role_id === "string" ? data.role_id : null;
+  if (!roleId) return null;
+
+  const { data: role } = await supabase
+    .from("roles")
+    .select("role_key")
+    .eq("id", roleId)
+    .maybeSingle();
+
+  const roleKey = typeof role?.role_key === "string" ? role.role_key : null;
+  if (typeof roleKey !== "string") return null;
+
+  return {
+    projectId,
+    profileId: profile.id,
+    roleKey,
+    permissions: [],
+    isDevelopmentFallback: false
+  };
+}

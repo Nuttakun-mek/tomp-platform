@@ -9,7 +9,7 @@ Run date: 2026-06-29.
 | `npm install` | Passed |
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
-| `npm run test` | Passed: 4 test files, 10 tests |
+| `npm run test` | Passed: 6 test files, 13 tests |
 | `NEXT_TELEMETRY_DISABLED=1 npm run build` | Passed |
 
 ## What Passed
@@ -19,8 +19,8 @@ Run date: 2026-06-29.
 - ESLint completed with no errors.
 - Next.js production build completed.
 - App routes render as static or dynamic placeholder pages without a database connection.
-- Unit tests now cover assignment rules, driver readiness, publish readiness, and driver access URL generation.
-- Next.js build generated 13 routes, including `/login`, `/driver/[token]`, `/projects/[projectId]`, and `/projects/[projectId]/assignments`.
+- Unit tests now cover assignment rules, driver readiness, publish readiness, RBAC permissions, driver access URL generation, and driver token hashing.
+- Next.js build generated 14 routes, including `/auth/callback`, `/login`, `/driver/[token]`, `/projects/[projectId]`, and `/projects/[projectId]/assignments`.
 
 ## What Failed And Was Fixed
 
@@ -34,6 +34,9 @@ Run date: 2026-06-29.
 - Supabase seed execution in a local database.
 - Live server-side writes against a real Supabase database.
 - Production deployment environment variable validation.
+- Real Supabase Auth cookie persistence.
+- Supabase Storage upload against a real bucket.
+- Supabase Realtime event delivery under load.
 - Driver QR token validation.
 - Realtime Mission Control.
 

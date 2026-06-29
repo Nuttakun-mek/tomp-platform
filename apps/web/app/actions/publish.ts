@@ -3,6 +3,8 @@
 import { publishProjectSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
+import { requirePermission } from "@/lib/auth/rbac";
+import { createPublishLock } from "@/lib/domain/publish-locking";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 export async function publishProjectAction(input: unknown): Promise<ActionResult> {
@@ -15,6 +17,8 @@ export async function publishProjectAction(input: unknown): Promise<ActionResult
   if (!client) {
     return actionFailure(error || "Supabase is not configured for writes.");
   }
+  const permission = await requirePermission(parsed.data.projectId, "project.publish");
+  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: project.publish");
 
   const { data, error: insertError } = await client
     .from("publish_snapshots")
@@ -43,10 +47,14 @@ export async function publishProjectAction(input: unknown): Promise<ActionResult
     reason: parsed.data.reason,
     afterData: data
   });
+  const lockResult = await createPublishLock(parsed.data.projectId, data.id, parsed.data.reason);
 
   return actionSuccess(
-    { mode, publishSnapshot: data, timelineEvent: timelineResult.data },
-    timelineResult.success ? undefined : `Publish snapshot created, but timeline insert failed: ${timelineResult.error}`
+    { mode, publishSnapshot: data, publishLock: lockResult, timelineEvent: timelineResult.data },
+    !timelineResult.success
+      ? `Publish snapshot created, but timeline insert failed: ${timelineResult.error}`
+      : lockResult.success
+        ? undefined
+        : `Publish snapshot created, but publish lock failed: ${lockResult.error}`
   );
 }
-

@@ -2,6 +2,7 @@ import { ExceptionList } from "@/components/mission-control/exception-list";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
 import { MapPlaceholder } from "@/components/mission-control/map-placeholder";
 import { ReadinessBoard } from "@/components/mission-control/readiness-board";
+import { RealtimeStatusPanel } from "@/components/mission-control/realtime-status-panel";
 import { TimelineFeed } from "@/components/mission-control/timeline-feed";
 import { PageHeader } from "@/components/page-header";
 import { demoProject } from "@/lib/demo/demo-kernel";
@@ -25,6 +26,9 @@ export default async function MissionControlPage() {
       </div>
       <div className="mt-6">
         <MapPlaceholder />
+      </div>
+      <div className="mt-6">
+        <RealtimeStatusPanel projectId={demoProject.id} />
       </div>
     </>
   );

@@ -3,6 +3,7 @@
 import { createProjectSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { mapProject } from "@/lib/data/mappers";
+import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createProjectTimelineEvent } from "@/lib/timeline";
 
@@ -15,6 +16,11 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
     return actionFailure(error || "Supabase is not configured for writes.");
+  }
+
+  const permission = await requirePermission(parsed.data.organizationId, "project.create");
+  if (!permission.allowed && mode !== "service_role") {
+    return actionFailure(permission.reason || "Missing permission: project.create");
   }
 
   const { data, error: insertError } = await client

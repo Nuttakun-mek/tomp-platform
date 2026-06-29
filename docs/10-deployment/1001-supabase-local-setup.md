@@ -16,6 +16,7 @@ Application:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+DRIVER_ACCESS_TOKEN_SECRET=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
@@ -45,6 +46,10 @@ psql "$SUPABASE_DB_URL" -f database/migrations/0003_driver_assignment_foundation
 psql "$SUPABASE_DB_URL" -f database/migrations/0004_auth_rbac_foundation.sql
 psql "$SUPABASE_DB_URL" -f database/migrations/0005_project_scoped_rls.sql
 psql "$SUPABASE_DB_URL" -f database/migrations/0006_publish_change_baseline.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/0007_publish_locking_foundation.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/0008_driver_token_security.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/0009_storage_photo_foundation.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/0010_realtime_mission_control_foundation.sql
 ```
 
 ## Run Seed Data

@@ -115,7 +115,7 @@ Sprint 1 does not implement live GPS, incident, recovery, analytics, AI, custome
 
 ## Current Stage
 
-The repository now contains Sprint 0 through Sprint 14 foundations:
+The repository now contains Sprint 0 through Sprint 20 foundations:
 
 - Next.js app shell.
 - Supabase schema, seed, and temporary RLS placeholders.
@@ -127,21 +127,28 @@ The repository now contains Sprint 0 through Sprint 14 foundations:
 - Publish/change baseline foundations.
 - Driver activation persistence actions.
 - Vitest unit test baseline.
+- Supabase Auth flow foundation.
+- RBAC checks on server-side write actions.
+- Publish lock and change application foundation.
+- Secure driver QR token generation and hashing.
+- Supabase Storage photo upload foundation.
+- Mission Control Realtime subscription foundation.
 
 ## What Is Not Implemented
 
 - Production authentication and project-scoped RBAC enforcement.
+- Production-hardened auth cookies and session refresh.
 - Production-hardened write transactions.
-- Publish locking and change application side effects.
-- Production QR token validation.
-- Photo upload storage.
-- Realtime Mission Control.
+- Fully audited publish/change application side effects.
+- Token revocation UX and full QR operational controls.
+- Storage evidence gallery and signed URL review.
+- Realtime Mission Control hardening.
 - Live production GPS streaming.
 - AI, route optimization, analytics, vendor/customer portals, accounting, CRM, payroll, or fleet maintenance.
 
 ## Next Recommended Sprint
 
-Sprint 15: Real Auth Flow and Session Handling, followed by project-scoped RBAC hardening and secure driver token validation.
+Sprint 21: Supabase SSR Session Hardening, followed by RLS tests and transactional publish/change hardening.
 
 ## Quality Checks
 
