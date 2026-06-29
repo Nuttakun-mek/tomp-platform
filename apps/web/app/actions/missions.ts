@@ -11,20 +11,20 @@ import { assertPlanEditable } from "@/lib/domain/publish-locking";
 export async function createMissionAction(input: unknown): Promise<ActionResult> {
   const parsed = createMissionSchema.safeParse(input);
   if (!parsed.success) {
-    return actionFailure("Mission validation failed.", parsed.error.flatten().fieldErrors);
+    return actionFailure("ข้อมูลภารกิจไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
   }
 
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
-    return actionFailure(error || "Supabase is not configured for writes.");
+    return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
 
   const permission = await requirePermission(parsed.data.projectId, "mission.create");
   if (!permission.allowed && mode !== "service_role") {
-    return actionFailure(permission.reason || "Missing permission: mission.create");
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างภารกิจ");
   }
   const editable = await assertPlanEditable(parsed.data.projectId);
-  if (!editable.editable) return actionFailure(editable.reason || "Project is locked.");
+  if (!editable.editable) return actionFailure(editable.reason || "โครงการถูกล็อกแล้ว กรุณาส่งคำขอเปลี่ยนแปลง");
 
   const { data, error: insertError } = await client
     .from("missions")
@@ -48,7 +48,7 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
     .single();
 
   if (insertError) {
-    return actionFailure(`Database insert failed: ${insertError.message}`);
+    return actionFailure(`บันทึกภารกิจไม่สำเร็จ: ${insertError.message}`);
   }
 
   const mission = mapMission(data);
@@ -56,6 +56,6 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
 
   return actionSuccess(
     { mode, mission, timelineEvent: timelineResult.data },
-    timelineResult.success ? undefined : `Mission was created, but timeline insert failed: ${timelineResult.error}`
+    timelineResult.success ? undefined : `สร้างภารกิจแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
 }

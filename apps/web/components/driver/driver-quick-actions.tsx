@@ -20,6 +20,7 @@ export function DriverQuickActions({ driverAccess, mapsUrl = "https://www.google
       status,
       source: "driver_qr"
     });
+
     const statusText: Record<typeof status, string> = {
       ready: "พร้อมเริ่มงาน",
       arrived_pickup: "ถึงจุดรับแล้ว",
@@ -47,20 +48,19 @@ export function DriverQuickActions({ driverAccess, mapsUrl = "https://www.google
   }
 
   return (
-    <div className="grid gap-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <button className="min-h-12 rounded-md bg-operation px-4 py-3 text-sm font-semibold text-white" onClick={() => updateStatus("ready")} type="button">พร้อมเริ่มงาน</button>
-        <button className="min-h-12 rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("arrived_pickup")} type="button">ถึงจุดรับแล้ว</button>
-        <button className="min-h-12 rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("passenger_onboard")} type="button">รับผู้โดยสารแล้ว</button>
-        <button className="min-h-12 rounded-md border border-operation px-4 py-3 text-sm font-semibold text-operation" onClick={() => updateStatus("completed")} type="button">เสร็จสิ้นงาน</button>
+    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4 shadow-soft">
+      <h2 className="text-lg font-semibold text-ink">อัปเดตสถานะงาน</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button className="min-h-14 rounded-md bg-operation px-4 py-3 text-base font-semibold text-white shadow-sm" onClick={() => updateStatus("ready")} type="button">พร้อมเริ่มงาน</button>
+        <button className="min-h-14 rounded-md border border-operation bg-white px-4 py-3 text-base font-semibold text-operation" onClick={() => updateStatus("arrived_pickup")} type="button">ถึงจุดรับแล้ว</button>
+        <button className="min-h-14 rounded-md border border-operation bg-white px-4 py-3 text-base font-semibold text-operation" onClick={() => updateStatus("passenger_onboard")} type="button">รับผู้โดยสารแล้ว</button>
+        <button className="min-h-14 rounded-md border border-operation bg-white px-4 py-3 text-base font-semibold text-operation" onClick={() => updateStatus("completed")} type="button">เสร็จสิ้นงาน</button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
         <a className="min-h-12 rounded-md border border-route px-4 py-3 text-center text-sm font-semibold text-route" href={mapsUrl}>เปิด Google Maps</a>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
         <button className="min-h-12 rounded-md border border-amber-300 px-4 py-3 text-sm font-semibold text-amber-800" onClick={reportIssue} type="button">แจ้งปัญหา</button>
-        <a className="min-h-12 rounded-md border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700" href="tel:+6620000000">โทรหาผู้ประสานงาน</a>
-        <a className="min-h-12 rounded-md border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700" href="tel:+6621111111">โทรศูนย์ควบคุม</a>
       </div>
-      {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
-    </div>
+      {message ? <p className="rounded-md bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}
+    </section>
   );
 }

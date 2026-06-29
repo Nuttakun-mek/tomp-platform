@@ -1,47 +1,48 @@
 # Thai UI Audit
 
-วันที่ตรวจ: 2026-06-29
+วันที่ตรวจ: 2026-06-30
 
-## ขอบเขตที่ตรวจ
+## Pages Reviewed
 
 - ภาพรวม
 - โครงการ
+- สร้างโครงการ
 - รายละเอียดโครงการ
 - Assignment planning
-- ทรัพยากร คนขับ และรถ
-- หน้าคนขับและ Driver Card
-- Mission Control
-- Login
-- Publish และ Change Request
-- Pilot checklist
+- ทรัพยากร
+- คนขับ
+- รถ
+- หน้าคนขับ
+- Driver Card จาก QR
+- ศูนย์ควบคุมปฏิบัติการ
+- เข้าสู่ระบบ
+- ทดสอบ Pilot
 
-## สรุปผล
+## Summary
 
-UI หลักถูกปรับเป็น Thai-first แล้ว โดยใช้ภาษาไทยแบบทางการแต่เข้าใจง่ายสำหรับทีมปฏิบัติการและคนขับ หน้าคนขับถูกปรับให้ mobile-first พร้อมปุ่มขนาดใหญ่และคำสั่งที่ตรงกับการปฏิบัติงานจริง
+UI หลักถูกปรับเป็น Thai-first และยกระดับ visual design ให้เหมาะกับ internal pilot มากขึ้น รอบนี้เน้น mobile driver experience, Mission Control dashboard, form grouping, Thai validation messages, clean navigation, และ shared UI primitives
 
-## คำอังกฤษที่ตั้งใจคงไว้
+## Remaining English Terms
 
-| คำ | เหตุผล |
+| Term | Reason |
 | --- | --- |
 | TOMP | ชื่อผลิตภัณฑ์ |
-| Assignment | เป็น core domain term ที่ใช้ใน handbook และ UI วางแผน |
-| Call Sign | เป็น operational identity เฉพาะทาง |
-| QR | เป็นคำที่ผู้ใช้ทั่วไปเข้าใจอยู่แล้ว |
-| GPS | เป็นคำเทคนิคที่ใช้กับตำแหน่ง |
+| Assignment | core domain term ของระบบ |
+| Call Sign | operational identity |
+| QR | คำที่ผู้ใช้ทั่วไปเข้าใจ |
+| GPS | คำเทคนิคด้านตำแหน่ง |
 | Google Maps | ชื่อบริการนำทาง |
-| Timeline | เป็นแนวคิดหลักของระบบและใช้คู่กับคำอธิบายภาษาไทย |
-| Mission Control | ใช้คู่กับคำอธิบายภาษาไทยว่า “ศูนย์ควบคุมปฏิบัติการ” |
-| Supabase, Vercel | ใช้ในเอกสารเทคนิคเท่านั้น |
 
-## ประเด็นที่ยังต้องตรวจโดยผู้ใช้จริง
+## Readiness
 
-- คำว่า Assignment ควรคงไว้หรือใช้ “งานที่จัดสรร” ในบางหน้าสำหรับผู้ใช้ใหม่
-- Driver Card ควรทดสอบกับคนขับจริงบนมือถือหลายขนาด
-- Mission Control ควรทดสอบกับทีม control room เพื่อปรับ density ของข้อมูล
-- ข้อความ error จาก server actions บางส่วนยังอาจมาจากฐานข้อมูลเป็นภาษาอังกฤษ
+- Thai UI readiness: 8.5/10
+- Mobile driver readiness: 8.5/10
+- Mission Control readiness: 8/10
+- Pilot readiness: 8/10
 
-## คะแนนความพร้อม
+## Remaining Issues
 
-Thai-first internal pilot readiness: 8/10
-
-ยังไม่ควรประกาศว่า production-ready จนกว่า auth, RBAC, token security, storage policy, realtime และ E2E test จะผ่านการตรวจจริง
+- ข้อความ error จากฐานข้อมูลจริงอาจยังเป็นภาษาอังกฤษบางส่วน
+- ต้องทดสอบ Driver Card บนมือถือจริงหลายขนาด
+- ต้องทดสอบ Mission Control กับทีมปฏิบัติการจริงเพื่อปรับ density
+- ยังไม่ควรประกาศว่า production-ready จนกว่า auth, RBAC, token security, storage policy, realtime และ E2E test จะผ่านการตรวจจริง

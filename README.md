@@ -1,24 +1,23 @@
 # TOMP Enterprise Platform
 
-TOMP คือ **Transportation Operations Management Platform** สำหรับวางแผน เตรียมความพร้อม ประกาศใช้แผน ปฏิบัติการ กู้คืนสถานการณ์ และทบทวนผลงานขนส่งแบบ event-based
+TOMP คือ Transportation Operations Management Platform สำหรับวางแผน เตรียมความพร้อม ประกาศใช้แผน ปฏิบัติการ กู้คืนสถานการณ์ และทบทวนงานขนส่งแบบ event-based
 
-TOMP ไม่ใช่ fleet maintenance, ERP, CRM, payroll, accounting หรือระบบ route optimization จุดโฟกัสคือ operations management: Project, Mission, Assignment, Call Sign, Driver Card, Timeline, Publish และ Change Request
+TOMP ไม่ใช่ fleet maintenance, ERP, CRM, payroll, accounting หรือ route optimization จุดโฟกัสคือ operations management: Project, Mission, Assignment, Call Sign, Driver Card, Timeline, Publish และ Change Request
 
 ## สถานะปัจจุบัน
 
-Repository นี้ผ่าน Sprint 0-30 ในระดับ internal pilot foundation แล้ว โดย Sprint 25-30 เปลี่ยน UI หลักเป็น Thai-first และเพิ่ม flow สำหรับทดสอบ Pilot ภายใน
+Repository นี้อยู่ในระดับ **Thai-first internal pilot foundation** รอบล่าสุดเน้น UI/UX hardening ไม่ได้เพิ่ม business scope ใหม่
 
-สิ่งที่ใช้งานและทดสอบได้ตอนนี้:
+สิ่งที่ใช้งานและทดสอบได้:
 
 - หน้าเว็บ Next.js + TypeScript + Tailwind CSS
-- Supabase schema, migrations, seed และ read/write helpers ฝั่ง server
 - โครงการ ภารกิจ Assignment ทรัพยากร คนขับ รถ และ Driver Card
+- Mission Control สำหรับทีมปฏิบัติการ
 - Publish baseline และ Change Request foundation
 - Timeline แบบ immutable ไม่มี UI สำหรับแก้ไขหรือลบเหตุการณ์
 - QR/driver access foundation แบบ assignment-scoped
-- Driver activation พร้อม checklist, status update และ photo upload foundation
-- Mission Control พร้อม readiness, exception list, Timeline และ Realtime fallback
-- หน้า `ทดสอบ Pilot` สำหรับเดิน flow end-to-end เป็นภาษาไทย
+- หน้า `ทดสอบ Pilot` สำหรับเดิน flow end-to-end
+- Supabase schema, migrations, seed และ read/write helpers ฝั่ง server
 
 ## วิธีรันในเครื่อง
 
@@ -44,8 +43,6 @@ NEXT_TELEMETRY_DISABLED=1 npm run build
 ## Supabase
 
 ตั้งค่า environment variables ใน `.env.local` เท่านั้น ห้าม commit secret key หรือ service-role key ขึ้น Git
-
-ค่าหลัก:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL=

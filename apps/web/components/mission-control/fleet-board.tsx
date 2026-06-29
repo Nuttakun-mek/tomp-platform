@@ -11,8 +11,11 @@ export function FleetBoard() {
   });
 
   return (
-    <section className="grid gap-3">
-      <h2 className="text-lg font-semibold text-ink">สถานะรถและคนขับ</h2>
+    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+      <div>
+        <h2 className="text-lg font-semibold text-ink">สถานะรถและคนขับ</h2>
+        <p className="mt-1 text-sm text-slate-600">ตรวจข้อมูลที่ต้องมีสำหรับ Assignment ก่อนเริ่มงาน</p>
+      </div>
       <AssignmentReadinessPanel
         readiness={{
           assignmentId: "10000000-0000-4000-8000-000000000010",

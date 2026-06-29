@@ -10,17 +10,17 @@ import { createProjectTimelineEvent } from "@/lib/timeline";
 export async function createProjectAction(input: unknown): Promise<ActionResult> {
   const parsed = createProjectSchema.safeParse(input);
   if (!parsed.success) {
-    return actionFailure("Project validation failed.", parsed.error.flatten().fieldErrors);
+    return actionFailure("ข้อมูลโครงการไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
   }
 
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
-    return actionFailure(error || "Supabase is not configured for writes.");
+    return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
 
   const permission = await requirePermission(parsed.data.organizationId, "project.create");
   if (!permission.allowed && mode !== "service_role") {
-    return actionFailure(permission.reason || "Missing permission: project.create");
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างโครงการ");
   }
 
   const { data, error: insertError } = await client
@@ -41,7 +41,7 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
     .single();
 
   if (insertError) {
-    return actionFailure(`Database insert failed: ${insertError.message}`);
+    return actionFailure(`บันทึกโครงการไม่สำเร็จ: ${insertError.message}`);
   }
 
   const project = mapProject(data);
@@ -49,6 +49,6 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
 
   return actionSuccess(
     { mode, project, timelineEvent: timelineResult.data },
-    timelineResult.success ? undefined : `Project was created, but timeline insert failed: ${timelineResult.error}`
+    timelineResult.success ? undefined : `สร้างโครงการแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
 }

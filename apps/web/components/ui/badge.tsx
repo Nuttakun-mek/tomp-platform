@@ -7,6 +7,5 @@ const tones = {
 };
 
 export function Badge({ label, tone = "neutral" }: { label: string; tone?: keyof typeof tones }) {
-  return <span className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{label}</span>;
+  return <span className={`inline-flex whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{label}</span>;
 }
-

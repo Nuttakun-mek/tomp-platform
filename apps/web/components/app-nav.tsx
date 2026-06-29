@@ -22,7 +22,7 @@ export function AppNav() {
 
   return (
     <div className="grid gap-3">
-      <button className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 lg:hidden" onClick={() => setOpen((current) => !current)} type="button">
+      <button className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm lg:hidden" onClick={() => setOpen((current) => !current)} type="button">
         เมนู
       </button>
       <nav className={`${open ? "grid" : "hidden"} gap-1 lg:grid`} aria-label="เมนูหลัก">
@@ -32,7 +32,7 @@ export function AppNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`rounded-md px-3 py-2 text-sm font-semibold transition ${active ? "bg-operation text-white" : "text-slate-700 hover:bg-slate-100 hover:text-operation"}`}
+              className={`rounded-md px-3 py-2.5 text-sm font-semibold transition ${active ? "bg-operation text-white shadow-sm" : "text-slate-700 hover:bg-slate-100 hover:text-operation"}`}
             >
               {item.label}
             </Link>

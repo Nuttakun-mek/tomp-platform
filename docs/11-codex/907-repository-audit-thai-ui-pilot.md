@@ -1,23 +1,23 @@
 # Repository Audit: Thai UI Pilot
 
-วันที่ตรวจ: 2026-06-29
+วันที่ตรวจ: 2026-06-30
 
-## Thai UI Conversion Summary
+## What Changed
 
-Sprint 25-30 ปรับ application UI หลักจาก English prototype เป็น Thai-first internal pilot application โดยเน้น flow ที่ใช้งานจริง:
+รอบนี้เป็น UI/UX hardening สำหรับ Thai-first internal pilot โดยไม่เพิ่ม business scope ใหม่
 
-- ภาพรวม
-- โครงการ
-- ภารกิจ
-- Assignment
-- ทรัพยากร
-- หน้าคนขับ
-- Mission Control
-- Publish baseline
-- Change Request
-- Pilot checklist
+Completed:
 
-## Files Created
+- Clean Thai navigation and app shell
+- Polished dashboard
+- Mobile-first Driver Card and driver actions
+- Mission Control redesign for operations staff
+- Project, Mission, and Assignment forms grouped and Thai-first
+- Shared UI components polished
+- Thai server action messages for primary create flows
+- README and verification docs refreshed
+
+## Files Created Earlier And Kept
 
 - `apps/web/lib/i18n/th.ts`
 - `apps/web/lib/i18n/status-th.ts`
@@ -29,28 +29,20 @@ Sprint 25-30 ปรับ application UI หลักจาก English prototype
 
 ## Functional Readiness
 
-- Main navigation is Thai-first.
-- Driver Card is mobile-first and uses Thai action labels.
-- Mission Control uses Thai section names, Thai empty states, and Thai status badges.
-- Project, Mission, Assignment, Driver, and Vehicle forms use Thai labels and messages.
-- Demo/fallback data is labeled or rewritten as `ข้อมูลตัวอย่าง` where visible.
-- Pilot checklist provides a guided end-to-end path.
+- Main UI is Thai-first.
+- Driver UI is mobile-first with large buttons and persistent contact actions.
+- Mission Control is visually clearer for desktop/tablet operations use.
+- Project/Mission/Assignment forms are more usable and less prototype-like.
+- Demo/fallback data is labeled as `ข้อมูลตัวอย่าง` where visible.
 
-## Pilot Readiness
+## Not Production Ready
 
-Ready for guided internal pilot with operations staff and selected drivers.
-
-Not ready for unsupervised production use.
-
-## Remaining Production Gaps
-
-- Auth/RBAC hardening with real users.
-- RLS policy proof against real Supabase auth claims.
-- Publish/change side-effect audit.
-- Driver token expiry/revocation UX and security review.
-- Supabase Storage bucket policy verification.
-- Realtime Mission Control load and reconnect testing.
-- End-to-end browser tests for Thai pilot scenario.
+- Auth/RBAC hardening with real users
+- RLS proof against real Supabase Auth claims
+- Driver token revoke/expiry UX
+- Supabase Storage policy verification
+- Realtime Mission Control load testing
+- E2E browser testing for the Thai pilot path
 
 ## Recommended Next Sprint
 
@@ -58,8 +50,8 @@ Sprint 31: Thai internal pilot hardening
 
 Focus:
 
-1. Run a supervised pilot with Thai operation manager, coordinator, and driver.
-2. Capture UX feedback per role.
-3. Convert remaining backend-origin error messages into Thai-friendly action results.
-4. Add E2E smoke tests for the Thai pilot path.
-5. Verify Supabase RLS, Storage, and Auth behavior with real users.
+1. Run guided pilot with operation manager, coordinator, and driver.
+2. Capture UX feedback by role.
+3. Convert remaining backend-origin database errors to Thai action messages.
+4. Add Playwright smoke tests for the Thai pilot flow.
+5. Verify Supabase RLS, Auth, Storage, and Realtime with real users.

@@ -11,20 +11,20 @@ import { assertPlanEditable } from "@/lib/domain/publish-locking";
 export async function createAssignmentAction(input: unknown): Promise<ActionResult> {
   const parsed = createAssignmentSchema.safeParse(input);
   if (!parsed.success) {
-    return actionFailure("Assignment validation failed.", parsed.error.flatten().fieldErrors);
+    return actionFailure("ข้อมูล Assignment ไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
   }
 
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
-    return actionFailure(error || "Supabase is not configured for writes.");
+    return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
 
   const permission = await requirePermission(parsed.data.projectId, "assignment.create");
   if (!permission.allowed && mode !== "service_role") {
-    return actionFailure(permission.reason || "Missing permission: assignment.create");
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้าง Assignment");
   }
   const editable = await assertPlanEditable(parsed.data.projectId);
-  if (!editable.editable) return actionFailure(editable.reason || "Project is locked.");
+  if (!editable.editable) return actionFailure(editable.reason || "โครงการถูกล็อกแล้ว กรุณาส่งคำขอเปลี่ยนแปลง");
 
   const { data, error: insertError } = await client
     .from("assignments")
@@ -43,7 +43,7 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
     .single();
 
   if (insertError) {
-    return actionFailure(`Database insert failed: ${insertError.message}`);
+    return actionFailure(`บันทึก Assignment ไม่สำเร็จ: ${insertError.message}`);
   }
 
   const assignment = mapAssignment(data);
@@ -51,6 +51,6 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
 
   return actionSuccess(
     { mode, assignment, timelineEvent: timelineResult.data },
-    timelineResult.success ? undefined : `Assignment was created, but timeline insert failed: ${timelineResult.error}`
+    timelineResult.success ? undefined : `สร้าง Assignment แล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
 }

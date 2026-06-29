@@ -2,7 +2,7 @@
 
 ## Latest Command Results
 
-Run date: 2026-06-29.
+Run date: 2026-06-30.
 
 | Command | Result |
 | --- | --- |
@@ -10,7 +10,7 @@ Run date: 2026-06-29.
 | `npm.cmd run typecheck` | Passed |
 | `npm.cmd run lint` | Passed |
 | `npm.cmd run test` | Passed: 6 test files, 13 tests |
-| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed after stopping stale build/dev processes, clearing `.next`, and allowing a long build window on OneDrive; 15 routes generated |
+| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed after stopping stale dev/build processes and clearing `.next`; 15 routes generated |
 
 ## What Passed
 
@@ -18,15 +18,14 @@ Run date: 2026-06-29.
 - TypeScript compiled for `apps/web`.
 - ESLint completed with no errors.
 - Vitest completed with 6 passing files and 13 passing tests.
-- Next.js production build completed and generated 15 routes, including `/pilot-checklist`, `/mission-control`, `/driver/[token]`, `/projects/[projectId]`, and `/projects/[projectId]/assignments`.
-- Thai-first UI routes render without requiring live Supabase during build.
+- Next.js production build completed and generated 15 routes.
+- Thai-first UI hardening builds successfully.
 
-## What Failed And Was Fixed
+## Notes From This Verification
 
-- PowerShell blocked `npm.ps1`; verification used `npm.cmd`, which is the Windows npm executable.
-- Early build attempts timed out while stale Next.js/dev processes were still running.
-- `.next` generated inside OneDrive produced stale manifest `readlink` errors after interrupted builds; stopping stale processes and clearing `.next` fixed it.
-- Server-side Supabase clients now return demo fallback during `phase-production-build`, preventing build-time network handles while preserving runtime Supabase usage.
+- `npm.ps1` may be blocked by Windows execution policy, so verification used `npm.cmd`.
+- Next.js build is slow inside the OneDrive workspace; interrupted builds can leave stale `.next` manifests. Stop stale Node processes and clear `.next` before rerunning build.
+- npm audit findings were not force-fixed because that may introduce dependency changes outside the UI hardening scope.
 
 ## Not Tested Yet
 
@@ -47,8 +46,8 @@ Run date: 2026-06-29.
 3. Run `npm.cmd run lint`.
 4. Run `npm.cmd run test`.
 5. Stop any local dev server if build conflicts with `.next`.
-6. Run `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build`.
-7. Apply migrations in order to a local or hosted Supabase database.
-8. Run `database/seed/0001_demo_kernel.sql`.
-9. Run `database/seed/0002_thai_pilot_scenario.sql`.
-10. Verify Thai project, mission, assignment, driver token, and timeline rows.
+6. Clear `apps/web/.next` if a previous build was interrupted.
+7. Run `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build`.
+8. Apply migrations in order to Supabase.
+9. Run `database/seed/0001_demo_kernel.sql`.
+10. Run `database/seed/0002_thai_pilot_scenario.sql`.

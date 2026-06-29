@@ -10,17 +10,17 @@ import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 export async function createDriverAction(input: unknown): Promise<ActionResult> {
   const parsed = createDriverSchema.safeParse(input);
   if (!parsed.success) {
-    return actionFailure("Driver validation failed.", parsed.error.flatten().fieldErrors);
+    return actionFailure("ข้อมูลคนขับไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
   }
 
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
-    return actionFailure(error || "Supabase is not configured for writes.");
+    return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
   const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
   if (projectId) {
     const permission = await requirePermission(projectId, "driver.create");
-    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: driver.create");
+    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างข้อมูลคนขับ");
   }
 
   const { data, error: insertError } = await client
@@ -38,7 +38,7 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
     .single();
 
   if (insertError) {
-    return actionFailure(`Database insert failed: ${insertError.message}`);
+    return actionFailure(`บันทึกข้อมูลคนขับไม่สำเร็จ: ${insertError.message}`);
   }
 
   const driver = mapDriver(data);
@@ -50,31 +50,31 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
         objectId: driver.id,
         eventType: TIMELINE_EVENTS.DRIVER_CREATED,
         source: "operation_user",
-        reason: "Driver resource created from server action.",
+        reason: "สร้างข้อมูลคนขับจากหน้าทรัพยากร",
         afterData: data
       })
-    : actionSuccess(null, "No projectId metadata was provided, so no project timeline event was created.");
+    : actionSuccess(null, "ไม่มี projectId จึงยังไม่สร้าง Timeline ของโครงการ");
 
   return actionSuccess(
     { mode, driver, timelineEvent: timelineResult.data },
-    timelineResult.success ? timelineResult.warning : `Driver was created, but timeline insert failed: ${timelineResult.error}`
+    timelineResult.success ? timelineResult.warning : `สร้างข้อมูลคนขับแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
 }
 
 export async function createVehicleAction(input: unknown): Promise<ActionResult> {
   const parsed = createVehicleSchema.safeParse(input);
   if (!parsed.success) {
-    return actionFailure("Vehicle validation failed.", parsed.error.flatten().fieldErrors);
+    return actionFailure("ข้อมูลรถไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
   }
 
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
-    return actionFailure(error || "Supabase is not configured for writes.");
+    return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
   const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
   if (projectId) {
     const permission = await requirePermission(projectId, "vehicle.create");
-    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: vehicle.create");
+    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างข้อมูลรถ");
   }
 
   const { data, error: insertError } = await client
@@ -91,7 +91,7 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
     .single();
 
   if (insertError) {
-    return actionFailure(`Database insert failed: ${insertError.message}`);
+    return actionFailure(`บันทึกข้อมูลรถไม่สำเร็จ: ${insertError.message}`);
   }
 
   const vehicle = mapVehicle(data);
@@ -103,13 +103,13 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
         objectId: vehicle.id,
         eventType: TIMELINE_EVENTS.VEHICLE_CREATED,
         source: "operation_user",
-        reason: "Vehicle resource created from server action.",
+        reason: "สร้างข้อมูลรถจากหน้าทรัพยากร",
         afterData: data
       })
-    : actionSuccess(null, "No projectId metadata was provided, so no project timeline event was created.");
+    : actionSuccess(null, "ไม่มี projectId จึงยังไม่สร้าง Timeline ของโครงการ");
 
   return actionSuccess(
     { mode, vehicle, timelineEvent: timelineResult.data },
-    timelineResult.success ? timelineResult.warning : `Vehicle was created, but timeline insert failed: ${timelineResult.error}`
+    timelineResult.success ? timelineResult.warning : `สร้างข้อมูลรถแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
 }

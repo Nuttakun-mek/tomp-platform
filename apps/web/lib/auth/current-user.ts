@@ -20,9 +20,9 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
       id: "development-profile",
       authUserId: null,
       organizationId: "10000000-0000-4000-8000-000000000001",
-      fullName: "Development Operator",
+      fullName: "ผู้ปฏิบัติการตัวอย่าง",
       email: null,
-      roleLabel: "project_manager placeholder",
+      roleLabel: "ผู้จัดการโครงการ (โหมดพัฒนา)",
       isDevelopmentFallback: true
     };
   }
@@ -35,9 +35,9 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
       id: "anonymous-development-profile",
       authUserId: null,
       organizationId: null,
-      fullName: "Not signed in",
+      fullName: "ยังไม่ได้เข้าสู่ระบบ",
       email: null,
-      roleLabel: "guest placeholder",
+      roleLabel: "ผู้เยี่ยมชม",
       isDevelopmentFallback: true
     };
   }
@@ -52,9 +52,9 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     id: typeof profile?.id === "string" ? profile.id : authUser.id,
     authUserId: authUser.id,
     organizationId: typeof profile?.organization_id === "string" ? profile.organization_id : null,
-    fullName: typeof profile?.full_name === "string" ? profile.full_name : authUser.email || "Authenticated user",
+    fullName: typeof profile?.full_name === "string" ? profile.full_name : authUser.email || "ผู้ใช้ที่เข้าสู่ระบบ",
     email: typeof profile?.email === "string" ? profile.email : authUser.email || null,
-    roleLabel: "authenticated placeholder",
+    roleLabel: "ผู้ใช้ที่เข้าสู่ระบบ",
     isDevelopmentFallback: false
   };
 }

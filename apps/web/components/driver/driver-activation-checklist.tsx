@@ -37,10 +37,11 @@ export function DriverActivationChecklist({ driverAccess }: { driverAccess?: Dri
       photoUrl: null,
       platePhotoUrl: null,
       metadata: {
-        photoPlaceholder: formData.get("vehiclePhotoCaptured") === "on",
-        platePhotoPlaceholder: formData.get("platePhotoCaptured") === "on"
+        photoCaptured: formData.get("vehiclePhotoCaptured") === "on",
+        platePhotoCaptured: formData.get("platePhotoCaptured") === "on"
       }
     });
+
     const photoFormData = new FormData();
     photoFormData.set("projectId", driverAccess.project.id);
     photoFormData.set("assignmentId", driverAccess.assignment.id);
@@ -63,29 +64,32 @@ export function DriverActivationChecklist({ driverAccess }: { driverAccess?: Dri
   ] as const;
 
   return (
-    <form action={handleSubmit} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold text-ink">ยืนยันความพร้อมก่อนเริ่มงาน</h2>
-      <p className="mt-1 text-sm text-slate-600">ตรวจข้อมูลหลักให้ครบก่อนกดส่งข้อมูลความพร้อม</p>
+    <form action={handleSubmit} className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+      <h2 className="text-lg font-semibold text-ink">ยืนยันความพร้อม</h2>
+      <p className="mt-1 text-sm text-slate-600">กรุณาตรวจข้อมูลให้ครบก่อนเริ่มงาน</p>
+
       <div className="mt-4 grid gap-3">
         {checklist.map(([name, label]) => (
           <label key={name} className="flex min-h-12 items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            <input name={name} type="checkbox" className="h-5 w-5" />
+            <input name={name} type="checkbox" className="h-5 w-5 accent-teal-700" />
             {label}
           </label>
         ))}
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           ถ่ายรูปรถ
-          <input className="rounded-md border border-slate-300 px-3 py-2" name="vehiclePhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+          <input className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" name="vehiclePhoto" type="file" accept="image/png,image/jpeg,image/webp" />
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           ถ่ายรูปป้ายทะเบียน
-          <input className="rounded-md border border-slate-300 px-3 py-2" name="platePhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+          <input className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" name="platePhoto" type="file" accept="image/png,image/jpeg,image/webp" />
         </label>
       </div>
-      {message ? <p className="mt-3 text-sm font-medium text-slate-700">{message}</p> : null}
-      <button className="mt-4 min-h-12 w-full rounded-md bg-operation px-4 py-3 text-base font-semibold text-white" type="submit">
+
+      {message ? <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}
+      <button className="mt-4 min-h-14 w-full rounded-md bg-operation px-4 py-3 text-base font-semibold text-white shadow-sm" type="submit">
         ส่งข้อมูลความพร้อม
       </button>
     </form>

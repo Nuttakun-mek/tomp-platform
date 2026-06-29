@@ -4,8 +4,8 @@
 
 :root {
   color-scheme: light;
-  background: #f6f8fb;
-  color: #17202a;
+  background: #f4f7fb;
+  color: #142033;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
@@ -17,10 +17,10 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 28rem),
-    linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
-  color: #17202a;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(244, 247, 251, 0.95) 42%, #eef3f8 100%);
+  color: #142033;
   text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -37,4 +37,8 @@ textarea {
 
 ::selection {
   background: rgba(15, 118, 110, 0.18);
+}
+
+.focus-ring {
+  @apply outline-none ring-offset-2 ring-offset-white focus-visible:ring-2 focus-visible:ring-operation/30;
 }
