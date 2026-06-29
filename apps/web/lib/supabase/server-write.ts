@@ -9,15 +9,18 @@ export interface SupabaseWriteClientResult {
 }
 
 export function getSupabaseWriteClient(): SupabaseWriteClientResult {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl) {
     return {
       client: null,
       mode: "missing",
-      error: "NEXT_PUBLIC_SUPABASE_URL is not configured."
+      error: "NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL is not configured."
     };
   }
 
@@ -27,7 +30,7 @@ export function getSupabaseWriteClient(): SupabaseWriteClientResult {
     return {
       client: null,
       mode: "missing",
-      error: "SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY is required for server-side writes."
+      error: "SUPABASE_SERVICE_ROLE_KEY, SUPABASE_SECRET_KEY, or a publishable key is required for server-side writes."
     };
   }
 
@@ -41,4 +44,3 @@ export function getSupabaseWriteClient(): SupabaseWriteClientResult {
     mode: serviceRoleKey ? "service_role" : "anon_development"
   };
 }
-

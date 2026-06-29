@@ -10,6 +10,7 @@ export type TimelineSource = "system" | "operation_user" | "driver_qr" | "coordi
 export type DriverActivationStatus = "pending" | "ready" | "blocked";
 export type CheckinStatus = "pending" | "confirmed" | "rejected";
 export type DriverIssueSeverity = "info" | "warning" | "urgent";
+export type DriverLocationSource = "driver_web_app" | "operation_user" | "system" | "demo";
 export type ReadinessStatus = "ready" | "warning" | "blocked";
 export type OperationalRiskLevel = "low" | "medium" | "high";
 export type PublishStatus = "draft" | "published" | "superseded" | "archived";
@@ -175,6 +176,21 @@ export interface DriverIssueReport {
   issueType: string;
   severity: DriverIssueSeverity;
   message?: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface DriverLocation {
+  id: Id;
+  projectId: Id;
+  assignmentId?: Id | null;
+  driverId?: Id | null;
+  vehicleId?: Id | null;
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  recordedAt: string;
+  source: DriverLocationSource;
+  createdAt: string;
   metadata: Record<string, unknown>;
 }
 

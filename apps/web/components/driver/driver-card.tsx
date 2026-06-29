@@ -4,6 +4,7 @@ import { buildGoogleMapsDirectionsUrl } from "@/lib/domain/assignment-rules";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { DriverActivationChecklist } from "./driver-activation-checklist";
 import { DriverContactStrip } from "./driver-contact-strip";
+import { DriverLocationShare } from "./driver-location-share";
 import { DriverQuickActions } from "./driver-quick-actions";
 
 export function DriverCard({ driverAccess }: { driverAccess?: DriverAccessAssignment }) {
@@ -40,6 +41,7 @@ export function DriverCard({ driverAccess }: { driverAccess?: DriverAccessAssign
       </section>
 
       <DriverQuickActions driverAccess={driverAccess} mapsUrl={mapsUrl} />
+      <DriverLocationShare driverAccess={driverAccess} />
       <DriverContactStrip />
       <DriverActivationChecklist driverAccess={driverAccess} />
     </div>

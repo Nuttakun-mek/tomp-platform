@@ -10,7 +10,7 @@ Run date: 2026-06-30.
 | `npm.cmd run typecheck` | Passed |
 | `npm.cmd run lint` | Passed |
 | `npm.cmd run test` | Passed: 6 test files, 13 tests |
-| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed after stopping stale dev/build processes and clearing `.next`; 15 routes generated |
+| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed after clearing stale `.next`; 17 routes generated |
 
 ## What Passed
 
@@ -18,8 +18,8 @@ Run date: 2026-06-30.
 - TypeScript compiled for `apps/web`.
 - ESLint completed with no errors.
 - Vitest completed with 6 passing files and 13 passing tests.
-- Next.js production build completed and generated 15 routes.
-- Thai-first UI hardening builds successfully.
+- Next.js production build completed and generated 17 routes, including driver location and Mission Control location APIs.
+- Thai-first UI and driver live location pilot build successfully.
 
 ## Notes From This Verification
 
@@ -36,6 +36,7 @@ Run date: 2026-06-30.
 - Real Supabase Auth session persistence across browser refreshes.
 - Supabase Storage bucket policy and signed URL review.
 - Supabase Realtime delivery and reconnect behavior under real operations.
+- Real mobile browser geolocation on a Vercel HTTPS deployment.
 - Driver QR token expiry and revoke UX with real tokens.
 - End-to-end browser automation for the Thai pilot path.
 
@@ -48,6 +49,6 @@ Run date: 2026-06-30.
 5. Stop any local dev server if build conflicts with `.next`.
 6. Clear `apps/web/.next` if a previous build was interrupted.
 7. Run `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build`.
-8. Apply migrations in order to Supabase.
+8. Apply migrations in order to Supabase through `database/migrations/0011_driver_live_location_pilot.sql`.
 9. Run `database/seed/0001_demo_kernel.sql`.
 10. Run `database/seed/0002_thai_pilot_scenario.sql`.

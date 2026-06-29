@@ -1,15 +1,20 @@
 import { ExceptionList } from "@/components/mission-control/exception-list";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
-import { MapPlaceholder } from "@/components/mission-control/map-placeholder";
+import { LiveLocationMap } from "@/components/mission-control/live-location-map";
 import { ReadinessBoard } from "@/components/mission-control/readiness-board";
 import { RealtimeStatusPanel } from "@/components/mission-control/realtime-status-panel";
 import { TimelineFeed } from "@/components/mission-control/timeline-feed";
 import { PageHeader } from "@/components/page-header";
+import { getProjects } from "@/lib/data/projects";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
+import { getLatestDriverLocationsByProjectId } from "@/lib/data/locations";
 import { demoProject } from "@/lib/demo/demo-kernel";
 
 export default async function MissionControlPage() {
-  const events = await getTimelineEventsByProjectId(demoProject.id);
+  const projects = await getProjects();
+  const activeProject = projects[0] ?? demoProject;
+  const events = await getTimelineEventsByProjectId(activeProject.id);
+  const locations = await getLatestDriverLocationsByProjectId(activeProject.id);
 
   return (
     <>
@@ -50,12 +55,12 @@ export default async function MissionControlPage() {
         </div>
         <div className="grid gap-6">
           <TimelineFeed events={events} />
-          <RealtimeStatusPanel projectId={demoProject.id} />
+          <RealtimeStatusPanel projectId={activeProject.id} />
         </div>
       </div>
 
       <div className="mt-6">
-        <MapPlaceholder />
+        <LiveLocationMap projectId={activeProject.id} initialLocations={locations} />
       </div>
     </>
   );

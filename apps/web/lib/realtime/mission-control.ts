@@ -36,6 +36,10 @@ export function subscribeToVehicleCheckins(projectId: string, handler: Handler) 
   return subscribe("vehicle_checkins", projectId, handler);
 }
 
+export function subscribeToDriverLocations(projectId: string, handler: Handler) {
+  return subscribe("gps_locations", projectId, handler);
+}
+
 export function unsubscribeMissionControl(channels: Array<ReturnType<typeof subscribe>>) {
   let supabase;
   try {

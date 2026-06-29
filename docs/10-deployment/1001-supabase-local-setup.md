@@ -14,10 +14,14 @@ Application:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
 DRIVER_ACCESS_TOKEN_SECRET=
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:7000
 ```
 
 Local database:
@@ -26,7 +30,7 @@ Local database:
 SUPABASE_DB_URL=
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is optional for server-side local writes. Never expose service-role keys in browser code, never prefix them with `NEXT_PUBLIC_`, and never import them into client components.
+`SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY` is optional for server-side local writes. Never expose service-role or secret keys in browser code, never prefix them with `NEXT_PUBLIC_`, and never import them into client components.
 
 ## Run Supabase Local
 
@@ -50,6 +54,7 @@ psql "$SUPABASE_DB_URL" -f database/migrations/0007_publish_locking_foundation.s
 psql "$SUPABASE_DB_URL" -f database/migrations/0008_driver_token_security.sql
 psql "$SUPABASE_DB_URL" -f database/migrations/0009_storage_photo_foundation.sql
 psql "$SUPABASE_DB_URL" -f database/migrations/0010_realtime_mission_control_foundation.sql
+psql "$SUPABASE_DB_URL" -f database/migrations/0011_driver_live_location_pilot.sql
 ```
 
 ## Run Seed Data
@@ -84,7 +89,7 @@ Expected demo project code: `TOMP-DEMO-001`.
 1. Start Supabase locally.
 2. Apply migrations through `0006_publish_change_baseline.sql`.
 3. Run the demo seed.
-4. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and optionally `SUPABASE_SERVICE_ROLE_KEY`.
+4. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and optionally `SUPABASE_SECRET_KEY`.
 5. Start the app with `npm run dev`.
 6. Submit create forms from Projects, Missions, Assignments, Drivers, or Vehicles.
 
@@ -100,5 +105,5 @@ select event_type, object_type, reason from public.timeline_events order by crea
 - RLS policies in `0002_rls_foundation.sql` are temporary development placeholders.
 - Project-scoped RBAC is designed but not production-hardened yet.
 - UI routes are placeholder-only and do not require database connectivity.
-- GPS tables exist as placeholders only; no live tracking is implemented.
+- Driver live location pilot exists through browser geolocation, server-side writes, `gps_locations`, and Mission Control map display. It is still not production fleet tracking.
 - Driver QR access token validation is not implemented yet.

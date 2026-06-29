@@ -1,0 +1,99 @@
+import type { DriverLocation } from "@tomp/types/domain";
+import { demoAssignment, demoDriver, demoProject, demoVehicle } from "@/lib/demo/demo-kernel";
+import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+
+type LocationRow = Record<string, unknown>;
+
+function text(row: LocationRow, key: string, fallback = "") {
+  const value = row[key];
+  return typeof value === "string" ? value : fallback;
+}
+
+function numberValue(row: LocationRow, key: string, fallback = 0) {
+  const value = row[key];
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return fallback;
+}
+
+function nullableText(row: LocationRow, key: string) {
+  const value = row[key];
+  return typeof value === "string" ? value : null;
+}
+
+function metadata(row: LocationRow) {
+  const value = row.metadata;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+export function mapDriverLocation(row: LocationRow): DriverLocation {
+  return {
+    id: text(row, "id"),
+    projectId: text(row, "project_id"),
+    assignmentId: nullableText(row, "assignment_id"),
+    driverId: nullableText(row, "driver_id"),
+    vehicleId: nullableText(row, "vehicle_id"),
+    latitude: numberValue(row, "latitude"),
+    longitude: numberValue(row, "longitude"),
+    accuracy: row.accuracy == null ? null : numberValue(row, "accuracy"),
+    recordedAt: text(row, "recorded_at", text(row, "created_at", new Date().toISOString())),
+    source: text(row, "source", "driver_web_app") as DriverLocation["source"],
+    createdAt: text(row, "created_at", new Date().toISOString()),
+    metadata: metadata(row)
+  };
+}
+
+export async function getLatestDriverLocationsByProjectId(projectId: string): Promise<DriverLocation[]> {
+  const client = getSupabaseServerDataClient();
+
+  if (!client) {
+    return getDemoDriverLocations();
+  }
+
+  const { data, error } = await client
+    .from("gps_locations")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("recorded_at", { ascending: false })
+    .limit(50);
+
+  if (error || !data?.length) {
+    return getDemoDriverLocations();
+  }
+
+  const latestByAssignment = new Map<string, DriverLocation>();
+  data.map(mapDriverLocation).forEach((location) => {
+    const key = location.assignmentId || location.driverId || location.id;
+    if (!latestByAssignment.has(key)) {
+      latestByAssignment.set(key, location);
+    }
+  });
+
+  return Array.from(latestByAssignment.values());
+}
+
+export function getDemoDriverLocations(): DriverLocation[] {
+  const now = new Date().toISOString();
+
+  return [
+    {
+      id: "demo-location-1",
+      projectId: demoProject.id,
+      assignmentId: demoAssignment.id,
+      driverId: demoDriver.id,
+      vehicleId: demoVehicle.id,
+      latitude: 13.7563,
+      longitude: 100.5018,
+      accuracy: 25,
+      recordedAt: now,
+      source: "demo",
+      createdAt: now,
+      metadata: {
+        callSign: "A-01",
+        driverName: "สมชาย ใจดี",
+        vehicleLabel: "กท 1001",
+        demo: true
+      }
+    }
+  ];
+}

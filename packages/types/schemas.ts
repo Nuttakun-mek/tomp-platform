@@ -131,6 +131,16 @@ export const assignmentStatusUpdateSchema = z.object({
   metadata: metadataSchema
 });
 
+export const driverLocationUpdateSchema = z.object({
+  token: z.string().trim().min(8).max(512),
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  accuracy: z.coerce.number().min(0).max(10000).optional().nullable(),
+  recordedAt: z.string().trim().optional().nullable(),
+  trackingEvent: z.enum(["sharing_started", "location_ping", "sharing_stopped"]).default("location_ping"),
+  metadata: metadataSchema
+});
+
 export const publishProjectSchema = z.object({
   projectId: uuidSchema,
   reason: z.string().trim().min(2).max(500),
@@ -177,6 +187,7 @@ export type VehicleCheckinInput = z.infer<typeof vehicleCheckinSchema>;
 export type DriverIssueReportInput = z.infer<typeof driverIssueReportSchema>;
 export type DriverCheckinInput = z.infer<typeof driverCheckinSchema>;
 export type AssignmentStatusUpdateInput = z.infer<typeof assignmentStatusUpdateSchema>;
+export type DriverLocationUpdateInput = z.infer<typeof driverLocationUpdateSchema>;
 export type PublishProjectInput = z.infer<typeof publishProjectSchema>;
 export type CreateChangeRequestInput = z.infer<typeof createChangeRequestSchema>;
 export type ApproveChangeRequestInput = z.infer<typeof approveChangeRequestSchema>;
