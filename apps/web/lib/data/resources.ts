@@ -1,10 +1,10 @@
 import type { Driver, Vehicle } from "@tomp/types/domain";
 import { demoKernel } from "@/lib/demo/demo-kernel";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import { mapDriver, mapVehicle } from "./mappers";
 
 export async function getDrivers(): Promise<Driver[]> {
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseServerDataClient();
   if (!supabase) return demoKernel.drivers;
 
   const { data, error } = await supabase.from("drivers").select("*").order("full_name");
@@ -13,7 +13,7 @@ export async function getDrivers(): Promise<Driver[]> {
 }
 
 export async function getVehicles(): Promise<Vehicle[]> {
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseServerDataClient();
   if (!supabase) return demoKernel.vehicles;
 
   const { data, error } = await supabase.from("vehicles").select("*").order("plate_number");
