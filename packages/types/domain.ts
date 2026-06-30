@@ -188,6 +188,7 @@ export interface DriverLocation {
   latitude: number;
   longitude: number;
   accuracy?: number | null;
+  sharingEvent?: "sharing_started" | "location_ping" | "sharing_stopped";
   recordedAt: string;
   source: DriverLocationSource;
   createdAt: string;
