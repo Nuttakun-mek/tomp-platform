@@ -4,8 +4,20 @@
 
 :root {
   color-scheme: light;
-  background: #f4f7fb;
-  color: #142033;
+  --ink: #132238;
+  --ink-soft: #42526b;
+  --canvas: #eef4f8;
+  --panel: #ffffff;
+  --line: #d8e3ef;
+  --operation: #0b756b;
+  --command: #12304a;
+  --route: #2563eb;
+  --success: #0f766e;
+  --warning: #b7791f;
+  --danger: #b91c1c;
+  --pilot: #6d28d9;
+  background: var(--canvas);
+  color: var(--ink);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
@@ -13,12 +25,17 @@
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+}
+
 body {
   min-height: 100vh;
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(244, 247, 251, 0.95) 42%, #eef3f8 100%);
-  color: #142033;
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34rem),
+    linear-gradient(180deg, #f8fbfd 0%, #eef4f8 42%, #e8eff6 100%);
+  color: var(--ink);
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
 }
@@ -36,9 +53,37 @@ textarea {
 }
 
 ::selection {
-  background: rgba(15, 118, 110, 0.18);
+  background: rgba(15, 118, 110, 0.2);
 }
 
 .focus-ring {
   @apply outline-none ring-offset-2 ring-offset-white focus-visible:ring-2 focus-visible:ring-operation/30;
+}
+
+.command-grid {
+  background-image:
+    linear-gradient(rgba(19, 34, 56, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(19, 34, 56, 0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.panel-glow {
+  box-shadow: 0 22px 70px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.status-pulse {
+  position: relative;
+}
+
+.status-pulse::after {
+  animation: pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  border-radius: 9999px;
+  content: "";
+  inset: -6px;
+  opacity: 0.35;
+  position: absolute;
+}
+
+.status-pulse-live::after {
+  background: #10b981;
 }

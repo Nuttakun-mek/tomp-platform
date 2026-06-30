@@ -1,5 +1,7 @@
-import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
+import { PilotRoleCard } from "@/components/pilot/pilot-role-card";
+import { PilotScenarioBoard } from "@/components/pilot/pilot-scenario-board";
+import { PilotStepper } from "@/components/pilot/pilot-stepper";
+import { PilotTestResultPanel } from "@/components/pilot/pilot-test-result-panel";
 import { getProjectIdWithLatestDriverLocation } from "@/lib/data/locations";
 import { getProjects } from "@/lib/data/projects";
 import { demoProject } from "@/lib/demo/demo-kernel";
@@ -10,67 +12,30 @@ export default async function PilotChecklistPage() {
   const projectDetailHref = `/projects/${activeProject.id}`;
   const assignmentsHref = `/projects/${activeProject.id}/assignments`;
 
-  const checklist = [
-    {
-      title: "ตั้งค่าโครงการ",
-      detail: `เลือกหรือสร้างโครงการปฏิบัติการ ปัจจุบันใช้ ${activeProject.projectCode}`,
-      href: "/projects"
-    },
-    {
-      title: "เพิ่มภารกิจ",
-      detail: "กำหนดภารกิจ จุดรับ จุดส่ง เวลา และข้อผูกพันด้านบริการ",
-      href: projectDetailHref
-    },
-    {
-      title: "จัดสรรรถและคนขับ",
-      detail: "เชื่อมภารกิจ Call Sign รถ คนขับ และช่วงเวลาทำงาน",
-      href: assignmentsHref
-    },
-    {
-      title: "สร้าง QR สำหรับคนขับ",
-      detail: "เปิดหน้า Assignment แล้วสร้างลิงก์ QR ที่ผูกกับ Assignment จริง",
-      href: assignmentsHref
-    },
-    {
-      title: "คนขับยืนยันความพร้อม",
-      detail: "ให้คนขับเปิด QR ที่สร้างจริง ระบบจะพาไปหน้าคนขับพร้อม token",
-      href: "/driver"
-    },
-    {
-      title: "ศูนย์ควบคุมตรวจสถานะ",
-      detail: "ติดตามตำแหน่ง GPS, ความพร้อม และ Timeline",
-      href: `/mission-control?projectId=${activeProject.id}`
-    },
-    {
-      title: "ตรวจ Timeline",
-      detail: "ตรวจลำดับเหตุการณ์สำคัญโดยไม่มีปุ่มแก้ไขหรือลบ Timeline",
-      href: `/mission-control?projectId=${activeProject.id}`
-    }
+  const steps = [
+    { title: "สร้างโครงการ", detail: "ตั้งชื่อ รหัส วันที่ และพื้นที่ปฏิบัติการ", href: "/projects/new" },
+    { title: "เพิ่มภารกิจ", detail: "กำหนดจุดรับ จุดส่ง เวลา และข้อผูกพันด้านบริการ", href: projectDetailHref },
+    { title: "จัดสรรรถและคนขับ", detail: "เชื่อมภารกิจ Call Sign คนขับ รถ และช่วงเวลา", href: assignmentsHref },
+    { title: "สร้าง QR", detail: "สร้างลิงก์เข้าหน้างานสำหรับคนขับแบบ assignment-scoped", href: assignmentsHref },
+    { title: "คนขับยืนยันความพร้อม", detail: "เปิดหน้าคนขับ ยืนยันข้อมูล และพร้อมเริ่มงาน", href: "/driver" },
+    { title: "แชร์ GPS", detail: "คนขับกดเริ่มแชร์ตำแหน่งจาก web app", href: "/live-test" },
+    { title: "ศูนย์ควบคุมติดตามสถานะ", detail: "ดูหมุด สีสัญญาณ ความเสี่ยง และรายการที่ต้องติดตาม", href: `/mission-control?projectId=${activeProject.id}` },
+    { title: "ตรวจ Timeline", detail: "ยืนยันว่าลำดับเหตุการณ์สำคัญถูกบันทึก", href: `/mission-control?projectId=${activeProject.id}` },
+    { title: "สรุปข้อสังเกต", detail: "บันทึกสิ่งที่ต้องแก้ก่อน pilot รอบถัดไป", href: "/pilot-checklist" }
   ];
 
   return (
     <>
-      <PageHeader
-        eyebrow="ทดสอบ Pilot"
-        title="Checklist สำหรับทดสอบภายใน"
-        description="เดิน flow จากข้อมูลจริง: โครงการ ภารกิจ Assignment QR คนขับ GPS และ Mission Control"
-      />
-      <section className="mb-6 rounded-md border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-        ระบบเลือกโครงการทดสอบอัตโนมัติ: <span className="font-semibold">{activeProject.projectCode}</span> หากต้องการเปลี่ยนโครงการ ให้เริ่มจากหน้าโครงการหรือ Mission Control
-      </section>
-      <section className="grid gap-4 md:grid-cols-2">
-        {checklist.map((item, index) => (
-          <Link key={item.title} href={item.href} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm hover:border-operation">
-            <div className="flex items-start gap-4">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-operation text-sm font-semibold text-white">{index + 1}</span>
-              <div>
-                <h2 className="text-lg font-semibold text-ink">{item.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </section>
+      <PilotScenarioBoard projectCode={activeProject.projectCode} />
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <PilotStepper steps={steps} />
+        <aside className="grid content-start gap-4">
+          <PilotRoleCard role="Operation Manager" responsibility="ดูภาพรวม ตัดสินใจเมื่อมีความเสี่ยง และยืนยันว่า flow พร้อมทดสอบ" />
+          <PilotRoleCard role="Dispatcher" responsibility="จัดสรรภารกิจ คนขับ รถ Call Sign และ QR สำหรับคนขับ" />
+          <PilotRoleCard role="Driver" responsibility="เปิด QR ยืนยันความพร้อม แชร์ GPS และอัปเดตสถานะงาน" />
+          <PilotTestResultPanel />
+        </aside>
+      </div>
     </>
   );
 }

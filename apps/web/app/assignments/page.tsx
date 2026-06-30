@@ -1,12 +1,9 @@
-import { AssignmentBoardPlaceholder } from "@/components/assignments/assignment-board-placeholder";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
-import { DriverAccessGenerator } from "@/components/driver/driver-access-generator";
-import { PageHeader } from "@/components/page-header";
-import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
+import { DispatchBoard } from "@/components/assignments/dispatch-board";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";
-import { getProjects, getProjectById } from "@/lib/data/projects";
+import { getProjects } from "@/lib/data/projects";
 import { getDrivers, getVehicles } from "@/lib/data/resources";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 
@@ -18,8 +15,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
   const params = searchParams ? await searchParams : {};
   const projects = await getProjects();
   const projectId = params.projectId || projects[0]?.id || demoKernel.projects[0]?.id || "";
-  const [project, assignments, missions, callSigns, drivers, vehicles] = await Promise.all([
-    getProjectById(projectId),
+  const [assignments, missions, callSigns, drivers, vehicles] = await Promise.all([
     getAssignmentsByProjectId(projectId),
     getMissionsByProjectId(projectId),
     getCallSignsByProjectId(projectId),
@@ -28,20 +24,9 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
   ]);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="จัดสรรงาน"
-        title="Assignment"
-        description={`จัดสรรภารกิจ Call Sign คนขับ รถ และช่วงเวลาปฏิบัติงานสำหรับ ${project?.projectCode ?? projectId}`}
-      />
-      <PublishedLockBanner project={project} />
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <CreateAssignmentForm projectId={projectId} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
-        <div className="grid gap-6">
-          <AssignmentBoardPlaceholder assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
-          <DriverAccessGenerator assignments={assignments} projectId={projectId} />
-        </div>
-      </div>
-    </>
+    <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
+      <CreateAssignmentForm projectId={projectId} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
+      <DispatchBoard projectId={projectId} assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
+    </div>
   );
 }

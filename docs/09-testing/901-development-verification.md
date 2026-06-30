@@ -6,57 +6,57 @@ Run date: 2026-06-30.
 
 | Command | Result |
 | --- | --- |
-| `npm.cmd install` | Passed; npm audit reports 7 dependency findings requiring separate review |
+| `npm.cmd install` | Passed; npm audit reports 7 existing dependency findings requiring separate review |
 | `npm.cmd run typecheck` | Passed |
 | `npm.cmd run lint` | Passed |
 | `npm.cmd run test` | Passed: 6 test files, 13 tests |
-| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed after clearing stale `.next`; 17 routes generated |
-| Supabase migration `0011_driver_live_location_pilot.sql` | Applied to hosted Supabase project |
-| Driver token page with real token | Passed; real Assignment rendered |
-| Driver token page with `demo-token` | Passed; rejected as invalid |
-| `POST /api/driver/location` with real token | Passed; inserted row into `gps_locations` |
-| `POST /api/driver/location` with invalid token | Passed; rejected with 403 |
-| `GET /api/mission-control/locations` | Passed; returned latest real driver location |
-| `/mission-control?projectId=<real-project-id>` | Passed; rendered with real project data |
+| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed; 20 app routes generated |
+
+## Current Verification Scope
+
+This verification covers the Thai-first UI/UX reset UX-31 to UX-42:
+
+- App shell redesign.
+- Operations dashboard.
+- Mission Control command center.
+- Driver mobile workspace.
+- Project workspace.
+- Dispatch board.
+- Resources readiness workspace.
+- Guided pilot journey.
+- Thai copy and UX audit documents.
 
 ## What Passed
 
-- Workspace dependency install completed.
 - TypeScript compiled for `apps/web`.
 - ESLint completed with no errors.
 - Vitest completed with 6 passing files and 13 passing tests.
-- Next.js production build completed and generated 17 routes, including driver location and Mission Control location APIs.
-- Thai-first UI and driver live location pilot build successfully.
-- Driver live location pilot was verified against hosted Supabase with a real project, assignment, token hash, and `gps_locations` row.
+- Next.js production build completed.
+- The UI reset did not add new backend business scope.
 
-## Notes From This Verification
+## Notes
 
 - `npm.ps1` may be blocked by Windows execution policy, so verification used `npm.cmd`.
-- Next.js build is slow inside the OneDrive workspace; interrupted builds can leave stale `.next` manifests. Stop stale Node processes and clear `.next` before rerunning build.
-- npm audit findings were not force-fixed because that may introduce dependency changes outside the UI hardening scope.
+- `npm audit` still reports 7 existing findings. They were not force-fixed because that can introduce broad dependency changes outside this UI/UX sprint.
+- Web GPS remains foreground-first. Background GPS after screen lock requires native or hybrid app capability.
+
+## Manual Smoke Test Checklist
+
+1. Open `/`.
+2. Open `/mission-control`.
+3. Open `/projects`.
+4. Open a project workspace.
+5. Open the Assignment dispatch board.
+6. Open `/live-test` and generate a driver test link.
+7. Open the driver link on mobile.
+8. Start GPS sharing.
+9. Confirm Mission Control shows GPS status and driver identity.
+10. Open `/pilot-checklist` and follow the guided journey.
 
 ## Not Tested Yet
 
-- Full Thai pilot scenario with real operation users and drivers on mobile devices.
-- RLS behavior with real authenticated users.
-- Supabase seed `database/seed/0002_thai_pilot_scenario.sql` against a freshly reset database.
-- Production deployment environment variable validation.
-- Real Supabase Auth session persistence across browser refreshes.
-- Supabase Storage bucket policy and signed URL review.
-- Supabase Realtime delivery and reconnect behavior under multiple real mobile devices.
-- Real mobile browser geolocation on a Vercel HTTPS deployment.
-- Driver QR token expiry and revoke UX with real tokens.
-- End-to-end browser automation for the Thai pilot path.
-
-## Local Verification Checklist
-
-1. Run `npm.cmd install`.
-2. Run `npm.cmd run typecheck`.
-3. Run `npm.cmd run lint`.
-4. Run `npm.cmd run test`.
-5. Stop any local dev server if build conflicts with `.next`.
-6. Clear `apps/web/.next` if a previous build was interrupted.
-7. Run `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build`.
-8. Apply migrations in order to Supabase through `database/migrations/0011_driver_live_location_pilot.sql`.
-9. Run `database/seed/0001_demo_kernel.sql`.
-10. Run `database/seed/0002_thai_pilot_scenario.sql`.
+- Full E2E browser automation.
+- Visual regression screenshots across all breakpoints.
+- Fresh Supabase reset using all migrations and seed files.
+- Real multi-user auth and project-scoped RBAC.
+- Real mobile browser GPS under long-running field conditions.

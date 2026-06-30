@@ -1,0 +1,47 @@
+import Link from "next/link";
+import type { DriverLocation, Project, TimelineEvent } from "@tomp/types/domain";
+import { TimelineItem } from "@/components/ui/timeline-item";
+
+export function TodayOperationBoard({ projects, latestLocation, latestEvent }: { projects: Project[]; latestLocation?: DriverLocation; latestEvent?: TimelineEvent }) {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">Today Board</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink">กระดานปฏิบัติการวันนี้</h2>
+        </div>
+        <Link className="rounded-md border border-operation px-3 py-2 text-sm font-semibold text-operation" href="/projects">
+          ดูโครงการ
+        </Link>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-500">โครงการที่กำลังติดตาม</p>
+          <div className="mt-3 grid gap-2">
+            {projects.slice(0, 4).map((project) => (
+              <Link key={project.id} className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-ink shadow-sm" href={`/projects/${project.id}`}>
+                {project.projectCode} · {project.projectName}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-500">GPS ล่าสุด</p>
+          {latestLocation ? (
+            <div className="mt-3">
+              <p className="text-lg font-semibold text-ink">{String(latestLocation.metadata.callSign || "ยังไม่ระบุ Call Sign")}</p>
+              <p className="text-sm text-slate-600">{String(latestLocation.metadata.driverName || "ยังไม่ระบุคนขับ")}</p>
+              <p className="mt-2 text-xs text-slate-500">{new Date(latestLocation.recordedAt).toLocaleString("th-TH")}</p>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">ยังไม่มี GPS ล่าสุด</p>
+          )}
+        </div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-500">Timeline ล่าสุด</p>
+          {latestEvent ? <TimelineItem title={latestEvent.eventType} detail={latestEvent.reason || "บันทึกลำดับเหตุการณ์"} time={new Date(latestEvent.createdAt).toLocaleString("th-TH")} /> : <p className="mt-3 text-sm text-slate-600">ยังไม่มีลำดับเหตุการณ์</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
