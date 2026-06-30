@@ -9,6 +9,7 @@ const navSections = [
     title: "งานปฏิบัติการ",
     items: [
       { href: "/", label: "ภาพรวม" },
+      { href: "/live-test", label: "ทดสอบ GPS สด" },
       { href: "/mission-control", label: "ศูนย์ควบคุม" },
       { href: "/projects", label: "โครงการ" },
       { href: "/pilot-checklist", label: "ทดสอบ Pilot" }

@@ -1,4 +1,4 @@
-import type { Assignment, Driver, Mission, Project, TimelineEvent, Vehicle } from "@tomp/types/domain";
+import type { Assignment, CallSign, Driver, Mission, Project, TimelineEvent, Vehicle } from "@tomp/types/domain";
 
 type Row = Record<string, unknown>;
 
@@ -73,6 +73,19 @@ export function mapAssignment(row: Row): Assignment {
     endTime: nullableText(row, "end_time"),
     commitmentId: nullableText(row, "commitment_id"),
     currentVersion: numberValue(row, "current_version", 1),
+    createdAt: text(row, "created_at"),
+    updatedAt: text(row, "updated_at"),
+    metadata: metadata(row)
+  };
+}
+
+export function mapCallSign(row: Row): CallSign {
+  return {
+    id: text(row, "id"),
+    projectId: text(row, "project_id"),
+    callSign: text(row, "call_sign"),
+    groupName: nullableText(row, "group_name"),
+    status: text(row, "status", "active") as CallSign["status"],
     createdAt: text(row, "created_at"),
     updatedAt: text(row, "updated_at"),
     metadata: metadata(row)
