@@ -14,8 +14,10 @@ export function AssignmentSummaryCard({ assignment }: { assignment: Assignment }
         <div>
           <p className="text-sm font-semibold text-operation">Call Sign {callSign}</p>
           <h3 className="mt-1 text-base font-semibold text-ink">ภารกิจ {assignment.missionId}</h3>
-          <p className="mt-1 text-sm text-slate-600">{driver} / {vehicle}</p>
-          <p className="mt-1 text-xs text-slate-500">ลิงก์ QR สำหรับคนขับ: /driver/demo-token</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {driver} / {vehicle}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">สร้าง QR จริงจากส่วน “สร้างลิงก์ QR สำหรับคนขับ” ในหน้านี้</p>
         </div>
         <StatusBadge label={formatStatusTh(assignment.status)} />
       </div>

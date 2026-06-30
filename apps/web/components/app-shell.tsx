@@ -4,12 +4,12 @@ import { AuthStatus } from "@/components/auth/auth-status";
 
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="min-h-screen text-ink">
+    <div className="min-h-screen bg-slate-50 text-ink">
       <div className="mx-auto grid min-h-screen w-full max-w-[1600px] lg:grid-cols-[280px_1fr]">
         <aside className="hidden border-r border-slate-200 bg-white/95 px-5 py-6 shadow-sm lg:block">
           <Link href="/" className="flex flex-col rounded-md border border-slate-200 bg-slate-50 p-4 shadow-sm">
             <span className="text-sm font-semibold tracking-wide text-operation">TOMP</span>
-            <span className="mt-1 text-base font-semibold leading-6">แพลตฟอร์มควบคุมปฏิบัติการขนส่ง</span>
+            <span className="mt-1 text-base font-semibold leading-6">ระบบควบคุมปฏิบัติการขนส่ง</span>
             <span className="mt-3 w-fit rounded-md border border-teal-100 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">Internal Pilot</span>
           </Link>
           <div className="mt-6">

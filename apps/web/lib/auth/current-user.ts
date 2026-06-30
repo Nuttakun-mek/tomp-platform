@@ -16,30 +16,14 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
   const supabase = getSupabaseServerClient();
 
   if (!supabase) {
-    return {
-      id: "development-profile",
-      authUserId: null,
-      organizationId: "10000000-0000-4000-8000-000000000001",
-      fullName: "ผู้ปฏิบัติการตัวอย่าง",
-      email: null,
-      roleLabel: "ผู้จัดการโครงการ (โหมดพัฒนา)",
-      isDevelopmentFallback: true
-    };
+    return pilotFallbackProfile("development-profile", "โหมดทดสอบภายใน");
   }
 
   const { data: authData } = await supabase.auth.getUser();
   const authUser = authData.user;
 
   if (!authUser) {
-    return {
-      id: "anonymous-development-profile",
-      authUserId: null,
-      organizationId: null,
-      fullName: "ยังไม่ได้เข้าสู่ระบบ",
-      email: null,
-      roleLabel: "ผู้เยี่ยมชม",
-      isDevelopmentFallback: true
-    };
+    return pilotFallbackProfile("anonymous-pilot-profile", "ยังไม่เปิดใช้ Auth production");
   }
 
   const { data: profile } = await supabase
@@ -59,6 +43,18 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
   };
 }
 
+function pilotFallbackProfile(id: string, roleLabel: string): CurrentUserProfile {
+  return {
+    id,
+    authUserId: null,
+    organizationId: "10000000-0000-4000-8000-000000000001",
+    fullName: "ผู้ดูแล Pilot",
+    email: null,
+    roleLabel,
+    isDevelopmentFallback: true
+  };
+}
+
 export interface ProjectMembership {
   projectId: string;
   profileId: string;
@@ -75,7 +71,22 @@ export async function getProjectMembership(projectId: string): Promise<ProjectMe
       projectId,
       profileId: profile.id,
       roleKey: "project_manager",
-      permissions: ["project.read", "project.create", "project.publish", "mission.read", "mission.create", "assignment.read", "assignment.create", "driver.create", "vehicle.create", "timeline.read", "timeline.create", "change.create", "change.approve", "change.apply"],
+      permissions: [
+        "project.read",
+        "project.create",
+        "project.publish",
+        "mission.read",
+        "mission.create",
+        "assignment.read",
+        "assignment.create",
+        "driver.create",
+        "vehicle.create",
+        "timeline.read",
+        "timeline.create",
+        "change.create",
+        "change.approve",
+        "change.apply"
+      ],
       isDevelopmentFallback: true
     };
   }
@@ -94,11 +105,7 @@ export async function getProjectMembership(projectId: string): Promise<ProjectMe
   const roleId = typeof data?.role_id === "string" ? data.role_id : null;
   if (!roleId) return null;
 
-  const { data: role } = await supabase
-    .from("roles")
-    .select("role_key")
-    .eq("id", roleId)
-    .maybeSingle();
+  const { data: role } = await supabase.from("roles").select("role_key").eq("id", roleId).maybeSingle();
 
   const roleKey = typeof role?.role_key === "string" ? role.role_key : null;
   if (typeof roleKey !== "string") return null;

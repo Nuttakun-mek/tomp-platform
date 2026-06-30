@@ -1,0 +1,37 @@
+import { AssignmentBoardPlaceholder } from "@/components/assignments/assignment-board-placeholder";
+import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
+import { DriverAccessGenerator } from "@/components/driver/driver-access-generator";
+import { PageHeader } from "@/components/page-header";
+import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
+import { getAssignmentsByProjectId } from "@/lib/data/assignments";
+import { getProjects, getProjectById } from "@/lib/data/projects";
+import { demoKernel } from "@/lib/demo/demo-kernel";
+
+interface AssignmentsPageProps {
+  searchParams?: Promise<{ projectId?: string }>;
+}
+
+export default async function AssignmentsPage({ searchParams }: AssignmentsPageProps) {
+  const params = searchParams ? await searchParams : {};
+  const projects = await getProjects();
+  const projectId = params.projectId || projects[0]?.id || demoKernel.projects[0]?.id || "";
+  const [project, assignments] = await Promise.all([getProjectById(projectId), getAssignmentsByProjectId(projectId)]);
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="จัดสรรงาน"
+        title="Assignment"
+        description={`จัดสรรภารกิจ Call Sign คนขับ รถ และช่วงเวลาปฏิบัติงานสำหรับ ${project?.projectCode ?? projectId}`}
+      />
+      <PublishedLockBanner project={project} />
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <CreateAssignmentForm projectId={projectId} />
+        <div className="grid gap-6">
+          <AssignmentBoardPlaceholder assignments={assignments} />
+          <DriverAccessGenerator assignments={assignments} projectId={projectId} />
+        </div>
+      </div>
+    </>
+  );
+}

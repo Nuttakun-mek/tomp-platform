@@ -11,7 +11,13 @@ export async function AuthStatus() {
         <span className="font-semibold text-ink">{profile.fullName}</span>
         <span>{profile.roleLabel}</span>
       </div>
-      {profile.isDevelopmentFallback ? <Link className="font-semibold text-operation" href="/login">ตั้งค่าการเข้าสู่ระบบ</Link> : <LogoutButton />}
+      {profile.isDevelopmentFallback ? (
+        <Link className="font-semibold text-operation" href="/login">
+          ทางเข้าใช้งาน Pilot
+        </Link>
+      ) : (
+        <LogoutButton />
+      )}
     </div>
   );
 }

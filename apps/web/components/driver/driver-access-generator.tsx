@@ -26,7 +26,7 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
 
     const data = result.data as { accessUrl?: string };
     setAccessUrl(data.accessUrl || null);
-    setMessage("สร้างลิงก์ QR สำหรับคนขับสำเร็จ ใช้ลิงก์นี้ส่งให้คนขับเท่านั้น");
+    setMessage("สร้างลิงก์ QR สำหรับคนขับสำเร็จ ส่งลิงก์นี้ให้คนขับเท่านั้น");
   }
 
   return (
@@ -51,7 +51,7 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
         </form>
       ) : (
         <p className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-          ยังไม่มี Assignment ให้สร้าง Assignment ก่อน
+          ยังไม่มี Assignment ให้สร้าง QR กรุณาสร้าง Assignment ก่อน
         </p>
       )}
 

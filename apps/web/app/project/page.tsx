@@ -1,0 +1,61 @@
+import { ChangeRequestForm } from "@/components/change/change-request-form";
+import { ChangeRequestList } from "@/components/change/change-request-list";
+import { ProjectScopeCard } from "@/components/auth/project-scope-card";
+import { CreateMissionForm } from "@/components/missions/create-mission-form";
+import { MissionListPlaceholder } from "@/components/missions/mission-list-placeholder";
+import { PageHeader } from "@/components/page-header";
+import { PublishActionCard } from "@/components/publish/publish-action-card";
+import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
+import { PublishReadinessPanel } from "@/components/publish/publish-readiness-panel";
+import { getAssignmentsByProjectId } from "@/lib/data/assignments";
+import { getProjects, getProjectById } from "@/lib/data/projects";
+import { getMissionsByProjectId } from "@/lib/data/missions";
+import { demoKernel } from "@/lib/demo/demo-kernel";
+import { checkProjectPublishReadiness } from "@/lib/domain/publish-readiness";
+import Link from "next/link";
+
+interface ProjectPageProps {
+  searchParams?: Promise<{ projectId?: string }>;
+}
+
+export default async function ProjectPage({ searchParams }: ProjectPageProps) {
+  const params = searchParams ? await searchParams : {};
+  const projects = await getProjects();
+  const projectId = params.projectId || projects[0]?.id || demoKernel.projects[0]?.id || "";
+  const [project, missions, assignments] = await Promise.all([
+    getProjectById(projectId),
+    getMissionsByProjectId(projectId),
+    getAssignmentsByProjectId(projectId)
+  ]);
+  const operationDays = project ? demoKernel.operationDays.filter((day) => day.projectId === project.id) : [];
+  const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="รายละเอียดโครงการ"
+        title={project?.projectName ?? "ไม่พบโครงการ"}
+        description={`พื้นที่ทำงานของ ${project?.projectCode ?? projectId} สำหรับวางแผน ประกาศใช้แผน และควบคุมการเปลี่ยนแปลง`}
+      />
+      <PublishedLockBanner project={project} />
+      <Link className="mb-6 inline-flex rounded-md border border-operation px-4 py-2 text-sm font-semibold text-operation" href={`/projects/${projectId}/assignments`}>
+        เปิดหน้าจัดสรรงาน
+      </Link>
+      <div className="mb-6">
+        <ProjectScopeCard projectId={projectId} />
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <CreateMissionForm projectId={projectId} />
+        <MissionListPlaceholder missions={missions} />
+      </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <PublishReadinessPanel readiness={readiness} />
+        <PublishActionCard projectId={projectId} canPublish={readiness.canPublish} />
+      </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <ChangeRequestForm projectId={projectId} />
+        <ChangeRequestList />
+      </div>
+    </>
+  );
+}

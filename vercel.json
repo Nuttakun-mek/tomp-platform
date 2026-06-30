@@ -12,6 +12,18 @@
       "dest": "/apps/web/api/$1"
     },
     {
+      "src": "/projects/([^/]+)/assignments",
+      "dest": "/apps/web/assignments?projectId=$1"
+    },
+    {
+      "src": "/projects/([^/]+)",
+      "dest": "/apps/web/project?projectId=$1"
+    },
+    {
+      "src": "/driver/([^/]+)",
+      "dest": "/apps/web/driver?token=$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/apps/web/$1"
     }
