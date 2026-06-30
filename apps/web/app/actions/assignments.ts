@@ -2,6 +2,7 @@
 
 import { createAssignmentSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { mapAssignment } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -43,7 +44,7 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
     .single();
 
   if (insertError) {
-    return actionFailure(`บันทึก Assignment ไม่สำเร็จ: ${insertError.message}`);
+    return actionFailure(getDatabaseErrorMessage(insertError, "บันทึก Assignment ไม่สำเร็จ"));
   }
 
   const assignment = mapAssignment(data);

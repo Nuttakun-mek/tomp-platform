@@ -12,6 +12,10 @@
       "dest": "/apps/web/api/$1"
     },
     {
+      "src": "/projects/new",
+      "dest": "/apps/web/projects/new"
+    },
+    {
       "src": "/projects/([^/]+)/assignments",
       "dest": "/apps/web/assignments?projectId=$1"
     },

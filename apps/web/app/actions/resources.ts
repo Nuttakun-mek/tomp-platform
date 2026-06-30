@@ -2,6 +2,7 @@
 
 import { createDriverSchema, createVehicleSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { mapDriver, mapVehicle } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -38,7 +39,7 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
     .single();
 
   if (insertError) {
-    return actionFailure(`บันทึกข้อมูลคนขับไม่สำเร็จ: ${insertError.message}`);
+    return actionFailure(getDatabaseErrorMessage(insertError, "บันทึกข้อมูลคนขับไม่สำเร็จ"));
   }
 
   const driver = mapDriver(data);
@@ -91,7 +92,7 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
     .single();
 
   if (insertError) {
-    return actionFailure(`บันทึกข้อมูลรถไม่สำเร็จ: ${insertError.message}`);
+    return actionFailure(getDatabaseErrorMessage(insertError, "บันทึกข้อมูลรถไม่สำเร็จ"));
   }
 
   const vehicle = mapVehicle(data);

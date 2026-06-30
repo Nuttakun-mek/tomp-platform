@@ -1,6 +1,7 @@
 "use server";
 
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
@@ -10,14 +11,14 @@ import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 export async function createDriverAccessTokenAction(input: unknown): Promise<ActionResult> {
   const data = input as { projectId?: string; assignmentId?: string; driverId?: string | null; expiresAt?: string | null };
   if (!data.projectId || !data.assignmentId) {
-    return actionFailure("projectId and assignmentId are required.");
+    return actionFailure("กรุณาเลือกโครงการและ Assignment");
   }
 
   const { client, error, mode } = getSupabaseWriteClient();
-  if (!client) return actionFailure(error || "Supabase is not configured for writes.");
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
 
   const permission = await requirePermission(data.projectId, "assignment.update");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: assignment.update");
+  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างลิงก์ QR สำหรับคนขับ");
 
   const token = generateDriverAccessToken({
     assignmentId: data.assignmentId,
@@ -40,7 +41,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     .select()
     .single();
 
-  if (insertError) return actionFailure(`Driver access token creation failed: ${insertError.message}`);
+  if (insertError) return actionFailure(getDatabaseErrorMessage(insertError, "สร้างลิงก์ QR สำหรับคนขับไม่สำเร็จ"));
   const timelineResult = await createTimelineEvent({
     projectId: data.projectId,
     objectType: "assignment",
@@ -56,13 +57,13 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
 
 export async function revokeDriverAccessTokenAction(input: unknown): Promise<ActionResult> {
   const data = input as { projectId?: string; tokenId?: string; reason?: string | null };
-  if (!data.projectId || !data.tokenId) return actionFailure("projectId and tokenId are required.");
+  if (!data.projectId || !data.tokenId) return actionFailure("กรุณาเลือกโครงการและลิงก์ QR");
 
   const { client, error, mode } = getSupabaseWriteClient();
-  if (!client) return actionFailure(error || "Supabase is not configured for writes.");
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
 
   const permission = await requirePermission(data.projectId, "assignment.update");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: assignment.update");
+  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์ยกเลิกลิงก์ QR สำหรับคนขับ");
 
   const { data: row, error: updateError } = await client
     .from("driver_access_tokens")
@@ -72,7 +73,7 @@ export async function revokeDriverAccessTokenAction(input: unknown): Promise<Act
     .select("id, assignment_id, status, revoked_at")
     .single();
 
-  if (updateError) return actionFailure(`Driver access token revoke failed: ${updateError.message}`);
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "ยกเลิกลิงก์ QR สำหรับคนขับไม่สำเร็จ"));
 
   const timelineResult = await createTimelineEvent({
     projectId: data.projectId,
@@ -89,10 +90,10 @@ export async function revokeDriverAccessTokenAction(input: unknown): Promise<Act
 
 export async function validateDriverAccessTokenAction(input: unknown): Promise<ActionResult> {
   const token = typeof input === "object" && input && "token" in input ? String(input.token) : "";
-  if (!token) return actionFailure("Token is required.");
+  if (!token) return actionFailure("ไม่พบ token สำหรับคนขับ");
 
   const { client, error } = getSupabaseWriteClient();
-  if (!client) return actionFailure(error || "Supabase is not configured for token validation.");
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการตรวจสอบลิงก์คนขับ");
 
   const { data: row, error: lookupError } = await client
     .from("driver_access_tokens")
@@ -100,9 +101,9 @@ export async function validateDriverAccessTokenAction(input: unknown): Promise<A
     .eq("token_hash", hashDriverAccessToken(token))
     .maybeSingle();
 
-  if (lookupError) return actionFailure(`Token validation failed: ${lookupError.message}`);
-  if (!row || row.status !== "active") return actionFailure("Driver access token is invalid or revoked.");
-  if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return actionFailure("Driver access token is expired.");
+  if (lookupError) return actionFailure(getDatabaseErrorMessage(lookupError, "ตรวจสอบลิงก์คนขับไม่สำเร็จ"));
+  if (!row || row.status !== "active") return actionFailure("ลิงก์คนขับไม่ถูกต้องหรือถูกยกเลิกแล้ว");
+  if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return actionFailure("ลิงก์คนขับหมดอายุแล้ว");
 
   await client
     .from("driver_access_tokens")

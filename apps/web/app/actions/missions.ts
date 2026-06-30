@@ -2,6 +2,7 @@
 
 import { createMissionSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { mapMission } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -48,7 +49,7 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
     .single();
 
   if (insertError) {
-    return actionFailure(`บันทึกภารกิจไม่สำเร็จ: ${insertError.message}`);
+    return actionFailure(getDatabaseErrorMessage(insertError, "บันทึกภารกิจไม่สำเร็จ"));
   }
 
   const mission = mapMission(data);

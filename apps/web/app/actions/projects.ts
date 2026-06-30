@@ -2,6 +2,7 @@
 
 import { createProjectSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { mapProject } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -23,6 +24,22 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างโครงการ");
   }
 
+  const { data: existingProject, error: lookupError } = await client
+    .from("projects")
+    .select("id")
+    .eq("project_code", parsed.data.projectCode)
+    .maybeSingle();
+
+  if (lookupError) {
+    return actionFailure(getDatabaseErrorMessage(lookupError, "ตรวจสอบรหัสโครงการไม่สำเร็จ"));
+  }
+
+  if (existingProject) {
+    return actionFailure("รหัสโครงการนี้ถูกใช้แล้ว กรุณาเปลี่ยนรหัสโครงการ", {
+      projectCode: ["รหัสโครงการนี้ถูกใช้แล้ว"]
+    });
+  }
+
   const { data, error: insertError } = await client
     .from("projects")
     .insert({
@@ -41,7 +58,7 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
     .single();
 
   if (insertError) {
-    return actionFailure(`บันทึกโครงการไม่สำเร็จ: ${insertError.message}`);
+    return actionFailure(getDatabaseErrorMessage(insertError, "บันทึกโครงการไม่สำเร็จ"));
   }
 
   const project = mapProject(data);
