@@ -162,12 +162,12 @@ export async function createLiveGpsPilotScenarioAction(): Promise<ActionResult> 
       if (stepError) return actionFailure(getDatabaseErrorMessage(stepError, "สร้างชุดทดสอบ GPS ไม่สำเร็จ"));
     }
 
+    const expiresAt = getDefaultDriverTokenExpiry();
     const token = generateDriverAccessToken({
       assignmentId: ids.assignment,
       driverId: ids.driver,
-      expiresAt: getDefaultDriverTokenExpiry()
+      expiresAt
     });
-    const expiresAt = getDefaultDriverTokenExpiry();
     const { data: tokenRow, error: tokenError } = await client
       .from("driver_access_tokens")
       .insert({

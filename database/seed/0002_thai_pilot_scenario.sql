@@ -78,7 +78,7 @@ values (
   '2026-07-20 02:30:00+00',
   'พบผู้โดยสารที่จุดนัดพบขาเข้า และส่งถึงประตูหลักศูนย์ประชุม',
   'รถต้องถึงจุดรับก่อนเวลาอย่างน้อย 15 นาที',
-  '{"seed": true}'::jsonb
+  '{"seed": true, "pickupLocation": "จุดรับผู้โดยสาร", "dropoffLocation": "ศูนย์ประชุม"}'::jsonb
 ) on conflict (id) do nothing;
 
 insert into public.call_signs (id, project_id, call_sign, group_name, status, metadata)
@@ -128,7 +128,7 @@ values (
   '2026-07-20 01:30:00+00',
   '2026-07-20 02:30:00+00',
   1,
-  '{"seed": true}'::jsonb
+  '{"seed": true, "pickupLocation": "จุดรับผู้โดยสาร", "dropoffLocation": "ศูนย์ประชุม", "coordinatorPhone": "+6620000000", "operationPhone": "+6621111111"}'::jsonb
 ) on conflict (id) do nothing;
 
 insert into public.driver_access_tokens (id, project_id, assignment_id, driver_id, token_hash, access_scope, status, expires_at, metadata)
