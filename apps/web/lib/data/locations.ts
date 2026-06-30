@@ -70,3 +70,43 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
 
   return Array.from(latestByAssignment.values());
 }
+
+export async function getLatestDriverLocations(limit = 50): Promise<DriverLocation[]> {
+  const client = getSupabaseServerDataClient();
+
+  if (!client) {
+    return [];
+  }
+
+  const { data, error } = await client.from("gps_locations").select("*").order("recorded_at", { ascending: false }).limit(limit);
+
+  if (error || !data?.length) {
+    return [];
+  }
+
+  const latestByAssignment = new Map<string, DriverLocation>();
+  data.map(mapDriverLocation).forEach((location) => {
+    const key = location.assignmentId || location.driverId || location.id;
+    if (!latestByAssignment.has(key)) {
+      latestByAssignment.set(key, location);
+    }
+  });
+
+  return Array.from(latestByAssignment.values());
+}
+
+export async function getProjectIdWithLatestDriverLocation(): Promise<string | null> {
+  const client = getSupabaseServerDataClient();
+
+  if (!client) {
+    return null;
+  }
+
+  const { data, error } = await client.from("gps_locations").select("project_id").order("recorded_at", { ascending: false }).limit(1).maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return text(data as LocationRow, "project_id") || null;
+}

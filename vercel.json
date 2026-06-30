@@ -8,20 +8,12 @@
   ],
   "routes": [
     {
-      "src": "/driver/(.*)",
-      "dest": "apps/web/driver/$1"
-    },
-    {
-      "src": "/projects/(.*)",
-      "dest": "apps/web/projects/$1"
-    },
-    {
       "src": "/api/(.*)",
-      "dest": "apps/web/api/$1"
+      "dest": "/apps/web/api/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "apps/web/$1"
+      "dest": "/apps/web/$1"
     }
   ]
 }

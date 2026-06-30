@@ -16,10 +16,11 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
       <PageHeader
         eyebrow="หน้าคนขับ"
         title="เข้าถึงงานด้วย QR"
-        description={driverAccess ? "ตรวจสอบสิทธิ์เข้าถึง Assignment นี้แล้ว" : "คนขับต้องเปิดลิงก์จาก QR ที่ศูนย์ควบคุมสร้างให้"}
+        description={driverAccess ? "ตรวจสอบสิทธิ์ Assignment สำเร็จ สามารถเริ่มยืนยันความพร้อมและแชร์ตำแหน่งได้" : "เปิดลิงก์จาก QR ที่ศูนย์ควบคุมสร้างให้เท่านั้น"}
       />
+
       {!driverAccess ? (
-        <section className="rounded-md border border-red-200 bg-red-50 p-5 text-sm font-medium leading-6 text-red-900">
+        <section className="mx-auto max-w-2xl rounded-md border border-red-200 bg-red-50 p-5 text-sm font-medium leading-6 text-red-900">
           ไม่พบ Assignment ที่ผูกกับ token นี้ หรือ QR หมดอายุแล้ว กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR ใหม่
         </section>
       ) : (

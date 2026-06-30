@@ -6,13 +6,15 @@ import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 
 export function DriverActivationChecklist({ driverAccess }: { driverAccess?: DriverAccessAssignment }) {
   const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     if (!driverAccess) {
-      setMessage("ไม่พบข้อมูลงานของคนขับ กรุณาขอ QR ใหม่จากผู้ประสานงาน");
+      setMessage("ไม่พบข้อมูลงาน กรุณาขอ QR ใหม่จากผู้ประสานงาน");
       return;
     }
 
+    setPending(true);
     const driverResult = await driverCheckinAction({
       projectId: driverAccess.project.id,
       assignmentId: driverAccess.assignment.id,
@@ -51,6 +53,7 @@ export function DriverActivationChecklist({ driverAccess }: { driverAccess?: Dri
     if (platePhoto instanceof File) photoFormData.set("platePhoto", platePhoto);
     const photoResult = await vehiclePhotoUploadAction(photoFormData);
 
+    setPending(false);
     setMessage(driverResult.success && vehicleResult.success && photoResult.success ? photoResult.warning || "ส่งข้อมูลความพร้อมแล้ว" : driverResult.error || vehicleResult.error || photoResult.error || "ส่งข้อมูลไม่สำเร็จ");
   }
 
@@ -65,13 +68,15 @@ export function DriverActivationChecklist({ driverAccess }: { driverAccess?: Dri
 
   return (
     <form action={handleSubmit} className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
-      <h2 className="text-lg font-semibold text-ink">ยืนยันความพร้อม</h2>
-      <p className="mt-1 text-sm text-slate-600">กรุณาตรวจข้อมูลให้ครบก่อนเริ่มงาน</p>
+      <div>
+        <h2 className="text-lg font-semibold text-ink">ยืนยันความพร้อม</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">ตรวจข้อมูลสำคัญก่อนเริ่มงาน ภาพถ่ายจะถูกใช้สำหรับยืนยันการรับรถในรอบทดสอบภายใน</p>
+      </div>
 
       <div className="mt-4 grid gap-3">
         {checklist.map(([name, label]) => (
           <label key={name} className="flex min-h-12 items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            <input name={name} type="checkbox" className="h-5 w-5 accent-teal-700" />
+            <input className="h-5 w-5 accent-teal-700" name={name} type="checkbox" />
             {label}
           </label>
         ))}
@@ -89,8 +94,8 @@ export function DriverActivationChecklist({ driverAccess }: { driverAccess?: Dri
       </div>
 
       {message ? <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}
-      <button className="mt-4 min-h-14 w-full rounded-md bg-operation px-4 py-3 text-base font-semibold text-white shadow-sm" type="submit">
-        ส่งข้อมูลความพร้อม
+      <button className="mt-4 min-h-14 w-full rounded-md bg-operation px-4 py-3 text-base font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={pending} type="submit">
+        {pending ? "กำลังส่งข้อมูล..." : "ส่งข้อมูลความพร้อม"}
       </button>
     </form>
   );
