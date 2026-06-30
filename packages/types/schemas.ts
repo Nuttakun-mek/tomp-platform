@@ -21,7 +21,7 @@ export const updateProjectSchema = createProjectSchema.partial();
 
 export const createMissionSchema = z.object({
   projectId: uuidSchema,
-  projectDayId: uuidSchema,
+  projectDayId: optionalUuidSchema,
   sessionId: optionalUuidSchema,
   missionCode: z.string().trim().min(2).max(40),
   missionName: z.string().trim().min(2).max(160),
