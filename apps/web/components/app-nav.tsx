@@ -69,7 +69,9 @@ export function AppNav() {
                   }`}
                 >
                   <span className="block text-sm font-semibold">{item.label}</span>
-                  <span className={`mt-0.5 block text-xs ${active ? "text-teal-50" : "text-slate-500 group-hover:text-slate-600"}`}>{item.description}</span>
+                  <span className={`mt-0.5 block text-xs ${active ? "text-teal-50" : "text-slate-500 group-hover:text-slate-600"}`}>
+                    {item.description}
+                  </span>
                 </Link>
               );
             })}

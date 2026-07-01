@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppNav } from "@/components/app-nav";
 import { AuthStatus } from "@/components/auth/auth-status";
+import { BuildVersionBadge } from "@/components/layout/build-version-badge";
 import { EnvironmentBadge } from "@/components/layout/environment-badge";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
 
@@ -34,6 +35,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
             <div className="grid gap-3 rounded-md border border-white/10 bg-white/8 p-4">
               <EnvironmentBadge />
+              <BuildVersionBadge />
               <AuthStatus />
               <p className="text-xs leading-5 text-slate-400">TOMP ใช้ GPS เพื่อมองเห็นสถานะปฏิบัติการ ไม่ใช่ระบบควบคุมคนขับ</p>
             </div>
@@ -48,7 +50,10 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
                   <p className="text-xs font-semibold tracking-[0.28em] text-operation">TOMP</p>
                   <p className="truncate text-base font-semibold text-ink">ศูนย์ปฏิบัติการขนส่ง</p>
                 </Link>
-                <EnvironmentBadge />
+                <div className="grid justify-items-end gap-1">
+                  <EnvironmentBadge />
+                  <span className="text-[10px] font-semibold text-slate-500">v2026.07.01.0708</span>
+                </div>
               </div>
               <AppNav />
             </div>

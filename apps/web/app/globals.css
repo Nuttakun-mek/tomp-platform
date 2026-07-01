@@ -4,17 +4,17 @@
 
 :root {
   color-scheme: light;
-  --ink: #132238;
-  --ink-soft: #42526b;
-  --canvas: #eef4f8;
+  --ink: #0f1f33;
+  --ink-soft: #40546d;
+  --canvas: #edf3f7;
   --panel: #ffffff;
-  --line: #d8e3ef;
-  --operation: #0b756b;
-  --command: #12304a;
-  --route: #2563eb;
-  --success: #0f766e;
-  --warning: #b7791f;
-  --danger: #b91c1c;
+  --line: #d5e0ec;
+  --operation: #08766f;
+  --command: #0d2438;
+  --route: #1d5fd7;
+  --success: #0f7a55;
+  --warning: #b26a00;
+  --danger: #b42318;
   --pilot: #6d28d9;
   background: var(--canvas);
   color: var(--ink);
@@ -34,7 +34,8 @@ body {
   margin: 0;
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34rem),
-    linear-gradient(180deg, #f8fbfd 0%, #eef4f8 42%, #e8eff6 100%);
+    radial-gradient(circle at top right, rgba(8, 118, 111, 0.1), transparent 30rem),
+    linear-gradient(180deg, #f8fbfd 0%, #edf3f7 42%, #dfe9f0 100%);
   color: var(--ink);
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
@@ -69,6 +70,25 @@ textarea {
 
 .panel-glow {
   box-shadow: 0 22px 70px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.command-card {
+  @apply rounded-panel border border-border bg-white shadow-panel;
+}
+
+.command-card-compact {
+  @apply rounded-md border border-border bg-white shadow-soft;
+}
+
+.command-panel-dark {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(20, 184, 166, 0.16), transparent 24rem),
+    linear-gradient(180deg, #102a42 0%, #0d2438 48%, #071827 100%);
+}
+
+.thai-readable {
+  line-height: 1.72;
+  letter-spacing: 0;
 }
 
 .status-pulse {
