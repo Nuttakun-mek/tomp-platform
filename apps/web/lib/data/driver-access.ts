@@ -1,5 +1,6 @@
-import type { Assignment, CallSign, Driver, Project, Vehicle } from "@tomp/types/domain";
+import type { Assignment, CallSign, Driver, DriverAssignmentPacket, DriverNotification, Project, RouteChangeInstruction, Vehicle } from "@tomp/types/domain";
 import { hashDriverAccessToken } from "@/lib/driver-access/token";
+import { getDriverAssignmentPacketByAssignmentId, getDriverNotificationsByAssignmentId, getRouteChangesByAssignmentId } from "@/lib/data/driver-operations";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
 export interface DriverAccessAssignment {
@@ -9,6 +10,9 @@ export interface DriverAccessAssignment {
   callSign: CallSign;
   driver: Driver;
   vehicle: Vehicle;
+  packet?: DriverAssignmentPacket | null;
+  notifications: DriverNotification[];
+  routeChanges: RouteChangeInstruction[];
   tokenValidated: boolean;
 }
 
@@ -95,9 +99,18 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     })
     .eq("token_hash", tokenHash);
 
+  const [packet, notifications, routeChanges] = await Promise.all([
+    getDriverAssignmentPacketByAssignmentId(text(assignment, "id")),
+    getDriverNotificationsByAssignmentId(text(assignment, "id")),
+    getRouteChangesByAssignmentId(text(assignment, "id"))
+  ]);
+
   return {
     token,
     tokenValidated: true,
+    packet,
+    notifications,
+    routeChanges,
     project: {
       ...base(project),
       organizationId: text(project, "organization_id"),

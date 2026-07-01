@@ -4,6 +4,51 @@ import { hashDriverAccessToken } from "@/lib/driver-access/token";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
+async function updateLocationSession(input: {
+  client: NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
+  projectId: string;
+  assignmentId: string;
+  driverId: string | null;
+  vehicleId: string | null;
+  recordedAt: string;
+  trackingEvent: "sharing_started" | "location_ping" | "sharing_stopped";
+}) {
+  if (input.trackingEvent === "sharing_started") {
+    await input.client.from("driver_location_sessions").insert({
+      project_id: input.projectId,
+      assignment_id: input.assignmentId,
+      driver_id: input.driverId,
+      vehicle_id: input.vehicleId,
+      started_at: input.recordedAt,
+      consent_given_at: input.recordedAt,
+      status: "healthy",
+      last_ping_at: input.recordedAt,
+      metadata: { source: "web_driver" }
+    });
+    return;
+  }
+
+  const { data: session } = await input.client
+    .from("driver_location_sessions")
+    .select("id")
+    .eq("assignment_id", input.assignmentId)
+    .is("stopped_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (session?.id) {
+    await input.client
+      .from("driver_location_sessions")
+      .update({
+        status: input.trackingEvent === "sharing_stopped" ? "offline" : "healthy",
+        last_ping_at: input.recordedAt,
+        stopped_at: input.trackingEvent === "sharing_stopped" ? input.recordedAt : null
+      })
+      .eq("id", session.id);
+  }
+}
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = driverLocationUpdateSchema.safeParse(body);
@@ -40,17 +85,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "QR หมดอายุแล้ว กรุณาขอ QR ใหม่จากศูนย์ควบคุม" }, { status: 403 });
   }
 
-  let vehicleId: string | null = null;
-  if (tokenRow.assignment_id) {
-    const { data: assignment } = await client
-      .from("assignments")
-      .select("vehicle_id")
-      .eq("id", tokenRow.assignment_id)
-      .maybeSingle();
-    vehicleId = typeof assignment?.vehicle_id === "string" ? assignment.vehicle_id : null;
-  }
-
+  const { data: assignment } = await client.from("assignments").select("vehicle_id").eq("id", tokenRow.assignment_id).maybeSingle();
+  const vehicleId = typeof assignment?.vehicle_id === "string" ? assignment.vehicle_id : null;
   const recordedAt = parsed.data.recordedAt || new Date().toISOString();
+
   const { data: inserted, error: insertError } = await client
     .from("gps_locations")
     .insert({
@@ -76,6 +114,16 @@ export async function POST(request: Request) {
   if (insertError) {
     return NextResponse.json({ success: false, error: insertError.message }, { status: 500 });
   }
+
+  await updateLocationSession({
+    client,
+    projectId: String(tokenRow.project_id),
+    assignmentId: String(tokenRow.assignment_id),
+    driverId: typeof tokenRow.driver_id === "string" ? tokenRow.driver_id : null,
+    vehicleId,
+    recordedAt,
+    trackingEvent: parsed.data.trackingEvent
+  });
 
   if (parsed.data.trackingEvent === "sharing_started" || parsed.data.trackingEvent === "sharing_stopped") {
     await createTimelineEvent({

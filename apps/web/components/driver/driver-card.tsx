@@ -19,7 +19,7 @@ export function DriverCard({ driverAccess }: { driverAccess: DriverAccessAssignm
   const dropoffLabel = text(driverAccess.assignment.metadata.dropoffLocation || driverAccess.assignment.metadata.dropoff_location, "ยังไม่ระบุจุดส่ง");
   const commitmentTime = text(driverAccess.assignment.metadata.commitmentTime || driverAccess.assignment.metadata.commitment_time, "ยังไม่ระบุเวลา");
   const mapsUrl = buildGoogleMapsDirectionsUrl(dropoffLabel, pickupLabel);
-  const packet = buildDriverAssignmentPacket({
+  const packet = driverAccess.packet ?? buildDriverAssignmentPacket({
     id: driverAccess.assignment.id,
     projectId: driverAccess.project.id,
     assignmentId: driverAccess.assignment.id,

@@ -12,6 +12,7 @@ import { RealtimeStatusPanel } from "@/components/mission-control/realtime-statu
 import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
 import { RouteChangeConsole } from "@/components/mission-control/route-change-console";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
+import { getDriverOperationSummaryByProjectId } from "@/lib/data/driver-operations";
 import { getLatestDriverLocationsByProjectId, getProjectIdWithLatestDriverLocation } from "@/lib/data/locations";
 import { getProjects } from "@/lib/data/projects";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
@@ -31,10 +32,11 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     projects[0] ??
     demoProject;
 
-  const [events, locations, assignments] = await Promise.all([
+  const [events, locations, assignments, driverOperations] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
     getLatestDriverLocationsByProjectId(activeProject.id),
-    getAssignmentsByProjectId(activeProject.id)
+    getAssignmentsByProjectId(activeProject.id),
+    getDriverOperationSummaryByProjectId(activeProject.id)
   ]);
 
   const locationAssignmentIds = new Set(locations.map((location) => location.assignmentId).filter(Boolean));
@@ -50,7 +52,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
       <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
         <div className="grid gap-6">
           <LiveMapPanel projectId={activeProject.id} locations={locations} />
-          <DriverOperationsPanel assignments={assignments} locations={locations} />
+          <DriverOperationsPanel locations={locations} summary={driverOperations} />
           <AssignmentMonitor assignments={assignments} locations={locations} />
         </div>
         <aside className="grid content-start gap-6">

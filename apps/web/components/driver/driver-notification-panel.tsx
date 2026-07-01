@@ -2,18 +2,20 @@ import { buildDriverNotification, getDriverNotificationActionLabel } from "@tomp
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 
 export function DriverNotificationPanel({ driverAccess }: { driverAccess: DriverAccessAssignment }) {
-  const notification = buildDriverNotification({
-    id: driverAccess.assignment.id,
-    projectId: driverAccess.project.id,
-    assignmentId: driverAccess.assignment.id,
-    driverId: driverAccess.driver.id,
-    notificationType: "assignment_ready",
-    priority: "normal",
-    title: "งานใหม่",
-    body: "กรุณาตรวจสอบรายละเอียดงานและกดรับทราบก่อนเริ่มปฏิบัติงาน",
-    action: "acknowledge",
-    metadata: { source: "web_driver_demo" }
-  });
+  const notification =
+    driverAccess.notifications[0] ??
+    buildDriverNotification({
+      id: driverAccess.assignment.id,
+      projectId: driverAccess.project.id,
+      assignmentId: driverAccess.assignment.id,
+      driverId: driverAccess.driver.id,
+      notificationType: "assignment_ready",
+      priority: "normal",
+      title: "งานใหม่",
+      body: "กรุณาตรวจสอบรายละเอียดงานและกดรับทราบก่อนเริ่มปฏิบัติงาน",
+      action: "acknowledge",
+      metadata: { source: "fallback" }
+    });
 
   return (
     <section className="rounded-2xl border border-blue-100 bg-blue-50 p-4 shadow-soft">
@@ -23,7 +25,7 @@ export function DriverNotificationPanel({ driverAccess }: { driverAccess: Driver
           <h2 className="mt-1 text-lg font-semibold text-ink">{notification.title}</h2>
           <p className="mt-1 text-sm leading-6 text-blue-900">{notification.body}</p>
         </div>
-        <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">ข้อมูลตัวอย่าง</span>
+        <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">{driverAccess.notifications.length ? "จากศูนย์ควบคุม" : "ข้อมูลตัวอย่าง"}</span>
       </div>
       <button className="mt-4 min-h-12 w-full rounded-xl bg-blue-700 px-4 py-3 text-sm font-semibold text-white" type="button">
         {getDriverNotificationActionLabel(notification.action)}
