@@ -52,7 +52,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
                 </Link>
                 <div className="grid justify-items-end gap-1">
                   <EnvironmentBadge />
-                  <span className="text-[10px] font-semibold text-slate-500">v2026.07.01.2337</span>
+                  <span className="text-[10px] font-semibold text-slate-500">v2026.07.02.0005</span>
                 </div>
               </div>
               <AppNav />
