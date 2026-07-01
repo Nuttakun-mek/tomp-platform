@@ -105,7 +105,7 @@ export const driverIssueReportSchema = z.object({
   assignmentId: uuidSchema,
   driverId: optionalUuidSchema,
   issueType: z.string().trim().min(1).max(80),
-  severity: z.enum(["info", "warning", "urgent"]).default("warning"),
+  severity: z.enum(["info", "warning", "urgent", "critical"]).default("warning"),
   message: z.string().trim().optional().nullable(),
   metadata: metadataSchema
 });
@@ -173,6 +173,127 @@ export const applyChangeRequestSchema = approveChangeRequestSchema.extend({
 
 export const rejectChangeRequestSchema = approveChangeRequestSchema;
 
+const routeStopSchema = z.object({
+  id: z.string().trim().optional(),
+  label: z.string().trim().min(1),
+  address: z.string().trim().optional().nullable(),
+  latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
+  plannedTime: z.string().trim().optional().nullable(),
+  notes: z.string().trim().optional().nullable()
+});
+
+const routePlanSchema = z.object({
+  id: z.string().trim().optional(),
+  summary: z.string().trim().min(1),
+  stops: z.array(routeStopSchema).default([]),
+  googleMapsUrl: z.string().trim().url().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const driverRouteInstructionSchema = z.object({
+  routePlan: routePlanSchema,
+  pickup: routeStopSchema,
+  dropoff: routeStopSchema,
+  note: z.string().trim().optional().nullable()
+});
+
+export const driverAssignmentPacketSchema = z.object({
+  id: uuidSchema,
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  driverId: optionalUuidSchema,
+  callSign: z.string().trim().min(1),
+  status: z.enum(["assigned", "acknowledged", "ready", "en_route_pickup", "arrived_pickup", "passenger_onboard", "en_route_dropoff", "completed", "blocked", "cancelled"]),
+  packetVersion: z.coerce.number().int().min(1),
+  projectName: z.string().trim().min(1),
+  missionName: z.string().trim().optional().nullable(),
+  instructions: z.array(
+    z.object({
+      id: uuidSchema,
+      title: z.string().trim().min(1),
+      status: z.enum(["assigned", "acknowledged", "ready", "en_route_pickup", "arrived_pickup", "passenger_onboard", "en_route_dropoff", "completed", "blocked", "cancelled"]),
+      sequence: z.coerce.number().int().min(1),
+      required: z.boolean().default(true)
+    })
+  ),
+  routeInstruction: driverRouteInstructionSchema,
+  contactInstruction: z.object({
+    coordinatorPhone: z.string().trim().optional().nullable(),
+    operationPhone: z.string().trim().optional().nullable(),
+    note: z.string().trim().optional().nullable()
+  }),
+  safetyInstructions: z.array(z.object({ message: z.string().trim().min(1), required: z.boolean().default(false) })).default([]),
+  publishedAt: z.string().trim().optional().nullable(),
+  acknowledgedAt: z.string().trim().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const routeChangeInstructionSchema = z.object({
+  id: uuidSchema,
+  assignmentId: uuidSchema,
+  reason: z.string().trim().min(1),
+  impactSummary: z.string().trim().optional().nullable(),
+  oldRoute: routePlanSchema.optional().nullable(),
+  newRoute: routePlanSchema,
+  status: z.enum(["pending", "acknowledged", "applied", "cancelled"]).default("pending")
+});
+
+export const driverNotificationSchema = z.object({
+  id: uuidSchema,
+  projectId: uuidSchema,
+  assignmentId: optionalUuidSchema,
+  driverId: optionalUuidSchema,
+  notificationType: z.string().trim().min(1),
+  priority: z.enum(["low", "normal", "high", "critical"]).default("normal"),
+  title: z.string().trim().min(1),
+  body: z.string().trim().min(1),
+  action: z.enum(["acknowledge", "call_control", "open_maps", "report_issue", "none"]).default("acknowledge"),
+  actionLabel: z.string().trim().optional().nullable(),
+  actionUrl: z.string().trim().url().optional().nullable(),
+  status: z.enum(["unread", "read", "actioned", "expired"]).default("unread"),
+  createdAt: z.string().trim().min(1),
+  expiresAt: z.string().trim().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const driverLocationPingSchema = z.object({
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  driverId: optionalUuidSchema,
+  vehicleId: optionalUuidSchema,
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  accuracy: z.coerce.number().min(0).max(10000).optional().nullable(),
+  recordedAt: z.string().trim().min(1),
+  source: z.enum(["driver_web_app", "operation_user", "system", "demo"]).default("driver_web_app"),
+  metadata: metadataSchema
+});
+
+export const driverLocationSessionSchema = z.object({
+  id: uuidSchema,
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  driverId: optionalUuidSchema,
+  vehicleId: optionalUuidSchema,
+  status: z.enum(["offline", "healthy", "weak", "stale"]).default("offline"),
+  startedAt: z.string().trim().min(1),
+  stoppedAt: z.string().trim().optional().nullable(),
+  lastPingAt: z.string().trim().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const driverEvidencePhotoSchema = z.object({
+  id: uuidSchema.optional(),
+  projectId: uuidSchema,
+  assignmentId: uuidSchema,
+  driverId: optionalUuidSchema,
+  photoType: z.enum(["vehicle", "plate", "pickup_proof", "completion_proof"]),
+  storagePath: z.string().trim().min(1),
+  capturedAt: z.string().trim().min(1),
+  metadata: metadataSchema
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type CreateMissionInput = z.infer<typeof createMissionSchema>;
@@ -193,3 +314,10 @@ export type CreateChangeRequestInput = z.infer<typeof createChangeRequestSchema>
 export type ApproveChangeRequestInput = z.infer<typeof approveChangeRequestSchema>;
 export type ApplyChangeRequestInput = z.infer<typeof applyChangeRequestSchema>;
 export type RejectChangeRequestInput = z.infer<typeof rejectChangeRequestSchema>;
+export type DriverAssignmentPacketInput = z.infer<typeof driverAssignmentPacketSchema>;
+export type DriverRouteInstructionInput = z.infer<typeof driverRouteInstructionSchema>;
+export type RouteChangeInstructionInput = z.infer<typeof routeChangeInstructionSchema>;
+export type DriverNotificationInput = z.infer<typeof driverNotificationSchema>;
+export type DriverLocationPingInput = z.infer<typeof driverLocationPingSchema>;
+export type DriverLocationSessionInput = z.infer<typeof driverLocationSessionSchema>;
+export type DriverEvidencePhotoInput = z.infer<typeof driverEvidencePhotoSchema>;

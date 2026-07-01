@@ -33,6 +33,9 @@
       ],
       "@tomp/types/schemas": [
         "../../packages/types/schemas.ts"
+      ],
+      "@tomp/driver-core": [
+        "../../packages/driver-core/src"
       ]
     },
     "plugins": [

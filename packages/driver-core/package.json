@@ -1,0 +1,23 @@
+{
+  "name": "@tomp/driver-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@tomp/types": "0.1.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}

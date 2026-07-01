@@ -2,12 +2,15 @@ import { AssignmentMonitor } from "@/components/mission-control/assignment-monit
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
 import { DecisionPanel } from "@/components/mission-control/decision-panel";
 import { DriverSignalPanel } from "@/components/mission-control/driver-signal-panel";
+import { DriverNotificationConsole } from "@/components/mission-control/driver-notification-console";
+import { DriverOperationsPanel } from "@/components/mission-control/driver-operations-panel";
 import { LiveMapPanel } from "@/components/mission-control/live-map-panel";
 import { OperationKpiStrip } from "@/components/mission-control/operation-kpi-strip";
 import { OperationTimelinePanel } from "@/components/mission-control/operation-timeline-panel";
 import { ProjectSwitcher } from "@/components/mission-control/project-switcher";
 import { RealtimeStatusPanel } from "@/components/mission-control/realtime-status-panel";
 import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
+import { RouteChangeConsole } from "@/components/mission-control/route-change-console";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getLatestDriverLocationsByProjectId, getProjectIdWithLatestDriverLocation } from "@/lib/data/locations";
 import { getProjects } from "@/lib/data/projects";
@@ -47,10 +50,13 @@ export default async function MissionControlPage({ searchParams }: MissionContro
       <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
         <div className="grid gap-6">
           <LiveMapPanel projectId={activeProject.id} locations={locations} />
+          <DriverOperationsPanel assignments={assignments} locations={locations} />
           <AssignmentMonitor assignments={assignments} locations={locations} />
         </div>
         <aside className="grid content-start gap-6">
           <DriverSignalPanel locations={locations} />
+          <DriverNotificationConsole />
+          <RouteChangeConsole />
           <RiskAndExceptionPanel assignments={assignments} locations={locations} />
           <OperationTimelinePanel events={events} />
           <RealtimeStatusPanel projectId={activeProject.id} />

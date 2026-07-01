@@ -1,7 +1,8 @@
-export function DriverRouteCard({ pickup, dropoff, commitmentTime }: { pickup: string; dropoff: string; commitmentTime: string }) {
+export function DriverRouteCard({ pickup, dropoff, commitmentTime, summary }: { pickup: string; dropoff: string; commitmentTime: string; summary: string }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
-      <p className="text-sm font-semibold text-operation">เส้นทางงาน</p>
+      <p className="text-sm font-semibold text-operation">จุดรับ / จุดส่ง / เวลา</p>
+      <p className="mt-1 text-sm text-slate-600">{summary}</p>
       <div className="mt-4 grid gap-3">
         <RoutePoint label="จุดรับ" value={pickup} tone="bg-blue-600" />
         <RoutePoint label="จุดส่ง" value={dropoff} tone="bg-operation" />
