@@ -27,18 +27,15 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <CommandHeader title="ภาพรวมการปฏิบัติการ" subtitle="ดูแผน ความพร้อม งานที่จัดสรร ตำแหน่ง GPS และรายการที่ต้องติดตามจากจุดเดียว" />
-      <OperationsHero projectCount={projects.length} assignmentCount={assignments.length} gpsCount={locations.length} followUpCount={followUpCount + riskCount} />
-      <OperationsPulse
-        ready={Math.max(0, assignments.length - followUpCount - activeAssignments - completedAssignments)}
-        followUp={followUpCount}
-        risk={riskCount}
-        active={activeAssignments}
-        completed={completedAssignments}
+      <CommandHeader
+        title="ภาพรวมการปฏิบัติการ"
+        subtitle="มองเห็นโครงการ งานที่จัดสรร ความพร้อมของคนขับและรถ สัญญาณ GPS และรายการที่ต้องติดตามในพื้นที่เดียว"
       />
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <OperationsHero projectCount={projects.length} assignmentCount={assignments.length} gpsCount={locations.length} followUpCount={followUpCount + riskCount} />
+      <OperationsPulse ready={Math.max(0, assignments.length - followUpCount - activeAssignments - completedAssignments)} followUp={followUpCount} risk={riskCount} active={activeAssignments} completed={completedAssignments} />
+      <div className="grid gap-7 xl:grid-cols-[1.25fr_0.75fr]">
         <TodayOperationBoard projects={projects} latestLocation={locations[0]} latestEvent={events[0]} />
-        <div className="grid gap-6">
+        <div className="grid gap-7">
           <ReadinessOverview score={readinessScore} gpsCount={locations.length} assignmentCount={assignments.length} />
           <QuickActionPanel />
         </div>

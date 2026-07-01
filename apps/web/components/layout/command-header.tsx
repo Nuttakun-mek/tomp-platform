@@ -1,16 +1,22 @@
 import { EnvironmentBadge } from "./environment-badge";
 
-export function CommandHeader({ title = "ศูนย์ปฏิบัติการขนส่ง", subtitle = "ติดตามแผน ความพร้อม งานที่จัดสรร และความเสี่ยงแบบรวมศูนย์" }: { title?: string; subtitle?: string }) {
+export function CommandHeader({
+  title = "ศูนย์ปฏิบัติการขนส่ง",
+  subtitle = "ติดตามแผน ความพร้อม งานที่จัดสรร GPS และความเสี่ยงจากมุมมองเดียวกัน"
+}: {
+  title?: string;
+  subtitle?: string;
+}) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white/85 p-4 shadow-soft backdrop-blur">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="enterprise-panel overflow-hidden">
+      <div className="enterprise-surface flex flex-wrap items-center justify-between gap-4 p-5 lg:p-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-operation">TOMP Command Workspace</p>
-          <h1 className="mt-1 text-xl font-semibold text-ink">{title}</h1>
-          <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
+          <p className="text-xs font-semibold tracking-[0.18em] text-operation">TOMP COMMAND WORKSPACE</p>
+          <h1 className="mt-2 text-2xl font-semibold leading-tight text-ink md:text-3xl">{title}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">{subtitle}</p>
         </div>
         <EnvironmentBadge />
       </div>
-    </div>
+    </section>
   );
 }

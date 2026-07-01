@@ -5,14 +5,14 @@ import { RiskBadge } from "@/components/ui/risk-badge";
 export function AssignmentMonitor({ assignments, locations }: { assignments: Assignment[]; locations: DriverLocation[] }) {
   const locationAssignmentIds = new Set(locations.map((location) => location.assignmentId).filter(Boolean));
   return (
-    <CommandPanel title="Assignment Monitor" eyebrow="งานที่จัดสรร">
+    <CommandPanel title="ติดตามงานที่จัดสรร" eyebrow="กระดานติดตามงาน">
       <div className="grid gap-3">
         {assignments.length ? (
           assignments.slice(0, 8).map((assignment) => {
             const hasGps = locationAssignmentIds.has(assignment.id);
             const missing = [!assignment.driverId ? "คนขับ" : null, !assignment.vehicleId ? "รถ" : null, !assignment.callSignId ? "Call Sign" : null].filter(Boolean);
             return (
-              <article key={assignment.id} className="rounded-md border border-slate-200 bg-slate-50 p-4">
+              <article key={assignment.id} className="rounded-[20px] border border-slate-200 bg-slate-50/80 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-ink">งานที่จัดสรร</p>
@@ -27,7 +27,7 @@ export function AssignmentMonitor({ assignments, locations }: { assignments: Ass
             );
           })
         ) : (
-          <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้</p>
+          <p className="rounded-[20px] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้</p>
         )}
       </div>
     </CommandPanel>

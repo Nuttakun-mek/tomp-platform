@@ -12,11 +12,11 @@ export function RiskAndExceptionPanel({ assignments, locations }: { assignments:
     .filter((item) => item.reason);
 
   return (
-    <CommandPanel title="รายการที่ต้องติดตาม" eyebrow="Exceptions">
+    <CommandPanel title="รายการที่ต้องติดตาม" eyebrow="ความเสี่ยงปฏิบัติการ">
       <div className="grid gap-3">
         {risks.length ? (
           risks.slice(0, 6).map((risk) => (
-            <article key={risk.id} className="rounded-md border border-amber-200 bg-amber-50 p-4">
+            <article key={risk.id} className="rounded-[20px] border border-amber-200 bg-amber-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-amber-950">{risk.reason}</p>
                 <RiskBadge level="medium" />
@@ -25,7 +25,7 @@ export function RiskAndExceptionPanel({ assignments, locations }: { assignments:
             </article>
           ))
         ) : (
-          <p className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">ยังไม่มีรายการที่ต้องติดตาม</p>
+          <p className="rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">ยังไม่มีรายการที่ต้องติดตาม</p>
         )}
       </div>
     </CommandPanel>

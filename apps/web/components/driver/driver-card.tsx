@@ -29,9 +29,7 @@ export function DriverCard({ driverAccess }: { driverAccess: DriverAccessAssignm
     packetVersion: driverAccess.assignment.currentVersion,
     projectName: driverAccess.project.projectName,
     missionName: null,
-    instructions: [
-      { id: driverAccess.assignment.id, title: "รับทราบงาน", status: "assigned", sequence: 1, required: true }
-    ],
+    instructions: [{ id: driverAccess.assignment.id, title: "รับทราบงาน", status: "assigned", sequence: 1, required: true }],
     routeInstruction: {
       routePlan: { summary: `${pickupLabel} ไป ${dropoffLabel}`, stops: [{ label: pickupLabel }, { label: dropoffLabel }], googleMapsUrl: mapsUrl, metadata: {} },
       pickup: { label: pickupLabel },
@@ -58,7 +56,7 @@ export function DriverCard({ driverAccess }: { driverAccess: DriverAccessAssignm
         <DriverRouteChangeAlert driverAccess={driverAccess} />
       </div>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-panel backdrop-blur lg:hidden">
-        <a className="flex min-h-14 items-center justify-center rounded-xl bg-route px-4 py-3 text-base font-semibold text-white" href={mapsUrl}>
+        <a className="flex min-h-14 items-center justify-center rounded-2xl bg-route px-4 py-3 text-base font-semibold text-white" href={mapsUrl}>
           เปิด Google Maps
         </a>
       </div>

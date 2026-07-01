@@ -11,19 +11,19 @@ export function OperationsPulse({ ready, followUp, risk, active, completed }: { 
   ];
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+    <section className="enterprise-panel p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">Operations Pulse</p>
-          <h2 className="mt-1 text-lg font-semibold text-ink">สัญญาณปฏิบัติการวันนี้</h2>
+          <p className="text-xs font-semibold tracking-[0.16em] text-operation">OPERATIONS PULSE</p>
+          <h2 className="mt-1 text-xl font-semibold text-ink">สัญญาณปฏิบัติการวันนี้</h2>
         </div>
-        <p className="text-sm text-slate-500">อัปเดตจากข้อมูลโครงการและ GPS ล่าสุด</p>
+        <p className="text-sm text-slate-500">อัปเดตจากงานและสัญญาณ GPS ล่าสุด</p>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-5">
         {items.map((item) => (
-          <article key={item.label} className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <article key={item.label} className="rounded-[18px] border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-sm font-semibold text-slate-600">{item.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-ink">{item.value}</p>
+            <p className="mt-2 text-3xl font-semibold text-ink">{item.value}</p>
             <div className="mt-3">
               <ProgressBar value={(item.value / total) * 100} tone={item.tone} />
             </div>
