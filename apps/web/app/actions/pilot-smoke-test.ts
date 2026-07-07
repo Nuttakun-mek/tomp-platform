@@ -3,8 +3,8 @@
 import { randomUUID } from "crypto";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
-import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
+import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
@@ -74,9 +74,14 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     assignment: randomUUID()
   };
 
+  const projectCode = `PILOT-${suffix}`;
+  const callSignCode = `PILOT-${suffix.slice(-4)}`;
+  const vehiclePlate = `TEST-${suffix.slice(-4)}`;
   const projectName = `ทดสอบ Pilot ${suffix}`;
+  const missionName = "รับส่งทดสอบระบบ";
   const pickupLocation = "จุดรับผู้โดยสาร";
   const dropoffLocation = "จุดส่งปลายทาง";
+  const commitmentTime = new Date(startTime).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
 
   const steps = [
     client.from("organizations").insert({
@@ -100,7 +105,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       id: ids.project,
       organization_id: ids.organization,
       owner_profile_id: ids.profile,
-      project_code: `PILOT-${suffix}`,
+      project_code: projectCode,
       project_name: projectName,
       start_date: today,
       end_date: today,
@@ -136,7 +141,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       project_day_id: ids.day,
       session_id: ids.session,
       mission_code: `MIS-${suffix}`,
-      mission_name: "รับส่งทดสอบระบบ",
+      mission_name: missionName,
       mission_type: "driver_tracking_test",
       priority: "normal",
       status: "draft",
@@ -144,12 +149,12 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       planned_end_time: endTime,
       instruction: "ให้คนขับเปิดหน้าคนขับและแชร์ GPS",
       service_commitment: "ศูนย์ควบคุมต้องเห็นตำแหน่งล่าสุด",
-      metadata: { pickupLocation, dropoffLocation, commitmentTime: new Date(startTime).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }) }
+      metadata: { pickupLocation, dropoffLocation, commitmentTime }
     }),
     client.from("call_signs").insert({
       id: ids.callSign,
       project_id: ids.project,
-      call_sign: `PILOT-${suffix.slice(-4)}`,
+      call_sign: callSignCode,
       group_name: "ทดสอบ Pilot",
       status: "active",
       metadata: { smokeTest: true }
@@ -158,7 +163,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       id: ids.vehicle,
       organization_id: ids.organization,
       vendor_id: null,
-      plate_number: `TEST-${suffix.slice(-4)}`,
+      plate_number: vehiclePlate,
       vehicle_type: "รถทดสอบ",
       capacity: 4,
       status: "assigned",
@@ -190,7 +195,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
         smokeTest: true,
         pickupLocation,
         dropoffLocation,
-        commitmentTime: new Date(startTime).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
+        commitmentTime,
         coordinatorPhone: "+6620000000",
         operationPhone: "+6621111111"
       }
@@ -206,7 +211,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     ...baseRecord(ids.project),
     organizationId: ids.organization,
     ownerProfileId: ids.profile,
-    projectCode: `PILOT-${suffix}`,
+    projectCode,
     projectName,
     startDate: today,
     endDate: today,
@@ -227,12 +232,12 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     endTime,
     commitmentId: null,
     currentVersion: 1,
-    metadata: { pickupLocation, dropoffLocation, commitmentTime: new Date(startTime).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }) }
+    metadata: { pickupLocation, dropoffLocation, commitmentTime }
   };
-  const callSign = { ...baseRecord(ids.callSign), projectId: ids.project, callSign: `PILOT-${suffix.slice(-4)}`, groupName: "ทดสอบ Pilot", status: "active" as const };
+  const callSign = { ...baseRecord(ids.callSign), projectId: ids.project, callSign: callSignCode, groupName: "ทดสอบ Pilot", status: "active" as const };
   const driver = { ...baseRecord(ids.driver), organizationId: ids.organization, vendorId: null, fullName: "คนขับทดสอบ Pilot", phone: "+66810000000", licenseType: "pilot", languages: ["th"], status: "assigned" as const };
-  const vehicle = { ...baseRecord(ids.vehicle), organizationId: ids.organization, vendorId: null, plateNumber: `TEST-${suffix.slice(-4)}`, vehicleType: "รถทดสอบ", capacity: 4, status: "assigned" as const };
-  const packet = buildWebDriverAssignmentPacket({ project, assignment, callSign, driver, vehicle, missionName: "รับส่งทดสอบระบบ" });
+  const vehicle = { ...baseRecord(ids.vehicle), organizationId: ids.organization, vendorId: null, plateNumber: vehiclePlate, vehicleType: "รถทดสอบ", capacity: 4, status: "assigned" as const };
+  const packet = buildWebDriverAssignmentPacket({ project, assignment, callSign, driver, vehicle, missionName });
 
   const expiresAt = getDefaultDriverTokenExpiry();
   const token = generateDriverAccessToken({ assignmentId: ids.assignment, driverId: ids.driver, expiresAt });

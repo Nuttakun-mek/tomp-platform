@@ -62,9 +62,13 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
         metadata: {
           assignmentId: ping.assignmentId,
           projectId: ping.projectId,
+          projectCode: driverAccess.project.projectCode,
+          projectName: driverAccess.project.projectName,
           callSign: driverAccess.callSign.callSign,
           driverName: driverAccess.driver.fullName,
-          vehiclePlate: driverAccess.vehicle.plateNumber
+          driverPhone: driverAccess.driver.phone,
+          vehiclePlate: driverAccess.vehicle.plateNumber,
+          assignmentStatus: driverAccess.assignment.status
         }
       })
     });
@@ -160,7 +164,7 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
             <p className="text-sm font-semibold text-blue-100">แชร์ตำแหน่ง GPS</p>
             <h3 className="mt-1 text-2xl font-semibold">ให้ศูนย์ควบคุมเห็นตำแหน่งรถ</h3>
             <p className="mt-2 text-sm leading-6 text-blue-50">
-              Web app จะส่งตำแหน่งขณะหน้านี้ยังทำงานอยู่ หากล็อกจอหรือสลับแอป ระบบมือถืออาจหยุดส่งชั่วคราว
+              Web app จะส่งตำแหน่งขณะหน้านี้ยังทำงานอยู่ หากล็อกจอหรือสลับแอป ระบบมือถืออาจหยุดส่งชั่วคราว หากต้องการ background location จริงควรใช้ Mobile App ในระยะถัดไป
             </p>
           </div>
           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-800">
@@ -171,7 +175,7 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
 
       <div className="grid gap-0 lg:grid-cols-[0.85fr_1.15fr]">
         <div className="p-5">
-          <div className="rounded-xl bg-blue-50 p-4 text-sm text-slate-700">
+          <div className="rounded-2xl bg-blue-50 p-4 text-sm text-slate-700">
             <p className="font-medium text-slate-950">{message}</p>
             <p className="mt-2 text-xs font-semibold text-blue-900">สถานะ session: {health.message}</p>
             {lastLocation ? (
@@ -188,31 +192,16 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
           </div>
 
           <div className="mt-4 grid gap-3">
-            <button
-              className="min-h-14 rounded-xl bg-blue-700 px-4 py-3 text-base font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={isSharing}
-              type="button"
-              onClick={startSharing}
-            >
+            <button className="min-h-14 rounded-2xl bg-blue-700 px-4 py-3 text-base font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300" disabled={isSharing} type="button" onClick={startSharing}>
               เริ่มแชร์ตำแหน่ง
             </button>
-            <button
-              className="min-h-14 rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:text-slate-400"
-              disabled={!isSharing}
-              type="button"
-              onClick={() => void stopSharing()}
-            >
+            <button className="min-h-14 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:text-slate-400" disabled={!isSharing} type="button" onClick={() => void stopSharing()}>
               หยุดแชร์ตำแหน่ง
             </button>
           </div>
 
           {lastLocation ? (
-            <a
-              className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800"
-              href={buildGoogleMapsUrl(lastLocation)}
-              rel="noreferrer"
-              target="_blank"
-            >
+            <a className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800" href={buildGoogleMapsUrl(lastLocation)} rel="noreferrer" target="_blank">
               เปิดตำแหน่งของฉันใน Google Maps
             </a>
           ) : null}

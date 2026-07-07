@@ -17,6 +17,10 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isSuccessMessage(message: string) {
+  return message.includes("สำเร็จ") || message.includes("บันทึก");
+}
+
 export function CreateProjectForm() {
   const initialCode = useMemo(() => buildProjectCode(), []);
   const [projectCode, setProjectCode] = useState(initialCode);
@@ -64,46 +68,46 @@ export function CreateProjectForm() {
   }
 
   return (
-    <form action={handleSubmit} className="grid gap-5 rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+    <form action={handleSubmit} className="enterprise-panel grid gap-5 p-5">
       <div className="border-b border-slate-100 pb-4">
         <h2 className="text-lg font-semibold text-ink">สร้างโครงการ</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">โครงการคือพื้นที่หลักสำหรับรวมภารกิจ ทรัพยากร Assignment และ Timeline</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">โครงการคือพื้นที่หลักสำหรับรวมภารกิจ ทรัพยากร Assignment และ Timeline ของปฏิบัติการ</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-slate-700 md:col-span-2">
           รหัสโครงการ
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <input className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2.5" name="projectCode" value={projectCode} onChange={(event) => setProjectCode(event.target.value)} />
-            <button className="whitespace-nowrap rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700" type="button" onClick={() => setProjectCode(buildProjectCode())}>
-              สร้างใหม่
+            <input className="min-w-0 flex-1 rounded-2xl border border-slate-300 px-3 py-2.5" name="projectCode" value={projectCode} onChange={(event) => setProjectCode(event.target.value)} />
+            <button className="whitespace-nowrap rounded-2xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700" type="button" onClick={() => setProjectCode(buildProjectCode())}>
+              สร้างรหัสใหม่
             </button>
           </div>
           <FieldError errors={fieldErrors.projectCode} />
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           ชื่อโครงการ
-          <input className="rounded-md border border-slate-300 px-3 py-2.5" name="projectName" placeholder="งานรับส่งผู้ร่วมประชุม" />
+          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="projectName" placeholder="งานรับส่งผู้ร่วมประชุม" />
           <FieldError errors={fieldErrors.projectName} />
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           วันที่เริ่มต้น
-          <input className="rounded-md border border-slate-300 px-3 py-2.5" name="startDate" type="date" defaultValue={today()} />
+          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="startDate" type="date" defaultValue={today()} />
           <FieldError errors={fieldErrors.startDate} />
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           วันที่สิ้นสุด
-          <input className="rounded-md border border-slate-300 px-3 py-2.5" name="endDate" type="date" defaultValue={today()} />
+          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="endDate" type="date" defaultValue={today()} />
           <FieldError errors={fieldErrors.endDate} />
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           เขตเวลา
-          <input className="rounded-md border border-slate-300 px-3 py-2.5" name="timezone" defaultValue="Asia/Bangkok" />
+          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="timezone" defaultValue="Asia/Bangkok" />
           <FieldError errors={fieldErrors.timezone} />
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           ระดับบริการ
-          <select className="rounded-md border border-slate-300 px-3 py-2.5" name="serviceLevel" defaultValue="standard">
+          <select className="rounded-2xl border border-slate-300 px-3 py-2.5" name="serviceLevel" defaultValue="standard">
             <option value="standard">มาตรฐาน</option>
             <option value="premium">พรีเมียม</option>
             <option value="vip">VIP</option>
@@ -112,12 +116,8 @@ export function CreateProjectForm() {
         </label>
       </div>
 
-      {message ? (
-        <p className={`rounded-md p-3 text-sm font-medium ${message.includes("สำเร็จ") ? "bg-teal-50 text-teal-900" : "bg-red-50 text-red-900"}`}>
-          {message}
-        </p>
-      ) : null}
-      <button className="w-fit rounded-md bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
+      {message ? <p className={`rounded-2xl p-3 text-sm font-medium ${isSuccessMessage(message) ? "bg-teal-50 text-teal-900" : "bg-red-50 text-red-900"}`}>{message}</p> : null}
+      <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
         {isPending ? "กำลังบันทึก..." : "บันทึกโครงการ"}
       </button>
     </form>

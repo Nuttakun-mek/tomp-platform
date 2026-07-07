@@ -130,10 +130,7 @@ export async function POST(request: Request) {
       projectId: String(tokenRow.project_id),
       objectType: "driver_location",
       objectId: String(tokenRow.assignment_id || inserted.id),
-      eventType:
-        parsed.data.trackingEvent === "sharing_started"
-          ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED
-          : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED,
+      eventType: parsed.data.trackingEvent === "sharing_started" ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED,
       source: "driver_qr",
       reason: parsed.data.trackingEvent === "sharing_started" ? "คนขับเริ่มแชร์ตำแหน่งจาก web app" : "คนขับหยุดแชร์ตำแหน่งจาก web app",
       afterData: {

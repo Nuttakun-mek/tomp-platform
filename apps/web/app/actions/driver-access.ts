@@ -3,8 +3,8 @@
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
-import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
+import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -28,8 +28,9 @@ function buildPacketPayload(input: {
   vehicle?: Row | null;
   mission?: Row | null;
 }) {
-  const pickup = text(input.assignment, "pickup_location", text(metadata(input.assignment), "pickupLocation", "ยังไม่ระบุจุดรับ"));
-  const dropoff = text(input.assignment, "dropoff_location", text(metadata(input.assignment), "dropoffLocation", "ยังไม่ระบุจุดส่ง"));
+  const assignmentMeta = metadata(input.assignment);
+  const pickup = text(assignmentMeta, "pickupLocation", "ยังไม่ระบุจุดรับ");
+  const dropoff = text(assignmentMeta, "dropoffLocation", "ยังไม่ระบุจุดส่ง");
   const assignmentId = text(input.assignment, "id");
   const projectId = text(input.project, "id");
   const driverId = text(input.driver, "id") || text(input.assignment, "driver_id") || null;
@@ -61,8 +62,8 @@ function buildPacketPayload(input: {
       dropoff: { label: dropoff }
     },
     contactInstruction: {
-      coordinatorPhone: text(metadata(input.assignment), "coordinatorPhone", "ยังไม่ระบุ"),
-      operationPhone: text(metadata(input.assignment), "operationPhone", "ยังไม่ระบุ")
+      coordinatorPhone: text(assignmentMeta, "coordinatorPhone", "ยังไม่ระบุ"),
+      operationPhone: text(assignmentMeta, "operationPhone", "ยังไม่ระบุ")
     },
     safetyInstructions: [{ message: "เปิด GPS ระหว่างปฏิบัติงานเมื่อพร้อม", required: true }],
     publishedAt: new Date().toISOString(),
@@ -154,7 +155,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     objectId: data.assignmentId,
     eventType: TIMELINE_EVENTS.DRIVER_ACCESS_TOKEN_CREATED,
     source: "operation_user",
-    reason: "Driver QR token and assignment packet created.",
+    reason: "สร้าง QR token และ assignment packet สำหรับคนขับ",
     afterData: { tokenId: row.id, expiresAt, packetRecord: packetResult?.packetRecord || null }
   });
 
@@ -193,7 +194,7 @@ export async function revokeDriverAccessTokenAction(input: unknown): Promise<Act
     objectId: row.assignment_id,
     eventType: TIMELINE_EVENTS.DRIVER_ACCESS_TOKEN_REVOKED,
     source: "operation_user",
-    reason: data.reason || "Driver QR token revoked.",
+    reason: data.reason || "ยกเลิก QR token สำหรับคนขับ",
     afterData: { tokenId: row.id, status: row.status }
   });
 
@@ -217,10 +218,7 @@ export async function validateDriverAccessTokenAction(input: unknown): Promise<A
   if (!row || row.status !== "active") return actionFailure("ลิงก์คนขับไม่ถูกต้องหรือถูกยกเลิกแล้ว");
   if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return actionFailure("ลิงก์คนขับหมดอายุแล้ว");
 
-  await client
-    .from("driver_access_tokens")
-    .update({ last_accessed_at: new Date().toISOString(), used_at: new Date().toISOString(), access_count: 1 })
-    .eq("id", row.id);
+  await client.from("driver_access_tokens").update({ last_accessed_at: new Date().toISOString(), used_at: new Date().toISOString(), access_count: 1 }).eq("id", row.id);
 
   await createTimelineEvent({
     projectId: row.project_id,
@@ -228,7 +226,7 @@ export async function validateDriverAccessTokenAction(input: unknown): Promise<A
     objectId: row.assignment_id,
     eventType: TIMELINE_EVENTS.DRIVER_ACCESS_TOKEN_USED,
     source: "driver_qr",
-    reason: "Driver QR token validated.",
+    reason: "คนขับเปิดลิงก์ QR และผ่านการตรวจสอบ token",
     afterData: { tokenId: row.id }
   });
 

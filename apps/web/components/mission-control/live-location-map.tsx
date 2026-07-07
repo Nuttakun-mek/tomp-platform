@@ -134,25 +134,17 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
   const issueCount = locations.filter((location) => ["slow", "offline", "stopped"].includes(getFreshness(location, now))).length;
 
   return (
-    <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-soft">
+    <section className="enterprise-panel overflow-hidden">
       <div className="border-b border-slate-200 bg-slate-950 px-5 py-4 text-white">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">แผนที่ติดตามสถานะ</p>
+            <p className="text-xs font-semibold tracking-wide text-blue-200">แผนที่ติดตามสถานะ</p>
             <h2 className="mt-1 text-xl font-semibold">ตำแหน่งคนขับแบบเรียลไทม์</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-200">
               ทุกตำแหน่งผูกกับ Project, Assignment, Call Sign, คนขับ และรถจากฐานข้อมูลจริง สีของหมุดแสดงความสดของสัญญาณ GPS ล่าสุด
             </p>
           </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              connection === "live"
-                ? "bg-emerald-400 text-emerald-950"
-                : connection === "offline"
-                  ? "bg-rose-300 text-rose-950"
-                  : "bg-amber-300 text-amber-950"
-            }`}
-          >
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${connection === "live" ? "bg-emerald-400 text-emerald-950" : connection === "offline" ? "bg-rose-300 text-rose-950" : "bg-amber-300 text-amber-950"}`}>
             {connection === "live" ? "เชื่อมต่อสด" : connection === "offline" ? "ออฟไลน์" : "สำรองด้วยการดึงข้อมูล"}
           </span>
         </div>
@@ -162,13 +154,7 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
         <div className="min-h-[420px] bg-slate-100">
           {mapUrl && latest ? (
             <div className="relative h-full min-h-[420px] overflow-hidden">
-              <iframe
-                className="h-[420px] w-full border-0 opacity-80 lg:h-full lg:min-h-[560px]"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                src={mapUrl}
-                title="แผนที่ตำแหน่งคนขับ"
-              />
+              <iframe className="h-[420px] w-full border-0 opacity-80 lg:h-full lg:min-h-[560px]" loading="lazy" referrerPolicy="no-referrer" src={mapUrl} title="แผนที่ตำแหน่งคนขับ" />
 
               {locations.map((location) => {
                 const status = getFreshness(location, now);
@@ -177,14 +163,8 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
                 return (
                   <div key={location.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={position}>
                     {status === "live" ? <span className="absolute inline-flex h-8 w-8 -translate-x-2 -translate-y-2 animate-ping rounded-full bg-emerald-400 opacity-60" /> : null}
-                    <a
-                      className={`relative flex h-4 w-4 rounded-full ring-8 ${getMarkerClass(status)}`}
-                      href={buildGoogleMapsUrl(location)}
-                      rel="noreferrer"
-                      target="_blank"
-                      title={`${identity.callSign} - ${identity.driverName}`}
-                    />
-                    <div className="absolute left-5 top-0 min-w-40 rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow-soft">
+                    <a className={`relative flex h-4 w-4 rounded-full ring-8 ${getMarkerClass(status)}`} href={buildGoogleMapsUrl(location)} rel="noreferrer" target="_blank" title={`${identity.callSign} - ${identity.driverName}`} />
+                    <div className="absolute left-5 top-0 min-w-40 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow-soft">
                       <p className="font-semibold text-ink">{identity.callSign}</p>
                       <p className="text-slate-600">{identity.driverName}</p>
                       <p className={`mt-1 inline-flex rounded-full border px-2 py-0.5 font-semibold ${getFreshnessClass(status)}`}>{getFreshnessLabel(status)}</p>
@@ -195,11 +175,9 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
             </div>
           ) : (
             <div className="flex min-h-[420px] items-center justify-center p-6 text-center">
-              <div className="max-w-md rounded-md border border-dashed border-slate-300 bg-white p-6">
+              <div className="max-w-md rounded-2xl border border-dashed border-slate-300 bg-white p-6">
                 <p className="text-lg font-semibold text-ink">ยังไม่มีตำแหน่งคนขับจริง</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  เปิดหน้าคนขับด้วยลิงก์ QR แล้วกดเริ่มแชร์ตำแหน่ง GPS แผนที่จะแสดงหมุดและสถานะอัตโนมัติ
-                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">เปิดหน้าคนขับด้วยลิงก์ QR แล้วกดเริ่มแชร์ตำแหน่ง GPS แผนที่จะเริ่มแสดงหมุดและสถานะอัตโนมัติ</p>
               </div>
             </div>
           )}
@@ -207,15 +185,15 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
 
         <div className="grid content-start gap-3 border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">
           <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-xs font-semibold text-slate-500">ทั้งหมด</p>
               <p className="mt-1 text-xl font-semibold text-ink">{locations.length}</p>
             </div>
-            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
               <p className="text-xs font-semibold text-emerald-800">กำลังแชร์</p>
               <p className="mt-1 text-xl font-semibold text-emerald-950">{liveCount}</p>
             </div>
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
               <p className="text-xs font-semibold text-amber-800">ต้องติดตาม</p>
               <p className="mt-1 text-xl font-semibold text-amber-950">{issueCount}</p>
             </div>
@@ -231,7 +209,7 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
               const identity = getLocationIdentity(location);
               const status = getFreshness(location, now);
               return (
-                <article key={location.id} className={`rounded-md border p-4 ${getFreshnessClass(status)}`}>
+                <article key={location.id} className={`rounded-2xl border p-4 ${getFreshnessClass(status)}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold">{identity.callSign}</p>
@@ -261,21 +239,14 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
                     {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
                     {location.accuracy ? ` | ความแม่นยำ ${Math.round(location.accuracy)} เมตร` : ""}
                   </p>
-                  <a
-                    className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-white/80 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                    href={buildGoogleMapsUrl(location)}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
+                  <a className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-white/80 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" href={buildGoogleMapsUrl(location)} rel="noreferrer" target="_blank">
                     เปิดตำแหน่งใน Google Maps
                   </a>
                 </article>
               );
             })
           ) : (
-            <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-              ยังไม่มีข้อมูลตำแหน่งสำหรับโครงการนี้ หากกำลังทดสอบ ให้เปิดหน้าคนขับบนมือถือและอนุญาตการเข้าถึงตำแหน่ง
-            </div>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">ยังไม่มีข้อมูลตำแหน่งสำหรับโครงการนี้ หากกำลังทดสอบ ให้เปิดหน้าคนขับบนมือถือและอนุญาตการเข้าถึงตำแหน่ง</div>
           )}
         </div>
       </div>

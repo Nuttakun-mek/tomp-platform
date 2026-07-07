@@ -3,8 +3,8 @@
 import { createProjectSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
-import { mapProject } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
+import { mapProject } from "@/lib/data/mappers";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createProjectTimelineEvent } from "@/lib/timeline";
 
@@ -24,19 +24,14 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างโครงการ");
   }
 
-  const { data: existingProject, error: lookupError } = await client
-    .from("projects")
-    .select("id")
-    .eq("project_code", parsed.data.projectCode)
-    .maybeSingle();
-
+  const { data: existingProject, error: lookupError } = await client.from("projects").select("id").eq("project_code", parsed.data.projectCode).maybeSingle();
   if (lookupError) {
     return actionFailure(getDatabaseErrorMessage(lookupError, "ตรวจสอบรหัสโครงการไม่สำเร็จ"));
   }
 
   if (existingProject) {
-    return actionFailure("รหัสโครงการนี้ถูกใช้แล้ว กรุณาเปลี่ยนรหัสโครงการ", {
-      projectCode: ["รหัสโครงการนี้ถูกใช้แล้ว"]
+    return actionFailure("รหัสโครงการนี้ถูกใช้งานแล้ว กรุณากดสร้างรหัสใหม่หรือเปลี่ยนรหัสโครงการ", {
+      projectCode: ["รหัสโครงการนี้ถูกใช้งานแล้ว"]
     });
   }
 

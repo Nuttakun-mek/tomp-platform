@@ -1,13 +1,32 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import Image from "next/image";
+import { useEffect, useState, useTransition } from "react";
 import type { Assignment } from "@tomp/types/domain";
 import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
 
 export function DriverAccessGenerator({ assignments, projectId }: { assignments: Assignment[]; projectId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [accessUrl, setAccessUrl] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    let cancelled = false;
+    async function renderQr() {
+      if (!accessUrl) {
+        setQrDataUrl(null);
+        return;
+      }
+      const QRCode = await import("qrcode");
+      const dataUrl = await QRCode.toDataURL(accessUrl, { margin: 2, width: 220, errorCorrectionLevel: "M" });
+      if (!cancelled) setQrDataUrl(dataUrl);
+    }
+    void renderQr();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessUrl]);
 
   function createAccess(formData: FormData) {
     setMessage(null);
@@ -34,45 +53,49 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
   }
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-ink">สร้างลิงก์ QR สำหรับคนขับ</h2>
+    <section className="enterprise-panel p-5">
+      <h2 className="text-lg font-semibold text-ink">สร้าง QR สำหรับคนขับ</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">
-        เลือก Assignment จริงเพื่อสร้าง token สำหรับคนขับ ระบบจะผูกลิงก์กับ Assignment นี้เท่านั้น
+        เลือก Assignment จริงเพื่อสร้าง token สำหรับคนขับ ระบบจะผูกลิงก์กับ Assignment นี้เท่านั้น และเก็บ token แบบ hash บนฝั่ง server
       </p>
 
       {assignments.length ? (
         <form action={createAccess} className="mt-4 grid gap-3">
-          <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" name="assignmentId" required>
+          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm" name="assignmentId" required>
             {assignments.map((assignment) => (
               <option key={assignment.id} value={assignment.id}>
                 {assignment.id.slice(0, 8)} | {assignment.status} | {assignment.driverId ? "มีคนขับ" : "ยังไม่มีคนขับ"}
               </option>
             ))}
           </select>
-          <button className="rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300" disabled={isPending} type="submit">
-            {isPending ? "กำลังสร้าง..." : "สร้างลิงก์สำหรับคนขับ"}
+          <button className="w-fit rounded-2xl bg-operation px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-300" disabled={isPending} type="submit">
+            {isPending ? "กำลังสร้าง..." : "สร้างลิงก์และ QR สำหรับคนขับ"}
           </button>
         </form>
       ) : (
-        <p className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-          ยังไม่มี Assignment ให้สร้าง QR กรุณาสร้าง Assignment ก่อน หรือใช้หน้า “ทดสอบ GPS สด”
-        </p>
+        <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">ยังไม่มี Assignment ให้สร้าง QR กรุณาสร้าง Assignment ก่อน หรือใช้หน้า “ทดสอบ GPS สด”</p>
       )}
 
       {message ? <p className="mt-4 text-sm font-medium text-slate-700">{message}</p> : null}
       {accessUrl ? (
-        <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-4">
-          <p className="text-xs font-semibold text-blue-900">ลิงก์สำหรับคนขับ</p>
-          <a className="mt-2 block break-all text-sm font-semibold text-blue-800 underline" href={accessUrl} target="_blank" rel="noreferrer">
-            {accessUrl}
-          </a>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <a className="rounded-md bg-blue-700 px-4 py-2 text-center text-sm font-semibold text-white" href={accessUrl} target="_blank" rel="noreferrer">
-              เปิดหน้าคนขับ
+        <div className="mt-3 grid gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 md:grid-cols-[auto_1fr]">
+          <div className="flex h-56 w-56 items-center justify-center rounded-2xl border border-blue-200 bg-white p-3">
+            {qrDataUrl ? <Image alt="QR สำหรับคนขับ" className="h-full w-full" height={220} src={qrDataUrl} unoptimized width={220} /> : <span className="text-sm font-semibold text-blue-900">กำลังสร้าง QR...</span>}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-blue-900">ลิงก์สำหรับคนขับ</p>
+            <a className="mt-2 block break-all text-sm font-semibold text-blue-800 underline" href={accessUrl} target="_blank" rel="noreferrer">
+              {accessUrl}
             </a>
-            <button className="rounded-md border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-800" type="button" onClick={() => void navigator.clipboard?.writeText(accessUrl)}>
-              คัดลอกลิงก์
-            </button>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <a className="rounded-2xl bg-blue-700 px-4 py-2.5 text-center text-sm font-semibold text-white" href={accessUrl} target="_blank" rel="noreferrer">
+                เปิดหน้าคนขับ
+              </a>
+              <button className="rounded-2xl border border-blue-300 bg-white px-4 py-2.5 text-sm font-semibold text-blue-800" type="button" onClick={() => void navigator.clipboard?.writeText(accessUrl)}>
+                คัดลอกลิงก์
+              </button>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-blue-900">สำหรับ pilot ภายใน สามารถส่งลิงก์นี้ให้คนขับเปิดบนมือถือเพื่อยืนยันงานและแชร์ GPS ได้ทันที</p>
           </div>
         </div>
       ) : null}

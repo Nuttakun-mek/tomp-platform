@@ -3,11 +3,11 @@
 import { createAssignmentSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
-import { mapAssignment } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
+import { mapAssignment } from "@/lib/data/mappers";
+import { assertPlanEditable } from "@/lib/domain/publish-locking";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createAssignmentTimelineEvent } from "@/lib/timeline";
-import { assertPlanEditable } from "@/lib/domain/publish-locking";
 
 export async function createAssignmentAction(input: unknown): Promise<ActionResult> {
   const parsed = createAssignmentSchema.safeParse(input);
@@ -24,6 +24,7 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
   if (!permission.allowed && mode !== "service_role") {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้าง Assignment");
   }
+
   const editable = await assertPlanEditable(parsed.data.projectId);
   if (!editable.editable) return actionFailure(editable.reason || "โครงการถูกล็อกแล้ว กรุณาส่งคำขอเปลี่ยนแปลง");
 
