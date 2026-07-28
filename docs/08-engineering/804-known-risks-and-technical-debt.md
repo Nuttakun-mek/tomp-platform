@@ -6,8 +6,9 @@
 - Driver token hashing and validation exist, but revocation management UI is deferred.
 - Mission Control has realtime subscription foundation, but retry/dedupe/load behavior is not production-hardened.
 - Migrations were proven against a hosted Supabase project, but local Supabase reset testing is still needed.
-- End-to-end tests are not implemented.
+- Production route smoke test script exists, but browser E2E tests are still not implemented.
 - Supabase schema needs repeatable migration and seed verification in CI.
 - npm audit reports moderate transitive dependency issues that currently require a breaking forced fix.
 - Storage upload utilities exist, but evidence gallery, signed URLs, and retention policy are deferred.
 - UI is ready for guided internal pilot, not unsupervised production operation.
+- `/api/health` and `/admin/operations` exist, but full observability with alerting/log drains is not yet implemented.

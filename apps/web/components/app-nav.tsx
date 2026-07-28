@@ -36,7 +36,8 @@ const navSections = [
     items: [
       { href: "/driver", label: "หน้าคนขับ", description: "เข้าถึงงานด้วย QR" },
       { href: "/login", label: "เข้าสู่ระบบ", description: "เจ้าหน้าที่ปฏิบัติการ" },
-      { href: "/admin", label: "ผู้ดูแลระบบ", description: "ตรวจระบบและ Pilot" }
+      { href: "/admin", label: "ผู้ดูแลระบบ", description: "ตรวจระบบและ Pilot" },
+      { href: "/admin/operations", label: "Runbook", description: "ขั้นตอนดูแลระบบ" }
     ]
   }
 ];
