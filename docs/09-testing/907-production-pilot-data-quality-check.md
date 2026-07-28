@@ -28,6 +28,7 @@
 - Assignment ที่ยังไม่ครบ Call Sign, คนขับ หรือรถ
 - มี Assignment แล้วแต่ยังไม่มี QR/token
 - มี QR/token แล้วแต่ยังไม่มี GPS location
+- ชุดทดสอบเก่าที่มี marker `smokeTest`
 - ตารางหลักที่อ่านได้จาก Supabase
 
 ## วิธีตีความผลตรวจ
@@ -43,6 +44,20 @@
 
 1. ข้อมูลทดสอบเก่า: archive หรือ reset ชุดทดสอบ
 2. ข้อมูลจริง: แก้เฉพาะ field ที่เพี้ยนและบันทึกเหตุผลใน Timeline ภายหลัง
+
+## การเก็บชุดทดสอบเก่า
+
+หน้า `/admin/data-quality` มีปุ่ม `เก็บชุดทดสอบเก่า`
+
+ปุ่มนี้ไม่ลบข้อมูล แต่จะทำสิ่งต่อไปนี้กับข้อมูลที่ระบบสร้างเองและมี marker `smokeTest`:
+
+- เปลี่ยนโครงการ ภารกิจ วันปฏิบัติการ session, Call Sign และ Assignment เป็น `archived`
+- ปิด QR/token เป็น `revoked`
+- ปิด location session ที่ยังค้างอยู่
+- เก็บ metadata ว่า archive โดย data quality tool
+- สร้าง Timeline event สำหรับโครงการทดสอบที่ถูกเก็บ
+
+ห้ามใช้ปุ่มนี้เป็นเครื่องมือ cleanup ข้อมูลจริงที่ผู้ใช้สร้างเอง เพราะเครื่องมือนี้ตั้งใจสำหรับชุดทดสอบ Production Pilot เท่านั้น
 
 ## ข้อจำกัด GPS บน web app
 

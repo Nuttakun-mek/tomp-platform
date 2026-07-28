@@ -1,4 +1,5 @@
 import type { DataQualityReport } from "@/lib/admin/data-quality";
+import { PilotCleanupAction } from "./pilot-cleanup-action";
 
 function severityStyle(severity: "warning" | "critical") {
   return severity === "critical" ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900";
@@ -52,6 +53,8 @@ export function DataQualityPanel({ report }: { report: DataQualityReport }) {
           ))}
         </div>
       </section>
+
+      <PilotCleanupAction />
 
       <section className="enterprise-card p-5 lg:p-6">
         <div>

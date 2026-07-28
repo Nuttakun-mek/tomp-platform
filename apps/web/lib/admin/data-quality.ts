@@ -30,7 +30,7 @@ export interface DataQualityReport {
 }
 
 const sourceChecks: SourceCheck[] = [
-  { table: "projects", label: "โครงการ", select: "id,project_code,project_name,status", textFields: ["project_code", "project_name", "status"] },
+  { table: "projects", label: "โครงการ", select: "id,project_code,project_name,status,metadata", textFields: ["project_code", "project_name", "status"] },
   { table: "missions", label: "ภารกิจ", select: "id,mission_code,mission_name,mission_type,status", textFields: ["mission_code", "mission_name", "mission_type", "status"] },
   { table: "drivers", label: "คนขับ", select: "id,full_name,phone,status", textFields: ["full_name", "phone", "status"] },
   { table: "vehicles", label: "รถ", select: "id,plate_number,vehicle_type,status", textFields: ["plate_number", "vehicle_type", "status"] },
@@ -172,6 +172,21 @@ export async function getDataQualityReport(): Promise<DataQualityReport> {
       area: "ตำแหน่ง GPS",
       title: "ยังไม่มีตำแหน่ง GPS จากคนขับ",
       detail: "ต้องเปิดลิงก์คนขับบนมือถือ กดเริ่มแชร์ และอนุญาตตำแหน่งใน browser"
+    });
+  }
+
+  const activeSmokeProjects = projects.filter((project) => {
+    const metadata = project.metadata;
+    return metadata && typeof metadata === "object" && (metadata as Record<string, unknown>).smokeTest === true && textValue(project, "status") !== "archived";
+  });
+
+  if (activeSmokeProjects.length > 3) {
+    addIssue(issues, {
+      severity: "warning",
+      area: "ข้อมูลทดสอบ",
+      title: "มีชุดทดสอบเก่าค้างหลายชุด",
+      detail: "ควรเก็บชุดทดสอบเก่าก่อนเริ่มทดสอบรอบใหม่ เพื่อให้ Mission Control อ่านง่ายและลดความสับสน",
+      sample: `${activeSmokeProjects.length} โครงการ`
     });
   }
 
