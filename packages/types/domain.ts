@@ -34,6 +34,10 @@ export type DriverAppConnectionStatus = "unknown" | "online" | "background" | "o
 export type DriverNotificationPriority = "low" | "normal" | "high" | "critical";
 export type DriverNotificationAction = "acknowledge" | "call_control" | "open_maps" | "report_issue" | "none";
 export type DriverIssueType = "delay" | "vehicle" | "passenger" | "route" | "safety" | "other";
+export type IncidentStatus = "open" | "acknowledged" | "recovering" | "resolved" | "closed";
+export type IncidentSeverity = "info" | "warning" | "urgent" | "critical";
+export type RecoveryActionType = "contact_driver" | "contact_coordinator" | "replace_driver" | "replace_vehicle" | "change_assignment" | "notify_organizer" | "monitor";
+export type RecoveryActionStatus = "recommended" | "accepted" | "in_progress" | "done" | "cancelled";
 
 export interface BaseRecord {
   id: Id;
@@ -520,4 +524,42 @@ export interface PickupProof extends DriverEvidencePhoto {
 
 export interface CompletionProof extends DriverEvidencePhoto {
   photoType: "completion_proof";
+}
+
+export interface OperationalIncident {
+  id: Id;
+  projectId: Id;
+  assignmentId?: Id | null;
+  driverId?: Id | null;
+  issueType: DriverIssueType;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  message: string;
+  createdAt: string;
+  acknowledgedAt?: string | null;
+  resolvedAt?: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface RecoveryAction {
+  id: Id;
+  projectId: Id;
+  incidentId?: Id | null;
+  assignmentId?: Id | null;
+  actionType: RecoveryActionType;
+  status: RecoveryActionStatus;
+  title: string;
+  detail: string;
+  ownerRole: "operation_manager" | "dispatcher" | "coordinator" | "planner";
+  dueAt?: string | null;
+  createdAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface RecoveryRecommendation {
+  severity: IncidentSeverity;
+  riskLabel: string;
+  actions: RecoveryActionType[];
+  operatorMessage: string;
+  driverMessage?: string | null;
 }

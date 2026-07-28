@@ -10,20 +10,21 @@ export interface CurrentUserProfile {
   email: string | null;
   roleLabel: string;
   isDevelopmentFallback: boolean;
+  productionRisk?: string | null;
 }
 
 export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
   const supabase = getSupabaseServerClient();
 
   if (!supabase) {
-    return pilotFallbackProfile("development-profile", "โหมดทดสอบภายใน");
+    return pilotFallbackProfile("development-profile", "โหมดทดสอบภายใน", "ยังไม่ได้ตั้งค่า Supabase Auth server client");
   }
 
   const { data: authData } = await supabase.auth.getUser();
   const authUser = authData.user;
 
   if (!authUser) {
-    return pilotFallbackProfile("anonymous-pilot-profile", "ยังไม่เปิดใช้ Auth production");
+    return pilotFallbackProfile("anonymous-pilot-profile", "ยังไม่เปิดใช้ Auth production", "ไม่มี session ผู้ใช้จริง ระบบกำลังใช้ fallback สำหรับ internal pilot");
   }
 
   const { data: profile } = await supabase
@@ -39,11 +40,12 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     fullName: typeof profile?.full_name === "string" ? profile.full_name : authUser.email || "ผู้ใช้ที่เข้าสู่ระบบ",
     email: typeof profile?.email === "string" ? profile.email : authUser.email || null,
     roleLabel: "ผู้ใช้ที่เข้าสู่ระบบ",
-    isDevelopmentFallback: false
+    isDevelopmentFallback: false,
+    productionRisk: null
   };
 }
 
-function pilotFallbackProfile(id: string, roleLabel: string): CurrentUserProfile {
+function pilotFallbackProfile(id: string, roleLabel: string, productionRisk: string): CurrentUserProfile {
   return {
     id,
     authUserId: null,
@@ -51,7 +53,8 @@ function pilotFallbackProfile(id: string, roleLabel: string): CurrentUserProfile
     fullName: "ผู้ดูแล Pilot",
     email: null,
     roleLabel,
-    isDevelopmentFallback: true
+    isDevelopmentFallback: true,
+    productionRisk
   };
 }
 

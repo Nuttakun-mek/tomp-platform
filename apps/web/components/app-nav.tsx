@@ -11,6 +11,7 @@ const navSections = [
     items: [
       { href: "/", label: "ภาพรวม", description: "สัญญาณรวมของงานวันนี้" },
       { href: "/mission-control", label: "ศูนย์ควบคุม", description: "แผนที่ งาน และความเสี่ยง" },
+      { href: "/recovery", label: "กู้คืนสถานการณ์", description: "เหตุผิดปกติและการแก้ไข" },
       { href: "/live-test", label: "ทดสอบ GPS", description: "สร้างงานทดสอบเร็ว" }
     ]
   },

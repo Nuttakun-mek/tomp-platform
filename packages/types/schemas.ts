@@ -294,6 +294,35 @@ export const driverEvidencePhotoSchema = z.object({
   metadata: metadataSchema
 });
 
+export const createIncidentSchema = z.object({
+  projectId: uuidSchema,
+  assignmentId: optionalUuidSchema,
+  driverId: optionalUuidSchema,
+  issueType: z.enum(["delay", "vehicle", "passenger", "route", "safety", "other"]).default("other"),
+  severity: z.enum(["info", "warning", "urgent", "critical"]).default("warning"),
+  message: z.string().trim().min(2).max(1000),
+  metadata: metadataSchema
+});
+
+export const updateIncidentStatusSchema = z.object({
+  projectId: uuidSchema,
+  incidentId: uuidSchema,
+  status: z.enum(["open", "acknowledged", "recovering", "resolved", "closed"]),
+  reason: z.string().trim().optional().nullable(),
+  metadata: metadataSchema
+});
+
+export const createRecoveryActionSchema = z.object({
+  projectId: uuidSchema,
+  incidentId: optionalUuidSchema,
+  assignmentId: optionalUuidSchema,
+  actionType: z.enum(["contact_driver", "contact_coordinator", "replace_driver", "replace_vehicle", "change_assignment", "notify_organizer", "monitor"]),
+  title: z.string().trim().min(2).max(160),
+  detail: z.string().trim().min(2).max(1000),
+  ownerRole: z.enum(["operation_manager", "dispatcher", "coordinator", "planner"]).default("dispatcher"),
+  metadata: metadataSchema
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type CreateMissionInput = z.infer<typeof createMissionSchema>;
@@ -321,3 +350,6 @@ export type DriverNotificationInput = z.infer<typeof driverNotificationSchema>;
 export type DriverLocationPingInput = z.infer<typeof driverLocationPingSchema>;
 export type DriverLocationSessionInput = z.infer<typeof driverLocationSessionSchema>;
 export type DriverEvidencePhotoInput = z.infer<typeof driverEvidencePhotoSchema>;
+export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
+export type UpdateIncidentStatusInput = z.infer<typeof updateIncidentStatusSchema>;
+export type CreateRecoveryActionInput = z.infer<typeof createRecoveryActionSchema>;

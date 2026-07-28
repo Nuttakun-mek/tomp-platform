@@ -20,6 +20,11 @@ export default function AdminPage() {
           <h2 className="mt-1 text-xl font-semibold text-ink">ตรวจคุณภาพข้อมูล Pilot</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">ตรวจชื่อภาษาไทยเพี้ยน ข้อมูล Assignment/QR/GPS และความพร้อมก่อนให้ทีมทดสอบจริง</p>
         </Link>
+        <Link className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft transition hover:-translate-y-0.5 hover:shadow-panel" href="/admin/enterprise-readiness">
+          <p className="text-sm font-semibold text-operation">Enterprise Readiness</p>
+          <h2 className="mt-1 text-xl font-semibold text-ink">ตรวจ 12 แกนระบบ</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">ดูสิ่งที่พร้อมทดสอบ สิ่งที่ยังต้อง harden และขั้นถัดไปก่อน production จริง</p>
+        </Link>
       </div>
     </>
   );
