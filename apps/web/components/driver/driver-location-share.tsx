@@ -32,66 +32,72 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
   const startedRef = useRef(false);
   const lastLocationRef = useRef<LastLocation | null>(null);
 
-  const postLocation = useCallback(async (location: LastLocation, trackingEvent: TrackingEvent) => {
-    const ping = buildLocationPingPayload({
-      projectId: driverAccess.project.id,
-      assignmentId: driverAccess.assignment.id,
-      driverId: driverAccess.driver.id,
-      vehicleId: driverAccess.vehicle.id,
-      latitude: location.latitude,
-      longitude: location.longitude,
-      accuracy: location.accuracy,
-      recordedAt: location.recordedAt,
-      source: "driver_web_app",
-      metadata: {
-        callSign: driverAccess.callSign.callSign,
-        trackingEvent
-      }
-    });
-
-    const response = await fetch("/api/driver/location", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: driverAccess.token,
-        latitude: ping.latitude,
-        longitude: ping.longitude,
-        accuracy: ping.accuracy,
-        recordedAt: ping.recordedAt,
-        trackingEvent,
+  const postLocation = useCallback(
+    async (location: LastLocation, trackingEvent: TrackingEvent) => {
+      const ping = buildLocationPingPayload({
+        projectId: driverAccess.project.id,
+        assignmentId: driverAccess.assignment.id,
+        driverId: driverAccess.driver.id,
+        vehicleId: driverAccess.vehicle.id,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        recordedAt: location.recordedAt,
+        source: "driver_web_app",
         metadata: {
-          assignmentId: ping.assignmentId,
-          projectId: ping.projectId,
-          projectCode: driverAccess.project.projectCode,
-          projectName: driverAccess.project.projectName,
           callSign: driverAccess.callSign.callSign,
-          driverName: driverAccess.driver.fullName,
-          driverPhone: driverAccess.driver.phone,
-          vehiclePlate: driverAccess.vehicle.plateNumber,
-          assignmentStatus: driverAccess.assignment.status
+          trackingEvent
         }
-      })
-    });
-    const result = (await response.json()) as { success?: boolean; error?: string };
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || "ส่งตำแหน่งไม่สำเร็จ");
-    }
-  }, [driverAccess]);
+      });
 
-  const sendPosition = useCallback(async (position: GeolocationPosition, trackingEvent: TrackingEvent) => {
-    const location = {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy ?? null,
-      recordedAt: new Date(position.timestamp).toISOString(),
-      sentAt: new Date().toLocaleTimeString("th-TH")
-    };
+      const response = await fetch("/api/driver/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: driverAccess.token,
+          latitude: ping.latitude,
+          longitude: ping.longitude,
+          accuracy: ping.accuracy,
+          recordedAt: ping.recordedAt,
+          trackingEvent,
+          metadata: {
+            assignmentId: ping.assignmentId,
+            projectId: ping.projectId,
+            projectCode: driverAccess.project.projectCode,
+            projectName: driverAccess.project.projectName,
+            callSign: driverAccess.callSign.callSign,
+            driverName: driverAccess.driver.fullName,
+            driverPhone: driverAccess.driver.phone,
+            vehiclePlate: driverAccess.vehicle.plateNumber,
+            assignmentStatus: driverAccess.assignment.status
+          }
+        })
+      });
+      const result = (await response.json()) as { success?: boolean; error?: string };
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "ส่งตำแหน่งไม่สำเร็จ");
+      }
+    },
+    [driverAccess]
+  );
 
-    await postLocation(location, trackingEvent);
-    lastLocationRef.current = location;
-    setLastLocation(location);
-    setMessage("ส่งตำแหน่งล่าสุดไปยังศูนย์ควบคุมแล้ว");
-  }, [postLocation]);
+  const sendPosition = useCallback(
+    async (position: GeolocationPosition, trackingEvent: TrackingEvent) => {
+      const location = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy ?? null,
+        recordedAt: new Date(position.timestamp).toISOString(),
+        sentAt: new Date().toLocaleTimeString("th-TH")
+      };
+
+      await postLocation(location, trackingEvent);
+      lastLocationRef.current = location;
+      setLastLocation(location);
+      setMessage("ส่งตำแหน่งล่าสุดไปยังศูนย์ควบคุมแล้ว");
+    },
+    [postLocation]
+  );
 
   function startSharing() {
     if (!("geolocation" in navigator)) {
@@ -164,13 +170,20 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
             <p className="text-sm font-semibold text-blue-100">แชร์ตำแหน่ง GPS</p>
             <h3 className="mt-1 text-2xl font-semibold">ให้ศูนย์ควบคุมเห็นตำแหน่งรถ</h3>
             <p className="mt-2 text-sm leading-6 text-blue-50">
-              Web app จะส่งตำแหน่งขณะหน้านี้ยังทำงานอยู่ หากล็อกจอหรือสลับแอป ระบบมือถืออาจหยุดส่งชั่วคราว หากต้องการ background location จริงควรใช้ Mobile App ในระยะถัดไป
+              ตำแหน่งนี้ผูกกับโครงการ Assignment, Call Sign, คนขับ และรถของงานนี้โดยตรง เจ้าหน้าที่จะเห็นว่า GPS มาจากใครและงานใดใน Mission Control
             </p>
           </div>
           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-800">
             {state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์"}
           </span>
         </div>
+      </div>
+
+      <div className="border-b border-blue-100 bg-blue-50 px-5 py-4">
+        <p className="text-sm font-semibold text-blue-950">ข้อจำกัดของ web app</p>
+        <p className="mt-1 text-sm leading-6 text-blue-900">
+          ระหว่างทดสอบ กรุณาเปิดหน้านี้ค้างไว้ หากล็อกจอหรือสลับไปแอปอื่น ระบบมือถืออาจหยุดส่งตำแหน่งชั่วคราว ถ้าต้องการติดตามตอนปิดจอจริง ต้องใช้ Mobile App ในระยะถัดไป
+        </p>
       </div>
 
       <div className="grid gap-0 lg:grid-cols-[0.85fr_1.15fr]">
@@ -192,16 +205,31 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
           </div>
 
           <div className="mt-4 grid gap-3">
-            <button className="min-h-14 rounded-2xl bg-blue-700 px-4 py-3 text-base font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300" disabled={isSharing} type="button" onClick={startSharing}>
+            <button
+              className="min-h-14 rounded-2xl bg-blue-700 px-4 py-3 text-base font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={isSharing}
+              type="button"
+              onClick={startSharing}
+            >
               เริ่มแชร์ตำแหน่ง
             </button>
-            <button className="min-h-14 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:text-slate-400" disabled={!isSharing} type="button" onClick={() => void stopSharing()}>
+            <button
+              className="min-h-14 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:text-slate-400"
+              disabled={!isSharing}
+              type="button"
+              onClick={() => void stopSharing()}
+            >
               หยุดแชร์ตำแหน่ง
             </button>
           </div>
 
           {lastLocation ? (
-            <a className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800" href={buildGoogleMapsUrl(lastLocation)} rel="noreferrer" target="_blank">
+            <a
+              className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800"
+              href={buildGoogleMapsUrl(lastLocation)}
+              rel="noreferrer"
+              target="_blank"
+            >
               เปิดตำแหน่งของฉันใน Google Maps
             </a>
           ) : null}

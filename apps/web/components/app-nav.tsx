@@ -9,7 +9,7 @@ const navSections = [
   {
     title: "ศูนย์ปฏิบัติการ",
     items: [
-      { href: "/", label: "ภาพรวม", description: "สัญญาณรวมวันนี้" },
+      { href: "/", label: "ภาพรวม", description: "สัญญาณรวมของงานวันนี้" },
       { href: "/mission-control", label: "ศูนย์ควบคุม", description: "แผนที่ งาน และความเสี่ยง" },
       { href: "/live-test", label: "ทดสอบ GPS", description: "สร้างงานทดสอบเร็ว" }
     ]
@@ -69,7 +69,9 @@ export function AppNav() {
                   }`}
                 >
                   <span className="block text-sm font-semibold">{item.label}</span>
-                  <span className={`mt-1 block text-xs leading-5 ${active ? "text-teal-50" : "text-slate-500 group-hover:text-slate-300"}`}>{item.description}</span>
+                  <span className={`mt-1 block text-xs leading-5 ${active ? "text-teal-50" : "text-slate-500 group-hover:text-slate-300"}`}>
+                    {item.description}
+                  </span>
                 </Link>
               );
             })}
