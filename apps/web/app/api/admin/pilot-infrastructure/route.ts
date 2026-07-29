@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkPilotInfrastructureViaPostgres } from "@/lib/db/pilot-scenario";
 import { getSupabaseConnectionMessage } from "@/lib/supabase/errors";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
@@ -20,6 +21,8 @@ const requiredTables = [
 export async function GET() {
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
+    const postgresResult = await checkPilotInfrastructureViaPostgres();
+    if (postgresResult) return NextResponse.json({ success: postgresResult.ready, ...postgresResult }, { status: postgresResult.ready ? 200 : 503 });
     return NextResponse.json({ success: false, ready: false, mode, error: error || "ยังไม่ได้ตั้งค่า Supabase" }, { status: 503 });
   }
 
@@ -42,6 +45,11 @@ export async function GET() {
   }
 
   const ready = tables.every((table) => table.ok);
+  if (!ready && tables.every((table) => table.message.includes("เชื่อมต่อ Supabase ไม่ได้"))) {
+    const postgresResult = await checkPilotInfrastructureViaPostgres();
+    if (postgresResult) return NextResponse.json({ success: postgresResult.ready, ...postgresResult }, { status: postgresResult.ready ? 200 : 503 });
+  }
+
   return NextResponse.json(
     {
       success: ready,

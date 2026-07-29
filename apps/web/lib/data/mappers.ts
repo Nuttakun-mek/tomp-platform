@@ -3,6 +3,7 @@ import type { Assignment, CallSign, Driver, Mission, Project, TimelineEvent, Veh
 type Row = Record<string, unknown>;
 
 function text(row: Row, key: string, fallback = ""): string {
+  if (row[key] instanceof Date) return row[key].toISOString();
   return typeof row[key] === "string" ? row[key] : fallback;
 }
 

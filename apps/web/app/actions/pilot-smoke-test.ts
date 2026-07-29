@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
+import { checkPilotInfrastructureViaPostgres, createPilotScenarioViaPostgres } from "@/lib/db/pilot-scenario";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
@@ -33,7 +34,11 @@ function baseRecord(id: string) {
 
 export async function checkPilotInfrastructureAction(): Promise<ActionResult> {
   const { client, error, mode } = getSupabaseWriteClient();
-  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่า Supabase สำหรับตรวจระบบ");
+  if (!client) {
+    const postgresResult = await checkPilotInfrastructureViaPostgres();
+    if (postgresResult) return actionSuccess(postgresResult);
+    return actionFailure(error || "ยังไม่ได้ตั้งค่า Supabase สำหรับตรวจระบบ");
+  }
 
   const tableResults = [];
   for (const table of requiredTables) {
@@ -53,17 +58,28 @@ export async function checkPilotInfrastructureAction(): Promise<ActionResult> {
     }
   }
 
-  return actionSuccess({
+  const supabaseResult = {
     mode,
     checkedAt: new Date().toISOString(),
     tables: tableResults,
     ready: tableResults.every((row) => row.ok)
-  });
+  };
+
+  if (!supabaseResult.ready && tableResults.every((row) => row.message.includes("เชื่อมต่อ Supabase ไม่ได้"))) {
+    const postgresResult = await checkPilotInfrastructureViaPostgres();
+    if (postgresResult) return actionSuccess(postgresResult);
+  }
+
+  return actionSuccess(supabaseResult);
 }
 
 export async function createProductionPilotSmokeScenarioAction(): Promise<ActionResult> {
   const { client, error } = getSupabaseWriteClient();
-  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่า Supabase สำหรับสร้างชุดทดสอบ");
+  if (!client) {
+    const postgresResult = await createPilotScenarioViaPostgres();
+    if (postgresResult) return actionSuccess(postgresResult);
+    return actionFailure(error || "ยังไม่ได้ตั้งค่า Supabase สำหรับสร้างชุดทดสอบ");
+  }
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -213,8 +229,24 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
   ];
 
   for (const step of steps) {
-    const { error: stepError } = await step;
-    if (stepError) return actionFailure(getDatabaseErrorMessage(stepError, "สร้างชุดทดสอบ Pilot ไม่สำเร็จ"));
+    try {
+      const { error: stepError } = await step;
+      if (stepError) {
+        const message = getSupabaseConnectionMessage(stepError);
+        if (message.includes("เชื่อมต่อ Supabase ไม่ได้")) {
+          const postgresResult = await createPilotScenarioViaPostgres();
+          if (postgresResult) return actionSuccess(postgresResult);
+        }
+        return actionFailure(getDatabaseErrorMessage(stepError, "สร้างชุดทดสอบ Pilot ไม่สำเร็จ"));
+      }
+    } catch (stepError) {
+      const message = getSupabaseConnectionMessage(stepError);
+      if (message.includes("เชื่อมต่อ Supabase ไม่ได้")) {
+        const postgresResult = await createPilotScenarioViaPostgres();
+        if (postgresResult) return actionSuccess(postgresResult);
+      }
+      return actionFailure(message);
+    }
   }
 
   const project = {
