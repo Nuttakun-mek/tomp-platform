@@ -31,6 +31,20 @@ function jsonb(value: unknown) {
   return JSON.stringify(value);
 }
 
+function getPostgresPilotErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (message.includes("tenant/user") || message.includes("ENOTFOUND")) {
+    return "เชื่อมต่อฐานข้อมูลจริงไม่ได้: Supabase pooler ไม่พบ project/tenant นี้ กรุณาตรวจว่า Project ยัง active และคัดลอก Connection string จากหน้า Supabase Dashboard อีกครั้ง";
+  }
+  if (message.toLowerCase().includes("password") || message.includes("28P01")) {
+    return "เชื่อมต่อฐานข้อมูลจริงไม่ได้: รหัสผ่านฐานข้อมูลไม่ถูกต้อง กรุณาตรวจ Database password หรือ reset password ใน Supabase";
+  }
+  if (message.toLowerCase().includes("timeout")) {
+    return "เชื่อมต่อฐานข้อมูลจริงไม่ได้: การเชื่อมต่อหมดเวลา กรุณาตรวจ network และ Supabase project status";
+  }
+  return message || "ตรวจตารางไม่สำเร็จ";
+}
+
 export async function checkPilotInfrastructureViaPostgres() {
   const sql = getPostgresClient();
   if (!sql) return null;
@@ -41,7 +55,7 @@ export async function checkPilotInfrastructureViaPostgres() {
       await sql`select 1 from ${sql(table)} limit 1`;
       tables.push({ table, ok: true, message: "พร้อมใช้งานผ่าน Postgres" });
     } catch (error) {
-      tables.push({ table, ok: false, message: error instanceof Error ? error.message : "ตรวจตารางไม่สำเร็จ" });
+      tables.push({ table, ok: false, message: getPostgresPilotErrorMessage(error) });
     }
   }
 
