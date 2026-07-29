@@ -121,23 +121,35 @@ export async function getDriverOperationSummaryByProjectId(projectId: string): P
 async function getDriverAssignmentPacketByAssignmentIdViaPostgres(assignmentId: string): Promise<DriverAssignmentPacket | null> {
   const sql = getPostgresClient();
   if (!sql) return null;
-  const data = await sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${assignmentId} order by created_at desc limit 1`;
-  const payload = data[0]?.payload;
-  return payload && typeof payload === "object" ? (payload as DriverAssignmentPacket) : null;
+  try {
+    const data = await sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${assignmentId} order by created_at desc limit 1`;
+    const payload = data[0]?.payload;
+    return payload && typeof payload === "object" ? (payload as DriverAssignmentPacket) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function getDriverNotificationsByAssignmentIdViaPostgres(assignmentId: string): Promise<DriverNotification[]> {
   const sql = getPostgresClient();
   if (!sql) return [];
-  const data = await sql<Row[]>`select * from driver_notifications where assignment_id = ${assignmentId} order by sent_at desc limit 10`;
-  return data.map(mapNotification);
+  try {
+    const data = await sql<Row[]>`select * from driver_notifications where assignment_id = ${assignmentId} order by sent_at desc limit 10`;
+    return data.map(mapNotification);
+  } catch {
+    return [];
+  }
 }
 
 async function getRouteChangesByAssignmentIdViaPostgres(assignmentId: string): Promise<RouteChangeInstruction[]> {
   const sql = getPostgresClient();
   if (!sql) return [];
-  const data = await sql<Row[]>`select * from route_change_instructions where assignment_id = ${assignmentId} order by created_at desc limit 5`;
-  return data.map(mapRouteChange);
+  try {
+    const data = await sql<Row[]>`select * from route_change_instructions where assignment_id = ${assignmentId} order by created_at desc limit 5`;
+    return data.map(mapRouteChange);
+  } catch {
+    return [];
+  }
 }
 
 async function getDriverOperationSummaryByProjectIdViaPostgres(projectId: string): Promise<DriverOperationSummary> {
@@ -146,20 +158,24 @@ async function getDriverOperationSummaryByProjectIdViaPostgres(projectId: string
     return { packets: 0, acknowledgedPackets: 0, pendingNotifications: 0, pendingRouteChanges: 0, activeLocationSessions: 0, latestPingAt: null };
   }
 
-  const [packets, acknowledged, notifications, routeChanges, sessions] = await Promise.all([
-    sql<Array<{ count: string }>>`select count(*)::text as count from driver_assignment_packets where project_id = ${projectId}`,
-    sql<Array<{ count: string }>>`select count(*)::text as count from driver_assignment_packets where project_id = ${projectId} and acknowledged_at is not null`,
-    sql<Array<{ count: string }>>`select count(*)::text as count from driver_notifications where project_id = ${projectId} and status in ('unread', 'sent')`,
-    sql<Array<{ count: string }>>`select count(*)::text as count from route_change_instructions where project_id = ${projectId} and status = 'pending'`,
-    sql<Row[]>`select id,last_ping_at,status from driver_location_sessions where project_id = ${projectId} order by last_ping_at desc limit 20`
-  ]);
+  try {
+    const [packets, acknowledged, notifications, routeChanges, sessions] = await Promise.all([
+      sql<Array<{ count: string }>>`select count(*)::text as count from driver_assignment_packets where project_id = ${projectId}`,
+      sql<Array<{ count: string }>>`select count(*)::text as count from driver_assignment_packets where project_id = ${projectId} and acknowledged_at is not null`,
+      sql<Array<{ count: string }>>`select count(*)::text as count from driver_notifications where project_id = ${projectId} and status in ('unread', 'sent')`,
+      sql<Array<{ count: string }>>`select count(*)::text as count from route_change_instructions where project_id = ${projectId} and status = 'pending'`,
+      sql<Row[]>`select id,last_ping_at,status from driver_location_sessions where project_id = ${projectId} order by last_ping_at desc limit 20`
+    ]);
 
-  return {
-    packets: Number(packets[0]?.count || 0),
-    acknowledgedPackets: Number(acknowledged[0]?.count || 0),
-    pendingNotifications: Number(notifications[0]?.count || 0),
-    pendingRouteChanges: Number(routeChanges[0]?.count || 0),
-    activeLocationSessions: sessions.filter((row) => text(row, "status") === "healthy" || text(row, "status") === "active").length,
-    latestPingAt: sessions.length ? text(sessions[0], "last_ping_at") || null : null
-  };
+    return {
+      packets: Number(packets[0]?.count || 0),
+      acknowledgedPackets: Number(acknowledged[0]?.count || 0),
+      pendingNotifications: Number(notifications[0]?.count || 0),
+      pendingRouteChanges: Number(routeChanges[0]?.count || 0),
+      activeLocationSessions: sessions.filter((row) => text(row, "status") === "healthy" || text(row, "status") === "active").length,
+      latestPingAt: sessions.length ? text(sessions[0], "last_ping_at") || null : null
+    };
+  } catch {
+    return { packets: 0, acknowledgedPackets: 0, pendingNotifications: 0, pendingRouteChanges: 0, activeLocationSessions: 0, latestPingAt: null };
+  }
 }

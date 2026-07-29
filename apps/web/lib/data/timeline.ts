@@ -16,6 +16,10 @@ export async function getTimelineEventsByProjectId(projectId: string): Promise<T
 async function getTimelineEventsByProjectIdViaPostgres(projectId: string): Promise<TimelineEvent[]> {
   const sql = getPostgresClient();
   if (!sql) return demoKernel.timelineEvents.filter((event) => event.projectId === projectId);
-  const data = await sql<Array<Record<string, unknown>>>`select * from timeline_events where project_id = ${projectId} order by created_at desc limit 100`;
-  return data.length ? data.map(mapTimelineEvent) : demoKernel.timelineEvents.filter((event) => event.projectId === projectId);
+  try {
+    const data = await sql<Array<Record<string, unknown>>>`select * from timeline_events where project_id = ${projectId} order by created_at desc limit 100`;
+    return data.length ? data.map(mapTimelineEvent) : demoKernel.timelineEvents.filter((event) => event.projectId === projectId);
+  } catch {
+    return demoKernel.timelineEvents.filter((event) => event.projectId === projectId);
+  }
 }

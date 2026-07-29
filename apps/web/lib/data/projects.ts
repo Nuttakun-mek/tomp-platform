@@ -25,14 +25,22 @@ export async function getProjectById(projectId: string): Promise<Project | null>
 async function getProjectsViaPostgres(): Promise<Project[]> {
   const sql = getPostgresClient();
   if (!sql) return demoKernel.projects;
-  const data = await sql<Array<Record<string, unknown>>>`select * from projects order by start_date asc, created_at desc limit 100`;
-  return data.length ? data.map(mapProject) : demoKernel.projects;
+  try {
+    const data = await sql<Array<Record<string, unknown>>>`select * from projects order by start_date asc, created_at desc limit 100`;
+    return data.length ? data.map(mapProject) : demoKernel.projects;
+  } catch {
+    return demoKernel.projects;
+  }
 }
 
 async function getProjectByIdViaPostgres(projectId: string): Promise<Project | null> {
   const sql = getPostgresClient();
   if (!sql) return demoKernel.projects.find((project) => project.id === projectId) ?? demoKernel.projects[0] ?? null;
-  const data = await sql<Array<Record<string, unknown>>>`select * from projects where id = ${projectId} limit 1`;
-  if (data[0]) return mapProject(data[0]);
-  return demoKernel.projects.find((project) => project.id === projectId) ?? demoKernel.projects[0] ?? null;
+  try {
+    const data = await sql<Array<Record<string, unknown>>>`select * from projects where id = ${projectId} limit 1`;
+    if (data[0]) return mapProject(data[0]);
+    return demoKernel.projects.find((project) => project.id === projectId) ?? demoKernel.projects[0] ?? null;
+  } catch {
+    return demoKernel.projects.find((project) => project.id === projectId) ?? demoKernel.projects[0] ?? null;
+  }
 }

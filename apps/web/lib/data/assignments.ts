@@ -16,6 +16,10 @@ export async function getAssignmentsByProjectId(projectId: string): Promise<Assi
 async function getAssignmentsByProjectIdViaPostgres(projectId: string): Promise<Assignment[]> {
   const sql = getPostgresClient();
   if (!sql) return demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
-  const data = await sql<Array<Record<string, unknown>>>`select * from assignments where project_id = ${projectId} order by start_time nulls last, created_at desc`;
-  return data.length ? data.map(mapAssignment) : demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
+  try {
+    const data = await sql<Array<Record<string, unknown>>>`select * from assignments where project_id = ${projectId} order by start_time nulls last, created_at desc`;
+    return data.length ? data.map(mapAssignment) : demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
+  } catch {
+    return demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
+  }
 }

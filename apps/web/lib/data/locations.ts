@@ -109,6 +109,7 @@ async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getS
 async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
   const sql = getPostgresClient();
   if (!sql || !locations.length) return locations;
+  try {
 
   const projectIds = Array.from(new Set(locations.map((location) => location.projectId).filter(Boolean)));
   const assignmentIds = Array.from(new Set(locations.map((location) => location.assignmentId).filter(Boolean))) as string[];
@@ -162,14 +163,22 @@ async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
       }
     };
   });
+  } catch {
+    return locations;
+  }
 }
 
 async function getLatestDriverLocationsViaPostgres(projectId: string | null, limit: number): Promise<DriverLocation[]> {
   const sql = getPostgresClient();
   if (!sql) return [];
-  const data = projectId
-    ? await sql<LocationRow[]>`select * from gps_locations where project_id = ${projectId} order by recorded_at desc limit ${limit}`
-    : await sql<LocationRow[]>`select * from gps_locations order by recorded_at desc limit ${limit}`;
+  let data: LocationRow[];
+  try {
+    data = projectId
+      ? await sql<LocationRow[]>`select * from gps_locations where project_id = ${projectId} order by recorded_at desc limit ${limit}`
+      : await sql<LocationRow[]>`select * from gps_locations order by recorded_at desc limit ${limit}`;
+  } catch {
+    return [];
+  }
 
   const latestByAssignment = new Map<string, DriverLocation>();
   data.map(mapDriverLocation).forEach((location) => {
@@ -254,6 +263,10 @@ export async function getProjectIdWithLatestDriverLocation(): Promise<string | n
 async function getProjectIdWithLatestDriverLocationViaPostgres(): Promise<string | null> {
   const sql = getPostgresClient();
   if (!sql) return null;
-  const rows = await sql<LocationRow[]>`select project_id from gps_locations order by recorded_at desc limit 1`;
-  return rows[0] ? text(rows[0], "project_id") || null : null;
+  try {
+    const rows = await sql<LocationRow[]>`select project_id from gps_locations order by recorded_at desc limit 1`;
+    return rows[0] ? text(rows[0], "project_id") || null : null;
+  } catch {
+    return null;
+  }
 }
