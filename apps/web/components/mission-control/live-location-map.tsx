@@ -64,12 +64,6 @@ function getAgeLabel(location: DriverLocation, now = Date.now()) {
   return `${Math.round(ageSeconds / 60)} นาทีที่แล้ว`;
 }
 
-function buildOsmEmbedUrl(location: DriverLocation) {
-  const { latitude, longitude } = location;
-  const delta = 0.012;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - delta}%2C${latitude - delta}%2C${longitude + delta}%2C${latitude + delta}&layer=mapnik`;
-}
-
 function buildGoogleMapsUrl(location: DriverLocation) {
   return `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
 }
@@ -93,6 +87,8 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
   const [connection, setConnection] = useState<"live" | "fallback" | "offline">("fallback");
   const [now, setNow] = useState(Date.now());
   const latest = locations[0];
+  const latestLatitude = latest?.latitude;
+  const latestLongitude = latest?.longitude;
 
   useEffect(() => {
     let mounted = true;
@@ -129,7 +125,11 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
     };
   }, [projectId]);
 
-  const mapUrl = useMemo(() => (latest ? buildOsmEmbedUrl(latest) : null), [latest]);
+  const mapUrl = useMemo(() => {
+    if (latestLatitude == null || latestLongitude == null) return null;
+    const delta = 0.012;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${latestLongitude - delta}%2C${latestLatitude - delta}%2C${latestLongitude + delta}%2C${latestLatitude + delta}&layer=mapnik`;
+  }, [latestLatitude, latestLongitude]);
   const liveCount = locations.filter((location) => getFreshness(location, now) === "live").length;
   const issueCount = locations.filter((location) => ["slow", "offline", "stopped"].includes(getFreshness(location, now))).length;
 
@@ -219,7 +219,7 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
                   </div>
                   <dl className="mt-3 grid gap-1 text-xs">
                     <div className="flex justify-between gap-3">
-                      <dt className="font-semibold">Project</dt>
+                      <dt className="font-semibold">โครงการ</dt>
                       <dd className="text-right">{identity.projectCode}</dd>
                     </div>
                     <div className="flex justify-between gap-3">

@@ -10,6 +10,10 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
   const [accessUrl, setAccessUrl] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const readyAssignments = assignments.filter((assignment) => assignment.callSignId && assignment.driverId && assignment.vehicleId);
+  const hasAssignments = assignments.length > 0;
+  const hasReadyAssignment = readyAssignments.length > 0;
+  const orderedAssignments = [...readyAssignments, ...assignments.filter((assignment) => !readyAssignments.some((ready) => ready.id === assignment.id))];
 
   useEffect(() => {
     let cancelled = false;
@@ -59,16 +63,21 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
         เลือก Assignment จริงเพื่อสร้าง token สำหรับคนขับ ระบบจะผูกลิงก์กับ Assignment นี้เท่านั้น และเก็บ token แบบ hash บนฝั่ง server
       </p>
 
-      {assignments.length ? (
+      {hasAssignments ? (
         <form action={createAccess} className="mt-4 grid gap-3">
-          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm" name="assignmentId" required>
-            {assignments.map((assignment) => (
-              <option key={assignment.id} value={assignment.id}>
-                {assignment.id.slice(0, 8)} | {assignment.status} | {assignment.driverId ? "มีคนขับ" : "ยังไม่มีคนขับ"}
+          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-3 text-sm" name="assignmentId" required disabled={!hasReadyAssignment} defaultValue={readyAssignments[0]?.id}>
+            {orderedAssignments.map((assignment) => (
+              <option key={assignment.id} value={assignment.id} disabled={!assignment.callSignId || !assignment.driverId || !assignment.vehicleId}>
+                {assignment.id.slice(0, 8)} | {assignment.status} | {assignment.driverId ? "มีคนขับ" : "ขาดคนขับ"} | {assignment.vehicleId ? "มีรถ" : "ขาดรถ"} | {assignment.callSignId ? "มี Call Sign" : "ขาด Call Sign"}
               </option>
             ))}
           </select>
-          <button className="w-fit rounded-2xl bg-operation px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-300" disabled={isPending} type="submit">
+          {!hasReadyAssignment ? (
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
+              ยังไม่มีงานที่พร้อมสร้าง QR กรุณาเลือก Call Sign คนขับ และรถให้ครบใน Assignment ก่อน
+            </p>
+          ) : null}
+          <button className="w-fit rounded-2xl bg-operation px-5 py-3 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending || !hasReadyAssignment} type="submit">
             {isPending ? "กำลังสร้าง..." : "สร้างลิงก์และ QR สำหรับคนขับ"}
           </button>
         </form>

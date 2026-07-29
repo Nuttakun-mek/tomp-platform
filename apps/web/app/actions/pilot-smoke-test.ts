@@ -6,6 +6,7 @@ import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
+import { getRequestBaseUrl } from "@/lib/request-origin";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -316,7 +317,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     projectId: ids.project,
     assignmentId: ids.assignment,
     driverId: ids.driver,
-    accessUrl: buildDriverAccessUrl(token),
+    accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
     missionControlUrl: `/mission-control?projectId=${ids.project}`,
     assignmentsUrl: `/projects/${ids.project}/assignments`,
     packetId: packetRow.id,

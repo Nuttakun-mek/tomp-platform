@@ -27,6 +27,7 @@
 }
 
 html {
+  font-size: 15.5px;
   min-height: 100%;
   scroll-behavior: smooth;
 }
@@ -39,6 +40,8 @@ body {
     radial-gradient(circle at 90% 0%, rgba(37, 99, 235, 0.09), transparent 28rem),
     linear-gradient(180deg, #f8fbfd 0%, #f3f7fa 46%, #edf3f7 100%);
   color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.65;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -64,11 +67,11 @@ textarea {
 }
 
 .enterprise-panel {
-  @apply rounded-[22px] border border-border/90 bg-white/95 shadow-panel backdrop-blur;
+  @apply rounded-[18px] border border-border/90 bg-white/95 shadow-panel backdrop-blur;
 }
 
 .enterprise-panel-soft {
-  @apply rounded-[18px] border border-border/80 bg-white/90 shadow-soft backdrop-blur;
+  @apply rounded-2xl border border-border/80 bg-white/90 shadow-soft backdrop-blur;
 }
 
 .enterprise-surface {

@@ -5,6 +5,7 @@ import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
+import { getRequestBaseUrl } from "@/lib/request-origin";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -125,9 +126,27 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างลิงก์ QR สำหรับคนขับ");
   }
 
+  const { data: assignmentForQr, error: assignmentError } = await client
+    .from("assignments")
+    .select("id, project_id, call_sign_id, driver_id, vehicle_id")
+    .eq("id", data.assignmentId)
+    .eq("project_id", data.projectId)
+    .maybeSingle();
+
+  if (assignmentError) return actionFailure(getDatabaseErrorMessage(assignmentError, "ตรวจสอบ Assignment ก่อนสร้าง QR ไม่สำเร็จ"));
+  if (!assignmentForQr) return actionFailure("ไม่พบ Assignment นี้ในโครงการ กรุณาเลือกงานใหม่");
+
+  const missing: string[] = [];
+  if (!assignmentForQr.call_sign_id) missing.push("Call Sign");
+  if (!assignmentForQr.driver_id && !data.driverId) missing.push("คนขับ");
+  if (!assignmentForQr.vehicle_id) missing.push("รถ");
+  if (missing.length) {
+    return actionFailure(`ยังสร้าง QR ไม่ได้ เพราะ Assignment นี้ยังขาด ${missing.join(", ")} กรุณาจัดสรรข้อมูลให้ครบก่อน`);
+  }
+
   const token = generateDriverAccessToken({
     assignmentId: data.assignmentId,
-    driverId: data.driverId,
+    driverId: data.driverId ?? assignmentForQr.driver_id,
     expiresAt: data.expiresAt
   });
   const expiresAt = data.expiresAt || getDefaultDriverTokenExpiry();
@@ -137,7 +156,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     .insert({
       project_id: data.projectId,
       assignment_id: data.assignmentId,
-      driver_id: data.driverId || null,
+      driver_id: data.driverId || assignmentForQr.driver_id || null,
       token_hash: hashDriverAccessToken(token),
       status: "active",
       expires_at: expiresAt,
@@ -148,7 +167,18 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
 
   if (insertError) return actionFailure(getDatabaseErrorMessage(insertError, "สร้างลิงก์ QR สำหรับคนขับไม่สำเร็จ"));
 
-  const packetResult = await createAssignmentPacket(client, data.projectId, data.assignmentId, data.driverId);
+  const packetResult = await createAssignmentPacket(client, data.projectId, data.assignmentId, data.driverId ?? assignmentForQr.driver_id);
+  if (!packetResult) {
+    await client
+      .from("driver_access_tokens")
+      .update({
+        status: "revoked",
+        revoked_at: new Date().toISOString(),
+        metadata: { tokenVersion: 1, revokedReason: "assignment_packet_failed" }
+      })
+      .eq("id", row.id);
+    return actionFailure("สร้าง QR แล้วแต่สร้างชุดข้อมูลงานสำหรับคนขับไม่สำเร็จ กรุณาตรวจสอบ Call Sign คนขับ และรถอีกครั้ง");
+  }
   const timelineResult = await createTimelineEvent({
     projectId: data.projectId,
     objectType: "assignment",
@@ -161,7 +191,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
 
   return actionSuccess({
     token,
-    accessUrl: buildDriverAccessUrl(token),
+    accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
     tokenRecord: { id: row.id, expires_at: row.expires_at, status: row.status },
     packetRecord: packetResult?.packetRecord || null,
     timelineEvent: timelineResult.data

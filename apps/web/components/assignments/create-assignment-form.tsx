@@ -16,7 +16,7 @@ interface CreateAssignmentFormProps {
 export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, vehicles }: CreateAssignmentFormProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const canCreate = missions.length > 0 && callSigns.length > 0;
+  const canCreate = missions.length > 0 && callSigns.length > 0 && drivers.length > 0 && vehicles.length > 0;
 
   function handleSubmit(formData: FormData) {
     setMessage(null);
@@ -24,8 +24,8 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
       projectId,
       missionId: formData.get("missionId"),
       callSignId: formData.get("callSignId"),
-      driverId: formData.get("driverId") || null,
-      vehicleId: formData.get("vehicleId") || null,
+      driverId: formData.get("driverId"),
+      vehicleId: formData.get("vehicleId"),
       startTime: formData.get("startTime") || null,
       endTime: formData.get("endTime") || null,
       metadata: {
@@ -35,7 +35,7 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
     });
 
     if (!parsed.success) {
-      setMessage("กรุณาเลือกภารกิจและ Call Sign ให้ครบถ้วน");
+      setMessage("กรุณาเลือกภารกิจ Call Sign คนขับ และรถให้ครบถ้วน");
       return;
     }
 
@@ -80,8 +80,8 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           เลือกคนขับ
-          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="driverId" defaultValue="">
-            <option value="">ยังไม่ระบุคนขับ</option>
+          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="driverId" defaultValue="" required>
+            <option value="" disabled>เลือกคนขับ</option>
             {drivers.map((driver) => (
               <option key={driver.id} value={driver.id}>
                 {driver.fullName} | {driver.phone || "ไม่มีเบอร์"}
@@ -91,8 +91,8 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
         </label>
         <label className="grid gap-2 text-sm font-medium text-slate-700">
           เลือกรถ
-          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="vehicleId" defaultValue="">
-            <option value="">ยังไม่ระบุรถ</option>
+          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="vehicleId" defaultValue="" required>
+            <option value="" disabled>เลือกรถ</option>
             {vehicles.map((vehicle) => (
               <option key={vehicle.id} value={vehicle.id}>
                 {vehicle.plateNumber} | {vehicle.vehicleType}
@@ -112,7 +112,7 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
 
       {!canCreate ? (
         <p className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
-          ต้องมีภารกิจและ Call Sign ก่อนจึงจะสร้าง Assignment ได้ หากต้องการทดสอบเร็วให้ใช้หน้า “ทดสอบ GPS สด”
+          ต้องมีภารกิจ Call Sign คนขับ และรถก่อนจึงจะสร้าง Assignment ที่พร้อมสร้าง QR ได้ หากต้องการทดสอบเร็วให้ใช้หน้า “ทดสอบ GPS สด”
         </p>
       ) : null}
       {message ? <p className="rounded-2xl bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}
