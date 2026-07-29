@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/*",
+    "apps/web",
     "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @tomp/web",
+    "dev:mobile": "npm --prefix apps/mobile-driver run start",
+    "mobile:android": "npm --prefix apps/mobile-driver run android",
+    "mobile:ios": "npm --prefix apps/mobile-driver run ios",
     "build": "npm run build -w @tomp/web",
     "lint": "npm run lint -w @tomp/web",
     "typecheck": "npm run typecheck -w @tomp/web",

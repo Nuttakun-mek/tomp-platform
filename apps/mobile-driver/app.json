@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "TOMP Driver",
+    "slug": "tomp-driver",
+    "scheme": "tompdriver",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tomp.driver",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "TOMP ใช้ตำแหน่งเพื่อให้ศูนย์ควบคุมเห็นสถานะระหว่างปฏิบัติงาน",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "TOMP ใช้ตำแหน่งเบื้องหลังเมื่อคนขับอนุญาต เพื่อให้ศูนย์ควบคุมติดตามงานได้ต่อเนื่อง",
+        "NSCameraUsageDescription": "TOMP จะใช้กล้องสำหรับถ่ายรูปรถ ป้ายทะเบียน และหลักฐานงานในรุ่นถัดไป"
+      }
+    },
+    "android": {
+      "package": "com.tomp.driver",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "CAMERA"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "อนุญาตให้ TOMP ใช้ตำแหน่งระหว่างปฏิบัติงาน"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "tompApiBaseUrl": "https://tomp-platform.vercel.app"
+    }
+  }
+}
