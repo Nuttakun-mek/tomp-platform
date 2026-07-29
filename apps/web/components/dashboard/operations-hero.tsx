@@ -1,25 +1,32 @@
 import Link from "next/link";
+import { ArrowRight, RadioTower } from "lucide-react";
 import { StatusDot } from "@/components/ui/status-dot";
 
 export function OperationsHero({ projectCount, assignmentCount, gpsCount, followUpCount }: { projectCount: number; assignmentCount: number; gpsCount: number; followUpCount: number }) {
   return (
-    <section className="command-panel-dark overflow-hidden rounded-[32px] text-white shadow-command">
-      <div className="command-grid grid gap-7 p-6 lg:grid-cols-[1.22fr_0.78fr] lg:p-8">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-xs font-semibold text-emerald-100">
-            <StatusDot tone="success" pulse />
-            Internal Pilot กำลังทดสอบ
+    <section className="command-panel-dark overflow-hidden rounded-3xl text-white shadow-command">
+      <div className="command-grid grid gap-6 p-6 lg:grid-cols-[1.15fr_0.85fr] lg:p-7">
+        <div className="flex min-w-0 flex-col justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-100">
+              <StatusDot tone="success" pulse />
+              Internal Pilot พร้อมตรวจระบบ
+            </div>
+            <h2 className="mt-5 max-w-3xl text-3xl font-semibold leading-tight lg:text-[40px]">
+              ควบคุมการปฏิบัติการขนส่งจากภาพเดียว
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-200">
+              ดูโครงการ งานที่จัดสรร ความพร้อม ความเสี่ยง และตำแหน่ง GPS ล่าสุด เพื่อให้ทีมปฏิบัติการตัดสินใจได้เร็วและมั่นใจขึ้น
+            </p>
           </div>
-          <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-tight lg:text-5xl">ควบคุมการปฏิบัติการขนส่งจากภาพเดียว</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-200">
-            ดูสถานะโครงการ งานที่จัดสรร ความพร้อม ความเสี่ยง และตำแหน่ง GPS ล่าสุด เพื่อให้ทีมปฏิบัติการตัดสินใจได้เร็วและมั่นใจขึ้น
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link className="rounded-2xl bg-operation px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-operation-deep" href="/mission-control">
+          <div className="flex flex-wrap gap-3">
+            <Link className="inline-flex items-center gap-2 rounded-xl bg-operation px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-operation-deep" href="/mission-control">
               เปิดศูนย์ควบคุม
+              <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link className="rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15" href="/admin/pilot-smoke-test">
-              ทดสอบ Pilot
+            <Link className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15" href="/live-test">
+              <RadioTower className="h-4 w-4" />
+              ทดสอบ QR และ GPS
             </Link>
           </div>
         </div>
@@ -36,9 +43,9 @@ export function OperationsHero({ projectCount, assignmentCount, gpsCount, follow
 
 function HeroMetric({ label, value, danger = false }: { label: string; value: number; danger?: boolean }) {
   return (
-    <div className="rounded-[22px] border border-white/10 bg-white/10 p-5 backdrop-blur">
-      <p className="text-xs font-semibold text-slate-300">{label}</p>
-      <p className={`mt-2 text-4xl font-semibold ${danger && value > 0 ? "text-amber-200" : "text-white"}`}>{value}</p>
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+      <p className="text-[12px] font-semibold text-slate-300">{label}</p>
+      <p className={`mt-2 text-3xl font-semibold leading-none ${danger && value > 0 ? "text-amber-200" : "text-white"}`}>{value}</p>
     </div>
   );
 }

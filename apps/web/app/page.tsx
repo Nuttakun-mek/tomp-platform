@@ -33,9 +33,9 @@ export default async function DashboardPage() {
       />
       <OperationsHero projectCount={projects.length} assignmentCount={assignments.length} gpsCount={locations.length} followUpCount={followUpCount + riskCount} />
       <OperationsPulse ready={Math.max(0, assignments.length - followUpCount - activeAssignments - completedAssignments)} followUp={followUpCount} risk={riskCount} active={activeAssignments} completed={completedAssignments} />
-      <div className="grid gap-7 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <TodayOperationBoard projects={projects} latestLocation={locations[0]} latestEvent={events[0]} />
-        <div className="grid gap-7">
+        <div className="grid gap-6">
           <ReadinessOverview score={readinessScore} gpsCount={locations.length} assignmentCount={assignments.length} />
           <QuickActionPanel />
         </div>

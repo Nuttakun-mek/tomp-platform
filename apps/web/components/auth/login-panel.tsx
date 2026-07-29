@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { getGoogleSignInUrlAction, signInWithEmailAction } from "@/app/actions/auth";
 
+const roles = [
+  { title: "Admin / Operation Manager", body: "ดูภาพรวม ศูนย์ควบคุม แผนที่ GPS และ Timeline ของทุกโครงการที่มีสิทธิ์" },
+  { title: "Planner / Coordinator", body: "สร้างโครงการ ภารกิจ Assignment และ QR สำหรับคนขับ" },
+  { title: "Driver", body: "เปิดจาก QR หรือ URL ที่ผูกกับ Assignment เพื่อยืนยันงานและแชร์ GPS" }
+];
+
 export function LoginPanel() {
   const [message, setMessage] = useState<string | null>(null);
 
@@ -23,45 +29,54 @@ export function LoginPanel() {
 
   return (
     <section className="grid gap-6">
-      <div className="rounded-md border border-slate-200 bg-white p-6 shadow-soft">
-        <p className="text-sm font-semibold text-operation">ทางเข้าใช้งาน TOMP</p>
-        <h1 className="mt-2 text-3xl font-semibold text-ink">เลือกบทบาทก่อนเริ่มทดสอบ</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          รอบนี้เป็น Internal Pilot: เจ้าหน้าที่สามารถเข้าหน้าปฏิบัติการเพื่อทดสอบข้อมูลจริงได้ ส่วนคนขับต้องเปิดจากลิงก์ QR ที่สร้างจาก Assignment เท่านั้น
-        </p>
+      <div className="enterprise-panel overflow-hidden">
+        <div className="grid gap-6 p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.22em] text-operation">TOMP ACCESS</p>
+            <h1 className="mt-2 text-3xl font-semibold leading-tight text-ink">เข้าสู่ระบบปฏิบัติการ</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+              เจ้าหน้าที่ใช้บัญชีเพื่อเข้าถึงโครงการและศูนย์ควบคุม ส่วนคนขับเข้าผ่าน QR ที่ผูกกับ Assignment เท่านั้น
+            </p>
+            <div className="mt-5 grid gap-3">
+              {roles.map((role) => (
+                <div key={role.title} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <p className="font-semibold text-ink">{role.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{role.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+            <h2 className="text-xl font-semibold text-ink">เข้าสู่ระบบสำหรับเจ้าหน้าที่</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">ใช้ Supabase Auth สำหรับรอบ Pilot ก่อน harden RBAC production ในระยะถัดไป</p>
+            <form action={handleEmail} className="mt-5 grid gap-3">
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                อีเมล
+                <input className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-operation focus:ring-4 focus:ring-teal-100" name="email" placeholder="name@company.com" type="email" />
+              </label>
+              <button className="rounded-xl bg-operation px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-operation-deep" type="submit">
+                ส่งลิงก์เข้าสู่ระบบทางอีเมล
+              </button>
+            </form>
+            <button className="mt-3 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-operation hover:bg-teal-50" onClick={handleGoogle} type="button">
+              เข้าสู่ระบบด้วย Google
+            </button>
+            {message ? <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+              Driver ไม่ต้อง login ที่หน้านี้ ให้เปิดจาก QR ที่ศูนย์ควบคุมสร้างให้
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Link className="rounded-md border border-blue-200 bg-blue-50 p-5 shadow-sm hover:border-blue-500" href="/mission-control">
-          <p className="text-sm font-semibold text-blue-800">เจ้าหน้าที่ / Admin</p>
-          <h2 className="mt-2 text-xl font-semibold text-blue-950">เข้าศูนย์ควบคุม</h2>
-          <p className="mt-2 text-sm leading-6 text-blue-900">ดู Dashboard, แผนที่ GPS, Timeline และสถานะคนขับจากข้อมูลจริง</p>
+      <div className="flex flex-wrap gap-3">
+        <Link className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-operation hover:bg-teal-50" href="/mission-control">
+          ไปศูนย์ควบคุม
         </Link>
-        <Link className="rounded-md border border-teal-200 bg-teal-50 p-5 shadow-sm hover:border-teal-500" href="/projects">
-          <p className="text-sm font-semibold text-teal-800">Planner / Coordinator</p>
-          <h2 className="mt-2 text-xl font-semibold text-teal-950">จัดการโครงการ</h2>
-          <p className="mt-2 text-sm leading-6 text-teal-900">สร้าง Mission, Assignment, Call Sign และสร้าง QR ให้คนขับ</p>
+        <Link className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-operation hover:bg-teal-50" href="/live-test">
+          ทดสอบ QR และ GPS
         </Link>
-        <Link className="rounded-md border border-amber-200 bg-amber-50 p-5 shadow-sm hover:border-amber-500" href="/driver">
-          <p className="text-sm font-semibold text-amber-800">Driver</p>
-          <h2 className="mt-2 text-xl font-semibold text-amber-950">หน้าคนขับ</h2>
-          <p className="mt-2 text-sm leading-6 text-amber-900">ต้องเปิดจาก QR หรือ URL ที่มี token จึงจะเห็นงานและแชร์ GPS ได้</p>
-        </Link>
-      </div>
-
-      <div className="rounded-md border border-slate-200 bg-white p-6 shadow-soft">
-        <h2 className="text-lg font-semibold text-ink">เข้าสู่ระบบด้วย Supabase Auth</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">ใช้สำหรับทดสอบ session จริงเท่านั้น RBAC production ยังต้อง harden ก่อนเปิดใช้งานจริง</p>
-        <form action={handleEmail} className="mt-4 grid gap-3 md:max-w-md">
-          <input className="rounded-md border border-slate-300 px-3 py-2" name="email" placeholder="อีเมล" type="email" />
-          <button className="rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">
-            ส่งลิงก์เข้าสู่ระบบทางอีเมล
-          </button>
-        </form>
-        <button className="mt-3 w-fit rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700" onClick={handleGoogle} type="button">
-          เข้าสู่ระบบด้วย Google
-        </button>
-        {message ? <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}
       </div>
     </section>
   );
