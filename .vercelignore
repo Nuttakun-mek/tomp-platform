@@ -1,0 +1,10 @@
+node_modules
+.next
+.next-check
+apps/web/.next
+apps/web/.next-check
+coverage
+dist
+build
+*.log
+*.tsbuildinfo
