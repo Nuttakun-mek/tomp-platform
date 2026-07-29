@@ -19,14 +19,14 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
                     <h1 className="mt-3 text-2xl font-semibold leading-8">ศูนย์ปฏิบัติการขนส่ง</h1>
                     <p className="mt-2 text-sm leading-6 text-slate-300">วางแผน จัดสรร ติดตาม และตัดสินใจจากข้อมูลปฏิบัติการเดียวกัน</p>
                   </div>
-                  <span className="rounded-full bg-emerald-300 px-3 py-1 text-[11px] font-bold text-emerald-950">LIVE</span>
+                  <span className="rounded-full bg-amber-300 px-3 py-1 text-[11px] font-bold text-amber-950">PILOT</span>
                 </div>
                 <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/45 p-4">
                   <p className="text-xs font-semibold text-slate-400">พื้นที่ทำงาน</p>
                   <p className="mt-1 text-sm font-semibold text-white">Internal Pilot Operations</p>
                   <div className="mt-3 flex items-center gap-2 text-xs text-emerald-200">
                     <span className="status-pulse status-pulse-live h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                    พร้อมติดตามงานและ GPS สด
+                    พร้อมทดสอบ QR และ GPS สด
                   </div>
                 </div>
               </Link>

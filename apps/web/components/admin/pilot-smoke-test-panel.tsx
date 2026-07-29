@@ -58,10 +58,10 @@ export function PilotSmokeTestPanel() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-operation">Production Pilot Smoke Test</p>
-            <h2 className="mt-1 text-2xl font-semibold text-ink">ตรวจแกนระบบก่อนทดสอบจริง</h2>
+            <p className="text-sm font-semibold text-operation">ตรวจ Infrastructure</p>
+            <h2 className="mt-1 text-2xl font-semibold text-ink">ตรวจตารางและสร้างข้อมูลทดสอบแบบผู้ดูแล</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              ใช้หน้านี้เพื่อตรวจ Supabase, ตาราง driver operations, สร้างชุดทดสอบจริง, เปิด QR คนขับ และตรวจ Mission Control โดยไม่เพิ่ม scope ธุรกิจใหม่
+              ใช้เมื่อจำเป็นต้องดูรายละเอียดตารางและ error จาก Supabase สำหรับผู้ใช้งานทั่วไปให้เริ่มที่หน้า “ทดสอบระบบจบขั้นตอน”
             </p>
           </div>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">Internal Pilot เท่านั้น</span>

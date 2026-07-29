@@ -7,37 +7,27 @@ import { SideNavSection } from "@/components/layout/side-nav-section";
 
 const navSections = [
   {
-    title: "ศูนย์ปฏิบัติการ",
+    title: "เริ่มใช้งาน",
     items: [
-      { href: "/", label: "ภาพรวม", description: "สัญญาณรวมของงานวันนี้" },
-      { href: "/mission-control", label: "ศูนย์ควบคุม", description: "แผนที่ งาน และความเสี่ยง" },
-      { href: "/recovery", label: "กู้คืนสถานการณ์", description: "เหตุผิดปกติและการแก้ไข" },
-      { href: "/live-test", label: "ทดสอบ GPS", description: "สร้างงานทดสอบเร็ว" }
+      { href: "/", label: "ภาพรวม", description: "สถานะรวมและทางลัดหลัก" },
+      { href: "/live-test", label: "ทดสอบระบบจบขั้นตอน", description: "สร้าง QR และทดสอบ GPS จริง" },
+      { href: "/mission-control", label: "ศูนย์ควบคุม", description: "แผนที่ งาน GPS และความเสี่ยง" }
     ]
   },
   {
-    title: "วางแผนและจัดสรร",
+    title: "วางแผนปฏิบัติการ",
     items: [
-      { href: "/projects", label: "โครงการ", description: "พื้นที่ปฏิบัติการ" },
-      { href: "/assignments", label: "Assignment", description: "บอร์ดจัดสรรงาน" },
-      { href: "/pilot-checklist", label: "ทดสอบ Pilot", description: "ขั้นตอนตรวจระบบ" }
+      { href: "/projects", label: "โครงการ", description: "สร้างและจัดการพื้นที่ปฏิบัติการ" },
+      { href: "/assignments", label: "บอร์ด Assignment", description: "จัดสรร Call Sign คนขับ และรถ" },
+      { href: "/resources", label: "ทรัพยากร", description: "ตรวจความพร้อมคนขับและรถ" }
     ]
   },
   {
-    title: "ทรัพยากร",
+    title: "ตรวจระบบ",
     items: [
-      { href: "/resources", label: "ภาพรวมทรัพยากร", description: "ความพร้อมคนและรถ" },
-      { href: "/resources/drivers", label: "คนขับ", description: "ข้อมูลติดต่อและสถานะ" },
-      { href: "/resources/vehicles", label: "รถ", description: "ทะเบียน ประเภท ความจุ" }
-    ]
-  },
-  {
-    title: "ระบบ",
-    items: [
-      { href: "/driver", label: "หน้าคนขับ", description: "เข้าถึงงานด้วย QR" },
-      { href: "/login", label: "เข้าสู่ระบบ", description: "เจ้าหน้าที่ปฏิบัติการ" },
-      { href: "/admin", label: "ผู้ดูแลระบบ", description: "ตรวจระบบและ Pilot" },
-      { href: "/admin/operations", label: "Runbook", description: "ขั้นตอนดูแลระบบ" }
+      { href: "/pilot-checklist", label: "คู่มือ Pilot", description: "ลำดับการทดสอบสำหรับทีม" },
+      { href: "/admin", label: "ผู้ดูแลระบบ", description: "health, data quality และ runbook" },
+      { href: "/login", label: "เข้าสู่ระบบ", description: "เจ้าหน้าที่ปฏิบัติการ" }
     ]
   }
 ];

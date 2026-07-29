@@ -1,6 +1,7 @@
 import { DriverCard } from "@/components/driver/driver-card";
 import { PageHeader } from "@/components/page-header";
 import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
+import Link from "next/link";
 
 interface DriverPageProps {
   searchParams?: Promise<{ token?: string }>;
@@ -20,8 +21,16 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
       />
 
       {!driverAccess ? (
-        <section className="mx-auto max-w-2xl rounded-md border border-red-200 bg-red-50 p-5 text-sm font-medium leading-6 text-red-900">
-          ไม่พบ Assignment ที่ผูกกับ token นี้ หรือ QR หมดอายุแล้ว กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR ใหม่
+        <section className="mx-auto grid max-w-2xl gap-4 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-medium leading-6 text-red-900">
+          <p>ไม่พบ Assignment ที่ผูกกับ token นี้ หรือ QR หมดอายุแล้ว กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR ใหม่</p>
+          <div className="flex flex-wrap gap-3">
+            <Link className="rounded-2xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white" href="/live-test">
+              สร้าง QR ทดสอบใหม่
+            </Link>
+            <Link className="rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-800" href="/mission-control">
+              กลับศูนย์ควบคุม
+            </Link>
+          </div>
         </section>
       ) : (
         <DriverCard driverAccess={driverAccess} />

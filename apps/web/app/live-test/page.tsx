@@ -5,9 +5,9 @@ export default function LiveTestPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ทดสอบ GPS สด"
-        title="ทดสอบคนขับแชร์ตำแหน่งแบบเรียลไทม์"
-        description="สร้างข้อมูลจริงสำหรับทดสอบ end-to-end: Assignment, QR คนขับ, การแชร์ GPS และ Mission Control"
+        eyebrow="ทดสอบระบบจบขั้นตอน"
+        title="ทดสอบ QR คนขับและ GPS สด"
+        description="เส้นทางหลักสำหรับ internal pilot: ตรวจระบบ สร้าง Assignment จริง เปิด QR คนขับ แชร์ GPS และดูผลในศูนย์ควบคุม"
       />
       <LiveGpsTestPanel />
     </>

@@ -35,7 +35,7 @@ export function AssignmentBoardPlaceholder({ assignments, missions = [], callSig
         </div>
       ) : (
         <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-          ยังไม่มี Assignment ในโครงการนี้ หากต้องการทดสอบทันที ให้เปิดเมนู “ทดสอบ GPS สด” เพื่อสร้างชุดข้อมูลครบชุด
+          ยังไม่มี Assignment ในโครงการนี้ หากต้องการทดสอบทันที ให้เปิดเมนู “ทดสอบระบบจบขั้นตอน” เพื่อสร้างชุดข้อมูลครบชุด
         </div>
       )}
     </section>
