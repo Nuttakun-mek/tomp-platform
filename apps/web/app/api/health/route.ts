@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { buildInfo } from "@/lib/build-info";
+import { readCleanEnv } from "@/lib/env";
 
 function hasServerSupabaseConfig() {
-  return Boolean((process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL) && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
+  return Boolean(
+    readCleanEnv("NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL") &&
+      readCleanEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  );
 }
 
 function hasUnsafePublicSecret() {

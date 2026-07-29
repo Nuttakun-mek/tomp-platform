@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { readCleanEnv } from "@/lib/env";
 
 export interface SupabaseWriteClientResult {
   client: SupabaseClient | null;
@@ -9,12 +10,9 @@ export interface SupabaseWriteClientResult {
 }
 
 export function getSupabaseWriteClient(): SupabaseWriteClientResult {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_PUBLISHABLE_KEY;
+  const supabaseUrl = readCleanEnv("NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL");
+  const serviceRoleKey = readCleanEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY");
+  const anonKey = readCleanEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY");
 
   if (!supabaseUrl) {
     return {

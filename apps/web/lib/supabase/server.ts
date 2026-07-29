@@ -1,15 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { readCleanEnv } from "@/lib/env";
 
 export function getSupabaseServerClient(): SupabaseClient | null {
   if (process.env.NEXT_PHASE === "phase-production-build") {
     return null;
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_PUBLISHABLE_KEY;
+  const supabaseUrl = readCleanEnv("NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL");
+  const supabaseAnonKey = readCleanEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return null;
@@ -28,13 +26,8 @@ export function getSupabaseServerDataClient(): SupabaseClient | null {
     return null;
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseServerKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.SUPABASE_PUBLISHABLE_KEY;
+  const supabaseUrl = readCleanEnv("NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL");
+  const supabaseServerKey = readCleanEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY");
 
   if (!supabaseUrl || !supabaseServerKey) {
     return null;
