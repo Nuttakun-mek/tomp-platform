@@ -2,6 +2,7 @@ const baseUrl = process.env.TOMP_SMOKE_BASE_URL || "https://tomp-platform.vercel
 const routes = [
   "/",
   "/api/health",
+  "/api/admin/pilot-infrastructure",
   "/live-test",
   "/mission-control",
   "/assignments",
