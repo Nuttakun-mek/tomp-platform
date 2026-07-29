@@ -5,14 +5,14 @@ import { StatusDot } from "@/components/ui/status-dot";
 export function OperationsHero({ projectCount, assignmentCount, gpsCount, followUpCount }: { projectCount: number; assignmentCount: number; gpsCount: number; followUpCount: number }) {
   return (
     <section className="command-panel-dark overflow-hidden rounded-3xl text-white shadow-command">
-      <div className="command-grid grid gap-6 p-6 lg:grid-cols-[1.15fr_0.85fr] lg:p-7">
-        <div className="flex min-w-0 flex-col justify-between gap-6">
+      <div className="command-grid grid gap-5 p-5 lg:grid-cols-[1.15fr_0.85fr] lg:p-6">
+        <div className="flex min-w-0 flex-col justify-between gap-5">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-100">
               <StatusDot tone="success" pulse />
               Internal Pilot พร้อมตรวจระบบ
             </div>
-            <h2 className="mt-5 max-w-3xl text-3xl font-semibold leading-tight lg:text-[40px]">
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold leading-tight md:text-[30px] lg:text-[34px]">
               ควบคุมการปฏิบัติการขนส่งจากภาพเดียว
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-200">
@@ -45,7 +45,7 @@ function HeroMetric({ label, value, danger = false }: { label: string; value: nu
   return (
     <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
       <p className="text-[12px] font-semibold text-slate-300">{label}</p>
-      <p className={`mt-2 text-3xl font-semibold leading-none ${danger && value > 0 ? "text-amber-200" : "text-white"}`}>{value}</p>
+      <p className={`mt-2 text-2xl font-semibold leading-none md:text-[28px] ${danger && value > 0 ? "text-amber-200" : "text-white"}`}>{value}</p>
     </div>
   );
 }

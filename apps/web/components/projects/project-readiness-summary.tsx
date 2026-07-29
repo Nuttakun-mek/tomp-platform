@@ -6,7 +6,7 @@ export function ProjectReadinessSummary({ missions, assignments }: { missions: n
     <section className="enterprise-panel p-5">
       <p className="text-xs font-semibold tracking-[0.16em] text-operation">ความพร้อม</p>
       <h2 className="mt-1 text-lg font-semibold text-ink">ความพร้อมโครงการ</h2>
-      <p className="mt-4 text-3xl font-semibold text-ink">{score}%</p>
+      <p className="mt-4 metric-value">{score}%</p>
       <div className="mt-3">
         <ProgressBar value={score} tone={score > 70 ? "operation" : "warning"} />
       </div>

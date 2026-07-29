@@ -4,7 +4,7 @@ export function ResourceOverview({ drivers, vehicles }: { drivers: Driver[]; veh
   const readyDrivers = drivers.filter((driver) => driver.phone && driver.status !== "archived").length;
   const readyVehicles = vehicles.filter((vehicle) => vehicle.plateNumber && vehicle.status !== "archived" && vehicle.status !== "out_of_service").length;
   return (
-    <section className="command-panel-dark rounded-[30px] p-5 text-white shadow-command">
+    <section className="command-panel-dark rounded-3xl p-5 text-white shadow-command">
       <p className="text-xs font-semibold tracking-[0.16em] text-teal-200">ความพร้อมทรัพยากร</p>
       <h1 className="mt-1 text-2xl font-semibold">เตรียมคนขับและรถสำหรับปฏิบัติการ</h1>
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
@@ -19,9 +19,9 @@ export function ResourceOverview({ drivers, vehicles }: { drivers: Driver[]; veh
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[20px] border border-white/10 bg-white/10 p-4">
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
       <p className="text-xs font-semibold text-slate-300">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-white">{value}</p>
+      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
     </div>
   );
 }

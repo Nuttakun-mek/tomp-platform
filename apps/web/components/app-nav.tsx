@@ -53,7 +53,7 @@ export function AppNav() {
         <span>เมนูระบบ</span>
         {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </button>
-      <nav className={`${open ? "grid" : "hidden"} gap-5 lg:grid`} aria-label="เมนูหลัก">
+      <nav className={`${open ? "grid" : "hidden"} gap-4 lg:grid`} aria-label="เมนูหลัก">
         {navSections.map((section) => (
           <SideNavSection key={section.title} title={section.title}>
             {section.items.map((item) => {
@@ -63,7 +63,7 @@ export function AppNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`group flex gap-3 rounded-xl border px-3 py-3 transition duration-200 ${
+                  className={`group flex gap-3 rounded-xl border px-3 py-2.5 transition duration-200 ${
                     active
                       ? "border-teal-300/60 bg-teal-400/14 text-white shadow-command"
                       : "border-white/0 text-slate-300 hover:border-white/10 hover:bg-white/8 hover:text-white"

@@ -9,7 +9,7 @@ export function ReadinessScoreCard({ title, score, status }: { title: string; sc
         <h3 className="text-base font-semibold text-ink">{title}</h3>
         <StatusBadge label={formatStatusTh(status)} tone={status === "ready" ? "ready" : status === "blocked" ? "critical" : "warning"} />
       </div>
-      <p className="mt-4 text-3xl font-semibold text-ink">{score}%</p>
+      <p className="mt-4 metric-value">{score}%</p>
     </article>
   );
 }

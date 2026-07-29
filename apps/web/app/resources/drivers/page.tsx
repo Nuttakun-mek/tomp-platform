@@ -9,10 +9,10 @@ export default async function DriversPage() {
 
   return (
     <>
-      <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">Drivers</p>
-        <h1 className="mt-1 text-3xl font-semibold text-ink">คนขับ</h1>
-        <p className="mt-2 text-sm text-slate-600">เตรียมข้อมูลคนขับสำหรับ QR, การติดต่อ และการแชร์ GPS ระหว่างปฏิบัติงาน</p>
+      <section className="enterprise-panel p-5">
+        <p className="page-kicker">Drivers</p>
+        <h1 className="mt-1 page-title">คนขับ</h1>
+        <p className="mt-2 page-description">เตรียมข้อมูลคนขับสำหรับ QR การติดต่อ และการแชร์ GPS ระหว่างปฏิบัติงาน</p>
       </section>
       <div className="grid gap-4 md:grid-cols-3">
         <ResourceQualityCard title="คนขับทั้งหมด" value={`${drivers.length}`} detail="จากฐานข้อมูลปัจจุบัน" />

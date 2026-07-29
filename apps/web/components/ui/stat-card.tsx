@@ -2,7 +2,7 @@ export function StatCard({ label, value, detail }: { label: string; value: strin
   return (
     <article className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-normal text-ink">{value}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-normal text-ink">{value}</p>
       {detail ? <p className="mt-2 text-sm text-slate-600">{detail}</p> : null}
     </article>
   );

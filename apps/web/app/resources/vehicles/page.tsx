@@ -9,10 +9,10 @@ export default async function VehiclesPage() {
 
   return (
     <>
-      <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">Vehicles</p>
-        <h1 className="mt-1 text-3xl font-semibold text-ink">รถ</h1>
-        <p className="mt-2 text-sm text-slate-600">เตรียมทะเบียน ประเภทรถ ความจุ และสถานะพร้อมใช้สำหรับงานที่จัดสรร</p>
+      <section className="enterprise-panel p-5">
+        <p className="page-kicker">Vehicles</p>
+        <h1 className="mt-1 page-title">รถ</h1>
+        <p className="mt-2 page-description">เตรียมทะเบียน ประเภทรถ ความจุ และสถานะพร้อมใช้สำหรับงานที่จัดสรร</p>
       </section>
       <div className="grid gap-4 md:grid-cols-3">
         <ResourceQualityCard title="รถทั้งหมด" value={`${vehicles.length}`} detail="จากฐานข้อมูลปัจจุบัน" />

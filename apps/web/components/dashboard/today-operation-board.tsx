@@ -15,7 +15,7 @@ export function TodayOperationBoard({ projects, latestLocation, latestEvent }: {
         </Link>
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
           <p className="text-sm font-semibold text-slate-500">โครงการที่กำลังติดตาม</p>
           <div className="mt-3 grid gap-2">
             {projects.slice(0, 4).map((project) => (
@@ -26,7 +26,7 @@ export function TodayOperationBoard({ projects, latestLocation, latestEvent }: {
             {projects.length === 0 ? <p className="rounded-2xl bg-white px-3 py-3 text-sm text-slate-500">ยังไม่มีโครงการที่ต้องติดตาม</p> : null}
           </div>
         </div>
-        <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
           <p className="text-sm font-semibold text-slate-500">GPS ล่าสุด</p>
           {latestLocation ? (
             <div className="mt-3">
@@ -38,7 +38,7 @@ export function TodayOperationBoard({ projects, latestLocation, latestEvent }: {
             <p className="mt-3 text-sm text-slate-600">ยังไม่มี GPS ล่าสุด</p>
           )}
         </div>
-        <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
           <p className="text-sm font-semibold text-slate-500">ลำดับเหตุการณ์ล่าสุด</p>
           {latestEvent ? <TimelineItem title={latestEvent.eventType} detail={latestEvent.reason || "บันทึกลำดับเหตุการณ์"} time={new Date(latestEvent.createdAt).toLocaleString("th-TH")} /> : <p className="mt-3 text-sm text-slate-600">ยังไม่มีลำดับเหตุการณ์</p>}
         </div>

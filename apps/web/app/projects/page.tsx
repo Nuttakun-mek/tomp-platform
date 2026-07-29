@@ -10,10 +10,10 @@ export default async function ProjectsPage() {
   return (
     <>
       <section className="rounded-md border border-slate-200 bg-slate-950 p-6 text-white shadow-command">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200">Project Workspace</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-teal-200">Project Workspace</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">โครงการปฏิบัติการ</h1>
+            <h1 className="text-2xl font-semibold leading-tight md:text-[30px]">โครงการปฏิบัติการ</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">โครงการคือพื้นที่หลักสำหรับรวมภารกิจ งานที่จัดสรร ทรัพยากร Call Sign และ Timeline ของการปฏิบัติการขนส่ง</p>
           </div>
           <Link className="rounded-md bg-operation px-4 py-3 text-sm font-semibold text-white" href="/projects/new">

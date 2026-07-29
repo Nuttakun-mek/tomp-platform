@@ -49,13 +49,13 @@ export default async function MissionControlPage({ searchParams }: MissionContro
       <ProjectSwitcher projects={projects} activeProjectId={activeProject.id} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
-        <div className="grid gap-6">
+      <div className="grid gap-5 xl:grid-cols-[1.32fr_0.88fr]">
+        <div className="grid gap-5">
           <LiveMapPanel projectId={activeProject.id} locations={locations} />
           <DriverOperationsPanel locations={locations} summary={driverOperations} />
           <AssignmentMonitor assignments={assignments} locations={locations} />
         </div>
-        <aside className="grid content-start gap-6">
+        <aside className="grid content-start gap-5">
           <DriverSignalPanel locations={locations} />
           <DriverNotificationConsole />
           <RouteChangeConsole />

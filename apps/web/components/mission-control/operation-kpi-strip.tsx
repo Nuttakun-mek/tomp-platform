@@ -10,9 +10,9 @@ export function OperationKpiStrip({ readiness, assignments, liveDrivers, followU
   return (
     <section className="grid gap-3 md:grid-cols-5">
       {items.map((item) => (
-        <article key={item.label} className={`rounded-[22px] border border-slate-200 ${item.bg} p-4 shadow-soft`}>
-          <p className="text-xs font-semibold text-slate-500">{item.label}</p>
-          <p className={`mt-2 text-3xl font-semibold ${item.tone}`}>{item.value}</p>
+        <article key={item.label} className={`rounded-2xl border border-slate-200 ${item.bg} p-4 shadow-soft`}>
+          <p className="text-[12px] font-semibold text-slate-500">{item.label}</p>
+          <p className={`mt-2 text-2xl font-semibold leading-none ${item.tone}`}>{item.value}</p>
         </article>
       ))}
     </section>
