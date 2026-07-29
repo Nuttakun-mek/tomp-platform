@@ -42,7 +42,7 @@ export async function checkPilotInfrastructureAction(): Promise<ActionResult> {
       tableResults.push({
         table,
         ok: !tableError,
-        message: tableError ? tableError.message : "พร้อมใช้งาน"
+        message: tableError ? getSupabaseConnectionMessage(tableError) : "พร้อมใช้งาน"
       });
     } catch (tableError) {
       tableResults.push({

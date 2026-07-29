@@ -30,7 +30,7 @@ export async function GET() {
       tables.push({
         table,
         ok: !tableError,
-        message: tableError ? tableError.message : "พร้อมใช้งาน"
+        message: tableError ? getSupabaseConnectionMessage(tableError) : "พร้อมใช้งาน"
       });
     } catch (tableError) {
       tables.push({
