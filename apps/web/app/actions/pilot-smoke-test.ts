@@ -7,6 +7,7 @@ import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAcces
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
 import { getRequestBaseUrl } from "@/lib/request-origin";
+import { getSupabaseConnectionMessage } from "@/lib/supabase/errors";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -36,12 +37,20 @@ export async function checkPilotInfrastructureAction(): Promise<ActionResult> {
 
   const tableResults = [];
   for (const table of requiredTables) {
-    const { error: tableError } = await client.from(table).select("*").limit(1);
-    tableResults.push({
-      table,
-      ok: !tableError,
-      message: tableError ? tableError.message : "พร้อมใช้งาน"
-    });
+    try {
+      const { error: tableError } = await client.from(table).select("*").limit(1);
+      tableResults.push({
+        table,
+        ok: !tableError,
+        message: tableError ? tableError.message : "พร้อมใช้งาน"
+      });
+    } catch (tableError) {
+      tableResults.push({
+        table,
+        ok: false,
+        message: getSupabaseConnectionMessage(tableError)
+      });
+    }
   }
 
   return actionSuccess({

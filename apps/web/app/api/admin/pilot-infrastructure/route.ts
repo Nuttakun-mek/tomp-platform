@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSupabaseConnectionMessage } from "@/lib/supabase/errors";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
 const requiredTables = [
@@ -15,12 +16,6 @@ const requiredTables = [
   "gps_locations",
   "timeline_events"
 ];
-
-function getSafeMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "object" && error && "message" in error) return String((error as { message?: unknown }).message);
-  return "ตรวจตารางไม่สำเร็จ";
-}
 
 export async function GET() {
   const { client, error, mode } = getSupabaseWriteClient();
@@ -41,7 +36,7 @@ export async function GET() {
       tables.push({
         table,
         ok: false,
-        message: getSafeMessage(tableError)
+        message: getSupabaseConnectionMessage(tableError)
       });
     }
   }
