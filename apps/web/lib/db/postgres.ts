@@ -6,6 +6,10 @@ import { readCleanEnv } from "@/lib/env";
 let sqlClient: Sql | null | undefined;
 
 export function getPostgresClient() {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return null;
+  }
+
   if (sqlClient !== undefined) return sqlClient;
 
   const databaseUrl = readCleanEnv("SUPABASE_DB_URL", "DATABASE_URL", "POSTGRES_URL");
@@ -26,5 +30,9 @@ export function getPostgresClient() {
 }
 
 export function hasPostgresClient() {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return false;
+  }
+
   return Boolean(readCleanEnv("SUPABASE_DB_URL", "DATABASE_URL", "POSTGRES_URL"));
 }

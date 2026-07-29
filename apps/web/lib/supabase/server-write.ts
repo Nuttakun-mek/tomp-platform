@@ -10,6 +10,14 @@ export interface SupabaseWriteClientResult {
 }
 
 export function getSupabaseWriteClient(): SupabaseWriteClientResult {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return {
+      client: null,
+      mode: "missing",
+      error: "Supabase writes are disabled during production build."
+    };
+  }
+
   const supabaseUrl = readCleanEnv("NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL");
   const serviceRoleKey = readCleanEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY");
   const anonKey = readCleanEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY");
