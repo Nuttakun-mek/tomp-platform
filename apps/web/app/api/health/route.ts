@@ -23,7 +23,7 @@ export function GET() {
       timezone: buildInfo.timezone,
       checks: {
         serverSupabaseConfig: hasServerSupabaseConfig(),
-        unsafePublicSecret: !unsafePublicSecret,
+        publicSecretSafe: !unsafePublicSecret,
         webGpsMode: "foreground-browser",
         timelineImmutableUi: true
       }
