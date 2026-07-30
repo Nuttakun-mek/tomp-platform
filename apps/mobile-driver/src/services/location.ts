@@ -2,6 +2,7 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
+import { enqueueOfflineAction } from "./offline-queue";
 import { getSavedDriverToken } from "./token-store";
 
 type LocationCallback = (location: Location.LocationObject) => void;
@@ -41,10 +42,21 @@ export async function getCurrentLocation() {
   return Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
 }
 
+async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]) {
+  const result = await submitLocation(input).catch((error) => ({
+    success: false,
+    error: error instanceof Error ? error.message : "ส่งตำแหน่งไม่สำเร็จ"
+  }));
+  if (!result.success) {
+    await enqueueOfflineAction("location", input);
+  }
+  return result;
+}
+
 export async function startForegroundLocationSharing(token: string, onLocation: LocationCallback) {
   const firstLocation = await getCurrentLocation();
   onLocation(firstLocation);
-  await submitLocation({
+  await submitOrQueueLocation({
     token,
     latitude: firstLocation.coords.latitude,
     longitude: firstLocation.coords.longitude,
@@ -65,7 +77,7 @@ export async function startForegroundLocationSharing(token: string, onLocation: 
     },
     (location) => {
       onLocation(location);
-      void submitLocation({
+      void submitOrQueueLocation({
         token,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -101,7 +113,7 @@ export async function startBackgroundLocationSharing() {
 export async function stopLocationSharing(token: string) {
   const location = await getCurrentLocation().catch(() => null);
   if (location) {
-    await submitLocation({
+    await submitOrQueueLocation({
       token,
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,

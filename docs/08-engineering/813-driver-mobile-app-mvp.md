@@ -28,6 +28,7 @@
 7. แอปส่งตำแหน่งไป `/api/driver/location`
 8. ศูนย์ควบคุมเห็นตำแหน่งใน Mission Control
 9. คนขับส่งสถานะงานหรือแจ้งปัญหา
+10. หากสัญญาณไม่พร้อม แอปเก็บรายการสำคัญไว้ใน offline queue และให้คนขับกดส่งซ้ำ
 
 ## API Boundary
 
@@ -56,11 +57,21 @@ MVP เตรียม `expo-task-manager` และ `expo-location` แล้�
 
 Expo Go อาจมีข้อจำกัดสำหรับ background location บางกรณี ต้องทดสอบด้วย development build บนเครื่องจริง
 
+## Offline Queue
+
+MVP ใช้ SecureStore เก็บ queue ขนาดเล็กสำหรับ:
+
+- readiness
+- assignment status
+- issue report
+- location ping
+
+ข้อจำกัด: เก็บเฉพาะรายการล่าสุดไม่เกิน 20 รายการ เพื่อหลีกเลี่ยงข้อมูลใหญ่เกินไปบน SecureStore รุ่นถัดไปควรเปลี่ยนเป็น AsyncStorage หรือ SQLite พร้อม retry policy ที่ละเอียดกว่า
+
 ## ยังไม่เสร็จ
 
 - upload รูปรถ/ป้ายทะเบียน
 - push notification จริง
-- offline queue
 - store signing
 - production privacy policy สำหรับ location
 
@@ -72,4 +83,4 @@ Sprint Mobile-02:
 - เพิ่ม iOS TestFlight setup
 - เพิ่ม photo evidence upload
 - เพิ่ม push notification จริง
-- เพิ่ม offline queue สำหรับ location/status
+- ยกระดับ offline queue เป็น persistent store ที่รองรับงานหลายชั่วโมง

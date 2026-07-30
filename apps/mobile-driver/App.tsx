@@ -8,6 +8,7 @@ import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { colors, radius } from "./src/theme";
 import type { DriverScreenState, MobileDriverAssignment } from "./src/types";
 import { fetchAssignmentByToken, submitIssue, submitReadiness, submitStatus } from "./src/services/driver-api";
+import { enqueueOfflineAction, flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-queue";
 import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
 import {
   requestBackgroundLocationPermission,
@@ -48,6 +49,8 @@ export default function App() {
   const [subscription, setSubscription] = useState<LocationSubscription | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [qrLocked, setQrLocked] = useState(false);
+  const [offlineCount, setOfflineCount] = useState(0);
+  const [retryingQueue, setRetryingQueue] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const nextAction = useMemo(() => (assignment ? getNextDriverAction(assignment.packet.status) : "โหลดงานจาก QR ก่อน"), [assignment]);
@@ -97,7 +100,7 @@ export default function App() {
 
   async function sendReadiness() {
     if (!assignment) return;
-    const result = await submitReadiness({
+    const input = {
       projectId: assignment.project.id,
       assignmentId: assignment.assignment.id,
       driverId: assignment.driver.id,
@@ -107,26 +110,40 @@ export default function App() {
       confirmedVehicle: true,
       gpsConsent: true,
       metadata: { source: "mobile_driver" }
-    });
-    setMessage(result.success ? "ส่งข้อมูลความพร้อมแล้ว" : result.error ?? "ส่งข้อมูลความพร้อมไม่สำเร็จ");
+    } as const;
+    const result = await submitReadiness(input);
+    if (!result.success) {
+      await enqueueOfflineAction("readiness", input);
+      await refreshOfflineCount();
+      setMessage("ยังส่งข้อมูลไม่ได้ ระบบเก็บไว้ส่งซ้ำเมื่อสัญญาณพร้อม");
+      return;
+    }
+    setMessage("ส่งข้อมูลความพร้อมแล้ว");
   }
 
   async function sendStatus(status: "ready" | "arrived_pickup" | "passenger_onboard" | "completed" | "blocked") {
     if (!assignment) return;
-    const result = await submitStatus({
+    const input = {
       projectId: assignment.project.id,
       assignmentId: assignment.assignment.id,
       driverId: assignment.driver.id,
       status,
       source: "driver_qr",
       metadata: { source: "mobile_driver" }
-    });
-    setMessage(result.success ? `ส่งสถานะ ${mapDriverStatusToThai(status)} แล้ว` : result.error ?? "ส่งสถานะไม่สำเร็จ");
+    } as const;
+    const result = await submitStatus(input);
+    if (!result.success) {
+      await enqueueOfflineAction("status", input);
+      await refreshOfflineCount();
+      setMessage("ยังส่งสถานะไม่ได้ ระบบเก็บไว้ส่งซ้ำเมื่อสัญญาณพร้อม");
+      return;
+    }
+    setMessage(`ส่งสถานะ ${mapDriverStatusToThai(status)} แล้ว`);
   }
 
   async function reportIssue() {
     if (!assignment) return;
-    const result = await submitIssue({
+    const input = {
       projectId: assignment.project.id,
       assignmentId: assignment.assignment.id,
       driverId: assignment.driver.id,
@@ -134,8 +151,27 @@ export default function App() {
       severity: "urgent",
       message: "คนขับกดแจ้งปัญหาจากแอปมือถือ",
       metadata: { source: "mobile_driver" }
-    });
-    setMessage(result.success ? "แจ้งปัญหาไปยังศูนย์ควบคุมแล้ว" : result.error ?? "แจ้งปัญหาไม่สำเร็จ");
+    } as const;
+    const result = await submitIssue(input);
+    if (!result.success) {
+      await enqueueOfflineAction("issue", input);
+      await refreshOfflineCount();
+      setMessage("ยังแจ้งปัญหาไม่ได้ ระบบเก็บไว้ส่งซ้ำเมื่อสัญญาณพร้อม");
+      return;
+    }
+    setMessage("แจ้งปัญหาไปยังศูนย์ควบคุมแล้ว");
+  }
+
+  async function refreshOfflineCount() {
+    setOfflineCount(await getOfflineQueueCount());
+  }
+
+  async function retryOfflineQueue() {
+    setRetryingQueue(true);
+    const result = await flushOfflineQueue();
+    setRetryingQueue(false);
+    setOfflineCount(result.remaining);
+    setMessage(result.remaining ? `ส่งซ้ำสำเร็จ ${result.sent} รายการ ยังเหลือ ${result.remaining} รายการ` : `ส่งข้อมูลค้างสำเร็จ ${result.sent} รายการ`);
   }
 
   async function toggleLocationSharing() {
@@ -184,6 +220,7 @@ export default function App() {
     getSavedDriverToken().then((savedToken) => {
       if (savedToken) void loadAssignment(savedToken);
     });
+    void refreshOfflineCount();
 
     const subscription = ExpoLinking.addEventListener("url", ({ url }) => {
       void loadAssignment(url);
@@ -211,6 +248,18 @@ export default function App() {
           <View style={styles.panel}>
             <ActivityIndicator color={colors.operation} />
             <Text style={styles.panelText}>กำลังโหลดข้อมูลงาน</Text>
+          </View>
+        ) : null}
+
+        {offlineCount > 0 ? (
+          <View style={styles.offlinePanel}>
+            <View style={styles.offlineTextGroup}>
+              <Text style={styles.offlineTitle}>มีข้อมูลรอส่ง {offlineCount} รายการ</Text>
+              <Text style={styles.offlineText}>ระบบจะเก็บข้อมูลไว้ในเครื่องชั่วคราวเมื่อสัญญาณไม่พร้อม</Text>
+            </View>
+            <Pressable style={styles.offlineButton} onPress={retryOfflineQueue} disabled={retryingQueue}>
+              <Text style={styles.offlineButtonText}>{retryingQueue ? "กำลังส่ง" : "ส่งซ้ำ"}</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -363,6 +412,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 12,
     padding: 16
+  },
+  offlinePanel: {
+    alignItems: "center",
+    backgroundColor: "#fff7e8",
+    borderColor: "#ffd391",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    padding: 14
+  },
+  offlineTextGroup: {
+    flex: 1
+  },
+  offlineTitle: {
+    color: "#8a4b00",
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  offlineText: {
+    color: "#9a610f",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2
+  },
+  offlineButton: {
+    alignItems: "center",
+    backgroundColor: "#8a4b00",
+    borderRadius: radius.md,
+    justifyContent: "center",
+    minHeight: 42,
+    minWidth: 86,
+    paddingHorizontal: 12
+  },
+  offlineButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900"
   },
   panelText: {
     color: colors.muted,

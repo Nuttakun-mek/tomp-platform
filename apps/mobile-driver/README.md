@@ -15,6 +15,7 @@
 - ส่งสถานะงาน
 - แจ้งปัญหาไปศูนย์ควบคุม
 - แชร์ GPS แบบ foreground
+- เก็บ readiness/status/issue/location ไว้ส่งซ้ำเมื่อสัญญาณไม่พร้อม
 - เตรียม background location เมื่อระบบมือถือและ permission อนุญาต
 
 ## วิธีรัน
@@ -47,6 +48,7 @@ EXPO_PUBLIC_TOMP_API_BASE_URL=https://your-tunnel-url.ngrok.app
 - ยังไม่ได้ทำ App Store / Play Store build
 - ยังไม่ได้ทำ push notification จริง
 - ยังไม่ได้ทำ photo upload จากมือถือ
+- offline queue ยังเป็น MVP ขนาดเล็ก เก็บรายการล่าสุดไม่เกิน 20 รายการ
 - background location ขึ้นกับ policy ของ Android/iOS และต้องทดสอบบนเครื่องจริง
 - การ build สำหรับ Android/iOS ต้องใช้ EAS และบัญชี developer ของแต่ละ platform
 
