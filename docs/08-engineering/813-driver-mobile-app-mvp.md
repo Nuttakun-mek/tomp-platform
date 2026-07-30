@@ -13,14 +13,14 @@
 - TypeScript
 - Expo Location
 - Expo SecureStore
-- Expo Notifications
 - Expo Camera
+- Expo TaskManager
 - TOMP Web API เป็น backend boundary
 
 ## Flow ปัจจุบัน
 
 1. คนขับเปิดแอป TOMP Driver
-2. เปิดงานจาก QR/token
+2. สแกน QR ในแอป หรือเปิดงานจาก token/deep link
 3. แอปเรียก `/api/driver/assignment`
 4. แอปแสดง Call Sign, งาน, จุดรับ, จุดส่ง และ Google Maps
 5. คนขับส่ง readiness
@@ -58,11 +58,9 @@ Expo Go อาจมีข้อจำกัดสำหรับ background loc
 
 ## ยังไม่เสร็จ
 
-- กล้องสแกน QR ในแอป
 - upload รูปรถ/ป้ายทะเบียน
 - push notification จริง
 - offline queue
-- EAS build profile
 - store signing
 - production privacy policy สำหรับ location
 
@@ -70,8 +68,8 @@ Expo Go อาจมีข้อจำกัดสำหรับ background loc
 
 Sprint Mobile-02:
 
-- เพิ่ม camera QR scanner
-- เพิ่ม EAS build config
-- เพิ่ม Android internal testing APK
+- สร้าง Android internal testing APK ด้วย EAS
 - เพิ่ม iOS TestFlight setup
+- เพิ่ม photo evidence upload
+- เพิ่ม push notification จริง
 - เพิ่ม offline queue สำหรับ location/status

@@ -7,6 +7,7 @@
 ใช้งานได้สำหรับการทดสอบภายใน:
 
 - เปิดงานจาก QR/token
+- สแกน QR ด้วยกล้องในแอป
 - โหลด assignment packet จาก TOMP Web API
 - แสดง Call Sign, โครงการ, จุดรับ, จุดส่ง, เวลา และรถ
 - เปิด Google Maps
@@ -47,4 +48,35 @@ EXPO_PUBLIC_TOMP_API_BASE_URL=https://your-tunnel-url.ngrok.app
 - ยังไม่ได้ทำ push notification จริง
 - ยังไม่ได้ทำ photo upload จากมือถือ
 - background location ขึ้นกับ policy ของ Android/iOS และต้องทดสอบบนเครื่องจริง
-- QR scanning ใน MVP ใช้วิธีเปิด deep link หรือวาง token ก่อน ยังไม่ได้เปิดกล้องสแกนในแอป
+- การ build สำหรับ Android/iOS ต้องใช้ EAS และบัญชี developer ของแต่ละ platform
+
+## Build สำหรับทดสอบบนเครื่องจริง
+
+ติดตั้ง EAS CLI:
+
+```bash
+npm install -g eas-cli
+```
+
+เข้าสู่ระบบ Expo:
+
+```bash
+eas login
+```
+
+สร้าง Android APK สำหรับ internal test:
+
+```bash
+cd apps/mobile-driver
+eas build -p android --profile preview
+```
+
+สร้าง development build:
+
+```bash
+cd apps/mobile-driver
+eas build -p android --profile development
+eas build -p ios --profile development
+```
+
+หมายเหตุ: background location ควรทดสอบด้วย development build หรือ production build บนเครื่องจริง ไม่ควรสรุปผลจาก Expo Go เพียงอย่างเดียว

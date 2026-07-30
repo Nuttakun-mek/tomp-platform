@@ -15,6 +15,7 @@
     "@tomp/driver-core": "file:../../packages/driver-core",
     "@tomp/types": "file:../../packages/types",
     "expo": "^57.0.8",
+    "expo-camera": "^57.0.3",
     "expo-linking": "^57.0.4",
     "expo-location": "^57.0.6",
     "expo-secure-store": "^57.0.1",

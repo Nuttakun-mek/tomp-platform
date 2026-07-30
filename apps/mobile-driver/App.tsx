@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
 import type { LocationObject, LocationSubscription } from "expo-location";
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
 import * as ExpoLinking from "expo-linking";
 import { getNextDriverAction, mapDriverStatusToThai } from "@tomp/driver-core";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
@@ -45,6 +46,9 @@ export default function App() {
   const [locationSharing, setLocationSharing] = useState(false);
   const [backgroundEnabled, setBackgroundEnabled] = useState(false);
   const [subscription, setSubscription] = useState<LocationSubscription | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [qrLocked, setQrLocked] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const nextAction = useMemo(() => (assignment ? getNextDriverAction(assignment.packet.status) : "โหลดงานจาก QR ก่อน"), [assignment]);
 
@@ -67,6 +71,28 @@ export default function App() {
     setTokenInput(token);
     setMessage("โหลดงานสำเร็จ");
     setScreenState("ready");
+    setScannerOpen(false);
+    setQrLocked(false);
+  }
+
+  async function openScanner() {
+    if (!cameraPermission?.granted) {
+      const result = await requestCameraPermission();
+      if (!result.granted) {
+        Alert.alert("ต้องอนุญาตกล้อง", "กรุณาอนุญาต Camera เพื่อสแกน QR งานจากศูนย์ควบคุม");
+        return;
+      }
+    }
+    setMessage("");
+    setQrLocked(false);
+    setScannerOpen(true);
+  }
+
+  function handleQrScanned(result: BarcodeScanningResult) {
+    if (qrLocked) return;
+    setQrLocked(true);
+    setMessage("พบ QR แล้ว กำลังโหลดงาน");
+    void loadAssignment(result.data);
   }
 
   async function sendReadiness() {
@@ -191,7 +217,22 @@ export default function App() {
         {!assignment ? (
           <View style={styles.panel}>
             <Text style={styles.sectionTitle}>เปิดงานจาก QR</Text>
-            <Text style={styles.panelText}>สแกน QR ด้วยกล้องมือถือแล้วเปิดลิงก์ หรือใส่ token ที่ศูนย์ควบคุมสร้างให้</Text>
+            <Text style={styles.panelText}>กดสแกน QR ที่ศูนย์ควบคุมสร้างให้ หรือวาง token เฉพาะกรณีทดสอบ</Text>
+            {scannerOpen ? (
+              <View style={styles.scannerBox}>
+                <CameraView
+                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                  onBarcodeScanned={qrLocked ? undefined : handleQrScanned}
+                  style={styles.camera}
+                />
+                <View style={styles.scannerOverlay}>
+                  <Text style={styles.scannerText}>จัด QR ให้อยู่ในกรอบ</Text>
+                </View>
+              </View>
+            ) : null}
+            <Pressable style={styles.routeButton} onPress={scannerOpen ? () => setScannerOpen(false) : openScanner}>
+              <Text style={styles.routeButtonText}>{scannerOpen ? "ปิดกล้อง" : "สแกน QR"}</Text>
+            </Pressable>
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
@@ -342,6 +383,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 52,
     paddingHorizontal: 14
+  },
+  scannerBox: {
+    backgroundColor: "#061421",
+    borderRadius: radius.lg,
+    height: 280,
+    overflow: "hidden",
+    position: "relative"
+  },
+  camera: {
+    height: "100%",
+    width: "100%"
+  },
+  scannerOverlay: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.75)",
+    borderRadius: radius.lg,
+    borderWidth: 2,
+    bottom: 42,
+    justifyContent: "center",
+    left: 36,
+    position: "absolute",
+    right: 36,
+    top: 42
+  },
+  scannerText: {
+    backgroundColor: "rgba(6,20,33,0.72)",
+    borderRadius: 999,
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
+    paddingHorizontal: 14,
+    paddingVertical: 8
   },
   primaryButton: {
     alignItems: "center",
