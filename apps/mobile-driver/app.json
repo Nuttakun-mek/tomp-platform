@@ -2,6 +2,7 @@
   "expo": {
     "name": "TOMP Driver",
     "slug": "tomp-driver",
+    "owner": "enexis",
     "scheme": "tompdriver",
     "version": "0.1.0",
     "orientation": "portrait",
