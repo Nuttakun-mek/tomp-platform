@@ -2,12 +2,14 @@
   "expo": {
     "name": "TOMP Driver",
     "slug": "tomp-driver",
-    "owner": "enexis",
+    "owner": "enexiss-team",
     "scheme": "tompdriver",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tomp.driver",
@@ -38,7 +40,10 @@
       "expo-camera"
     ],
     "extra": {
-      "tompApiBaseUrl": "https://tomp-platform.vercel.app"
+      "tompApiBaseUrl": "https://tomp-platform.vercel.app",
+      "eas": {
+        "projectId": "bb39622e-d0d8-4f8e-a956-33fb6638201d"
+      }
     }
   }
 }
