@@ -1,4 +1,6 @@
 node_modules
+.expo
+apps/mobile-driver/.expo
 .next
 .next-check
 .vercel
