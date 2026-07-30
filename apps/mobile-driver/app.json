@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "TOMP Driver",
-    "slug": "tomp-driver",
+    "slug": "tomp",
     "owner": "enexiss-team",
     "scheme": "tompdriver",
     "version": "0.1.0",
@@ -42,7 +42,7 @@
     "extra": {
       "tompApiBaseUrl": "https://tomp-platform.vercel.app",
       "eas": {
-        "projectId": "bb39622e-d0d8-4f8e-a956-33fb6638201d"
+        "projectId": "ea9c91b8-049d-4287-bfcd-dad4ecc7981b"
       }
     }
   }
