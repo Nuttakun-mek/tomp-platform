@@ -47,7 +47,7 @@ export async function checkPilotInfrastructureAction(): Promise<ActionResult> {
   const tables = await Promise.all(
     requiredTables.map(async (table) => {
       try {
-        const { error: tableError } = await withTimeout(client.from(table).select("*").limit(1), 2500, `ตรวจตาราง ${table}`);
+        const { error: tableError } = await withTimeout(client.from(table).select("*").limit(1), 6000, `ตรวจตาราง ${table}`);
         return {
           table,
           ok: !tableError,
