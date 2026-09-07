@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
 import { Tooltip } from "@/components/ui/tooltip";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
@@ -61,9 +62,7 @@ function getMarkerClass(status: LocationFreshness) {
 }
 
 function getAgeLabel(location: DriverLocation, now: number) {
-  const ageSeconds = Math.max(0, Math.round((now - new Date(location.recordedAt).getTime()) / 1000));
-  if (ageSeconds < 60) return `${ageSeconds} วินาทีที่แล้ว`;
-  return `${Math.round(ageSeconds / 60)} นาทีที่แล้ว`;
+  return formatRelativeTh(location.recordedAt, now);
 }
 
 function buildGoogleMapsUrl(location: DriverLocation) {

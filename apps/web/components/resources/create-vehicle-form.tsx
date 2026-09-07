@@ -57,30 +57,30 @@ export function CreateVehicleForm() {
         <h2 className="text-lg font-semibold text-ink">สร้างโปรไฟล์รถ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">เพิ่มรถสำหรับใช้งานจริง พร้อมกำหนดข้อปฏิบัติก่อนรับงานของรถคันนั้น</p>
       </div>
-      <label className="grid gap-2 text-sm font-medium text-slate-700">
+      <label className="field-label">
         ทะเบียนรถ
-        <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="plateNumber" placeholder="เช่น 1กข 1234" />
+        <input className="field-input" name="plateNumber" placeholder="เช่น 1กข 1234" />
       </label>
-      <label className="grid gap-2 text-sm font-medium text-slate-700">
+      <label className="field-label">
         ประเภทรถ
-        <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="vehicleType" placeholder="เช่น Van, SUV, Sedan" />
+        <input className="field-input" name="vehicleType" placeholder="เช่น Van, SUV, Sedan" />
       </label>
-      <label className="grid gap-2 text-sm font-medium text-slate-700">
+      <label className="field-label">
         จำนวนที่นั่ง
-        <input className="rounded-2xl border border-slate-300 px-3 py-2.5" min={0} name="capacity" placeholder="เช่น 4" type="number" />
+        <input className="field-input" min={0} name="capacity" placeholder="เช่น 4" type="number" />
       </label>
-      <label className="grid gap-2 text-sm font-medium text-slate-700">
+      <label className="field-label">
         <span className="flex items-center gap-2">
           ข้อกำหนดก่อนรับงาน
           <Tooltip content="กรอกหนึ่งรายการต่อหนึ่งบรรทัด เช่น ถ่ายรูปรถ, ถ่ายรูปป้ายทะเบียน, ยืนยัน GPS">
             <span className="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[11px] text-slate-500">?</span>
           </Tooltip>
         </span>
-        <textarea className="min-h-28 rounded-2xl border border-slate-300 px-3 py-2.5" name="requirements" placeholder={"ถ่ายรูปรถ\nถ่ายรูปป้ายทะเบียน\nยืนยัน GPS ก่อนเริ่มงาน"} />
+        <textarea className="field-input min-h-28" name="requirements" placeholder={"ถ่ายรูปรถ\nถ่ายรูปป้ายทะเบียน\nยืนยัน GPS ก่อนเริ่มงาน"} />
       </label>
-      <label className="grid gap-2 text-sm font-medium text-slate-700">
+      <label className="field-label">
         หมายเหตุปฏิบัติการ
-        <textarea className="min-h-24 rounded-2xl border border-slate-300 px-3 py-2.5" name="operationNote" placeholder="เช่น รถคันนี้ใช้สำหรับแขก VIP หรือกำหนดจุดจอดเฉพาะ" />
+        <textarea className="field-input min-h-24" name="operationNote" placeholder="เช่น รถคันนี้ใช้สำหรับแขก VIP หรือกำหนดจุดจอดเฉพาะ" />
       </label>
       <ActionFeedback message={message} tone={tone} />
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">

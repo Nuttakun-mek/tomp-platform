@@ -10,7 +10,7 @@ export function ProjectWorkspaceHeader({ project }: { project: Project | null })
     <section className="enterprise-panel p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="page-kicker">Project Workspace</p>
+          <p className="section-label">พื้นที่โครงการ</p>
           <h1 className="mt-2 page-title">{project?.projectName || "ไม่พบโครงการ"}</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {project?.projectCode || "ยังไม่ระบุรหัส"} / {project?.startDate || "-"} ถึง {project?.endDate || "-"} / {project?.timezone || "Asia/Bangkok"}

@@ -4,19 +4,46 @@
 
 :root {
   color-scheme: light;
+
+  /* palette */
   --ink: #102033;
-  --ink-soft: #52657a;
-  --canvas: #f4f7fb;
+  --ink-soft: #4a5f77;
+  --ink-faint: #7688a0;
+  --canvas: #f3f7fa;
   --panel: #ffffff;
-  --line: #d9e3ec;
+  --line: #dbe5ee;
   --operation: #087b73;
   --operation-deep: #045f59;
+  --operation-soft: #e2f3f1;
   --command: #0c2234;
   --route: #2563eb;
-  --success: #11825f;
-  --warning: #b86a00;
-  --danger: #bd2f2a;
-  --pilot: #5f4bd6;
+  --success: #14835b;
+  --warning: #b66a00;
+  --danger: #ba2f2a;
+  --pilot: #6b4fd6;
+
+  /* radii */
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+
+  /* type scale — Thai-tuned (base 15px) */
+  --fs-2xs: 0.6875rem; /* 11 */
+  --fs-xs: 0.75rem; /* 12 */
+  --fs-sm: 0.8125rem; /* 13 */
+  --fs-base: 0.9375rem; /* 15 */
+  --fs-md: 1rem; /* 16 */
+  --fs-lg: 1.125rem; /* 18 */
+  --fs-xl: 1.375rem; /* 22 */
+  --fs-2xl: 1.75rem; /* 28 */
+  --fs-3xl: 2.125rem; /* 34 */
+
+  /* elevation */
+  --shadow-sm: 0 6px 18px rgba(16, 32, 51, 0.05);
+  --shadow-md: 0 14px 38px rgba(16, 32, 51, 0.08);
+  --shadow-lg: 0 24px 64px rgba(16, 32, 51, 0.12);
+  --shadow-command: 0 22px 64px rgba(12, 34, 52, 0.28);
 }
 
 * {
@@ -27,22 +54,38 @@ html {
   min-height: 100%;
   font-size: 15px;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
   background:
-    linear-gradient(135deg, rgba(8, 123, 115, 0.06), transparent 34rem),
-    linear-gradient(225deg, rgba(37, 99, 235, 0.05), transparent 30rem),
-    #f4f7fb;
+    radial-gradient(60rem 40rem at 8% -10%, rgba(8, 123, 115, 0.06), transparent 60%),
+    radial-gradient(52rem 36rem at 108% 4%, rgba(37, 99, 235, 0.05), transparent 60%),
+    var(--canvas);
   color: var(--ink);
   font-family: var(--font-thai), "Noto Sans Thai", "Sarabun", ui-sans-serif, system-ui, sans-serif;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1.62;
   letter-spacing: 0;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  /* Thai has no spaces — break a too-long run rather than overflow, but don't
+     break every character (that would shred short labels and badges). */
+  overflow-wrap: break-word;
+}
+
+/* Headings and long descriptive copy may break anywhere so a Thai run never
+   forces a flex/grid track wider than its container. */
+:where(h1, h2, h3, h4, h5, h6),
+.page-description,
+.section-description,
+.meta-text,
+p.leading-6,
+p.leading-7 {
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
 a {
@@ -57,6 +100,14 @@ textarea {
   font: inherit;
 }
 
+/* form controls must never push a flex/grid track wider than its container */
+input,
+select,
+textarea {
+  max-width: 100%;
+  min-width: 0;
+}
+
 button {
   cursor: pointer;
 }
@@ -69,78 +120,178 @@ button:disabled {
   background: rgba(8, 123, 115, 0.18);
 }
 
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* A `grid` with no explicit column template sizes its single implicit column to
+   the content's max-content — which, with unbreakable Thai runs or long tokens,
+   blows past the container. Give such grids a shrinkable single column. Grids
+   that opt into columns (`grid-cols-*`) or column flow keep their own sizing. */
+.grid:not([class*="grid-cols"]):not([class*="grid-flow-col"]):not([class*="auto-cols"]):not(.page-grid):not(.page-rail):not(.page-main) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .focus-ring {
   @apply outline-none ring-offset-2 ring-offset-white focus-visible:ring-2 focus-visible:ring-operation/30;
 }
 
+/* ---- layout ---- */
 .app-page {
-  @apply mx-auto grid w-full max-w-[1500px] gap-5 px-4 py-4 sm:px-5 lg:px-7 lg:py-6;
+  @apply mx-auto grid w-full max-w-[1400px] gap-5 px-4 py-5 sm:px-6 lg:px-7 lg:py-6;
 }
 
+/* Balanced main + rail: the rail sticks, the main column flows to its own
+   height — no forced equal-height columns leaving dead vertical space. */
+.page-grid {
+  @apply grid gap-5 lg:grid-cols-[minmax(0,1fr)_var(--rail,340px)] lg:items-start;
+}
+
+.page-rail {
+  @apply grid gap-5 lg:sticky lg:top-6 lg:self-start;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.page-main {
+  @apply grid gap-5 content-start;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+/* ---- surfaces ---- */
 .enterprise-panel {
-  @apply rounded-[22px] border border-border/85 bg-white shadow-[0_18px_50px_rgba(16,32,51,0.08)];
+  border-radius: var(--r-lg);
+  @apply border border-border/85 bg-white;
+  box-shadow: var(--shadow-md);
 }
 
 .enterprise-panel-soft {
-  @apply rounded-[20px] border border-border/75 bg-white/[0.92] shadow-[0_12px_34px_rgba(16,32,51,0.06)] backdrop-blur;
+  border-radius: var(--r-md);
+  @apply border border-border/70 bg-white/95 backdrop-blur;
+  box-shadow: var(--shadow-sm);
+}
+
+.enterprise-surface {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(243, 247, 250, 0.55)),
+    var(--panel);
+}
+
+.control-card {
+  border-radius: var(--r-md);
+  @apply border border-border/80 bg-white p-4;
+  box-shadow: var(--shadow-sm);
+}
+
+.smart-card {
+  border-radius: var(--r-md);
+  @apply border border-border/80 bg-white p-4 transition duration-200 hover:-translate-y-0.5;
+  box-shadow: var(--shadow-sm);
+}
+
+.smart-card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .command-panel-dark {
+  border-radius: var(--r-xl);
   background:
-    radial-gradient(circle at 18% 0%, rgba(45, 212, 191, 0.15), transparent 22rem),
-    radial-gradient(circle at 100% 20%, rgba(96, 165, 250, 0.12), transparent 20rem),
-    linear-gradient(180deg, #12344c 0%, #0c2234 56%, #081723 100%);
+    radial-gradient(circle at 16% -8%, rgba(45, 212, 191, 0.16), transparent 42%),
+    radial-gradient(circle at 108% 12%, rgba(96, 165, 250, 0.13), transparent 42%),
+    linear-gradient(180deg, #12344c 0%, #0c2234 58%, #081723 100%);
 }
 
 .command-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
-.page-kicker {
-  @apply text-[11px] font-bold uppercase tracking-[0.18em] text-operation;
+/* ---- type ---- */
+.page-kicker,
+.section-label {
+  font-size: var(--fs-2xs);
+  @apply font-bold uppercase tracking-[0.16em] text-operation;
 }
 
 .page-title {
-  @apply text-[26px] font-semibold leading-tight text-ink sm:text-[30px];
+  font-size: var(--fs-2xl);
+  line-height: 1.24;
+  @apply font-semibold text-ink;
+  text-wrap: balance;
+}
+
+.display-title {
+  font-size: var(--fs-3xl);
+  line-height: 1.18;
+  @apply font-semibold tracking-[-0.01em];
+  text-wrap: balance;
 }
 
 .page-description {
-  @apply max-w-4xl text-sm leading-7 text-ink-soft;
+  font-size: var(--fs-base);
+  @apply max-w-3xl leading-7 text-ink-soft;
 }
 
 .section-title {
-  @apply text-lg font-semibold leading-snug text-ink;
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+  @apply font-semibold text-ink;
 }
 
 .section-description {
-  @apply text-sm leading-6 text-ink-soft;
+  font-size: var(--fs-sm);
+  @apply leading-6 text-ink-soft;
+}
+
+.card-title {
+  font-size: var(--fs-lg);
+  @apply font-semibold leading-snug text-ink;
 }
 
 .metric-value {
-  @apply text-2xl font-semibold leading-none text-ink;
+  font-size: var(--fs-2xl);
+  @apply font-semibold leading-none text-ink;
+  font-variant-numeric: tabular-nums;
 }
 
 .metric-value-large {
-  @apply text-[34px] font-semibold leading-none text-ink sm:text-[42px];
+  font-size: var(--fs-3xl);
+  @apply font-semibold leading-none text-ink;
+  font-variant-numeric: tabular-nums;
 }
 
-.control-card {
-  @apply rounded-[18px] border border-border/80 bg-white p-4 shadow-[0_10px_28px_rgba(16,32,51,0.06)];
+.meta-text {
+  font-size: var(--fs-xs);
+  @apply leading-5 text-ink-faint;
 }
 
-.smart-card {
-  @apply rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(16,32,51,0.07)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(16,32,51,0.1)];
+/* ---- forms ---- */
+.field-label {
+  @apply grid min-w-0 gap-1.5 text-[13px] font-semibold text-ink-soft;
 }
 
+.field-input {
+  border-radius: var(--r-sm);
+  @apply w-full border border-border bg-white px-3 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-ink-faint;
+  @apply focus-visible:border-operation focus-visible:ring-2 focus-visible:ring-operation/20;
+}
+
+.field-input:disabled {
+  @apply cursor-not-allowed bg-canvas text-ink-faint;
+}
+
+/* ---- status pulse ---- */
 .status-pulse {
   position: relative;
 }
 
 .status-pulse::after {
-  animation: pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: tomp-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   border-radius: 9999px;
   content: "";
   inset: -6px;
@@ -152,12 +303,25 @@ button:disabled {
   background: #10b981;
 }
 
+@keyframes tomp-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
 @media (max-width: 767px) {
   html {
     font-size: 14.5px;
   }
 
-  .page-title {
-    @apply text-[24px];
+  :root {
+    --fs-2xl: 1.5rem; /* 24 */
+    --fs-3xl: 1.75rem; /* 28 */
   }
 }

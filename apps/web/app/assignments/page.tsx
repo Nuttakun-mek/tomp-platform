@@ -26,33 +26,38 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
   ]);
 
   return (
-    <div className="grid gap-6">
-      <section className="enterprise-panel-soft p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-operation">บอร์ด Assignment</p>
-            <h1 className="mt-1 text-2xl font-semibold text-ink">{activeProject?.projectName || "เลือกโครงการเพื่อจัดสรรงาน"}</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-600">เลือกโครงการให้ถูกต้องก่อนสร้าง Assignment และ QR สำหรับคนขับ</p>
+    <div className="grid gap-5">
+      <section className="enterprise-panel overflow-hidden">
+        <div className="enterprise-surface p-5 lg:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="section-label">บอร์ด Assignment</p>
+              <h1 className="page-title mt-2">{activeProject?.projectName || "เลือกโครงการเพื่อจัดสรรงาน"}</h1>
+              <p className="page-description mt-2.5">เลือกโครงการให้ถูกต้องก่อนสร้าง Assignment และ QR สำหรับคนขับ</p>
+            </div>
+            <Link
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-panel bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-operation-deep"
+              href="/live-test"
+            >
+              ทดสอบระบบจบขั้นตอน
+            </Link>
           </div>
-          <Link className="rounded-2xl bg-operation px-5 py-3 text-sm font-semibold text-white shadow-sm" href="/live-test">
-            ทดสอบระบบจบขั้นตอน
-          </Link>
+          {projects.length > 1 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {projects.map((project) => (
+                <Link
+                  key={project.id}
+                  className={`rounded-card border px-3.5 py-1.5 text-[13px] font-semibold transition ${project.id === projectId ? "border-operation bg-operation-soft text-operation" : "border-border/80 bg-white text-ink-soft hover:border-operation/40"}`}
+                  href={`/assignments?projectId=${project.id}`}
+                >
+                  {project.projectCode}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
-        {projects.length > 1 ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {projects.map((project) => (
-              <Link
-                key={project.id}
-                className={`rounded-2xl border px-4 py-2 text-sm font-semibold ${project.id === projectId ? "border-operation bg-teal-50 text-operation" : "border-slate-200 bg-white text-slate-700"}`}
-                href={`/assignments?projectId=${project.id}`}
-              >
-                {project.projectCode}
-              </Link>
-            ))}
-          </div>
-        ) : null}
       </section>
-      <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">
         <CreateAssignmentForm projectId={projectId} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
         <DispatchBoard projectId={projectId} assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
       </div>

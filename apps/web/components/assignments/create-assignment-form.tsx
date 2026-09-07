@@ -58,7 +58,7 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid gap-5 p-5">
+    <form action={handleSubmit} className="enterprise-panel grid content-start gap-5 p-5">
       <div className="border-b border-slate-100 pb-4">
         <h2 className="text-lg font-semibold text-ink">เปิดงานใหม่</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -67,9 +67,9 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           เลือกภารกิจ
-          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="missionId" required>
+          <select className="field-input" name="missionId" required>
             <option value="">เลือกภารกิจ</option>
             {missions.map((mission) => (
               <option key={mission.id} value={mission.id}>
@@ -78,14 +78,14 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
             ))}
           </select>
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           <span className="flex items-center gap-2">
             Call Sign
             <Tooltip content="Call Sign คือรหัสสื่อสารในงาน เช่น A-01 หรือ VAN-12 ใช้ให้ศูนย์ควบคุมและคนขับอ้างอิงตรงกัน">
               <span className="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[11px] text-slate-500">?</span>
             </Tooltip>
           </span>
-          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="callSignId" required>
+          <select className="field-input" name="callSignId" required>
             <option value="">เลือก Call Sign</option>
             {callSigns.map((callSign) => (
               <option key={callSign.id} value={callSign.id}>
@@ -94,9 +94,9 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
             ))}
           </select>
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           เลือกคนขับ
-          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="driverId" defaultValue="" required>
+          <select className="field-input" name="driverId" defaultValue="" required>
             <option value="" disabled>เลือกคนขับ</option>
             {drivers.map((driver) => (
               <option key={driver.id} value={driver.id}>
@@ -105,9 +105,9 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
             ))}
           </select>
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           เลือกรถ
-          <select className="rounded-2xl border border-slate-300 bg-white px-3 py-2.5" name="vehicleId" defaultValue="" required>
+          <select className="field-input" name="vehicleId" defaultValue="" required>
             <option value="" disabled>เลือกรถ</option>
             {vehicles.map((vehicle) => (
               <option key={vehicle.id} value={vehicle.id}>
@@ -116,25 +116,25 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
             ))}
           </select>
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           จุดรับ
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="pickupLocation" placeholder="เช่น ประตู 3 อาคารผู้โดยสาร" />
+          <input className="field-input" name="pickupLocation" placeholder="เช่น ประตู 3 อาคารผู้โดยสาร" />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           จุดส่ง
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="dropoffLocation" placeholder="เช่น หน้าโรงแรมหรือสถานที่จัดงาน" />
+          <input className="field-input" name="dropoffLocation" placeholder="เช่น หน้าโรงแรมหรือสถานที่จัดงาน" />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           เวลาเริ่ม
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="startTime" type="datetime-local" />
+          <input className="field-input" name="startTime" type="datetime-local" />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           เวลาสิ้นสุด
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="endTime" type="datetime-local" />
+          <input className="field-input" name="endTime" type="datetime-local" />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700 md:col-span-2">
+        <label className="field-label md:col-span-2">
           คำสั่งสำหรับคนขับ
-          <textarea className="min-h-24 rounded-2xl border border-slate-300 px-3 py-2.5" name="driverInstruction" placeholder="เช่น โทรหาผู้ประสานงานก่อนถึงจุดรับ 10 นาที" />
+          <textarea className="field-input min-h-24" name="driverInstruction" placeholder="เช่น โทรหาผู้ประสานงานก่อนถึงจุดรับ 10 นาที" />
         </label>
       </div>
 

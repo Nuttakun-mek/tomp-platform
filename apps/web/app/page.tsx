@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { OperationsHero } from "@/components/dashboard/operations-hero";
 import { OperationsPulse } from "@/components/dashboard/operations-pulse";
 import { PilotProgressPanel } from "@/components/dashboard/pilot-progress-panel";
@@ -34,17 +35,23 @@ export default async function DashboardPage() {
 
       <OperationsHero projectCount={projects.length} assignmentCount={assignments.length} gpsCount={locations.length} followUpCount={followUpCount + riskCount} />
 
-      <OperationsPulse ready={Math.max(0, assignments.length - followUpCount - activeAssignments - completedAssignments)} followUp={followUpCount} risk={riskCount} active={activeAssignments} completed={completedAssignments} />
-
-      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-        <TodayOperationBoard projects={projects} latestLocation={locations[0]} latestEvent={events[0]} />
-        <div className="grid gap-5">
+      <div className="page-grid" style={{ "--rail": "360px" } as CSSProperties}>
+        <div className="page-main">
+          <OperationsPulse
+            ready={Math.max(0, assignments.length - followUpCount - activeAssignments - completedAssignments)}
+            followUp={followUpCount}
+            risk={riskCount}
+            active={activeAssignments}
+            completed={completedAssignments}
+          />
+          <TodayOperationBoard projects={projects} latestLocation={locations[0]} latestEvent={events[0]} />
+          <PilotProgressPanel />
+        </div>
+        <div className="page-rail">
           <ReadinessOverview score={readinessScore} gpsCount={locations.length} assignmentCount={assignments.length} />
           <QuickActionPanel />
         </div>
       </div>
-
-      <PilotProgressPanel />
     </>
   );
 }

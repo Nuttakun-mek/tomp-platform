@@ -7,9 +7,11 @@ const config: Config = {
       colors: {
         ink: "#102033",
         "ink-soft": "#4a5f77",
-        operation: "#007a73",
-        "operation-soft": "#e1f4f1",
-        command: "#0e2538",
+        "ink-faint": "#7688a0",
+        operation: "#087b73",
+        "operation-deep": "#045f59",
+        "operation-soft": "#e2f3f1",
+        command: "#0c2234",
         "command-soft": "#173b58",
         route: "#2563eb",
         "route-soft": "#e8f0ff",
@@ -35,8 +37,9 @@ const config: Config = {
         lift: "0 16px 42px rgba(16, 32, 51, 0.12)"
       },
       borderRadius: {
-        panel: "18px",
-        command: "22px"
+        card: "12px",
+        panel: "20px",
+        command: "26px"
       },
       spacing: {
         "page-x": "clamp(1rem, 2.5vw, 2rem)",

@@ -32,7 +32,7 @@ export function LoginPanel() {
       <div className="enterprise-panel overflow-hidden">
         <div className="grid gap-6 p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
           <div>
-            <p className="text-[11px] font-bold tracking-[0.22em] text-operation">TOMP ACCESS</p>
+            <p className="text-[11px] font-bold tracking-[0.22em] text-operation">เข้าสู่ระบบ TOMP</p>
             <h1 className="mt-2 text-3xl font-semibold leading-tight text-ink">เข้าสู่ระบบปฏิบัติการ</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
               เจ้าหน้าที่ใช้บัญชีเพื่อเข้าถึงโครงการและศูนย์ควบคุม ส่วนคนขับเข้าผ่าน QR ที่ผูกกับ Assignment เท่านั้น

@@ -11,16 +11,16 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       <div className="grid min-h-screen lg:grid-cols-[272px_minmax(0,1fr)]">
         <aside className="command-panel-dark hidden text-white lg:block">
           <div className="sticky top-0 flex h-screen flex-col overflow-y-auto border-r border-white/10 px-4 py-5">
-            <Link href="/" className="group block rounded-[24px] border border-white/10 bg-white/[0.08] p-4 shadow-command transition hover:bg-white/[0.12]">
-              <div className="flex items-start justify-between gap-3">
+            <Link href="/" className="group block rounded-panel border border-white/10 bg-white/[0.08] p-4 shadow-command transition hover:bg-white/[0.12]">
+              <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-bold tracking-[0.34em] text-teal-200">TOMP</p>
-                  <h1 className="mt-3 text-[21px] font-semibold leading-7 text-white">ศูนย์ควบคุมขนส่ง</h1>
+                  <p className="text-[11px] font-bold tracking-[0.32em] text-teal-200">TOMP</p>
+                  <h1 className="mt-2.5 text-[19px] font-semibold leading-6 text-white">ศูนย์ควบคุมขนส่ง</h1>
                   <p className="mt-2 text-[12px] leading-6 text-slate-300">
                     วางแผน มอบงาน ติดตาม GPS และควบคุมการปฏิบัติการจากภาพเดียว
                   </p>
                 </div>
-                <span className="rounded-full bg-amber-300 px-3 py-1 text-[10px] font-bold text-amber-950">PILOT</span>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-300 px-2.5 py-1 text-[10px] font-bold tracking-wide text-amber-950">PILOT</span>
               </div>
 
               <div className="mt-4 rounded-[18px] border border-white/10 bg-slate-950/40 p-3">

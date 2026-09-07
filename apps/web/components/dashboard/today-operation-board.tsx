@@ -1,20 +1,21 @@
 import Link from "next/link";
 import type { DriverLocation, Project, TimelineEvent } from "@tomp/types/domain";
 import { TimelineItem } from "@/components/ui/timeline-item";
+import { formatTimelineEventTh } from "@/lib/i18n/timeline-th";
 
 export function TodayOperationBoard({ projects, latestLocation, latestEvent }: { projects: Project[]; latestLocation?: DriverLocation; latestEvent?: TimelineEvent }) {
   return (
     <section className="enterprise-panel p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold tracking-[0.16em] text-operation">TODAY OPERATIONS</p>
-          <h2 className="mt-1 text-xl font-semibold text-ink">กระดานปฏิบัติการวันนี้</h2>
+          <p className="section-label">กระดานวันนี้</p>
+          <h2 className="section-title mt-1">กระดานปฏิบัติการวันนี้</h2>
         </div>
-        <Link className="rounded-2xl border border-operation/30 bg-teal-50 px-4 py-2 text-sm font-semibold text-operation transition hover:bg-teal-100" href="/projects">
+        <Link className="rounded-panel border border-operation/30 bg-operation-soft px-4 py-2 text-sm font-semibold text-operation transition hover:bg-operation hover:text-white" href="/projects">
           ดูโครงการ
         </Link>
       </div>
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      <div className="mt-5 grid items-start gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
           <p className="text-sm font-semibold text-slate-500">โครงการที่กำลังติดตาม</p>
           <div className="mt-3 grid gap-2">
@@ -40,7 +41,7 @@ export function TodayOperationBoard({ projects, latestLocation, latestEvent }: {
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
           <p className="text-sm font-semibold text-slate-500">ลำดับเหตุการณ์ล่าสุด</p>
-          {latestEvent ? <TimelineItem title={latestEvent.eventType} detail={latestEvent.reason || "บันทึกลำดับเหตุการณ์"} time={new Date(latestEvent.createdAt).toLocaleString("th-TH")} /> : <p className="mt-3 text-sm text-slate-600">ยังไม่มีลำดับเหตุการณ์</p>}
+          {latestEvent ? <TimelineItem title={formatTimelineEventTh(latestEvent.eventType)} detail={latestEvent.reason || "บันทึกลำดับเหตุการณ์"} time={new Date(latestEvent.createdAt).toLocaleString("th-TH")} /> : <p className="mt-3 text-sm text-slate-600">ยังไม่มีลำดับเหตุการณ์</p>}
         </div>
       </div>
     </section>

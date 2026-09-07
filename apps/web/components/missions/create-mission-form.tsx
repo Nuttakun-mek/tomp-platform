@@ -48,40 +48,40 @@ export function CreateMissionForm({ projectId }: { projectId: string }) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           รหัสภารกิจ
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="missionCode" placeholder="MIS-001" required />
+          <input className="field-input" name="missionCode" placeholder="MIS-001" required />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           ชื่อภารกิจ
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="missionName" placeholder="รับผู้โดยสารจากสนามบินรอบเช้า" required />
+          <input className="field-input" name="missionName" placeholder="รับผู้โดยสารจากสนามบินรอบเช้า" required />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           ประเภทภารกิจ
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="missionType" placeholder="รับจากสนามบิน" required />
+          <input className="field-input" name="missionType" placeholder="รับจากสนามบิน" required />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           ความสำคัญ
-          <select className="rounded-2xl border border-slate-300 px-3 py-2.5" name="priority" defaultValue="normal">
+          <select className="field-input" name="priority" defaultValue="normal">
             <option value="low">ต่ำ</option>
             <option value="normal">ปกติ</option>
             <option value="high">สูง</option>
             <option value="critical">วิกฤต</option>
           </select>
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           เวลาเริ่มต้น
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="plannedStartTime" type="datetime-local" />
+          <input className="field-input" name="plannedStartTime" type="datetime-local" />
         </label>
-        <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <label className="field-label">
           เวลาสิ้นสุด
-          <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="plannedEndTime" type="datetime-local" />
+          <input className="field-input" name="plannedEndTime" type="datetime-local" />
         </label>
       </div>
 
-      <label className="grid gap-2 text-sm font-medium text-slate-700">
+      <label className="field-label">
         ข้อผูกพันด้านบริการ
-        <textarea className="min-h-24 rounded-2xl border border-slate-300 px-3 py-2.5" name="serviceCommitment" placeholder="เช่น ต้องถึงจุดรับก่อนเวลา 15 นาที และประสานงานกับผู้จัดงานก่อนปล่อยรถ" />
+        <textarea className="field-input min-h-24" name="serviceCommitment" placeholder="เช่น ต้องถึงจุดรับก่อนเวลา 15 นาที และประสานงานกับผู้จัดงานก่อนปล่อยรถ" />
       </label>
 
       {message ? <p className="rounded-2xl bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}

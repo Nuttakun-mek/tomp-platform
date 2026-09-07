@@ -7,7 +7,7 @@ export function ProjectAssignmentBoard({ projectId, assignments }: { projectId: 
     <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">Assignments</p>
+          <p className="section-label">งานที่จัดสรร</p>
           <h2 className="mt-1 text-lg font-semibold text-ink">งานที่จัดสรร</h2>
           <p className="mt-1 text-sm text-slate-600">พร้อมใช้งาน {ready} จาก {assignments.length} งาน</p>
         </div>

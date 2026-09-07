@@ -1,8 +1,9 @@
 import type { TimelineEvent } from "@tomp/types/domain";
+import { formatTimelineEventTh } from "@/lib/i18n/timeline-th";
 
 export function TimelineFeed({ events }: { events: TimelineEvent[] }) {
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+    <section className="enterprise-panel p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-ink">ลำดับเหตุการณ์</h2>
@@ -12,9 +13,11 @@ export function TimelineFeed({ events }: { events: TimelineEvent[] }) {
       <div className="mt-4 grid gap-3">
         {events.length ? (
           events.map((event) => (
-            <article key={event.id} className="relative rounded-md border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold text-operation">{event.createdAt} / {event.source}</p>
-              <h3 className="mt-1 text-sm font-semibold text-ink">{event.eventType}</h3>
+            <article key={event.id} className="relative rounded-card border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-operation">
+                {new Date(event.createdAt).toLocaleString("th-TH")} · {event.source}
+              </p>
+              <h3 className="mt-1 text-sm font-semibold text-ink">{formatTimelineEventTh(event.eventType)}</h3>
               {event.reason ? <p className="mt-1 text-sm leading-6 text-slate-600">{event.reason}</p> : null}
             </article>
           ))

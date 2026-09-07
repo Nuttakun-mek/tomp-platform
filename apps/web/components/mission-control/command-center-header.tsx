@@ -8,7 +8,7 @@ export function CommandCenterHeader({ project, liveCount, issueCount }: { projec
       <div className="command-grid p-6 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold tracking-[0.2em] text-teal-200">Mission Control / ศูนย์ควบคุมปฏิบัติการ</p>
+            <p className="text-[11px] font-bold tracking-[0.2em] text-teal-200">ศูนย์ควบคุมปฏิบัติการ</p>
             <h1 className="mt-3 max-w-4xl text-[28px] font-semibold leading-tight sm:text-[36px]">{project.projectName}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
               {project.projectCode} · ติดตามงานที่จัดสรร ตำแหน่ง GPS รถ คนขับ Timeline และรายการที่ต้องตัดสินใจในจอเดียว

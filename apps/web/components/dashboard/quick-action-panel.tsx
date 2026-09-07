@@ -10,7 +10,7 @@ const actions = [
 export function QuickActionPanel() {
   return (
     <section className="enterprise-panel p-5">
-      <p className="text-[11px] font-bold tracking-[0.18em] text-operation">QUICK ACTIONS</p>
+      <p className="section-label">ทางลัดปฏิบัติการ</p>
       <h2 className="mt-1 text-lg font-semibold text-ink">ทางลัดปฏิบัติการ</h2>
       <div className="mt-4 grid gap-3">
         {actions.map((action) => (

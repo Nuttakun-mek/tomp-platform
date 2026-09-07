@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { AssignmentMonitor } from "@/components/mission-control/assignment-monitor";
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
 import { DecisionPanel } from "@/components/mission-control/decision-panel";
@@ -51,21 +52,21 @@ export default async function MissionControlPage({ searchParams }: MissionContro
       <ProjectSwitcher projects={projects} activeProjectId={activeProject.id} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
 
-      <div className="grid gap-5 xl:grid-cols-[1.32fr_0.88fr]">
-        <div className="grid gap-5">
+      <div className="page-grid" style={{ "--rail": "380px" } as CSSProperties}>
+        <div className="page-main">
           <LiveMapPanel projectId={activeProject.id} locations={locations} />
           <DriverOperationsPanel locations={locations} summary={driverOperations} />
           <AssignmentMonitor assignments={assignments} locations={locations} />
+          <RiskAndExceptionPanel assignments={assignments} locations={locations} />
+          <OperationTimelinePanel events={events} />
         </div>
-        <aside className="grid content-start gap-5">
+        <aside className="page-rail">
+          <DecisionPanel projectId={activeProject.id} followUps={followUps} />
           <VehicleMonitorPanel profiles={vehicleProfiles} />
           <DriverSignalPanel locations={locations} />
           <DriverNotificationConsole />
           <RouteChangeConsole />
-          <RiskAndExceptionPanel assignments={assignments} locations={locations} />
-          <OperationTimelinePanel events={events} />
           <RealtimeStatusPanel projectId={activeProject.id} />
-          <DecisionPanel projectId={activeProject.id} followUps={followUps} />
         </aside>
       </div>
     </>

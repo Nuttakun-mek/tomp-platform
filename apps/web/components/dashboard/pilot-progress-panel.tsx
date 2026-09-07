@@ -1,18 +1,30 @@
-const stages = ["วางแผน", "เตรียมพร้อม", "ประกาศใช้แผน", "ปฏิบัติการ", "กู้คืนสถานการณ์", "ทบทวนผล"];
+const stages = [
+  { name: "วางแผน", detail: "สร้างโครงการและภารกิจ" },
+  { name: "เตรียมพร้อม", detail: "จัดรถ คนขับ และ QR" },
+  { name: "ประกาศใช้แผน", detail: "ล็อกแผนและแจ้งทีม" },
+  { name: "ปฏิบัติการ", detail: "ติดตาม GPS และ Timeline" },
+  { name: "กู้คืนสถานการณ์", detail: "จัดการเหตุผิดปกติ" },
+  { name: "ทบทวนผล", detail: "สรุปงานและบทเรียน" }
+];
 
 export function PilotProgressPanel() {
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">TOMP Operating Model</p>
-      <h2 className="mt-1 text-lg font-semibold text-ink">วงจรการดำเนินงาน</h2>
-      <div className="mt-5 grid gap-3">
+    <section className="enterprise-panel p-5">
+      <p className="section-label">วงจรการดำเนินงาน</p>
+      <h2 className="section-title mt-1">ลำดับการทำงานของ TOMP</h2>
+      <ol className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {stages.map((stage, index) => (
-          <div key={stage} className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-operation text-sm font-semibold text-white">{index + 1}</span>
-            <p className="font-semibold text-ink">{stage}</p>
-          </div>
+          <li key={stage.name} className="flex items-start gap-3 rounded-card border border-border/70 bg-canvas/50 p-3">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-operation text-[13px] font-semibold text-white">
+              {index + 1}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink">{stage.name}</span>
+              <span className="mt-0.5 block text-xs text-ink-faint">{stage.detail}</span>
+            </span>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }

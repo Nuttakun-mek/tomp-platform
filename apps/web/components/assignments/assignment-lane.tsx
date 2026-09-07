@@ -20,10 +20,10 @@ function timeLabel(value?: string | null) {
 
 export function AssignmentLane({ title, assignments, missions, callSigns, drivers, vehicles }: LaneProps) {
   return (
-    <section className="min-w-[280px] rounded-2xl border border-slate-200 bg-white p-4 shadow-soft">
+    <section className="min-w-0 rounded-panel border border-border/80 bg-canvas/60 p-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-semibold text-ink">{title}</h2>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{assignments.length}</span>
+        <h3 className="card-title truncate">{title}</h3>
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-ink-soft shadow-sm">{assignments.length}</span>
       </div>
       <div className="mt-4 grid gap-3">
         {assignments.length ? (
