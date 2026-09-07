@@ -26,9 +26,9 @@ export function DispatchBoard({ projectId, assignments, missions, callSigns, dri
       <div className="enterprise-panel-soft p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold tracking-[0.16em] text-operation">บอร์ดจัดสรรงาน</p>
-            <h1 className="mt-1 text-2xl font-semibold text-ink">บอร์ดจัดสรรงาน</h1>
-            <p className="mt-1 text-sm text-slate-600">สแกนสถานะ Call Sign คนขับ รถ QR และความเสี่ยงของงานที่จัดสรร</p>
+            <p className="page-kicker">บอร์ดจัดสรรงาน</p>
+            <h1 className="mt-1 text-2xl font-semibold text-ink">ติดตามงานที่มอบให้รถและคนขับ</h1>
+            <p className="mt-1 text-sm leading-6 text-slate-600">แยกตามสถานะ เพื่อให้ dispatcher เห็นทันทีว่างานใดพร้อม งานใดต้องติดตาม และงานใดถูกถอนแล้ว</p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{assignments.length} งาน</span>
         </div>

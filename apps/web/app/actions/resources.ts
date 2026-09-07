@@ -1,10 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createDriverSchema, createVehicleSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
-import { mapDriver, mapVehicle } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
+import { mapDriver, mapVehicle } from "@/lib/data/mappers";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -18,6 +19,7 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
   if (!client) {
     return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
+
   const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
   if (projectId) {
     const permission = await requirePermission(projectId, "driver.create");
@@ -54,7 +56,10 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
         reason: "สร้างข้อมูลคนขับจากหน้าทรัพยากร",
         afterData: data
       })
-    : actionSuccess(null, "ไม่มี projectId จึงยังไม่สร้าง Timeline ของโครงการ");
+    : actionSuccess(null, "ยังไม่มี projectId จึงยังไม่สร้าง Timeline ของโครงการ");
+
+  revalidatePath("/resources");
+  revalidatePath("/resources/drivers");
 
   return actionSuccess(
     { mode, driver, timelineEvent: timelineResult.data },
@@ -72,6 +77,7 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
   if (!client) {
     return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
+
   const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
   if (projectId) {
     const permission = await requirePermission(projectId, "vehicle.create");
@@ -107,7 +113,10 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
         reason: "สร้างข้อมูลรถจากหน้าทรัพยากร",
         afterData: data
       })
-    : actionSuccess(null, "ไม่มี projectId จึงยังไม่สร้าง Timeline ของโครงการ");
+    : actionSuccess(null, "ยังไม่มี projectId จึงยังไม่สร้าง Timeline ของโครงการ");
+
+  revalidatePath("/resources");
+  revalidatePath("/resources/vehicles");
 
   return actionSuccess(
     { mode, vehicle, timelineEvent: timelineResult.data },

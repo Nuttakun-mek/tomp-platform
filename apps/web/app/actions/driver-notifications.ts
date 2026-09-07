@@ -1,6 +1,7 @@
 "use server";
 
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent } from "@/lib/timeline";
 
@@ -99,4 +100,56 @@ export async function markDriverNotificationReadAction(input: { projectId: strin
 
   if (updateError) return actionFailure(`บันทึกการอ่านแจ้งเตือนไม่สำเร็จ: ${updateError.message}`);
   return actionSuccess({ notification: data });
+}
+
+export async function sendDriverNotificationAction(input: {
+  projectId: string;
+  assignmentId: string;
+  driverId?: string | null;
+  title: string;
+  body: string;
+  priority?: "low" | "normal" | "high" | "critical";
+  actionLabel?: string | null;
+  actionUrl?: string | null;
+}): Promise<ActionResult> {
+  if (!input.projectId || !input.assignmentId || !input.title.trim() || !input.body.trim()) {
+    return actionFailure("กรุณากรอกหัวข้อและข้อความให้ครบก่อนส่ง");
+  }
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const { data, error: insertError } = await client
+    .from("driver_notifications")
+    .insert({
+      project_id: input.projectId,
+      assignment_id: input.assignmentId,
+      driver_id: input.driverId || null,
+      notification_type: "control_message",
+      priority: input.priority || "normal",
+      title: input.title.trim(),
+      body: input.body.trim(),
+      action_label: input.actionLabel || "รับทราบ",
+      action_url: input.actionUrl || null,
+      status: "unread",
+      sent_at: new Date().toISOString(),
+      metadata: { source: "mission_control" }
+    })
+    .select()
+    .single();
+
+  if (insertError) return actionFailure(getDatabaseErrorMessage(insertError, "ส่งข้อความถึงคนขับไม่สำเร็จ"));
+
+  const timelineResult = await createTimelineEvent({
+    projectId: input.projectId,
+    objectType: "assignment",
+    objectId: input.assignmentId,
+    eventType: "DRIVER_NOTIFICATION_SENT",
+    source: "operation_user",
+    reason: `ส่งข้อความถึงคนขับ: ${input.title.trim()}`,
+    afterData: data,
+    metadata: { notificationType: "control_message" }
+  });
+
+  return actionSuccess({ notification: data, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : `ส่งข้อความแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`);
 }

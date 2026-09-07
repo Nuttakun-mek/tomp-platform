@@ -1,40 +1,91 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { createVehicleAction } from "@/app/actions/resources";
+import { ActionFeedback } from "@/components/ui/action-feedback";
+import { Tooltip } from "@/components/ui/tooltip";
 import { createVehicleSchema } from "@/lib/validation";
+
+function splitRequirements(value: FormDataEntryValue | null) {
+  return String(value || "")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 export function CreateVehicleForm() {
   const [message, setMessage] = useState<string | null>(null);
+  const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
+  const [isPending, startTransition] = useTransition();
 
-  async function handleSubmit(formData: FormData) {
+  function handleSubmit(formData: FormData) {
+    setMessage(null);
     const parsed = createVehicleSchema.safeParse({
       organizationId: "10000000-0000-4000-8000-000000000001",
       plateNumber: formData.get("plateNumber"),
       vehicleType: formData.get("vehicleType"),
       capacity: formData.get("capacity"),
       metadata: {
-        projectId: "10000000-0000-4000-8000-000000000003"
+        projectId: "10000000-0000-4000-8000-000000000003",
+        requirements: splitRequirements(formData.get("requirements")),
+        operationNote: String(formData.get("operationNote") || "").trim()
       }
     });
 
     if (!parsed.success) {
-      setMessage("กรุณากรอกข้อมูลรถที่จำเป็นให้ครบถ้วน");
+      setTone("warning");
+      setMessage("กรุณากรอกทะเบียนรถ ประเภทรถ และจำนวนที่นั่งให้ครบถ้วน");
       return;
     }
 
-    const result = await createVehicleAction(parsed.data);
-    setMessage(result.success ? result.warning || "บันทึกข้อมูลรถและเตรียม Timeline แล้ว" : result.error || "สร้างข้อมูลรถไม่สำเร็จ");
+    startTransition(async () => {
+      const result = await createVehicleAction(parsed.data);
+      if (!result.success) {
+        setTone("danger");
+        setMessage(result.error || "สร้างโปรไฟล์รถไม่สำเร็จ");
+        return;
+      }
+      setTone("success");
+      setMessage(result.warning || "บันทึกโปรไฟล์รถสำเร็จ ระบบเตรียม Timeline แล้ว");
+      window.setTimeout(() => window.location.reload(), 900);
+    });
   }
 
   return (
-    <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-ink">เพิ่มรถ</h2>
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="plateNumber" placeholder="ทะเบียนรถ" />
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="vehicleType" placeholder="ประเภทรถ" />
-      <input className="rounded-md border border-slate-300 px-3 py-2" name="capacity" placeholder="จำนวนที่นั่ง" type="number" />
-      {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
-      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">บันทึกรถ</button>
+    <form action={handleSubmit} className="enterprise-panel grid gap-4 p-5">
+      <div>
+        <h2 className="text-lg font-semibold text-ink">สร้างโปรไฟล์รถ</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">เพิ่มรถสำหรับใช้งานจริง พร้อมกำหนดข้อปฏิบัติก่อนรับงานของรถคันนั้น</p>
+      </div>
+      <label className="grid gap-2 text-sm font-medium text-slate-700">
+        ทะเบียนรถ
+        <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="plateNumber" placeholder="เช่น 1กข 1234" />
+      </label>
+      <label className="grid gap-2 text-sm font-medium text-slate-700">
+        ประเภทรถ
+        <input className="rounded-2xl border border-slate-300 px-3 py-2.5" name="vehicleType" placeholder="เช่น Van, SUV, Sedan" />
+      </label>
+      <label className="grid gap-2 text-sm font-medium text-slate-700">
+        จำนวนที่นั่ง
+        <input className="rounded-2xl border border-slate-300 px-3 py-2.5" min={0} name="capacity" placeholder="เช่น 4" type="number" />
+      </label>
+      <label className="grid gap-2 text-sm font-medium text-slate-700">
+        <span className="flex items-center gap-2">
+          ข้อกำหนดก่อนรับงาน
+          <Tooltip content="กรอกหนึ่งรายการต่อหนึ่งบรรทัด เช่น ถ่ายรูปรถ, ถ่ายรูปป้ายทะเบียน, ยืนยัน GPS">
+            <span className="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[11px] text-slate-500">?</span>
+          </Tooltip>
+        </span>
+        <textarea className="min-h-28 rounded-2xl border border-slate-300 px-3 py-2.5" name="requirements" placeholder={"ถ่ายรูปรถ\nถ่ายรูปป้ายทะเบียน\nยืนยัน GPS ก่อนเริ่มงาน"} />
+      </label>
+      <label className="grid gap-2 text-sm font-medium text-slate-700">
+        หมายเหตุปฏิบัติการ
+        <textarea className="min-h-24 rounded-2xl border border-slate-300 px-3 py-2.5" name="operationNote" placeholder="เช่น รถคันนี้ใช้สำหรับแขก VIP หรือกำหนดจุดจอดเฉพาะ" />
+      </label>
+      <ActionFeedback message={message} tone={tone} />
+      <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
+        {isPending ? "กำลังบันทึก..." : "บันทึกโปรไฟล์รถ"}
+      </button>
     </form>
   );
 }

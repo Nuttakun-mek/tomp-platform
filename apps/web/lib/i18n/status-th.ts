@@ -14,18 +14,28 @@ const statusTh: Record<string, string> = {
   available: "พร้อมใช้งาน",
   assigned: "ถูกมอบหมายแล้ว",
   unavailable: "ไม่พร้อมใช้งาน",
+  out_of_service: "ไม่พร้อมใช้งาน",
+  inactive: "ไม่ใช้งาน",
+  archived: "เก็บถาวร",
   pending: "รอดำเนินการ",
+  acknowledged: "รับทราบแล้ว",
   arrived_pickup: "ถึงจุดรับแล้ว",
   passenger_onboard: "รับผู้โดยสารแล้ว",
+  en_route_pickup: "กำลังไปจุดรับ",
+  en_route_dropoff: "กำลังไปจุดส่ง",
   confirmed: "ยืนยันแล้ว",
   requested: "รอพิจารณา",
   approved: "อนุมัติแล้ว",
   rejected: "ปฏิเสธ",
-  applied: "นำไปใช้แล้ว"
+  applied: "นำไปใช้แล้ว",
+  live: "สด",
+  slow: "สัญญาณช้า",
+  offline: "ขาดการอัปเดต",
+  stopped: "หยุดแชร์แล้ว"
 };
 
 export function formatStatusTh(status?: string | null): string {
-  if (!status) return "ไม่ระบุ";
+  if (!status) return "ยังไม่ระบุ";
   return statusTh[status] ?? status;
 }
 

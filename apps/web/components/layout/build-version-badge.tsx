@@ -4,7 +4,7 @@ export function BuildVersionBadge({ compact = false }: { compact?: boolean }) {
   const deployedCommit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? buildInfo.commit;
 
   if (compact) {
-    return <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold text-teal-100">v{buildInfo.version}</span>;
+    return <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold text-teal-100">อัปเดต v{buildInfo.version}</span>;
   }
 
   return (
@@ -16,7 +16,7 @@ export function BuildVersionBadge({ compact = false }: { compact?: boolean }) {
       <div className="mt-1 leading-5">
         <p>{buildInfo.updatedAtText}</p>
         <p className="text-slate-500">
-          commit {deployedCommit} · {buildInfo.timezone}
+          commit {deployedCommit} / {buildInfo.timezone}
         </p>
       </div>
     </div>
