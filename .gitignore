@@ -18,3 +18,4 @@ coverage
 scripts/live-test-qr.png
 scripts/live-test-failure.png
 scripts/mission-control-pilot.png
+scripts/shot-*.png
