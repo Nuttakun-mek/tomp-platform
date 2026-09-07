@@ -43,7 +43,7 @@ const config: Config = {
         "page-y": "clamp(1.25rem, 3vw, 2.5rem)"
       },
       fontFamily: {
-        sans: ["Noto Sans Thai", "Sarabun", "Inter", "ui-sans-serif", "system-ui", "sans-serif"]
+        sans: ["var(--font-thai)", "Noto Sans Thai", "Sarabun", "Inter", "ui-sans-serif", "system-ui", "sans-serif"]
       }
     }
   },
