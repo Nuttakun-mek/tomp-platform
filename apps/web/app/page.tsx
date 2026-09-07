@@ -45,13 +45,14 @@ export default async function DashboardPage() {
             completed={completedAssignments}
           />
           <TodayOperationBoard projects={projects} latestLocation={locations[0]} latestEvent={events[0]} />
-          <PilotProgressPanel />
         </div>
         <div className="page-rail">
           <ReadinessOverview score={readinessScore} gpsCount={locations.length} assignmentCount={assignments.length} />
           <QuickActionPanel />
         </div>
       </div>
+
+      <PilotProgressPanel />
     </>
   );
 }
