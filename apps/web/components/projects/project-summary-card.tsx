@@ -4,6 +4,12 @@ import type { Project } from "@tomp/types/domain";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
+function formatDateTh(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function ProjectSummaryCard({ project }: { project: Project }) {
   return (
     <Link
@@ -19,7 +25,7 @@ export function ProjectSummaryCard({ project }: { project: Project }) {
       </div>
       <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink">{project.projectName}</h3>
       <p className="meta-text">
-        {project.startDate} – {project.endDate}
+        {formatDateTh(project.startDate)} – {formatDateTh(project.endDate)}
         <span className="mx-1.5 text-border">·</span>
         {project.timezone}
       </p>

@@ -30,13 +30,13 @@ export default async function ResourcesPage() {
 
 function ResourceLink({ href, title, detail, icon }: { href: string; title: string; detail: string; icon: ReactNode }) {
   return (
-    <Link className="group rounded-3xl border border-slate-200 bg-white p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-operation hover:shadow-panel" href={href}>
+    <Link className="smart-card group p-5" href={href}>
       <div className="flex items-start justify-between gap-4">
-        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-white">{icon}</span>
-        <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-operation" />
+        <span className="grid h-11 w-11 place-items-center rounded-panel bg-command text-white">{icon}</span>
+        <ArrowRight className="h-5 w-5 text-ink-faint transition group-hover:translate-x-1 group-hover:text-operation" />
       </div>
-      <h2 className="mt-4 text-xl font-semibold text-ink">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
+      <h2 className="card-title mt-4">{title}</h2>
+      <p className="section-description mt-1.5">{detail}</p>
     </Link>
   );
 }
