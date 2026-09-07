@@ -29,6 +29,13 @@ for (const route of routes) {
       const json = await response.json();
       if (json.status !== "ok") failures.push(`/api/health status is ${json.status}`);
     }
+    if (route === "/api/admin/pilot-infrastructure") {
+      const json = await response.json();
+      if (json.ready !== true) {
+        const broken = Array.isArray(json.tables) ? json.tables.filter((table) => !table.ok).map((table) => table.table) : [];
+        failures.push(`/api/admin/pilot-infrastructure not ready${broken.length ? ` (tables: ${broken.join(", ")})` : ""}`);
+      }
+    }
   } catch (error) {
     console.log(`FAIL ${url} ${error instanceof Error ? error.message : String(error)}`);
     failures.push(url);

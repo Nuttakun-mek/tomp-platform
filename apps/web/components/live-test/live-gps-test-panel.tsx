@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
 import { checkPilotInfrastructureAction, createProductionPilotSmokeScenarioAction } from "@/app/actions/pilot-smoke-test";
+import { withTimeout } from "@/lib/async/timeout";
 
 interface LiveGpsResult {
   projectId: string;
@@ -25,19 +26,6 @@ interface CheckResult {
   ready: boolean;
   mode: string;
   tables: TableCheck[];
-}
-
-async function withClientTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} ใช้เวลานานเกินกำหนด`)), timeoutMs);
-  });
-
-  try {
-    return await Promise.race([operation, timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }
 
 export function LiveGpsTestPanel() {
@@ -74,7 +62,7 @@ export function LiveGpsTestPanel() {
     startTransition(async () => {
       try {
         setMessage("กำลังตรวจ Supabase และตารางสำคัญ...");
-        const check = await withClientTimeout(checkPilotInfrastructureAction(), 12000, "ตรวจระบบ");
+        const check = await withTimeout(checkPilotInfrastructureAction(), 12000, "ตรวจระบบ", "ตรวจระบบใช้เวลานานเกินกำหนด");
         if (!check.success) {
           setMessage(check.error || "ตรวจระบบไม่สำเร็จ กรุณาตรวจ Supabase และ environment");
           setCurrentStep(1);
@@ -91,7 +79,7 @@ export function LiveGpsTestPanel() {
 
         setCurrentStep(2);
         setMessage("ระบบพร้อม กำลังสร้างโครงการ ภารกิจ Assignment และ QR จริง...");
-        const response = await withClientTimeout(createProductionPilotSmokeScenarioAction(), 20000, "สร้างชุดทดสอบ");
+        const response = await withTimeout(createProductionPilotSmokeScenarioAction(), 20000, "สร้างชุดทดสอบ", "สร้างชุดทดสอบใช้เวลานานเกินกำหนด");
         if (!response.success) {
           setMessage(response.error || "สร้างชุดทดสอบไม่สำเร็จ");
           setCurrentStep(2);

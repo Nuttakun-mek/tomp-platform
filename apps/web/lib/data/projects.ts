@@ -44,12 +44,15 @@ async function getProjectsViaPostgres(): Promise<Project[]> {
 
 async function getProjectByIdViaPostgres(projectId: string): Promise<Project | null> {
   const sql = getPostgresClient();
-  if (!sql) return demoKernel.projects.find((project) => project.id === projectId) ?? demoKernel.projects[0] ?? null;
+  // Only ever return a demo project when its id actually matches the request.
+  // Falling back to demoKernel.projects[0] would render a different project's
+  // data under the requested project's URL.
+  if (!sql) return demoKernel.projects.find((project) => project.id === projectId) ?? null;
   try {
     const data = await sql<Array<Record<string, unknown>>>`select * from projects where id = ${projectId} limit 1`;
     if (data[0]) return mapProject(data[0]);
-    return demoKernel.projects.find((project) => project.id === projectId) ?? demoKernel.projects[0] ?? null;
+    return demoKernel.projects.find((project) => project.id === projectId) ?? null;
   } catch {
-    return demoKernel.projects.find((project) => project.id === projectId) ?? demoKernel.projects[0] ?? null;
+    return demoKernel.projects.find((project) => project.id === projectId) ?? null;
   }
 }

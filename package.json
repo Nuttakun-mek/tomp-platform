@@ -18,9 +18,15 @@
     "test": "npm run test -w @tomp/web && npm run test -w @tomp/driver-core",
     "test:watch": "npm run test:watch -w @tomp/web",
     "security:env": "node scripts/check-public-env.mjs",
-    "smoke:production": "node scripts/production-smoke.mjs"
+    "smoke:production": "node scripts/production-smoke.mjs",
+    "db:migrate": "node scripts/apply-migrations.mjs",
+    "db:migrate:dry": "node scripts/apply-migrations.mjs --dry-run",
+    "db:seed": "node scripts/apply-migrations.mjs --seed"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "postgres": "^3.4.7"
   }
 }

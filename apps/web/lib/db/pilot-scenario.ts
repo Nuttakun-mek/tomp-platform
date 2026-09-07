@@ -1,27 +1,15 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
+import { withTimeout } from "@/lib/async/timeout";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
+import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
 import { getRequestBaseUrl } from "@/lib/request-origin";
-import { withTimeout } from "@/lib/async/timeout";
+import { PILOT_REQUIRED_TABLES } from "./pilot-tables";
 import { getPostgresClient } from "./postgres";
 
-const requiredTables = [
-  "organizations",
-  "projects",
-  "missions",
-  "assignments",
-  "driver_access_tokens",
-  "driver_assignment_packets",
-  "driver_notifications",
-  "route_change_instructions",
-  "driver_location_sessions",
-  "driver_acknowledgements",
-  "gps_locations",
-  "timeline_events"
-];
+const requiredTables = PILOT_REQUIRED_TABLES;
 
 function baseRecord(id: string) {
   const now = new Date().toISOString();

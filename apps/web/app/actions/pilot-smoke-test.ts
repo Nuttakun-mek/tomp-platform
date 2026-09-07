@@ -5,6 +5,7 @@ import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/a
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { withTimeout } from "@/lib/async/timeout";
 import { checkPilotInfrastructureViaPostgres, createPilotScenarioViaPostgres } from "@/lib/db/pilot-scenario";
+import { PILOT_REQUIRED_TABLES } from "@/lib/db/pilot-tables";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
@@ -13,26 +14,7 @@ import { getSupabaseConnectionMessage } from "@/lib/supabase/errors";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { TIMELINE_EVENTS } from "@/lib/timeline";
 
-const requiredTables = [
-  "organizations",
-  "profiles",
-  "projects",
-  "project_days",
-  "sessions",
-  "missions",
-  "call_signs",
-  "drivers",
-  "vehicles",
-  "assignments",
-  "driver_access_tokens",
-  "driver_assignment_packets",
-  "driver_notifications",
-  "route_change_instructions",
-  "driver_location_sessions",
-  "driver_acknowledgements",
-  "gps_locations",
-  "timeline_events"
-];
+const requiredTables = PILOT_REQUIRED_TABLES;
 
 type InsertStep = {
   label: string;

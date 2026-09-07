@@ -100,7 +100,11 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
         const response = await fetch(`/api/mission-control/locations?projectId=${projectId}`, { cache: "no-store" });
         const result = (await response.json()) as { success?: boolean; data?: DriverLocation[]; checkedAt?: string; error?: string };
         if (mounted) {
-          setLocations(result.data ?? []);
+          // On a failed poll, keep the last-known markers instead of clearing the
+          // map; only replace them when the request actually succeeded.
+          if (result.success !== false && Array.isArray(result.data)) {
+            setLocations(result.data);
+          }
           setLastCheckedAt(result.checkedAt ?? new Date().toISOString());
           setLastError(result.success === false ? result.error || "โหลดตำแหน่งไม่สำเร็จ" : null);
           setNow(Date.now());
