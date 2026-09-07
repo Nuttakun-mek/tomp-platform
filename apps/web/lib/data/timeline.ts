@@ -1,4 +1,5 @@
 import type { TimelineEvent } from "@tomp/types/domain";
+import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
@@ -8,9 +9,13 @@ export async function getTimelineEventsByProjectId(projectId: string): Promise<T
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return getTimelineEventsByProjectIdViaPostgres(projectId);
 
-  const { data, error } = await supabase.from("timeline_events").select("*").eq("project_id", projectId).order("created_at", { ascending: false });
-  if (error || !data) return getTimelineEventsByProjectIdViaPostgres(projectId);
-  return data.map(mapTimelineEvent);
+  try {
+    const { data, error } = await withTimeout(supabase.from("timeline_events").select("*").eq("project_id", projectId).order("created_at", { ascending: false }), 2200, "timeline events");
+    if (error || !data) return getTimelineEventsByProjectIdViaPostgres(projectId);
+    return data.map(mapTimelineEvent);
+  } catch {
+    return getTimelineEventsByProjectIdViaPostgres(projectId);
+  }
 }
 
 async function getTimelineEventsByProjectIdViaPostgres(projectId: string): Promise<TimelineEvent[]> {

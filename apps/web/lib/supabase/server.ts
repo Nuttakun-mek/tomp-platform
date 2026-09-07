@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readCleanEnv } from "@/lib/env";
+import { createTimeoutFetch } from "./fetch-timeout";
 
 export function getSupabaseServerClient(): SupabaseClient | null {
   if (process.env.NEXT_PHASE === "phase-production-build") {
@@ -14,6 +15,9 @@ export function getSupabaseServerClient(): SupabaseClient | null {
   }
 
   return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      fetch: createTimeoutFetch(2000)
+    },
     auth: {
       persistSession: false,
       autoRefreshToken: false
@@ -34,6 +38,9 @@ export function getSupabaseServerDataClient(): SupabaseClient | null {
   }
 
   return createClient(supabaseUrl, supabaseServerKey, {
+    global: {
+      fetch: createTimeoutFetch(2000)
+    },
     auth: {
       persistSession: false,
       autoRefreshToken: false

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { readCleanEnv } from "@/lib/env";
+import { createTimeoutFetch } from "./fetch-timeout";
 
 export interface SupabaseWriteClientResult {
   client: SupabaseClient | null;
@@ -42,6 +43,9 @@ export function getSupabaseWriteClient(): SupabaseWriteClientResult {
 
   return {
     client: createClient(supabaseUrl, key, {
+      global: {
+        fetch: createTimeoutFetch(4000)
+      },
       auth: {
         persistSession: false,
         autoRefreshToken: false

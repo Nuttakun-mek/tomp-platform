@@ -24,8 +24,7 @@ interface MissionControlPageProps {
 
 export default async function MissionControlPage({ searchParams }: MissionControlPageProps) {
   const params = searchParams ? await searchParams : {};
-  const projects = await getProjects();
-  const latestLocationProjectId = params.projectId ? null : await getProjectIdWithLatestDriverLocation();
+  const [projects, latestLocationProjectId] = await Promise.all([getProjects(), params.projectId ? Promise.resolve(null) : getProjectIdWithLatestDriverLocation()]);
   const activeProject =
     projects.find((project) => project.id === params.projectId) ??
     projects.find((project) => project.id === latestLocationProjectId) ??

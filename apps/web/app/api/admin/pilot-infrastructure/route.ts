@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withTimeout } from "@/lib/async/timeout";
 import { checkPilotInfrastructureViaPostgres } from "@/lib/db/pilot-scenario";
 import { getSupabaseConnectionMessage } from "@/lib/supabase/errors";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -21,43 +22,46 @@ const requiredTables = [
 export async function GET() {
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) {
-    const postgresResult = await checkPilotInfrastructureViaPostgres();
-    if (postgresResult) return NextResponse.json({ success: postgresResult.ready, ...postgresResult }, { status: postgresResult.ready ? 200 : 503 });
-    return NextResponse.json({ success: false, ready: false, mode, error: error || "ยังไม่ได้ตั้งค่า Supabase" }, { status: 503 });
+    const postgresResult = await withTimeout(checkPilotInfrastructureViaPostgres(), 7000, "Postgres infrastructure fallback").catch((fallbackError) => ({
+      mode: "postgres_direct",
+      checkedAt: new Date().toISOString(),
+      tables: requiredTables.map((table) => ({ table, ok: false, message: getSupabaseConnectionMessage(fallbackError) })),
+      ready: false
+    }));
+    if (postgresResult) return NextResponse.json({ success: true, ...postgresResult });
+    return NextResponse.json({ success: true, ready: false, mode, error: error || "ยังไม่ได้ตั้งค่า Supabase", tables: [] });
   }
 
-  const tables = [];
-  for (const table of requiredTables) {
+  const tables = await Promise.all(requiredTables.map(async (table) => {
     try {
-      const { error: tableError } = await client.from(table).select("*").limit(1);
-      tables.push({
+      const { error: tableError } = await withTimeout(
+        Promise.resolve(client.from(table).select("*").limit(1)) as Promise<{ error: unknown }>,
+        3500,
+        `Supabase table ${table}`
+      );
+      return {
         table,
         ok: !tableError,
         message: tableError ? getSupabaseConnectionMessage(tableError) : "พร้อมใช้งาน"
-      });
+      };
     } catch (tableError) {
-      tables.push({
+      return {
         table,
         ok: false,
         message: getSupabaseConnectionMessage(tableError)
-      });
+      };
     }
-  }
+  }));
 
   const ready = tables.every((table) => table.ok);
-  if (!ready && tables.every((table) => table.message.includes("เชื่อมต่อ Supabase ไม่ได้"))) {
-    const postgresResult = await checkPilotInfrastructureViaPostgres();
-    if (postgresResult) return NextResponse.json({ success: postgresResult.ready, ...postgresResult }, { status: postgresResult.ready ? 200 : 503 });
-  }
 
   return NextResponse.json(
     {
-      success: ready,
+      success: true,
       ready,
       mode,
       checkedAt: new Date().toISOString(),
       tables
-    },
-    { status: ready ? 200 : 503 }
+    }
   );
 }

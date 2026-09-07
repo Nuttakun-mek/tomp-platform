@@ -5,6 +5,7 @@ import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
 import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { getRequestBaseUrl } from "@/lib/request-origin";
+import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "./postgres";
 
 const requiredTables = [
@@ -49,10 +50,22 @@ export async function checkPilotInfrastructureViaPostgres() {
   const sql = getPostgresClient();
   if (!sql) return null;
 
+  try {
+    await withTimeout(sql`select 1`, 6000, "Supabase Postgres readiness check");
+  } catch (error) {
+    const message = getPostgresPilotErrorMessage(error);
+    return {
+      mode: "postgres_direct",
+      checkedAt: new Date().toISOString(),
+      tables: requiredTables.map((table) => ({ table, ok: false, message })),
+      ready: false
+    };
+  }
+
   const tables = [];
   for (const table of requiredTables) {
     try {
-      await sql`select 1 from ${sql(table)} limit 1`;
+      await withTimeout(sql`select 1 from ${sql(table)} limit 1`, 2500, `table ${table}`);
       tables.push({ table, ok: true, message: "พร้อมใช้งานผ่าน Postgres" });
     } catch (error) {
       tables.push({ table, ok: false, message: getPostgresPilotErrorMessage(error) });

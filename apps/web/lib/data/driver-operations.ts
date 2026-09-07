@@ -1,4 +1,5 @@
 import type { DriverAssignmentPacket, DriverNotification, RouteChangeInstruction } from "@tomp/types/domain";
+import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
@@ -60,13 +61,19 @@ export async function getDriverAssignmentPacketByAssignmentId(assignmentId: stri
   const client = getSupabaseServerDataClient();
   if (!client) return getDriverAssignmentPacketByAssignmentIdViaPostgres(assignmentId);
 
-  const { data, error } = await client
-    .from("driver_assignment_packets")
-    .select("payload")
-    .eq("assignment_id", assignmentId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let data: { payload?: unknown } | null | undefined;
+  let error: unknown;
+  try {
+    const result = await withTimeout(
+      client.from("driver_assignment_packets").select("payload").eq("assignment_id", assignmentId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      1800,
+      "driver assignment packet"
+    );
+    data = result.data as { payload?: unknown } | null;
+    error = result.error;
+  } catch {
+    return getDriverAssignmentPacketByAssignmentIdViaPostgres(assignmentId);
+  }
 
   if (error) return getDriverAssignmentPacketByAssignmentIdViaPostgres(assignmentId);
   const payload = data?.payload;
@@ -77,7 +84,15 @@ export async function getDriverNotificationsByAssignmentId(assignmentId: string)
   const client = getSupabaseServerDataClient();
   if (!client) return getDriverNotificationsByAssignmentIdViaPostgres(assignmentId);
 
-  const { data, error } = await client.from("driver_notifications").select("*").eq("assignment_id", assignmentId).order("sent_at", { ascending: false }).limit(10);
+  let data: Row[] | null | undefined;
+  let error: unknown;
+  try {
+    const result = await withTimeout(client.from("driver_notifications").select("*").eq("assignment_id", assignmentId).order("sent_at", { ascending: false }).limit(10), 1800, "driver notifications");
+    data = result.data as Row[] | null;
+    error = result.error;
+  } catch {
+    return getDriverNotificationsByAssignmentIdViaPostgres(assignmentId);
+  }
   if (error || !data?.length) return getDriverNotificationsByAssignmentIdViaPostgres(assignmentId);
   return data.map(mapNotification);
 }
@@ -86,7 +101,15 @@ export async function getRouteChangesByAssignmentId(assignmentId: string): Promi
   const client = getSupabaseServerDataClient();
   if (!client) return getRouteChangesByAssignmentIdViaPostgres(assignmentId);
 
-  const { data, error } = await client.from("route_change_instructions").select("*").eq("assignment_id", assignmentId).order("created_at", { ascending: false }).limit(5);
+  let data: Row[] | null | undefined;
+  let error: unknown;
+  try {
+    const result = await withTimeout(client.from("route_change_instructions").select("*").eq("assignment_id", assignmentId).order("created_at", { ascending: false }).limit(5), 1800, "route changes");
+    data = result.data as Row[] | null;
+    error = result.error;
+  } catch {
+    return getRouteChangesByAssignmentIdViaPostgres(assignmentId);
+  }
   if (error || !data?.length) return getRouteChangesByAssignmentIdViaPostgres(assignmentId);
   return data.map(mapRouteChange);
 }
@@ -95,13 +118,26 @@ export async function getDriverOperationSummaryByProjectId(projectId: string): P
   const client = getSupabaseServerDataClient();
   if (!client) return getDriverOperationSummaryByProjectIdViaPostgres(projectId);
 
-  const [packets, acknowledged, notifications, routeChanges, sessions] = await Promise.all([
-    client.from("driver_assignment_packets").select("id", { count: "exact", head: true }).eq("project_id", projectId),
-    client.from("driver_assignment_packets").select("id", { count: "exact", head: true }).eq("project_id", projectId).not("acknowledged_at", "is", null),
-    client.from("driver_notifications").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status", ["unread", "sent"]),
-    client.from("route_change_instructions").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("status", "pending"),
-    client.from("driver_location_sessions").select("id,last_ping_at,status").eq("project_id", projectId).order("last_ping_at", { ascending: false }).limit(20)
-  ]);
+  let packets;
+  let acknowledged;
+  let notifications;
+  let routeChanges;
+  let sessions;
+  try {
+    [packets, acknowledged, notifications, routeChanges, sessions] = await withTimeout(
+      Promise.all([
+        client.from("driver_assignment_packets").select("id", { count: "exact", head: true }).eq("project_id", projectId),
+        client.from("driver_assignment_packets").select("id", { count: "exact", head: true }).eq("project_id", projectId).not("acknowledged_at", "is", null),
+        client.from("driver_notifications").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status", ["unread", "sent"]),
+        client.from("route_change_instructions").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("status", "pending"),
+        client.from("driver_location_sessions").select("id,last_ping_at,status").eq("project_id", projectId).order("last_ping_at", { ascending: false }).limit(20)
+      ]),
+      2200,
+      "driver operation summary"
+    );
+  } catch {
+    return getDriverOperationSummaryByProjectIdViaPostgres(projectId);
+  }
 
   if (packets.error || acknowledged.error || notifications.error || routeChanges.error || sessions.error) {
     return getDriverOperationSummaryByProjectIdViaPostgres(projectId);

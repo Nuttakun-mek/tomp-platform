@@ -8,6 +8,8 @@ TOMP ไม่ใช่ fleet maintenance, ERP, CRM, payroll, accounting หร�
 
 Repository นี้อยู่ในระดับ **Thai-first Internal Pilot UI/UX reset** รอบล่าสุดยกระดับหน้าจอหลักให้ดูเป็น Transportation Operations Command Platform มากขึ้น โดยไม่เพิ่ม business scope ใหม่
 
+อัปเดตรอบล่าสุดเพิ่ม **System Stabilization**: ยุบเมนูทดสอบให้เหลือจุดเดียว, ทำให้ API ตรวจ Supabase ตอบเร็วขึ้น, เพิ่ม timeout ให้การเชื่อมต่อ backend, และทำให้แผนที่ Mission Control แสดงพื้นที่แผนที่พร้อม legend สถานะ GPS แม้ยังไม่มีตำแหน่งจริง
+
 สิ่งที่ใช้งานและทดสอบได้:
 
 - Dashboard แบบภาพรวมการปฏิบัติการ
@@ -59,6 +61,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:7000
 
 Seed สำหรับ Pilot ภาษาไทย: `database/seed/0002_thai_pilot_scenario.sql`
 
+หมายเหตุ: ระบบใช้ Supabase REST/server client เป็นเส้นทางหลัก ส่วน Postgres direct fallback ถูกปิดเป็นค่าเริ่มต้นเพื่อไม่ให้หน้าระบบค้างเมื่อ connection string ผิด หากต้องการทดสอบ direct DB ให้ตั้ง `TOMP_ENABLE_POSTGRES_FALLBACK=1` เฉพาะเครื่องทดสอบที่ connection string ถูกต้องเท่านั้น
+
 ## GPS และข้อจำกัดของ Web App
 
 Web app สามารถส่ง GPS ได้ขณะหน้าเว็บยังทำงานอยู่ และพยายามใช้ Screen Wake Lock หาก browser รองรับ แต่ web app ล้วนไม่สามารถรับประกัน background GPS หลังสลับแอปหรือล็อกจอได้ ถ้าต้องการ production-grade background tracking ต้องทำ driver companion app แบบ native หรือ hybrid ใน sprint ถัดไป
@@ -80,6 +84,7 @@ Web app สามารถส่ง GPS ได้ขณะหน้าเว็�
 - Product experience reset: `docs/05-ux/504-product-experience-reset.md`
 - Thai copy guideline: `docs/05-ux/505-thai-copy-guideline.md`
 - Very big change audit: `docs/11-codex/908-very-big-change-ui-ux-audit.md`
+- System stabilization plan: `docs/11-codex/919-system-stabilization-plan.md`
 - Thai pilot scenario: `docs/09-testing/906-thai-internal-pilot-scenario.md`
 
 ## ขั้นตอนถัดไป

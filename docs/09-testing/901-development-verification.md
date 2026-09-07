@@ -2,15 +2,16 @@
 
 ## Latest Command Results
 
-Run date: 2026-06-30.
+Run date: 2026-09-07.
 
 | Command | Result |
 | --- | --- |
-| `npm.cmd install` | Passed; npm audit reports 7 existing dependency findings requiring separate review |
+| `npm.cmd install` | Passed |
 | `npm.cmd run typecheck` | Passed |
 | `npm.cmd run lint` | Passed |
-| `npm.cmd run test` | Passed: 6 test files, 13 tests |
-| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed; 20 app routes generated |
+| `npm.cmd run test` | Passed: 12 test files, 30 tests |
+| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed; 31 app routes generated |
+| `npm.cmd run security:env` | Passed; no `NEXT_PUBLIC_*` service/secret key found in source |
 
 ## Current Verification Scope
 
@@ -30,15 +31,17 @@ This verification covers the Thai-first UI/UX reset UX-31 to UX-42:
 
 - TypeScript compiled for `apps/web`.
 - ESLint completed with no errors.
-- Vitest completed with 6 passing files and 13 passing tests.
+- Vitest completed with 12 passing files and 30 passing tests.
 - Next.js production build completed.
 - The UI reset did not add new backend business scope.
+- Local production-like smoke checks passed for `/`, `/projects`, `/assignments`, `/driver`, `/live-test`, `/mission-control`, `/api/health`, `/api/admin/pilot-infrastructure`, and `/api/mission-control/locations`.
 
 ## Notes
 
 - `npm.ps1` may be blocked by Windows execution policy, so verification used `npm.cmd`.
-- `npm audit` still reports 7 existing findings. They were not force-fixed because that can introduce broad dependency changes outside this UI/UX sprint.
+- `npm audit --omit=dev --audit-level=moderate` still reports existing dependency findings. They were not force-fixed because that can introduce broad dependency changes outside this stabilization sprint.
 - Web GPS remains foreground-first. Background GPS after screen lock requires native or hybrid app capability.
+- Supabase connectivity is still the main live-test blocker in the current environment. The UI now returns a clear `ไม่พร้อม` state instead of hanging.
 
 ## Manual Smoke Test Checklist
 

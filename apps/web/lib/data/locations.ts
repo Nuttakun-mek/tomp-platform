@@ -1,5 +1,7 @@
 import type { DriverLocation } from "@tomp/types/domain";
+import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
+import { demoKernel } from "@/lib/demo/demo-kernel";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 type LocationRow = Record<string, unknown>;
@@ -48,17 +50,18 @@ export function mapDriverLocation(row: LocationRow): DriverLocation {
 async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getSupabaseServerDataClient>>, locations: DriverLocation[]) {
   if (!locations.length) return locations;
 
+  try {
   const projectIds = Array.from(new Set(locations.map((location) => location.projectId).filter(Boolean)));
   const assignmentIds = Array.from(new Set(locations.map((location) => location.assignmentId).filter(Boolean))) as string[];
   const driverIds = Array.from(new Set(locations.map((location) => location.driverId).filter(Boolean))) as string[];
   const vehicleIds = Array.from(new Set(locations.map((location) => location.vehicleId).filter(Boolean))) as string[];
 
-  const [{ data: projects }, { data: assignments }, { data: drivers }, { data: vehicles }] = await Promise.all([
+  const [{ data: projects }, { data: assignments }, { data: drivers }, { data: vehicles }] = await withTimeout(Promise.all([
     projectIds.length ? client.from("projects").select("id, project_code, project_name").in("id", projectIds) : Promise.resolve({ data: [] }),
     assignmentIds.length ? client.from("assignments").select("id, mission_id, call_sign_id, status").in("id", assignmentIds) : Promise.resolve({ data: [] }),
     driverIds.length ? client.from("drivers").select("id, full_name, phone").in("id", driverIds) : Promise.resolve({ data: [] }),
     vehicleIds.length ? client.from("vehicles").select("id, plate_number, vehicle_type").in("id", vehicleIds) : Promise.resolve({ data: [] })
-  ]);
+  ]), 1600, "location metadata");
 
   const callSignIds = Array.from(
     new Set((assignments || []).map((assignment) => (assignment as LocationRow).call_sign_id).filter((id): id is string => typeof id === "string"))
@@ -67,10 +70,10 @@ async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getS
     new Set((assignments || []).map((assignment) => (assignment as LocationRow).mission_id).filter((id): id is string => typeof id === "string"))
   );
 
-  const [{ data: callSigns }, { data: missions }] = await Promise.all([
+  const [{ data: callSigns }, { data: missions }] = await withTimeout(Promise.all([
     callSignIds.length ? client.from("call_signs").select("id, call_sign").in("id", callSignIds) : Promise.resolve({ data: [] }),
     missionIds.length ? client.from("missions").select("id, mission_code, mission_name").in("id", missionIds) : Promise.resolve({ data: [] })
-  ]);
+  ]), 1600, "location assignment metadata");
 
   const projectById = new Map((projects || []).map((project) => [String((project as LocationRow).id), project as LocationRow]));
   const assignmentById = new Map((assignments || []).map((assignment) => [String((assignment as LocationRow).id), assignment as LocationRow]));
@@ -104,6 +107,23 @@ async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getS
       }
     };
   });
+  } catch {
+    return locations;
+  }
+}
+
+function getDemoDriverLocations(projectId: string | null, limit = 50) {
+  const now = new Date().toISOString();
+  const locations = demoKernel.locations.filter((location) => !projectId || location.projectId === projectId);
+  return locations.slice(0, limit).map((location) => ({
+    ...location,
+    recordedAt: now,
+    createdAt: now,
+    metadata: {
+      ...location.metadata,
+      label: "ข้อมูลตัวอย่าง"
+    }
+  }));
 }
 
 async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
@@ -170,14 +190,14 @@ async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
 
 async function getLatestDriverLocationsViaPostgres(projectId: string | null, limit: number): Promise<DriverLocation[]> {
   const sql = getPostgresClient();
-  if (!sql) return [];
+  if (!sql) return getDemoDriverLocations(projectId, limit);
   let data: LocationRow[];
   try {
     data = projectId
       ? await sql<LocationRow[]>`select * from gps_locations where project_id = ${projectId} order by recorded_at desc limit ${limit}`
       : await sql<LocationRow[]>`select * from gps_locations order by recorded_at desc limit ${limit}`;
   } catch {
-    return [];
+    return getDemoDriverLocations(projectId, limit);
   }
 
   const latestByAssignment = new Map<string, DriverLocation>();
@@ -198,12 +218,19 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
     return getLatestDriverLocationsViaPostgres(projectId, 50);
   }
 
-  const { data, error } = await client
-    .from("gps_locations")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("recorded_at", { ascending: false })
-    .limit(50);
+  let data: LocationRow[] | null | undefined;
+  let error: unknown;
+  try {
+    const result = await withTimeout(
+      client.from("gps_locations").select("*").eq("project_id", projectId).order("recorded_at", { ascending: false }).limit(50),
+      2200,
+      "project driver locations"
+    );
+    data = result.data as LocationRow[] | null;
+    error = result.error;
+  } catch {
+    return getLatestDriverLocationsViaPostgres(projectId, 50);
+  }
 
   if (error || !data?.length) {
     return getLatestDriverLocationsViaPostgres(projectId, 50);
@@ -227,7 +254,15 @@ export async function getLatestDriverLocations(limit = 50): Promise<DriverLocati
     return getLatestDriverLocationsViaPostgres(null, limit);
   }
 
-  const { data, error } = await client.from("gps_locations").select("*").order("recorded_at", { ascending: false }).limit(limit);
+  let data: LocationRow[] | null | undefined;
+  let error: unknown;
+  try {
+    const result = await withTimeout(client.from("gps_locations").select("*").order("recorded_at", { ascending: false }).limit(limit), 2200, "driver locations");
+    data = result.data as LocationRow[] | null;
+    error = result.error;
+  } catch {
+    return getLatestDriverLocationsViaPostgres(null, limit);
+  }
 
   if (error || !data?.length) {
     return getLatestDriverLocationsViaPostgres(null, limit);
@@ -251,7 +286,15 @@ export async function getProjectIdWithLatestDriverLocation(): Promise<string | n
     return getProjectIdWithLatestDriverLocationViaPostgres();
   }
 
-  const { data, error } = await client.from("gps_locations").select("project_id").order("recorded_at", { ascending: false }).limit(1).maybeSingle();
+  let data: LocationRow | null | undefined;
+  let error: unknown;
+  try {
+    const result = await withTimeout(client.from("gps_locations").select("project_id").order("recorded_at", { ascending: false }).limit(1).maybeSingle(), 1800, "latest location project");
+    data = result.data as LocationRow | null;
+    error = result.error;
+  } catch {
+    return getProjectIdWithLatestDriverLocationViaPostgres();
+  }
 
   if (error || !data) {
     return getProjectIdWithLatestDriverLocationViaPostgres();

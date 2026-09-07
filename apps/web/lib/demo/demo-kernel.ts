@@ -1,7 +1,7 @@
-import type { Assignment, CallSign, Driver, Mission, OperationDay, Project, Session, TimelineEvent, Vehicle } from "@tomp/types/domain";
+import type { Assignment, CallSign, Driver, DriverLocation, Mission, OperationDay, Project, Session, TimelineEvent, Vehicle } from "@tomp/types/domain";
 
 const createdAt = "2026-06-29T00:00:00.000Z";
-const metadata = { demo: true };
+const metadata = { demo: true, label: "ข้อมูลตัวอย่าง" };
 
 export const demoProject: Project = {
   id: "10000000-0000-4000-8000-000000000003",
@@ -62,7 +62,7 @@ export const demoMission: Mission = {
   plannedEndTime: "2026-07-15T02:30:00.000Z",
   pickupVenueId: null,
   dropoffVenueId: null,
-  instruction: "พบผู้โดยสารที่ประตูผู้โดยสารขาเข้าและส่งไปยังสถานที่จัดงาน",
+  instruction: "พบผู้โดยสารที่ประตูผู้โดยสารขาเข้า และส่งไปยังสถานที่จัดงาน",
   serviceCommitment: "รับผู้โดยสารภายในช่วงเวลาที่กำหนด",
   createdAt,
   updatedAt: createdAt,
@@ -124,6 +124,34 @@ export const demoAssignment: Assignment = {
   metadata
 };
 
+export const demoDriverLocation: DriverLocation = {
+  id: "10000000-0000-4000-8000-000000000011",
+  projectId: demoProject.id,
+  assignmentId: demoAssignment.id,
+  driverId: demoDriver.id,
+  vehicleId: demoVehicle.id,
+  latitude: 13.7563,
+  longitude: 100.5018,
+  accuracy: 35,
+  sharingEvent: "location_ping",
+  recordedAt: new Date().toISOString(),
+  source: "demo",
+  createdAt: new Date().toISOString(),
+  metadata: {
+    ...metadata,
+    projectCode: demoProject.projectCode,
+    projectName: demoProject.projectName,
+    assignmentStatus: demoAssignment.status,
+    callSign: demoCallSign.callSign,
+    driverName: demoDriver.fullName,
+    driverPhone: demoDriver.phone,
+    vehiclePlate: demoVehicle.plateNumber,
+    vehicleType: demoVehicle.vehicleType,
+    missionCode: demoMission.missionCode,
+    missionName: demoMission.missionName
+  }
+};
+
 export const demoTimelineEvents: TimelineEvent[] = [
   {
     id: "10000000-0000-4000-8000-000000000012",
@@ -164,5 +192,6 @@ export const demoKernel = {
   drivers: [demoDriver],
   vehicles: [demoVehicle],
   assignments: [demoAssignment],
+  locations: [demoDriverLocation],
   timelineEvents: demoTimelineEvents
 };

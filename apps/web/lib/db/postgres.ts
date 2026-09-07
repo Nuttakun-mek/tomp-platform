@@ -10,6 +10,10 @@ export function getPostgresClient() {
     return null;
   }
 
+  if (readCleanEnv("TOMP_ENABLE_POSTGRES_FALLBACK") !== "1") {
+    return null;
+  }
+
   if (sqlClient !== undefined) return sqlClient;
 
   const databaseUrl = readCleanEnv("SUPABASE_DB_URL", "DATABASE_URL", "POSTGRES_URL");
@@ -21,7 +25,7 @@ export function getPostgresClient() {
   sqlClient = postgres(databaseUrl, {
     max: 1,
     idle_timeout: 20,
-    connect_timeout: 15,
+    connect_timeout: 5,
     ssl: "require",
     prepare: false
   });
@@ -34,5 +38,5 @@ export function hasPostgresClient() {
     return false;
   }
 
-  return Boolean(readCleanEnv("SUPABASE_DB_URL", "DATABASE_URL", "POSTGRES_URL"));
+  return readCleanEnv("TOMP_ENABLE_POSTGRES_FALLBACK") === "1" && Boolean(readCleanEnv("SUPABASE_DB_URL", "DATABASE_URL", "POSTGRES_URL"));
 }

@@ -1,6 +1,6 @@
+import Link from "next/link";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
 import { DispatchBoard } from "@/components/assignments/dispatch-board";
-import Link from "next/link";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";

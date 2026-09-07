@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, ClipboardCheck, FolderKanban, Gauge, LockKeyhole, MapPinned, Menu, Route, Settings, Truck, UserRoundCheck, X } from "lucide-react";
+import { Activity, FolderKanban, Gauge, LockKeyhole, MapPinned, Menu, Route, Settings, Truck, UserRoundCheck, X } from "lucide-react";
 import { SideNavSection } from "@/components/layout/side-nav-section";
 
 const navSections = [
@@ -32,9 +32,13 @@ const navSections = [
   {
     title: "ทดสอบระบบ",
     items: [
-      { href: "/live-test", label: "ทดสอบ QR และ GPS", description: "สร้างชุดทดสอบครบขั้นตอน", icon: Activity },
-      { href: "/pilot-checklist", label: "คู่มือ Pilot", description: "ลำดับตรวจระบบภายใน", icon: ClipboardCheck },
-      { href: "/admin", label: "ผู้ดูแลระบบ", description: "ตรวจ health และ runbook", icon: Settings }
+      { href: "/live-test", label: "ทดสอบระบบจบขั้นตอน", description: "QR คนขับ GPS และศูนย์ควบคุม", icon: Activity }
+    ]
+  },
+  {
+    title: "ตั้งค่าระบบ",
+    items: [
+      { href: "/admin", label: "ผู้ดูแลระบบ", description: "สิทธิ์ สุขภาพระบบ และ runbook", icon: Settings }
     ]
   }
 ];

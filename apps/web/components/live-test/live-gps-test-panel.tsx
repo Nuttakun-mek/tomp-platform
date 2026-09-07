@@ -27,6 +27,19 @@ interface CheckResult {
   tables: TableCheck[];
 }
 
+async function withClientTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} ใช้เวลานานเกินกำหนด`)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export function LiveGpsTestPanel() {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -57,34 +70,40 @@ export function LiveGpsTestPanel() {
     setResult(null);
     setQrDataUrl(null);
     setCurrentStep(1);
+
     startTransition(async () => {
-      setMessage("กำลังตรวจ Supabase และตารางสำคัญ...");
-      const check = await checkPilotInfrastructureAction();
-      if (!check.success) {
-        setMessage(check.error || "ตรวจระบบไม่สำเร็จ กรุณาตรวจ Supabase และ environment");
-        setCurrentStep(1);
-        return;
-      }
+      try {
+        setMessage("กำลังตรวจ Supabase และตารางสำคัญ...");
+        const check = await withClientTimeout(checkPilotInfrastructureAction(), 12000, "ตรวจระบบ");
+        if (!check.success) {
+          setMessage(check.error || "ตรวจระบบไม่สำเร็จ กรุณาตรวจ Supabase และ environment");
+          setCurrentStep(1);
+          return;
+        }
 
-      const infra = check.data as CheckResult;
-      setCheckResult(infra);
-      if (!infra.ready) {
-        setMessage("ยังเริ่มทดสอบไม่ได้ เพราะตารางบางส่วนไม่พร้อม กรุณาดูรายการที่ไม่ผ่านด้านล่าง");
-        setCurrentStep(1);
-        return;
-      }
+        const infra = check.data as CheckResult;
+        setCheckResult(infra);
+        if (!infra.ready) {
+          setMessage("ยังเริ่มทดสอบไม่ได้ เพราะตารางบางส่วนไม่พร้อม กรุณาดูรายการที่ไม่ผ่านด้านล่าง");
+          setCurrentStep(1);
+          return;
+        }
 
-      setCurrentStep(2);
-      setMessage("ระบบพร้อม กำลังสร้างโครงการ ภารกิจ Assignment และ QR จริง...");
-      const response = await createProductionPilotSmokeScenarioAction();
-      if (!response.success) {
-        setMessage(response.error || "สร้างชุดทดสอบไม่สำเร็จ");
         setCurrentStep(2);
-        return;
+        setMessage("ระบบพร้อม กำลังสร้างโครงการ ภารกิจ Assignment และ QR จริง...");
+        const response = await withClientTimeout(createProductionPilotSmokeScenarioAction(), 20000, "สร้างชุดทดสอบ");
+        if (!response.success) {
+          setMessage(response.error || "สร้างชุดทดสอบไม่สำเร็จ");
+          setCurrentStep(2);
+          return;
+        }
+
+        setResult(response.data as LiveGpsResult);
+        setCurrentStep(3);
+        setMessage("สร้างชุดทดสอบสำเร็จ เปิด QR บนมือถือแล้วกดเริ่มแชร์ GPS");
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "ระบบตอบกลับช้าเกินไป กรุณาตรวจ Supabase และลองใหม่");
       }
-      setResult(response.data as LiveGpsResult);
-      setCurrentStep(3);
-      setMessage("สร้างชุดทดสอบสำเร็จ เปิด QR บนมือถือแล้วกดเริ่มแชร์ GPS");
     });
   }
 
@@ -135,8 +154,8 @@ export function LiveGpsTestPanel() {
                   </span>
                 </div>
                 <div className="mt-3 grid gap-2">
-                  {checkResult.tables.slice(0, 8).map((table) => (
-                    <div key={table.table} className="flex items-center justify-between gap-3 text-xs">
+                  {checkResult.tables.slice(0, 12).map((table) => (
+                    <div key={table.table} className="grid gap-1 text-xs sm:grid-cols-[180px_1fr]">
                       <span className="font-semibold text-slate-700">{table.table}</span>
                       <span className={table.ok ? "text-emerald-700" : "text-red-700"}>{table.ok ? "ผ่าน" : table.message}</span>
                     </div>

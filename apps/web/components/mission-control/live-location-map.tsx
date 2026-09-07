@@ -85,6 +85,8 @@ function getMarkerPosition(location: DriverLocation, locations: DriverLocation[]
 export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMapProps) {
   const [locations, setLocations] = useState(initialLocations);
   const [connection, setConnection] = useState<"live" | "fallback" | "offline">("fallback");
+  const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const latest = locations[0];
   const latestLatitude = latest?.latitude;
@@ -96,14 +98,20 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
     async function refresh() {
       try {
         const response = await fetch(`/api/mission-control/locations?projectId=${projectId}`, { cache: "no-store" });
-        const result = (await response.json()) as { data?: DriverLocation[] };
-        if (mounted && result.data) {
-          setLocations(result.data);
+        const result = (await response.json()) as { success?: boolean; data?: DriverLocation[]; checkedAt?: string; error?: string };
+        if (mounted) {
+          setLocations(result.data ?? []);
+          setLastCheckedAt(result.checkedAt ?? new Date().toISOString());
+          setLastError(result.success === false ? result.error || "โหลดตำแหน่งไม่สำเร็จ" : null);
           setNow(Date.now());
-          setConnection((current) => (current === "live" ? "live" : "fallback"));
+          setConnection((current) => (result.success === false ? "offline" : current === "live" ? "live" : "fallback"));
         }
       } catch {
-        if (mounted) setConnection("offline");
+        if (mounted) {
+          setConnection("offline");
+          setLastCheckedAt(new Date().toISOString());
+          setLastError("เชื่อมต่อข้อมูลตำแหน่งไม่ได้");
+        }
       }
     }
 
@@ -126,9 +134,10 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
   }, [projectId]);
 
   const mapUrl = useMemo(() => {
-    if (latestLatitude == null || latestLongitude == null) return null;
+    const centerLatitude = latestLatitude ?? 13.7563;
+    const centerLongitude = latestLongitude ?? 100.5018;
     const delta = 0.012;
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${latestLongitude - delta}%2C${latestLatitude - delta}%2C${latestLongitude + delta}%2C${latestLatitude + delta}&layer=mapnik`;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${centerLongitude - delta}%2C${centerLatitude - delta}%2C${centerLongitude + delta}%2C${centerLatitude + delta}&layer=mapnik`;
   }, [latestLatitude, latestLongitude]);
   const liveCount = locations.filter((location) => getFreshness(location, now) === "live").length;
   const issueCount = locations.filter((location) => ["slow", "offline", "stopped"].includes(getFreshness(location, now))).length;
@@ -141,18 +150,21 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
             <p className="text-[11px] font-bold tracking-[0.18em] text-blue-200">แผนที่ติดตามสถานะ</p>
             <h2 className="mt-1 text-lg font-semibold md:text-xl">ตำแหน่งคนขับแบบเรียลไทม์</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-200">
-              ทุกตำแหน่งผูกกับ Project, Assignment, Call Sign, คนขับ และรถจากฐานข้อมูลจริง สีของหมุดแสดงความสดของสัญญาณ GPS ล่าสุด
+              ทุกตำแหน่งผูกกับโครงการ งานที่จัดสรร Call Sign คนขับ และรถจากฐานข้อมูล สีของหมุดแสดงความสดของสัญญาณ GPS ล่าสุด
             </p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${connection === "live" ? "bg-emerald-400 text-emerald-950" : connection === "offline" ? "bg-rose-300 text-rose-950" : "bg-amber-300 text-amber-950"}`}>
-            {connection === "live" ? "เชื่อมต่อสด" : connection === "offline" ? "ออฟไลน์" : "สำรองด้วยการดึงข้อมูล"}
-          </span>
+          <div className="grid justify-items-start gap-2 sm:justify-items-end">
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${connection === "live" ? "bg-emerald-400 text-emerald-950" : connection === "offline" ? "bg-rose-300 text-rose-950" : "bg-amber-300 text-amber-950"}`}>
+              {connection === "live" ? "เชื่อมต่อสด" : connection === "offline" ? "ออฟไลน์" : "สำรองด้วยการดึงข้อมูล"}
+            </span>
+            {lastCheckedAt ? <span className="text-xs text-slate-300">ตรวจล่าสุด {new Date(lastCheckedAt).toLocaleTimeString("th-TH")}</span> : null}
+          </div>
         </div>
       </div>
 
       <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
         <div className="min-h-[380px] bg-slate-100">
-          {mapUrl && latest ? (
+          {mapUrl ? (
             <div className="relative h-full min-h-[380px] overflow-hidden">
               <iframe className="h-[380px] w-full border-0 opacity-80 lg:h-full lg:min-h-[500px]" loading="lazy" referrerPolicy="no-referrer" src={mapUrl} title="แผนที่ตำแหน่งคนขับ" />
 
@@ -172,15 +184,14 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
                   </div>
                 );
               })}
+              {!latest ? (
+                <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-slate-200 bg-white/95 p-4 text-sm shadow-soft">
+                  <p className="font-semibold text-ink">รอตำแหน่ง GPS จากคนขับ</p>
+                  <p className="mt-1 leading-6 text-slate-600">แผนที่พร้อมใช้งานแล้ว เมื่อคนขับเปิดลิงก์ QR และกดแชร์ตำแหน่ง หมุดจะปรากฏพร้อมสีตามสถานะ</p>
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <div className="flex min-h-[380px] items-center justify-center p-6 text-center">
-              <div className="max-w-md rounded-2xl border border-dashed border-slate-300 bg-white p-6">
-                <p className="text-lg font-semibold text-ink">ยังไม่มีตำแหน่งคนขับจริง</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">เปิดหน้าคนขับด้วยลิงก์ QR แล้วกดเริ่มแชร์ตำแหน่ง GPS แผนที่จะเริ่มแสดงหมุดและสถานะอัตโนมัติ</p>
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
 
         <div className="grid content-start gap-3 border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">
@@ -203,6 +214,14 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
             <p className="text-sm font-semibold text-ink">รายการตำแหน่งล่าสุด</p>
             <p className="text-xs text-slate-500">แยกตาม Assignment เพื่อให้รู้ว่าใครอยู่ในงานใด</p>
           </div>
+
+          <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> กำลังแชร์: อัปเดตไม่เกิน 35 วินาที</div>
+            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> สัญญาณช้า: เกิน 35 วินาที</div>
+            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> ขาดการอัปเดต: เกิน 2 นาที</div>
+          </div>
+
+          {lastError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{lastError}</div> : null}
 
           {locations.length ? (
             locations.map((location) => {

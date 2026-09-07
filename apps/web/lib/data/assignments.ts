@@ -1,4 +1,5 @@
 import type { Assignment } from "@tomp/types/domain";
+import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
@@ -8,9 +9,13 @@ export async function getAssignmentsByProjectId(projectId: string): Promise<Assi
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return getAssignmentsByProjectIdViaPostgres(projectId);
 
-  const { data, error } = await supabase.from("assignments").select("*").eq("project_id", projectId).order("start_time");
-  if (error || !data) return getAssignmentsByProjectIdViaPostgres(projectId);
-  return data.map(mapAssignment);
+  try {
+    const { data, error } = await withTimeout(supabase.from("assignments").select("*").eq("project_id", projectId).order("start_time"), 2200, "assignments");
+    if (error || !data) return getAssignmentsByProjectIdViaPostgres(projectId);
+    return data.map(mapAssignment);
+  } catch {
+    return getAssignmentsByProjectIdViaPostgres(projectId);
+  }
 }
 
 async function getAssignmentsByProjectIdViaPostgres(projectId: string): Promise<Assignment[]> {
