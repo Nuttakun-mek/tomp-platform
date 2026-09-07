@@ -21,7 +21,13 @@
     "smoke:production": "node scripts/production-smoke.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs",
     "db:migrate:dry": "node scripts/apply-migrations.mjs --dry-run",
-    "db:seed": "node scripts/apply-migrations.mjs --seed"
+    "db:seed": "node scripts/apply-migrations.mjs --seed",
+    "db:local:sync": "node scripts/sync-supabase-migrations.mjs",
+    "db:local:start": "npm run db:local:sync && npx --prefix apps/web supabase start",
+    "db:local:stop": "npx --prefix apps/web supabase stop",
+    "db:local:reset": "npm run db:local:sync && npx --prefix apps/web supabase db reset",
+    "db:local:status": "npx --prefix apps/web supabase status",
+    "live-test:smoke": "node scripts/live-test-smoke.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -1,109 +1,111 @@
-# Supabase Local Setup
+# Supabase Setup — Cloud and Local
 
-## Required Tools
+There are two database tracks. Both apply the **same** SQL from `database/migrations/`.
 
-- Node.js 20 or newer.
-- npm.
-- Supabase CLI.
-- Docker Desktop for local Supabase.
-- `psql` for directly applying SQL files when needed.
+| Track | When | Tooling |
+| --- | --- | --- |
+| **Cloud** (`nbvzqtxoxcghazrvbesx`) | shared dev / pilot / prod | `npm run db:migrate` (via `SUPABASE_DB_URL`) |
+| **Local Docker** | offline / isolated dev | `npm run db:local:*` (Supabase CLI) |
 
-## Environment Variables
+`database/migrations/` is the single source of truth. `supabase/migrations/` is a
+generated mirror for the CLI — `npm run db:local:sync` (run automatically by
+`db:local:start` / `db:local:reset`) keeps it in step.
 
-Application:
+## Required tools
+
+- Node.js 20+ and npm.
+- Docker Desktop (for the local track).
+- No global Supabase CLI needed — it is a dev dependency of `apps/web`; the
+  `db:local:*` scripts call it through `npx --prefix apps/web supabase`.
+
+## Cloud track
+
+`SUPABASE_DB_URL` in `.env.local` is the Supabase pooler string. The runner
+rewrites the transaction-pooler port `6543` to the session-pooler port `5432`
+automatically because multi-statement DDL needs a session connection.
+
+```bash
+npm run db:migrate:dry     # connect, list pending migrations, apply nothing
+npm run db:migrate         # apply pending migrations (prompts unless --yes)
+npm run db:migrate -- --seed   # also load database/seed/*.sql (idempotent)
+```
+
+Applied migrations are tracked in `public.schema_migrations_tomp`. Each file runs
+in its own transaction with its tracking row, so a failure rolls back cleanly.
+
+## Local Docker track
+
+The local stack runs on a **shifted port range** so it can coexist with other
+local Supabase projects on the same machine:
+
+| Service | Port |
+| --- | --- |
+| API / PostgREST | `54421` |
+| Postgres | `54422` |
+| Studio | `54423` |
+| Inbucket (mail) | `54424` |
+
+```bash
+npm run db:local:start     # sync migrations, pull images, boot the stack
+npm run db:local:reset     # re-sync, drop, re-run every migration + seeds
+npm run db:local:status    # print URLs and keys
+npm run db:local:stop      # stop containers (data is kept)
+```
+
+After `db:local:start`, point `.env.local` at the local stack. The keys below are
+the Supabase CLI's fixed local-dev keys — identical on every install, not secret:
 
 ```text
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_URL=
-SUPABASE_PUBLISHABLE_KEY=
-SUPABASE_SECRET_KEY=
-DRIVER_ACCESS_TOKEN_SECRET=
-NEXT_PUBLIC_APP_URL=http://localhost:7000
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54421
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54422/postgres
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+DRIVER_ACCESS_TOKEN_SECRET=tomp-local-driver-token-secret
+# not needed against local (REST works); keep only for the cloud track
+# TOMP_ENABLE_POSTGRES_FALLBACK=1
 ```
 
-Local database:
+Run `npm run db:local:status` to confirm (it also prints `sb_publishable_*` /
+`sb_secret_*` variants if you prefer the new key format).
 
-```text
-SUPABASE_DB_URL=
-```
+Studio: <http://127.0.0.1:54423>. Emails: <http://127.0.0.1:54424>.
 
-`SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY` is optional for server-side local writes. Never expose service-role or secret keys in browser code, never prefix them with `NEXT_PUBLIC_`, and never import them into client components.
+`analytics`, `vector`, `imgproxy` and `pooler` are disabled for the local stack
+(not needed for pilot testing, and analytics/logflare is flaky on Windows).
 
-## Run Supabase Local
-
-```bash
-supabase start
-supabase status
-```
-
-Confirm command availability with `supabase --help` because Supabase CLI behavior changes over time.
-
-## Apply Kernel Migration
-
-```bash
-psql "$SUPABASE_DB_URL" -f database/migrations/0001_initial_kernel.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0002_rls_foundation.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0003_driver_assignment_foundation.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0004_auth_rbac_foundation.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0005_project_scoped_rls.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0006_publish_change_baseline.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0007_publish_locking_foundation.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0008_driver_token_security.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0009_storage_photo_foundation.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0010_realtime_mission_control_foundation.sql
-psql "$SUPABASE_DB_URL" -f database/migrations/0011_driver_live_location_pilot.sql
-```
-
-## Run Seed Data
-
-```bash
-psql "$SUPABASE_DB_URL" -f database/seed/0001_demo_kernel.sql
-```
-
-## Reset Local Database
-
-If the local Supabase project is configured:
-
-```bash
-supabase db reset
-```
-
-If applying SQL manually, recreate the local database or reset through the Supabase CLI, then reapply migrations and seed in order.
-
-## Verify Seed Data
+## Verify the schema
 
 ```sql
+-- cloud track (applied by scripts/apply-migrations.mjs)
+select filename from public.schema_migrations_tomp order by filename;
+
+-- local Docker track (applied by the Supabase CLI)
+select version, name from supabase_migrations.schema_migrations order by version;  -- 17 rows
+
+-- both
 select project_code, project_name from public.projects;
 select mission_code, mission_name from public.missions;
-select call_sign from public.call_signs;
-select event_type from public.timeline_events order by created_at desc;
 ```
 
-Expected demo project code: `TOMP-DEMO-001`.
+## Live-test smoke
 
-## Run Writes Locally
+With the app running (`npm run dev`, port 3000) and a database reachable:
 
-1. Start Supabase locally.
-2. Apply migrations through `0006_publish_change_baseline.sql`.
-3. Run the demo seed.
-4. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and optionally `SUPABASE_SECRET_KEY`.
-5. Start the app with `npm run dev`.
-6. Submit create forms from Projects, Missions, Assignments, Drivers, or Vehicles.
-
-Verify inserted rows:
-
-```sql
-select id, project_code, project_name from public.projects order by created_at desc;
-select event_type, object_type, reason from public.timeline_events order by created_at desc;
+```bash
+npm run live-test:smoke
 ```
 
-## Known Limitations
+Drives `/live-test` with headless Chrome: infra check → create
+Project/Mission/Assignment → save `scripts/live-test-qr.png`, and prints a
+LAN-host driver URL a phone on the same Wi-Fi can open.
 
-- RLS policies in `0002_rls_foundation.sql` are temporary development placeholders.
-- Project-scoped RBAC is designed but not production-hardened yet.
-- UI routes are placeholder-only and do not require database connectivity.
-- Driver live location pilot exists through browser geolocation, server-side writes, `gps_locations`, and Mission Control map display. It is still not production fleet tracking.
-- Driver QR access token validation is not implemented yet.
+## Known limitations
+
+- RLS policies in `0002_rls_foundation.sql` are development placeholders.
+- Project-scoped RBAC is designed, not production-hardened.
+- Driver live location is browser geolocation + server-side writes, not
+  production fleet tracking.
+- `alter publication supabase_realtime …` in `0010`/`0011` needs the Supabase
+  `supabase_realtime` publication — present on both tracks, absent on a bare
+  Postgres container.
