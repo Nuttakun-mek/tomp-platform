@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight, MapPinned, RadioTower, ShieldCheck } from "lucide-react";
-import { StatusDot } from "@/components/ui/status-dot";
 
 export function OperationsHero({ projectCount, assignmentCount, gpsCount, followUpCount }: { projectCount: number; assignmentCount: number; gpsCount: number; followUpCount: number }) {
   return (
@@ -8,12 +7,9 @@ export function OperationsHero({ projectCount, assignmentCount, gpsCount, follow
       <div className="command-grid grid gap-0 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <div className="relative min-w-0 p-6 sm:p-7 lg:p-8">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-teal-300/70 to-transparent" />
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-[12px] font-semibold text-emerald-100">
-            <StatusDot tone="success" pulse />
-            ระบบทดสอบภายในพร้อมตรวจงาน
-          </div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-teal-200">ภาพรวมปฏิบัติการ</p>
 
-          <h2 className="display-title mt-4 max-w-xl text-white">ควบคุมปฏิบัติการขนส่งจากภาพเดียว</h2>
+          <h2 className="display-title mt-3 max-w-xl text-white">ควบคุมปฏิบัติการขนส่งจากภาพเดียว</h2>
           <p className="mt-3 max-w-lg text-[13px] leading-7 text-slate-300 sm:text-sm">
             เห็นโครงการ งานที่จัดสรร รถ คนขับ ความพร้อม สัญญาณ GPS และรายการที่ต้องตัดสินใจในพื้นที่เดียว เพื่อให้ทีมปฏิบัติการทำงานเร็วขึ้นและมั่นใจขึ้น
           </p>

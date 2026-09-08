@@ -1,8 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { AppNav } from "@/components/app-nav";
-import { AuthStatus } from "@/components/auth/auth-status";
-import { RoleBadge } from "@/components/auth/role-badge";
+import { UserMenu } from "@/components/auth/user-menu";
 import { BuildVersionBadge } from "@/components/layout/build-version-badge";
 import { EnvironmentBadge } from "@/components/layout/environment-badge";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
@@ -13,8 +12,9 @@ import { getProjects } from "@/lib/data/projects";
 import { SCOPE_COOKIE, resolveActiveScope } from "@/lib/workspace/scope";
 
 export async function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
-  const { permissions, roleKeys, primaryRole } = await getViewerAccess();
+  const { permissions, roleKeys, primaryRole, profile } = await getViewerAccess();
   const sections = filterNav(NAV_SECTIONS, { permissions, roleKeys });
+  const signedIn = Boolean(profile.authUserId) || profile.isDevelopmentFallback;
 
   const projects = (await getProjects()).map((project) => ({
     id: project.id,
@@ -30,44 +30,26 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
       <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="command-panel-dark hidden text-white lg:block">
           <div className="sticky top-0 flex h-screen flex-col overflow-y-auto border-r border-white/10 px-4 py-5">
-            <Link href="/" className="group block rounded-[26px] border border-white/10 bg-white/[0.08] p-4 shadow-command transition hover:bg-white/[0.12]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold tracking-[0.32em] text-teal-200">TOMP</p>
-                  <h1 className="mt-2.5 text-[20px] font-semibold leading-7 text-white">ศูนย์ปฏิบัติการขนส่ง</h1>
-                  <p className="mt-2 text-[12px] leading-6 text-slate-300">
-                    วางแผน มอบหมายงาน ติดตาม GPS และควบคุมการปฏิบัติการจากพื้นที่เดียว
-                  </p>
-                </div>
-                <span className="shrink-0 whitespace-nowrap rounded-full bg-teal-300 px-2.5 py-1 text-[10px] font-bold tracking-wide text-teal-950">LIVE</span>
-              </div>
-
-              <div className="mt-4 rounded-[18px] border border-white/10 bg-slate-950/40 p-3">
-                <p className="text-[11px] font-semibold text-slate-400">พื้นที่ทำงาน</p>
-                <p className="mt-1 text-sm font-semibold text-white">Internal Operations</p>
-                <div className="mt-2 flex items-center gap-2 text-[12px] font-medium text-emerald-200">
-                  <span className="status-pulse status-pulse-live h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                  พร้อมติดตามงานและตำแหน่งตามสิทธิ์
-                </div>
-              </div>
+            <Link href="/" className="group flex items-center gap-2.5 rounded-2xl px-1 py-1 transition hover:opacity-90">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-300 text-[13px] font-bold text-teal-950">T</span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-bold tracking-[0.28em] text-teal-200">TOMP</span>
+                <span className="block truncate text-[13px] font-semibold text-white">ศูนย์ปฏิบัติการขนส่ง</span>
+              </span>
             </Link>
 
             <div className="mt-4">
               <ProjectScopePill projects={projects} activeId={activeScope?.id ?? null} variant="dark" />
             </div>
 
-            <div className="mt-5 flex-1">
+            <div className="mt-4 flex-1 overflow-y-auto">
               <AppNav sections={sections} />
             </div>
 
-            <div className="mt-5 grid gap-3 rounded-[22px] border border-white/10 bg-white/[0.07] p-4">
-              <RoleBadge roleKey={primaryRole} />
+            <div className="mt-4 grid gap-2.5 border-t border-white/10 pt-4">
               <EnvironmentBadge />
+              <UserMenu name={profile.fullName} email={profile.email} roleKey={primaryRole} signedIn={signedIn} variant="dark" />
               <BuildVersionBadge />
-              <AuthStatus />
-              <p className="text-[11px] leading-5 text-slate-400">
-                ใช้ตำแหน่งเพื่อควบคุมงานตามความยินยอมของคนขับเท่านั้น ไม่ใช่ระบบติดตามนอกเวลาปฏิบัติงาน
-              </p>
             </div>
           </div>
         </aside>
@@ -80,10 +62,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
                   <p className="text-[11px] font-bold tracking-[0.28em] text-operation">TOMP</p>
                   <p className="truncate text-base font-semibold text-ink">ศูนย์ปฏิบัติการขนส่ง</p>
                 </Link>
-                <div className="grid justify-items-end gap-1">
-                  <EnvironmentBadge />
-                  <BuildVersionBadge compact />
-                </div>
+                <UserMenu name={profile.fullName} email={profile.email} roleKey={primaryRole} signedIn={signedIn} variant="light" />
               </div>
               <ProjectScopePill projects={projects} activeId={activeScope?.id ?? null} variant="light" />
               <AppNav sections={sections} />

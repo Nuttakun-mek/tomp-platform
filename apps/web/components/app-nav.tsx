@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   CarFront,
-  ChevronRight,
   ClipboardList,
   FolderKanban,
   Gauge,
@@ -18,7 +17,6 @@ import {
   X,
   type LucideIcon
 } from "lucide-react";
-import { Tooltip } from "@/components/ui/tooltip";
 import type { NavSection } from "@/lib/auth/nav-model";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -48,42 +46,44 @@ export function AppNav({ sections }: { sections: NavSection[] }) {
         {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </button>
 
-      <nav className={`${open ? "grid" : "hidden"} gap-5 lg:grid`} aria-label="เมนูหลัก">
+      <nav className={`${open ? "grid" : "hidden"} gap-4 lg:grid`} aria-label="เมนูหลัก">
         {sections.map((section) => (
-          <section key={section.title} className="grid gap-2">
-            <p className="px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:text-slate-400">{section.title}</p>
-            <div className="grid gap-1.5">
+          <section key={section.title} className="grid gap-1">
+            <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:text-slate-500">{section.title}</p>
+            <div className="grid gap-0.5">
               {section.items.map((item) => {
                 const Icon = ICONS[item.icon] ?? Gauge;
                 const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
                 return (
-                  <Tooltip key={item.href} content={item.help} side="right" className="w-full">
-                    <Link
-                      href={item.href}
-                      onClick={() => setOpen(false)}
-                      className={`group flex w-full items-center gap-3 rounded-[18px] border px-3 py-3 transition duration-200 ${
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    title={item.help}
+                    className={`group flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-colors ${
+                      active
+                        ? "border-teal-300/50 bg-white text-ink lg:bg-white/[0.12] lg:text-white"
+                        : "border-transparent text-slate-700 hover:bg-slate-50 lg:text-slate-300 lg:hover:bg-white/[0.06] lg:hover:text-white"
+                    }`}
+                  >
+                    <span
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
                         active
-                          ? "border-teal-300/60 bg-white text-ink shadow-[0_16px_34px_rgba(15,118,110,0.18)] lg:bg-white/95"
-                          : "border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50 lg:bg-transparent lg:text-slate-300 lg:hover:border-white/10 lg:hover:bg-white/8 lg:hover:text-white"
+                          ? "bg-operation text-white"
+                          : "bg-slate-100 text-slate-500 group-hover:text-operation lg:bg-white/[0.06] lg:text-slate-400 lg:group-hover:text-white"
                       }`}
                     >
-                      <span
-                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[14px] ${
-                          active ? "bg-operation text-white" : "bg-slate-100 text-slate-500 group-hover:text-operation lg:bg-white/8 lg:text-slate-400 lg:group-hover:text-white"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold leading-5">{item.label}</span>
-                        <span className={`mt-0.5 block truncate text-[12px] leading-5 ${active ? "text-slate-600" : "text-slate-500 lg:group-hover:text-slate-300"}`}>
-                          {item.description}
-                        </span>
-                      </span>
-                      <ChevronRight className={`h-4 w-4 shrink-0 ${active ? "text-operation" : "text-slate-300 opacity-0 transition group-hover:opacity-100"}`} />
-                    </Link>
-                  </Tooltip>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-semibold leading-5">{item.label}</span>
+                      {active ? (
+                        <span className="block truncate text-[11px] leading-4 text-slate-500 lg:text-slate-300">{item.description}</span>
+                      ) : null}
+                    </span>
+                  </Link>
                 );
               })}
             </div>

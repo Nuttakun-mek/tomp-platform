@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import { OperationsHero } from "@/components/dashboard/operations-hero";
 import { OperationsPulse } from "@/components/dashboard/operations-pulse";
-import { PilotProgressPanel } from "@/components/dashboard/pilot-progress-panel";
 import { QuickActionPanel } from "@/components/dashboard/quick-action-panel";
 import { ReadinessOverview } from "@/components/dashboard/readiness-overview";
 import { TodayOperationBoard } from "@/components/dashboard/today-operation-board";
@@ -90,7 +89,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {isSuperAdmin ? <PilotProgressPanel /> : null}
     </>
   );
 }
