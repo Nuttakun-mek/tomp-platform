@@ -3,7 +3,12 @@
 import { useState, useTransition } from "react";
 import { signOutAction } from "@/app/actions/auth";
 
-export function LogoutButton() {
+const VARIANT_CLASS = {
+  dark: "border-white/10 bg-white/8 text-teal-100 hover:bg-white/12",
+  light: "border-border bg-white text-ink-soft hover:border-operation hover:text-operation"
+} as const;
+
+export function LogoutButton({ variant = "dark" }: { variant?: "dark" | "light" }) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -21,10 +26,15 @@ export function LogoutButton() {
 
   return (
     <div className="grid gap-1">
-      <button className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-semibold text-teal-100 transition hover:bg-white/12 disabled:opacity-60" disabled={isPending} onClick={handleLogout} type="button">
+      <button
+        className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-4 text-xs font-semibold transition disabled:opacity-60 ${VARIANT_CLASS[variant]}`}
+        disabled={isPending}
+        onClick={handleLogout}
+        type="button"
+      >
         {isPending ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}
       </button>
-      {message ? <span className="text-xs text-red-200">{message}</span> : null}
+      {message ? <span className={`text-xs ${variant === "dark" ? "text-red-200" : "text-danger"}`}>{message}</span> : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PREFIXES = ["/login", "/auth/callback", "/driver", "/api/driver", "/api/health", "/_next", "/favicon.ico"];
+const PUBLIC_PREFIXES = ["/login", "/no-access", "/auth/callback", "/driver", "/api/driver", "/api/health", "/_next", "/favicon.ico"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
