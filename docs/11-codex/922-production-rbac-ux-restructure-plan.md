@@ -1,7 +1,7 @@
 # Production RBAC + UX/UI Restructure — Plan
 
 **วันที่:** 2026-09-08
-**สถานะ:** Phase 0-2 ✅ · Phase 3 ถัดไป (data scoping — RLS) — impl plan [923](923-rbac-phase-0-1-impl-plan.md), handoff [924](924-rbac-phase-0-1-done.md)
+**สถานะ:** Phase 0-3 ✅ · Phase 4 ถัดไป (workspace UX) — impl plans [923](923-rbac-phase-0-1-impl-plan.md) / [925](925-rbac-phase-2-impl-plan.md) / [927](927-rbac-phase-3-impl-plan.md), handoffs [924](924-rbac-phase-0-1-done.md) / [926](926-rbac-phase-2-done.md) / [928](928-rbac-phase-3-done.md) · Phase 3 กระทบ: `TOMP_SCOPED_READS` ยังไม่เปิดใน prod
 **ผู้เกี่ยวข้องก่อนหน้า:** `958d226` (stabilize) · `72e822b`–`cd70dea` (design-system pass) · `0b4f8bf`+`a98f4f7`+`464ef10` (auth foundation) · handoffs [920](920-pilot-stability-followup-handoff.md), [921](921-production-reset-auth-handoff.md)
 
 เป้าหมาย: เปลี่ยนจาก "internal pilot ทุกคนเห็นเท่ากัน" → **ระบบ production ที่แต่ละบัญชีเข้าถึงต่างกันตามบทบาท** โดยยึด docs ที่มีอยู่ ([001](../00-foundation/001-vision-and-philosophy.md), [102](../01-business/102-customer-and-stakeholder-model.md), [103](../01-business/103-project-lifecycle.md), [400](../04-product/400-product-workspaces.md), [500](../05-ux/500-ux-blueprint.md), [504](../05-ux/504-product-experience-reset.md), [805](../08-engineering/805-auth-and-rbac-foundation.md))
@@ -249,14 +249,14 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 13. `/superadmin/dev-tools` landing (จัดกลุ่มเครื่องมือ)
 14. `/superadmin/users` — list + **ฟอร์ม "เพิ่มผู้ใช้"** (pre-provision profile + assign role/project) — ปลดล็อกไม่ต้องยิง SQL
 
-### Phase 3 — Data scoping (RLS) — กระทบสูงสุด
-15. migration `0019_rbac_rls_v2.sql` **มาก่อน**: `is_super_admin()` bypass · org-scope · drop `sprint2_*` ที่เหลือ · scoped policy สำหรับ drivers/vehicles/gps_locations/organizations/profiles
-16. RLS test suite ผ่านครบ (seeded users เห็นเฉพาะ scope)
-17. `getScopedDataClient()` (session-aware) + เปลี่ยน `lib/data/*` read → scoped client (หลัง flag `TOMP_SCOPED_READS=1`)
-18. create-project → สร้าง `project_members` (project_manager) + `owner_profile_id` ในทรานแซกชันเดียว
-19. แก้ `requirePermission` (`project.create` = org-scope) + ลบ escape hatch `mode !== "service_role"`
-20. UX: `<ProjectScopePill>` + scope switcher + scope cookie; `ข้อมูลตัวอย่าง` badge เข้มงวด
-21. เปิด flag ทีละ env → prod
+### Phase 3 — Data scoping (RLS) — กระทบสูงสุด ✅
+15. ✅ migration `0019_rbac_rls_v2.sql` + `0020` fixup — helper fn + scoped policy ทุกตาราง (apply local + cloud)
+16. ✅ RLS test suite — `scripts/seed-test-users.mjs` + `scripts/verify-rls.mjs` — ALL PASS
+17. ✅ `getScopedDataClient()` + `resolveReadClient()` + wired 8 `lib/data/*` (flag `TOMP_SCOPED_READS`)
+18. ✅ create-project → `project_members` (project_manager) + `owner_profile_id`
+19. ✅ `requirePermission` global-permission routing + ลบ escape hatch `mode !== "service_role"`
+20. ✅ `<ProjectScopePill>` + scope cookie `tomp_scope` ใน app shell
+21. ⏳ เปิด flag `TOMP_SCOPED_READS=1` ทีละ env → prod (ยังไม่เปิด — ต้อง manual test + staging RLS suite ก่อน)
 
 ### Phase 4 — Workspace UX + error-reduction patterns (§7.3–7.6)
 22. `/portal` (organizer/customer read-only v1 — decision #3): ภาพรวม + สถานะ mission + change request + ไม่เห็น GPS/คนขับ
