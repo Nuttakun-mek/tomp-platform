@@ -2,6 +2,8 @@ import "server-only";
 
 import { randomUUID } from "crypto";
 import { getSessionAwareAuthClient } from "@/lib/auth/auth-server";
+import { resolvePrimaryRole } from "@/lib/auth/role-model";
+import { roleLabelTh } from "@/lib/i18n/role-th";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 export interface CurrentUserProfile {
@@ -52,8 +54,15 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     .maybeSingle();
 
   if (!profile) {
+    profile = await linkInvitedProfile(authUser.id, authUser.email || null);
+  }
+
+  if (!profile) {
     profile = await bootstrapFirstProfileIfEmpty(authUser.id, authUser.email || null);
   }
+
+  const roleKeys = typeof profile?.id === "string" ? await queryRoleKeys(profile.id) : [];
+  const primaryRole = resolvePrimaryRole(roleKeys);
 
   return {
     id: typeof profile?.id === "string" ? profile.id : authUser.id,
@@ -61,10 +70,74 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     organizationId: typeof profile?.organization_id === "string" ? profile.organization_id : null,
     fullName: typeof profile?.full_name === "string" && profile.full_name.trim() ? profile.full_name : authUser.email || "ผู้ใช้งานระบบ",
     email: typeof profile?.email === "string" ? profile.email : authUser.email || null,
-    roleLabel: "ผู้ใช้งานระบบ",
+    roleLabel: roleLabelTh(primaryRole),
     isDevelopmentFallback: false,
-    productionRisk: null
+    productionRisk: primaryRole ? null : "บัญชีนี้ยังไม่ได้รับบทบาทในระบบ"
   };
+}
+
+type RoleKeyJoin = { roles?: { role_key?: string } | { role_key?: string }[] | null };
+
+function roleKeyFromJoin(row: RoleKeyJoin): string | null {
+  const roles = row.roles;
+  const key = Array.isArray(roles) ? roles[0]?.role_key : roles?.role_key;
+  return typeof key === "string" ? key : null;
+}
+
+// อ่านบทบาททั้ง global (user_role_assignments, project_id null) และรายโครงการ
+// (project_members) ผ่าน service-role client — สองตารางนี้ RLS ปิดกั้น authenticated
+async function queryRoleKeys(profileId: string): Promise<string[]> {
+  const admin = getSupabaseServerDataClient();
+  if (!admin) return [];
+
+  const keys = new Set<string>();
+
+  const { data: globalRoles } = await admin
+    .from("user_role_assignments")
+    .select("roles(role_key)")
+    .eq("profile_id", profileId)
+    .eq("status", "active")
+    .is("project_id", null);
+  for (const row of (globalRoles || []) as RoleKeyJoin[]) {
+    const key = roleKeyFromJoin(row);
+    if (key) keys.add(key);
+  }
+
+  const { data: memberRoles } = await admin
+    .from("project_members")
+    .select("roles(role_key)")
+    .eq("profile_id", profileId)
+    .eq("status", "active");
+  for (const row of (memberRoles || []) as RoleKeyJoin[]) {
+    const key = roleKeyFromJoin(row);
+    if (key) keys.add(key);
+  }
+
+  return [...keys];
+}
+
+// เจอ profile ที่ email ตรงและยังไม่ผูก auth_user_id (invited) → ผูกให้
+async function linkInvitedProfile(authUserId: string, email: string | null) {
+  const adminClient = getSupabaseServerDataClient();
+  if (!adminClient || !email) return null;
+
+  const { data: invited } = await adminClient
+    .from("profiles")
+    .select("id, auth_user_id, organization_id, full_name, email")
+    .ilike("email", email)
+    .is("auth_user_id", null)
+    .maybeSingle();
+
+  if (!invited) return null;
+
+  const { data: linked } = await adminClient
+    .from("profiles")
+    .update({ auth_user_id: authUserId, status: "active" })
+    .eq("id", invited.id)
+    .select("id, auth_user_id, organization_id, full_name, email")
+    .single();
+
+  return linked ?? null;
 }
 
 async function bootstrapFirstProfileIfEmpty(authUserId: string, email: string | null) {
