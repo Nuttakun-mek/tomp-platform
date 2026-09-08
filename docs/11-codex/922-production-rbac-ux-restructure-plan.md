@@ -1,7 +1,7 @@
 # Production RBAC + UX/UI Restructure — Plan
 
 **วันที่:** 2026-09-08
-**สถานะ:** Phase 0-3 ✅ · Phase 4 ถัดไป (workspace UX) — impl plans [923](923-rbac-phase-0-1-impl-plan.md) / [925](925-rbac-phase-2-impl-plan.md) / [927](927-rbac-phase-3-impl-plan.md), handoffs [924](924-rbac-phase-0-1-done.md) / [926](926-rbac-phase-2-done.md) / [928](928-rbac-phase-3-done.md) · Phase 3 กระทบ: `TOMP_SCOPED_READS` ยังไม่เปิดใน prod
+**สถานะ:** Phase 0-4 (core) ✅ · Phase 4b/5 ถัดไป — impl plans [923](923-rbac-phase-0-1-impl-plan.md) / [925](925-rbac-phase-2-impl-plan.md) / [927](927-rbac-phase-3-impl-plan.md) / [929](929-rbac-phase-4-impl-plan.md), handoffs [924](924-rbac-phase-0-1-done.md) / [926](926-rbac-phase-2-done.md) / [928](928-rbac-phase-3-done.md) / [930](930-rbac-phase-4-done.md) · Phase 3 กระทบ: `TOMP_SCOPED_READS` ยังไม่เปิดใน prod
 **ผู้เกี่ยวข้องก่อนหน้า:** `958d226` (stabilize) · `72e822b`–`cd70dea` (design-system pass) · `0b4f8bf`+`a98f4f7`+`464ef10` (auth foundation) · handoffs [920](920-pilot-stability-followup-handoff.md), [921](921-production-reset-auth-handoff.md)
 
 เป้าหมาย: เปลี่ยนจาก "internal pilot ทุกคนเห็นเท่ากัน" → **ระบบ production ที่แต่ละบัญชีเข้าถึงต่างกันตามบทบาท** โดยยึด docs ที่มีอยู่ ([001](../00-foundation/001-vision-and-philosophy.md), [102](../01-business/102-customer-and-stakeholder-model.md), [103](../01-business/103-project-lifecycle.md), [400](../04-product/400-product-workspaces.md), [500](../05-ux/500-ux-blueprint.md), [504](../05-ux/504-product-experience-reset.md), [805](../08-engineering/805-auth-and-rbac-foundation.md))
@@ -259,16 +259,16 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 21. ⏳ เปิด flag `TOMP_SCOPED_READS=1` ทีละ env → prod (ยังไม่เปิด — ต้อง manual test + staging RLS suite ก่อน)
 
 ### Phase 4 — Workspace UX + error-reduction patterns (§7.3–7.6)
-22. `/portal` (organizer/customer read-only v1 — decision #3): ภาพรวม + สถานะ mission + change request + ไม่เห็น GPS/คนขับ
-23. home `/` — section ตาม permission + redirect ที่ถูกต้องต่อ role
-24. `<OwnerTag>` ทุก object ปฏิบัติการ (assignment/incident/change/mission)
-25. `<ContactStrip>` ในทุกหน้า operational (dispatch, mission-control, coordinator, driver)
-26. `<ConflictWarning>` inline ตอน assign driver/vehicle (ASN-005/006, VEH-006)
-27. `<ReadinessGate>` + `<ConfirmImpactDialog>` ก่อน publish (PUB-004/005) — ปุ่ม publish ล็อกจนเขียว
-28. `<ChangeRequestButton>` แทนปุ่มแก้หลัง publish (PUB-003, CHG-*)
-29. `<NotificationCard>` — ข้อความ + ปุ่ม action + scoped (NOT-001/003)
-30. dispatch fluency: bulk assign, keyboard nav, inline edit + `<SavePanel>`, saved filter
-31. `<UndoToast>` + optimistic update + rollback ทุก action; toast → ลิงก์ Timeline
+22. ✅ `/portal` (organizer/customer read-only v1) — ภาพรวม + สถานะ mission + change request; ไม่ fetch GPS/คนขับ
+23. ✅ home `/` — section ตาม permission (assignment.read / driver.read / project.read / super_admin) + EmptyState
+24. ✅ `<OwnerTag>` + helper `formatOwnerLine`/`formatRelativeTh` — wired: exception-list, assignment-summary-card
+25. ⏳ `<ContactStrip>` — สร้างแล้ว, ยังไม่ wire (ต้องมี contact model ต่อ assignment) → Phase 4b
+26. ✅ `<ConflictWarning>` + `describeAssignmentConflicts` — wired ใน create-assignment-form (บังคับเหตุผล override)
+27. ⏳ `<ReadinessGate>` hard-gate + `<ConfirmImpactDialog>` ก่อน publish → Phase 4b
+28. ⏳ `<ChangeRequestButton>` แทนปุ่มแก้หลัง publish → Phase 4b
+29. ✅ `<NotificationCard>` — wired ใน driver-notification-console (render DriverNotification จริง)
+30. ⏳ dispatch fluency: bulk assign, keyboard nav, inline edit + `<SavePanel>` → Phase 4b (แยก plan)
+31. ⏳ `<UndoToast>` + optimistic update + rollback ทุก action → Phase 4b (แยก plan)
 
 ### Phase 5 — Superadmin depth + workspace เต็ม (backlog)
 32. `/superadmin/roles` matrix editor · `/organizations` · `/superadmin/projects` (cross-org + member mgmt) · `/superadmin/audit`
