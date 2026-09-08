@@ -1,4 +1,5 @@
 import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
+import { OwnerTag } from "@/components/ui/owner-tag";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
@@ -8,9 +9,11 @@ interface AssignmentSummaryCardProps {
   callSign?: CallSign;
   driver?: Driver;
   vehicle?: Vehicle;
+  ownerName?: string | null;
+  ownerRoleKey?: string | null;
 }
 
-export function AssignmentSummaryCard({ assignment, mission, callSign, driver, vehicle }: AssignmentSummaryCardProps) {
+export function AssignmentSummaryCard({ assignment, mission, callSign, driver, vehicle, ownerName, ownerRoleKey }: AssignmentSummaryCardProps) {
   return (
     <article className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -26,6 +29,9 @@ export function AssignmentSummaryCard({ assignment, mission, callSign, driver, v
           </p>
         </div>
         <StatusBadge label={formatStatusTh(assignment.status)} />
+      </div>
+      <div className="mt-3 border-t border-slate-100 pt-2.5">
+        <OwnerTag name={ownerName} roleKey={ownerRoleKey} at={assignment.updatedAt || assignment.createdAt} />
       </div>
     </article>
   );
