@@ -1,10 +1,11 @@
+import Link from "next/link";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { PilotSmokeTestPanel } from "@/components/admin/pilot-smoke-test-panel";
 import { PageHeader } from "@/components/page-header";
-import Link from "next/link";
 
 export default function PilotSmokeTestPage() {
   return (
-    <>
+    <PermissionGate anyRole={["super_admin"]}>
       <PageHeader
         eyebrow="ผู้ดูแลระบบ"
         title="ตรวจระบบ Production Pilot"
@@ -20,6 +21,6 @@ export default function PilotSmokeTestPage() {
         </Link>
       </section>
       <PilotSmokeTestPanel />
-    </>
+    </PermissionGate>
   );
 }

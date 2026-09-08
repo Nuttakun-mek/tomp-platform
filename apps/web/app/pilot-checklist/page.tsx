@@ -1,3 +1,4 @@
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { PilotRoleCard } from "@/components/pilot/pilot-role-card";
 import { PilotScenarioBoard } from "@/components/pilot/pilot-scenario-board";
 import { PilotStepper } from "@/components/pilot/pilot-stepper";
@@ -25,7 +26,7 @@ export default async function PilotChecklistPage() {
   ];
 
   return (
-    <>
+    <PermissionGate anyRole={["super_admin"]}>
       <PilotScenarioBoard projectCode={activeProject.projectCode} />
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <PilotStepper steps={steps} />
@@ -36,6 +37,6 @@ export default async function PilotChecklistPage() {
           <PilotTestResultPanel />
         </aside>
       </div>
-    </>
+    </PermissionGate>
   );
 }

@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { PageHeader } from "@/components/page-header";
 
 export default function AdminPage() {
   return (
-    <>
+    <PermissionGate anyRole={["super_admin"]}>
       <PageHeader
         eyebrow="ผู้ดูแลระบบ"
         title="ตั้งค่าระบบ"
@@ -31,6 +32,6 @@ export default function AdminPage() {
           <p className="section-description mt-1.5">ตรวจสุขภาพระบบ ทดสอบ GPS ตรวจข้อมูล และขั้นตอนรับมือเหตุผิดปกติ</p>
         </Link>
       </div>
-    </>
+    </PermissionGate>
   );
 }
