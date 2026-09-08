@@ -3,32 +3,37 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Activity, CarFront, ChevronRight, ClipboardList, FolderKanban, Gauge, LockKeyhole, MapPinned, Menu, Settings, UserRoundCheck, X } from "lucide-react";
+import {
+  CarFront,
+  ChevronRight,
+  ClipboardList,
+  FolderKanban,
+  Gauge,
+  MapPinned,
+  Menu,
+  PanelsTopLeft,
+  ShieldAlert,
+  UserRoundCheck,
+  Users,
+  X,
+  type LucideIcon
+} from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
+import type { NavSection } from "@/lib/auth/nav-model";
 
-const navSections = [
-  {
-    title: "ใช้งานจริง",
-    items: [
-      { href: "/", label: "ภาพรวม", description: "สถานะรวมวันนี้", icon: Gauge, help: "ดูภาพรวมโครงการ งานที่จัดสรร GPS ล่าสุด และรายการที่ต้องติดตาม" },
-      { href: "/mission-control", label: "ศูนย์ควบคุม", description: "แผนที่ รถ งาน ความเสี่ยง", icon: MapPinned, help: "ติดตามรถหลายคันบนแผนที่ ดูสถานะงาน GPS ข้อความจากคนขับ และรายการเสี่ยง" },
-      { href: "/projects", label: "โครงการ", description: "สร้างและจัดการพื้นที่ปฏิบัติการ", icon: FolderKanban, help: "โครงการคือพื้นที่หลักสำหรับรวมภารกิจ งานที่จัดสรร คนขับ รถ QR และ Timeline" },
-      { href: "/assignments", label: "บอร์ด Assignment", description: "มอบงานให้รถและคนขับ", icon: ClipboardList, help: "จัดสรรงานให้ Call Sign คนขับ และรถ พร้อมสร้าง QR เฉพาะงาน" },
-      { href: "/resources/vehicles", label: "จัดการรถ", description: "โปรไฟล์รถและคิวงาน", icon: CarFront, help: "ดูรถแต่ละคัน งานปัจจุบัน งานคงเหลือ งานที่เสร็จแล้ว และ GPS ล่าสุด" },
-      { href: "/driver", label: "หน้าคนขับ", description: "เปิดงานผ่าน QR", icon: UserRoundCheck, help: "หน้าสำหรับคนขับดูงาน ยืนยันความพร้อม แชร์ GPS และแจ้งปัญหา" }
-    ]
-  },
-  {
-    title: "ตรวจระบบ",
-    items: [
-      { href: "/live-test", label: "ทดสอบระบบ", description: "QR และ GPS สด", icon: Activity, help: "ใช้ทดสอบ flow แบบ end-to-end เท่านั้น แยกจากงานจริงเพื่อลดความสับสน" },
-      { href: "/admin", label: "ผู้ดูแลระบบ", description: "สุขภาพระบบและข้อมูล", icon: Settings, help: "ตรวจฐานข้อมูล สิทธิ์ ข้อมูลผิดปกติ และ runbook สำหรับผู้ดูแล" },
-      { href: "/login", label: "เข้าสู่ระบบ", description: "บัญชีและสิทธิ์", icon: LockKeyhole, help: "เข้าสู่ระบบด้วยบัญชีที่เปิดใช้งานไว้ใน Supabase Auth" }
-    ]
-  }
-];
+const ICONS: Record<string, LucideIcon> = {
+  Gauge,
+  MapPinned,
+  ClipboardList,
+  FolderKanban,
+  CarFront,
+  UserRoundCheck,
+  PanelsTopLeft,
+  Users,
+  ShieldAlert
+};
 
-export function AppNav() {
+export function AppNav({ sections }: { sections: NavSection[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -44,12 +49,12 @@ export function AppNav() {
       </button>
 
       <nav className={`${open ? "grid" : "hidden"} gap-5 lg:grid`} aria-label="เมนูหลัก">
-        {navSections.map((section) => (
+        {sections.map((section) => (
           <section key={section.title} className="grid gap-2">
             <p className="px-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:text-slate-400">{section.title}</p>
             <div className="grid gap-1.5">
               {section.items.map((item) => {
-                const Icon = item.icon;
+                const Icon = ICONS[item.icon] ?? Gauge;
                 const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
                 return (
@@ -72,7 +77,7 @@ export function AppNav() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold leading-5">{item.label}</span>
-                        <span className={`mt-0.5 block truncate text-[12px] leading-5 ${active ? "text-slate-600" : "text-slate-500 lg:text-slate-500 lg:group-hover:text-slate-300"}`}>
+                        <span className={`mt-0.5 block truncate text-[12px] leading-5 ${active ? "text-slate-600" : "text-slate-500 lg:group-hover:text-slate-300"}`}>
                           {item.description}
                         </span>
                       </span>

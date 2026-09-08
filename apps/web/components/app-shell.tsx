@@ -1,13 +1,17 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { AppNav } from "@/components/app-nav";
-import { AuthGate } from "@/components/auth/auth-gate";
 import { AuthStatus } from "@/components/auth/auth-status";
+import { RoleBadge } from "@/components/auth/role-badge";
 import { BuildVersionBadge } from "@/components/layout/build-version-badge";
 import { EnvironmentBadge } from "@/components/layout/environment-badge";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
+import { getViewerAccess } from "@/lib/auth/access";
+import { NAV_SECTIONS, filterNav } from "@/lib/auth/nav-model";
 
-export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
+export async function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { permissions, roleKeys, primaryRole } = await getViewerAccess();
+  const sections = filterNav(NAV_SECTIONS, { permissions, roleKeys });
+
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -36,10 +40,11 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
             </Link>
 
             <div className="mt-5 flex-1">
-              <AppNav />
+              <AppNav sections={sections} />
             </div>
 
             <div className="mt-5 grid gap-3 rounded-[22px] border border-white/10 bg-white/[0.07] p-4">
+              <RoleBadge roleKey={primaryRole} />
               <EnvironmentBadge />
               <BuildVersionBadge />
               <AuthStatus />
@@ -63,15 +68,11 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
                   <BuildVersionBadge compact />
                 </div>
               </div>
-              <AppNav />
+              <AppNav sections={sections} />
             </div>
           </header>
 
-          <WorkspaceShell>
-            <Suspense fallback={<div className="p-6 text-sm font-semibold text-slate-600">กำลังเตรียมหน้าระบบ...</div>}>
-              <AuthGate>{children}</AuthGate>
-            </Suspense>
-          </WorkspaceShell>
+          <WorkspaceShell>{children}</WorkspaceShell>
         </div>
       </div>
     </div>
