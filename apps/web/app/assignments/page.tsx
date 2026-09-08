@@ -50,7 +50,21 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
         </div>
       </section>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">
-        <CreateAssignmentForm projectId={projectId} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
+        <CreateAssignmentForm
+          projectId={projectId}
+          missions={missions}
+          callSigns={callSigns}
+          drivers={drivers}
+          vehicles={vehicles}
+          existingAssignments={assignments.map((assignment) => ({
+            id: assignment.id,
+            driverId: assignment.driverId,
+            vehicleId: assignment.vehicleId,
+            startTime: assignment.startTime,
+            endTime: assignment.endTime,
+            label: callSigns.find((callSign) => callSign.id === assignment.callSignId)?.callSign ?? null
+          }))}
+        />
         <DispatchBoard projectId={projectId} assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
       </div>
     </div>

@@ -1,11 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
 import { ActionFeedback } from "@/components/ui/action-feedback";
+import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { Tooltip } from "@/components/ui/tooltip";
+import { describeAssignmentConflicts } from "@/lib/domain/assignment-rules";
 import { createAssignmentSchema } from "@/lib/validation";
+
+export interface ExistingAssignmentWindow {
+  id: string;
+  driverId?: string | null;
+  vehicleId?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  label?: string | null;
+}
 
 interface CreateAssignmentFormProps {
   projectId: string;
@@ -13,16 +24,35 @@ interface CreateAssignmentFormProps {
   callSigns: CallSign[];
   drivers: Driver[];
   vehicles: Vehicle[];
+  existingAssignments?: ExistingAssignmentWindow[];
 }
 
-export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, vehicles }: CreateAssignmentFormProps) {
+export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, vehicles, existingAssignments = [] }: CreateAssignmentFormProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
   const [isPending, startTransition] = useTransition();
+  const [driverId, setDriverId] = useState("");
+  const [vehicleId, setVehicleId] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const canCreate = missions.length > 0 && callSigns.length > 0 && drivers.length > 0 && vehicles.length > 0;
+
+  const conflicts = useMemo(() => {
+    if (!startTime || !endTime || (!driverId && !vehicleId)) return [];
+    const relevant = existingAssignments.filter(
+      (item) => (driverId && item.driverId === driverId) || (vehicleId && item.vehicleId === vehicleId)
+    );
+    return describeAssignmentConflicts({ startTime, endTime }, relevant);
+  }, [existingAssignments, driverId, vehicleId, startTime, endTime]);
 
   function handleSubmit(formData: FormData) {
     setMessage(null);
+
+    if (conflicts.length && !String(formData.get("overrideReason") || "").trim()) {
+      setTone("danger");
+      setMessage("มีการจองซ้อนเวลา — ต้องระบุเหตุผลก่อนจึงจะสร้างงานได้");
+      return;
+    }
     const parsed = createAssignmentSchema.safeParse({
       projectId,
       missionId: formData.get("missionId"),
@@ -34,7 +64,8 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
       metadata: {
         pickupLocation: formData.get("pickupLocation") || "ยังไม่ระบุจุดรับ",
         dropoffLocation: formData.get("dropoffLocation") || "ยังไม่ระบุจุดส่ง",
-        driverInstruction: formData.get("driverInstruction") || ""
+        driverInstruction: formData.get("driverInstruction") || "",
+        ...(conflicts.length ? { overrideReason: String(formData.get("overrideReason") || "").trim(), overrideConflicts: conflicts } : {})
       }
     });
 
@@ -96,7 +127,7 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
         </label>
         <label className="field-label">
           เลือกคนขับ
-          <select className="field-input" name="driverId" defaultValue="" required>
+          <select className="field-input" name="driverId" value={driverId} onChange={(event) => setDriverId(event.target.value)} required>
             <option value="" disabled>เลือกคนขับ</option>
             {drivers.map((driver) => (
               <option key={driver.id} value={driver.id}>
@@ -107,7 +138,7 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
         </label>
         <label className="field-label">
           เลือกรถ
-          <select className="field-input" name="vehicleId" defaultValue="" required>
+          <select className="field-input" name="vehicleId" value={vehicleId} onChange={(event) => setVehicleId(event.target.value)} required>
             <option value="" disabled>เลือกรถ</option>
             {vehicles.map((vehicle) => (
               <option key={vehicle.id} value={vehicle.id}>
@@ -126,11 +157,11 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
         </label>
         <label className="field-label">
           เวลาเริ่ม
-          <input className="field-input" name="startTime" type="datetime-local" />
+          <input className="field-input" name="startTime" type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
         </label>
         <label className="field-label">
           เวลาสิ้นสุด
-          <input className="field-input" name="endTime" type="datetime-local" />
+          <input className="field-input" name="endTime" type="datetime-local" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
         </label>
         <label className="field-label md:col-span-2">
           คำสั่งสำหรับคนขับ
@@ -143,6 +174,13 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
           tone="warning"
           message="ต้องมีภารกิจ Call Sign คนขับ และรถก่อน จึงจะสร้างงานและ QR ให้คนขับได้"
         />
+      ) : null}
+      <ConflictWarning conflicts={conflicts} />
+      {conflicts.length ? (
+        <label className="field-label">
+          เหตุผลการจองซ้อน (จำเป็น)
+          <textarea className="field-input min-h-20" name="overrideReason" placeholder="อธิบายเหตุผลที่ต้องจองคนขับ/รถ ทับช่วงเวลาเดิม" />
+        </label>
       ) : null}
       <ActionFeedback message={message} tone={tone} />
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={!canCreate || isPending} type="submit">
