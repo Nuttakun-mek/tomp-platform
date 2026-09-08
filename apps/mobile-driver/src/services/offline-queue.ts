@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import type { AssignmentStatusUpdateInput, DriverCheckinInput, DriverIssueReportInput, DriverLocationUpdateInput } from "@tomp/types/schemas";
 import { submitIssue, submitLocation, submitReadiness, submitStatus } from "./driver-api";
+import { getSavedDriverToken } from "./token-store";
 
 const OFFLINE_QUEUE_KEY = "tomp_driver_offline_queue";
 const MAX_QUEUE_SIZE = 20;
@@ -53,10 +54,12 @@ export async function enqueueOfflineAction(kind: OfflineAction["kind"], payload:
 }
 
 async function sendAction(action: OfflineAction) {
-  if (action.kind === "readiness") return submitReadiness(action.payload);
-  if (action.kind === "status") return submitStatus(action.payload);
-  if (action.kind === "issue") return submitIssue(action.payload);
-  return submitLocation(action.payload);
+  if (action.kind === "location") return submitLocation(action.payload);
+  const token = await getSavedDriverToken();
+  if (!token) return { success: false, error: "ไม่พบ token ของงาน" };
+  if (action.kind === "readiness") return submitReadiness(token, action.payload);
+  if (action.kind === "status") return submitStatus(token, action.payload);
+  return submitIssue(token, action.payload);
 }
 
 export async function flushOfflineQueue() {

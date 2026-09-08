@@ -111,7 +111,7 @@ export default function App() {
       gpsConsent: true,
       metadata: { source: "mobile_driver" }
     } as const;
-    const result = await submitReadiness(input);
+    const result = await submitReadiness(assignment.token, input);
     if (!result.success) {
       await enqueueOfflineAction("readiness", input);
       await refreshOfflineCount();
@@ -131,7 +131,7 @@ export default function App() {
       source: "driver_qr",
       metadata: { source: "mobile_driver" }
     } as const;
-    const result = await submitStatus(input);
+    const result = await submitStatus(assignment.token, input);
     if (!result.success) {
       await enqueueOfflineAction("status", input);
       await refreshOfflineCount();
@@ -152,7 +152,7 @@ export default function App() {
       message: "คนขับกดแจ้งปัญหาจากแอปมือถือ",
       metadata: { source: "mobile_driver" }
     } as const;
-    const result = await submitIssue(input);
+    const result = await submitIssue(assignment.token, input);
     if (!result.success) {
       await enqueueOfflineAction("issue", input);
       await refreshOfflineCount();

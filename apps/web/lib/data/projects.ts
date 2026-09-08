@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Project } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
@@ -5,7 +6,8 @@ import { demoKernel } from "@/lib/demo/demo-kernel";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapProject } from "./mappers";
 
-export async function getProjects(): Promise<Project[]> {
+// cache(): the shell, the page and workspace tabs all need the project list.
+export const getProjects = cache(async function getProjects(): Promise<Project[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return getProjectsViaPostgres();
 
@@ -16,7 +18,7 @@ export async function getProjects(): Promise<Project[]> {
   } catch {
     return getProjectsViaPostgres();
   }
-}
+});
 
 export async function getProjectById(projectId: string): Promise<Project | null> {
   const { client: supabase } = await resolveReadClient();

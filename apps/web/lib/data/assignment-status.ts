@@ -1,4 +1,5 @@
 import { getPostgresClient } from "@/lib/db/postgres";
+import { rowLoose, type Row } from "@/lib/data/row";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 export interface AssignmentStatusUpdate {
@@ -7,18 +8,15 @@ export interface AssignmentStatusUpdate {
   at: string;
 }
 
-type Row = Record<string, unknown>;
-
 function collapse(rows: Row[]): Record<string, AssignmentStatusUpdate> {
   const latest: Record<string, AssignmentStatusUpdate> = {};
   for (const row of rows) {
-    const id = String(row.assignment_id ?? "");
+    const id = rowLoose(row, "assignment_id");
     if (!id || latest[id]) continue;
-    const at = row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at ?? "");
     latest[id] = {
-      status: String(row.status ?? "unknown"),
-      source: String(row.source ?? "driver_qr"),
-      at
+      status: rowLoose(row, "status", "unknown"),
+      source: rowLoose(row, "source", "driver_qr"),
+      at: rowLoose(row, "created_at")
     };
   }
   return latest;

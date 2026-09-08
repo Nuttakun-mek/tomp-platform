@@ -1,3 +1,4 @@
+import { rowText, type Row } from "@/lib/data/row";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
 export interface VehicleEvidence {
@@ -7,13 +8,7 @@ export interface VehicleEvidence {
   platePhotoUrl: string | null;
 }
 
-type Row = Record<string, unknown>;
-
-function str(row: Row, key: string): string {
-  const value = row[key];
-  if (value instanceof Date) return value.toISOString();
-  return typeof value === "string" ? value : "";
-}
+const str = (row: Row, key: string) => rowText(row, key);
 
 // Latest vehicle check-in photo per assignment for a project, as short-lived
 // signed URLs (the driver-evidence bucket is private).

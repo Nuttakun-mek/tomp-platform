@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withTimeout } from "@/lib/async/timeout";
+import { guardProjectApi } from "@/lib/api/guard";
 import { getDriverCommsByProjectId } from "@/lib/data/driver-comms";
 import { getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
@@ -12,6 +13,9 @@ export async function GET(request: Request) {
   if (!projectId) {
     return NextResponse.json({ success: false, error: "ต้องระบุ projectId" }, { status: 400 });
   }
+
+  const denied = await guardProjectApi();
+  if (denied) return denied;
 
   try {
     const [comms, statuses, evidence] = await withTimeout(

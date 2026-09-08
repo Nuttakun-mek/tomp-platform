@@ -26,16 +26,18 @@ export async function fetchAssignmentByToken(token: string) {
   return requestJson<MobileDriverAssignment>(`/api/driver/assignment?token=${encodeURIComponent(token)}`);
 }
 
-export async function submitReadiness(input: DriverCheckinInput) {
-  return requestJson<unknown>("/api/driver/readiness", { method: "POST", body: JSON.stringify(input) });
+// The write routes verify the driver token (x-driver-token) and derive
+// projectId/assignmentId/driverId from it — the body ids are ignored.
+export async function submitReadiness(token: string, input: DriverCheckinInput) {
+  return requestJson<unknown>("/api/driver/readiness", { method: "POST", headers: { "x-driver-token": token }, body: JSON.stringify(input) });
 }
 
-export async function submitStatus(input: AssignmentStatusUpdateInput) {
-  return requestJson<unknown>("/api/driver/status", { method: "POST", body: JSON.stringify(input) });
+export async function submitStatus(token: string, input: AssignmentStatusUpdateInput) {
+  return requestJson<unknown>("/api/driver/status", { method: "POST", headers: { "x-driver-token": token }, body: JSON.stringify(input) });
 }
 
-export async function submitIssue(input: DriverIssueReportInput) {
-  return requestJson<unknown>("/api/driver/issue", { method: "POST", body: JSON.stringify(input) });
+export async function submitIssue(token: string, input: DriverIssueReportInput) {
+  return requestJson<unknown>("/api/driver/issue", { method: "POST", headers: { "x-driver-token": token }, body: JSON.stringify(input) });
 }
 
 export async function submitLocation(input: DriverLocationUpdateInput) {

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { randomUUID } from "crypto";
 import { getSessionAwareAuthClient } from "@/lib/auth/auth-server";
 import { resolvePrimaryRole } from "@/lib/auth/role-model";
@@ -21,7 +22,9 @@ function allowDevelopmentFallback() {
   return process.env.NODE_ENV !== "production" || process.env.TOMP_ALLOW_AUTH_FALLBACK === "1";
 }
 
-export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
+// cache(): the auth check + profile lookup runs once per request even though the
+// layout, several pages and getViewerAccess all ask for it.
+export const getCurrentUserProfile = cache(async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
   const supabase = await getSessionAwareAuthClient();
 
   if (!supabase) {
@@ -74,7 +77,7 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile> {
     isDevelopmentFallback: false,
     productionRisk: primaryRole ? null : "บัญชีนี้ยังไม่ได้รับบทบาทในระบบ"
   };
-}
+});
 
 type RoleKeyJoin = { roles?: { role_key?: string } | { role_key?: string }[] | null };
 

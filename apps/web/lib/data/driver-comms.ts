@@ -1,4 +1,5 @@
 import { getPostgresClient } from "@/lib/db/postgres";
+import { rowLoose, rowObject, type Row } from "@/lib/data/row";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 export interface DriverInboundMessage {
@@ -29,45 +30,32 @@ export interface DriverComms {
   outbound: DriverOutboundMessage[];
 }
 
-type Row = Record<string, unknown>;
-
-function str(row: Row, key: string, fallback = ""): string {
-  const value = row[key];
-  if (value instanceof Date) return value.toISOString();
-  return typeof value === "string" ? value : value == null ? fallback : String(value);
-}
-
-function metaObject(row: Row): Record<string, unknown> {
-  const value = row.metadata;
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}
-
 function mapInbound(row: Row): DriverInboundMessage {
-  const meta = metaObject(row);
-  const kind = meta.kind === "driver_message" || str(row, "issue_type") === "message" ? "message" : "issue";
+  const meta = rowObject(row);
+  const kind = meta.kind === "driver_message" || rowLoose(row, "issue_type") === "message" ? "message" : "issue";
   return {
-    id: str(row, "id"),
-    assignmentId: str(row, "assignment_id"),
-    driverId: str(row, "driver_id") || null,
-    issueType: str(row, "issue_type", "other"),
-    severity: str(row, "severity", "warning"),
-    message: str(row, "message"),
-    status: str(row, "status", "open"),
-    at: str(row, "created_at", new Date().toISOString()),
+    id: rowLoose(row, "id"),
+    assignmentId: rowLoose(row, "assignment_id"),
+    driverId: rowLoose(row, "driver_id") || null,
+    issueType: rowLoose(row, "issue_type", "other"),
+    severity: rowLoose(row, "severity", "warning"),
+    message: rowLoose(row, "message"),
+    status: rowLoose(row, "status", "open"),
+    at: rowLoose(row, "created_at", new Date().toISOString()),
     kind
   };
 }
 
 function mapOutbound(row: Row): DriverOutboundMessage {
   return {
-    id: str(row, "id"),
-    assignmentId: str(row, "assignment_id"),
-    driverId: str(row, "driver_id") || null,
-    title: str(row, "title", "ข้อความจากศูนย์ควบคุม"),
-    body: str(row, "body"),
-    priority: str(row, "priority", "normal"),
-    status: str(row, "status", "unread"),
-    at: str(row, "sent_at", str(row, "created_at", new Date().toISOString()))
+    id: rowLoose(row, "id"),
+    assignmentId: rowLoose(row, "assignment_id"),
+    driverId: rowLoose(row, "driver_id") || null,
+    title: rowLoose(row, "title", "ข้อความจากศูนย์ควบคุม"),
+    body: rowLoose(row, "body"),
+    priority: rowLoose(row, "priority", "normal"),
+    status: rowLoose(row, "status", "unread"),
+    at: rowLoose(row, "sent_at", rowLoose(row, "created_at", new Date().toISOString()))
   };
 }
 

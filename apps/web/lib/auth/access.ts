@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { getCurrentUserProfile, type CurrentUserProfile } from "@/lib/auth/current-user";
 import { loadRolePermissions, permissionsForRoles } from "@/lib/auth/permissions";
 import { getUserRoles } from "@/lib/auth/rbac";
@@ -12,7 +13,7 @@ export interface ViewerAccess {
   primaryRole: string | null;
 }
 
-export async function getViewerAccess(): Promise<ViewerAccess> {
+export const getViewerAccess = cache(async function getViewerAccess(): Promise<ViewerAccess> {
   const profile = await getCurrentUserProfile();
 
   // dev fallback: full access, super_admin
@@ -27,4 +28,4 @@ export async function getViewerAccess(): Promise<ViewerAccess> {
   const [roleKeys, matrix] = await Promise.all([getUserRoles(profile.id), loadRolePermissions()]);
   const permissions = permissionsForRoles(roleKeys, matrix);
   return { profile, roleKeys, permissions, primaryRole: resolvePrimaryRole(roleKeys) };
-}
+});

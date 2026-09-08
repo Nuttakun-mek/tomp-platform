@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 // Fallback matrix — must stay in sync with the latest role_permissions seed
 // (database/migrations/0021_rbac_v3_single_org.sql). The DB is the source of truth;
 // this is used only when the DB is unreachable (see loadRolePermissions).
@@ -62,7 +64,8 @@ export function permissionsForRoles(roleKeys: string[], matrix: Record<string, s
 }
 
 // อ่าน role_permissions จาก DB; ใช้ fallback map ถ้าอ่านไม่ได้/ว่าง
-export async function loadRolePermissions(): Promise<Record<string, string[]>> {
+// cache(): the permission matrix is identical for the whole request.
+export const loadRolePermissions = cache(async function loadRolePermissions(): Promise<Record<string, string[]>> {
   try {
     const { getSupabaseServerDataClient } = await import("@/lib/supabase/server");
     const client = getSupabaseServerDataClient();
@@ -85,4 +88,4 @@ export async function loadRolePermissions(): Promise<Record<string, string[]>> {
   } catch {
     return ROLE_PERMISSIONS;
   }
-}
+});

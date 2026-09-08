@@ -1,5 +1,6 @@
-import { resolveReadClient } from "@/lib/supabase/scoped-client";
+import { rowLoose, rowObject, type Row } from "@/lib/data/row";
 import { getPostgresClient } from "@/lib/db/postgres";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 export interface ProjectMemberRow {
   profileId: string;
@@ -9,17 +10,25 @@ export interface ProjectMemberRow {
   status: string;
 }
 
-type Row = Record<string, unknown>;
-
-function map(row: Row): ProjectMemberRow {
-  const profile = (row.profiles ?? {}) as Row;
-  const role = (row.roles ?? {}) as Row;
+function mapNested(row: Row): ProjectMemberRow {
+  const profile = rowObject(row, "profiles");
+  const role = rowObject(row, "roles");
   return {
-    profileId: String(row.profile_id ?? ""),
-    fullName: String(profile.full_name ?? "ไม่ทราบชื่อ"),
-    email: String(profile.email ?? ""),
-    roleKey: String(role.role_key ?? ""),
-    status: String(row.status ?? "active")
+    profileId: rowLoose(row, "profile_id"),
+    fullName: rowLoose(profile, "full_name", "ไม่ทราบชื่อ"),
+    email: rowLoose(profile, "email"),
+    roleKey: rowLoose(role, "role_key"),
+    status: rowLoose(row, "status", "active")
+  };
+}
+
+function mapFlat(row: Row): ProjectMemberRow {
+  return {
+    profileId: rowLoose(row, "profile_id"),
+    fullName: rowLoose(row, "full_name", "ไม่ทราบชื่อ"),
+    email: rowLoose(row, "email"),
+    roleKey: rowLoose(row, "role_key"),
+    status: rowLoose(row, "status", "active")
   };
 }
 
@@ -30,7 +39,7 @@ export async function getProjectMembers(projectId: string): Promise<ProjectMembe
       .from("project_members")
       .select("profile_id, status, profiles(full_name, email), roles(role_key)")
       .eq("project_id", projectId);
-    if (!error && data) return (data as Row[]).map(map);
+    if (!error && data) return (data as Row[]).map(mapNested);
   }
 
   const sql = getPostgresClient();
@@ -43,13 +52,7 @@ export async function getProjectMembers(projectId: string): Promise<ProjectMembe
       left join roles r on r.id = pm.role_id
       where pm.project_id = ${projectId}
     `;
-    return rows.map((row) => ({
-      profileId: String(row.profile_id ?? ""),
-      fullName: String(row.full_name ?? "ไม่ทราบชื่อ"),
-      email: String(row.email ?? ""),
-      roleKey: String(row.role_key ?? ""),
-      status: String(row.status ?? "active")
-    }));
+    return rows.map(mapFlat);
   } catch {
     return [];
   }

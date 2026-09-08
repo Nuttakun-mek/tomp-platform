@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -10,7 +11,8 @@ import { scopedReadsFlagOn, shouldUseScopedClient } from "./scoped-decision";
 
 // Session-aware read client: subject to RLS as the logged-in user (migration 0019/0020).
 // Returns null when Supabase is not configured (dev without env).
-export async function getScopedDataClient(): Promise<SupabaseClient | null> {
+// cache(): one client + one auth.getUser() per request, shared by every lib/data/* call.
+export const getScopedDataClient = cache(async function getScopedDataClient(): Promise<SupabaseClient | null> {
   if (process.env.NEXT_PHASE === "phase-production-build") return null;
 
   const supabaseUrl = readCleanEnv("NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL");
@@ -34,12 +36,13 @@ export async function getScopedDataClient(): Promise<SupabaseClient | null> {
       }
     }
   }) as unknown as SupabaseClient;
-}
+});
 
 // Chooses the read client for lib/data/* functions:
 //  - scoped session client when TOMP_SCOPED_READS=1 AND a real auth session exists
 //  - service-role client otherwise (dev fallback, system reads, flag off)
-export async function resolveReadClient(): Promise<{ client: SupabaseClient | null; scoped: boolean }> {
+// cache(): resolved once per request; every lib/data/* function reuses the decision.
+export const resolveReadClient = cache(async function resolveReadClient(): Promise<{ client: SupabaseClient | null; scoped: boolean }> {
   if (scopedReadsFlagOn()) {
     const scoped = await getScopedDataClient();
     if (scoped) {
@@ -48,4 +51,4 @@ export async function resolveReadClient(): Promise<{ client: SupabaseClient | nu
     }
   }
   return { client: getSupabaseServerDataClient(), scoped: false };
-}
+});

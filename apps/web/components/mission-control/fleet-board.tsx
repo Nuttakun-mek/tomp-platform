@@ -96,8 +96,8 @@ export function FleetBoard({
         /* keep last known */
       }
     }
-    const timer = window.setInterval(poll, 10000);
-    const clock = window.setInterval(() => setNow(Date.now()), 5000);
+    const timer = window.setInterval(poll, 12000);
+    const clock = window.setInterval(() => setNow(Date.now()), 15000);
     void poll();
     return () => {
       alive = false;

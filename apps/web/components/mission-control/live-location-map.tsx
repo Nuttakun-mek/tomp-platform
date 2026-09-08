@@ -90,8 +90,9 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
     });
 
     if (channel) setConnection("live");
-    const refreshTimer = window.setInterval(refresh, 7000);
-    const clockTimer = window.setInterval(() => setNow(Date.now()), 1000);
+    const refreshTimer = window.setInterval(refresh, 10000);
+    // freshness labels only need ~10s resolution; a 1s clock re-rendered the map every second
+    const clockTimer = window.setInterval(() => setNow(Date.now()), 10000);
     void refresh();
 
     return () => {
