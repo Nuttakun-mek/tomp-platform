@@ -23,3 +23,6 @@ scripts/audit/
 _*.mjs
 scripts/audit2/
 scripts/audit3/
+
+# seed output from scripts/seed-test-users.mjs (contains cloud ids, gitignored)
+scripts/.seed-test-users.json
