@@ -15,11 +15,10 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
 
   if (!driverAccess) {
     return (
-      <div className="grid min-h-[70vh] content-center gap-3 text-center">
-        <p className="text-4xl">🚫</p>
-        <h1 className="text-lg font-bold text-ink">ไม่พบงานสำหรับ QR นี้</h1>
+      <div className="grid min-h-[70vh] content-center gap-2 text-center">
+        <h1 className="text-lg font-bold text-ink">ไม่พบงานสำหรับลิงก์นี้</h1>
         <p className="mx-auto max-w-sm text-[13px] leading-6 text-ink-soft">
-          QR อาจหมดอายุหรือถูกยกเลิก กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR และรหัสใหม่
+          ลิงก์อาจหมดอายุหรือถูกยกเลิก กรุณาติดต่อศูนย์ควบคุมเพื่อขอลิงก์และรหัสใหม่
         </p>
       </div>
     );

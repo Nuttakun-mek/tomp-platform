@@ -17,6 +17,7 @@ import { getLatestDriverLocationsByProjectId, getProjectIdWithLatestDriverLocati
 import { getProjects } from "@/lib/data/projects";
 import { getDrivers, getVehicles } from "@/lib/data/resources";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
+import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getVehicleOperationProfilesByProjectId } from "@/lib/data/vehicle-operations";
 import { demoProject } from "@/lib/demo/demo-kernel";
 import Link from "next/link";
@@ -52,7 +53,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     projects[0] ??
     demoProject;
 
-  const [events, locations, assignments, vehicleProfiles, assignmentStatuses, callSigns, comms, drivers, vehicles] = await Promise.all([
+  const [events, locations, assignments, vehicleProfiles, assignmentStatuses, callSigns, comms, drivers, vehicles, evidence] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
     getLatestDriverLocationsByProjectId(activeProject.id),
     getAssignmentsByProjectId(activeProject.id),
@@ -61,7 +62,8 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     getCallSignsByProjectId(activeProject.id),
     getDriverCommsByProjectId(activeProject.id),
     getDrivers(),
-    getVehicles()
+    getVehicles(),
+    getVehicleEvidenceByProjectId(activeProject.id)
   ]);
 
   const locationAssignmentIds = new Set(locations.map((location) => location.assignmentId).filter(Boolean));
@@ -84,6 +86,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
         vehicles={vehicles}
         initialLocations={locations}
         initialStatuses={assignmentStatuses}
+        initialEvidence={evidence}
       />
 
       <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">

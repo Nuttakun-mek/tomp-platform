@@ -1,6 +1,6 @@
 import type { Assignment, CallSign, Driver, DriverAssignmentPacket, DriverNotification, Project, RouteChangeInstruction, Vehicle } from "@tomp/types/domain";
 import { hashDriverAccessToken } from "@/lib/driver-access/token";
-import { getDriverAssignmentPacketByAssignmentId, getDriverNotificationsByAssignmentId, getRouteChangesByAssignmentId } from "@/lib/data/driver-operations";
+import { getDriverAssignmentPacketByAssignmentId, getDriverIssueMessagesByAssignmentId, getDriverNotificationsByAssignmentId, getRouteChangesByAssignmentId, type DriverIssueMessage } from "@/lib/data/driver-operations";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
@@ -16,6 +16,7 @@ export interface DriverAccessAssignment {
   packet?: DriverAssignmentPacket | null;
   notifications: DriverNotification[];
   routeChanges: RouteChangeInstruction[];
+  messages: DriverIssueMessage[];
   tokenValidated: boolean;
 }
 
@@ -106,10 +107,11 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     })
     .eq("token_hash", tokenHash);
 
-  const [packet, notifications, routeChanges] = await Promise.all([
+  const [packet, notifications, routeChanges, messages] = await Promise.all([
     getDriverAssignmentPacketByAssignmentId(text(assignment, "id")),
     getDriverNotificationsByAssignmentId(text(assignment, "id")),
-    getRouteChangesByAssignmentId(text(assignment, "id"))
+    getRouteChangesByAssignmentId(text(assignment, "id")),
+    getDriverIssueMessagesByAssignmentId(text(assignment, "id"))
   ]);
 
   const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
@@ -122,6 +124,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     packet,
     notifications,
     routeChanges,
+    messages,
     project: {
       ...base(project),
       organizationId: text(project, "organization_id"),
@@ -198,14 +201,15 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   const assignment = assignmentRows[0];
   if (!assignment) return null;
 
-  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows] = await Promise.all([
+  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows] = await Promise.all([
     sql<Row[]>`select * from projects where id = ${String(tokenRow.project_id)} limit 1`,
     sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
     assignment.driver_id ? sql<Row[]>`select * from drivers where id = ${String(assignment.driver_id)} limit 1` : Promise.resolve([]),
     assignment.vehicle_id ? sql<Row[]>`select * from vehicles where id = ${String(assignment.vehicle_id)} limit 1` : Promise.resolve([]),
     sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 1`,
     sql<Row[]>`select * from driver_notifications where assignment_id = ${String(tokenRow.assignment_id)} order by sent_at desc limit 10`,
-    sql<Row[]>`select * from route_change_instructions where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 5`
+    sql<Row[]>`select * from route_change_instructions where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 5`,
+    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${String(tokenRow.assignment_id)} order by created_at asc limit 50`
   ]);
 
   const project = projectRows[0];
@@ -238,6 +242,13 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     token,
     tokenValidated: true,
     packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,
+    messages: messageRows.map((row) => ({
+      id: text(row, "id"),
+      text: text(row, "message"),
+      at: text(row, "created_at", new Date().toISOString()),
+      issueType: text(row, "issue_type", "message"),
+      severity: text(row, "severity", "info")
+    })),
     notifications: notificationRows.map((row) => ({
       id: text(row, "id"),
       projectId: text(row, "project_id"),

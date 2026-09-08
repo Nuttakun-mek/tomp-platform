@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, MapPin, Phone } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
 import type { AssignmentStatusUpdate } from "@/lib/data/assignment-status";
+import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/ui/relative-time";
 
@@ -15,6 +16,7 @@ interface FleetBoardProps {
   vehicles: Vehicle[];
   initialLocations: DriverLocation[];
   initialStatuses: Record<string, AssignmentStatusUpdate>;
+  initialEvidence?: Record<string, VehicleEvidence>;
 }
 
 type Freshness = "live" | "slow" | "offline" | "none";
@@ -44,9 +46,10 @@ const FRESH_LABEL: Record<Freshness, string> = {
 
 const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, slow: 2, live: 3 };
 
-export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicles, initialLocations, initialStatuses }: FleetBoardProps) {
+export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicles, initialLocations, initialStatuses, initialEvidence = {} }: FleetBoardProps) {
   const [locations, setLocations] = useState(initialLocations);
   const [statuses, setStatuses] = useState(initialStatuses);
+  const [evidence, setEvidence] = useState(initialEvidence);
   const [now, setNow] = useState(() => Date.now());
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -61,6 +64,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         if (!alive) return;
         if (locRes?.success !== false && Array.isArray(locRes?.data)) setLocations(locRes.data as DriverLocation[]);
         if (commsRes?.success && commsRes.data?.statuses) setStatuses(commsRes.data.statuses as Record<string, AssignmentStatusUpdate>);
+        if (commsRes?.success && commsRes.data?.evidence) setEvidence(commsRes.data.evidence as Record<string, VehicleEvidence>);
         setNow(Date.now());
       } catch {
         /* keep last known */
@@ -186,6 +190,33 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         </a>
                       ) : null}
                     </div>
+                    {(() => {
+                      const ev = evidence[row.assignment.id];
+                      if (!ev || (!ev.vehiclePhotoUrl && !ev.platePhotoUrl)) {
+                        return <p className="text-[11px] text-amber-600">ยังไม่มีรูปตรวจรถจากคนขับ</p>;
+                      }
+                      return (
+                        <div>
+                          <p className="text-xs font-semibold text-slate-600">หลักฐานตรวจรถ · {formatRelativeTh(ev.at, now)}</p>
+                          <div className="mt-1 flex gap-2">
+                            {ev.vehiclePhotoUrl ? (
+                              <a href={ev.vehiclePhotoUrl} target="_blank" rel="noreferrer" className="block">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={ev.vehiclePhotoUrl} alt="รูปรถ" className="h-20 w-28 rounded-lg border border-slate-200 object-cover" />
+                                <span className="mt-0.5 block text-center text-[10px] text-slate-500">รูปรถ</span>
+                              </a>
+                            ) : null}
+                            {ev.platePhotoUrl ? (
+                              <a href={ev.platePhotoUrl} target="_blank" rel="noreferrer" className="block">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={ev.platePhotoUrl} alt="รูปป้ายทะเบียน" className="h-20 w-28 rounded-lg border border-slate-200 object-cover" />
+                                <span className="mt-0.5 block text-center text-[10px] text-slate-500">ป้ายทะเบียน</span>
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <p className="text-[11px] text-slate-400">ส่งข้อความถึงคนขับได้ที่แผง “การสื่อสารกับคนขับ” ด้านล่าง</p>
                   </div>
                 ) : null}

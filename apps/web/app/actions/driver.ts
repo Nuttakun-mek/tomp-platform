@@ -7,6 +7,7 @@ import {
   vehicleCheckinSchema
 } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { uploadPlatePhoto, uploadVehiclePhoto } from "@/lib/storage/checkin-photos";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
@@ -93,6 +94,72 @@ export async function vehiclePhotoUploadAction(formData: FormData): Promise<Acti
   }
 
   return actionSuccess({ uploads });
+}
+
+// Token-authed evidence upload from the QR driver page. Project/assignment come
+// from the token, never from the form, so a driver can only attach to their own job.
+export async function driverEvidenceUploadAction(formData: FormData): Promise<ActionResult> {
+  const token = String(formData.get("token") || "");
+  const kind = String(formData.get("kind") || "");
+  const file = formData.get("file");
+
+  if (!token) return actionFailure("ไม่พบลิงก์งาน");
+  if (kind !== "vehicle" && kind !== "plate") return actionFailure("ประเภทรูปไม่ถูกต้อง");
+  if (!(file instanceof File) || file.size === 0) return actionFailure("ยังไม่ได้เลือกรูป");
+
+  const access = await getDriverAssignmentByToken(token);
+  if (!access) return actionFailure("QR หมดอายุหรือถูกยกเลิก");
+
+  const upload =
+    kind === "vehicle"
+      ? await uploadVehiclePhoto(access.project.id, access.assignment.id, file)
+      : await uploadPlatePhoto(access.project.id, access.assignment.id, file);
+
+  if (!upload.success) return actionFailure(upload.error || "อัปโหลดรูปไม่สำเร็จ");
+  return actionSuccess({ kind, path: upload.path });
+}
+
+// Records the vehicle-evidence check-in (photo storage paths) for the driver's job.
+// Token-authed; paths are storage keys in the private driver-evidence bucket.
+export async function recordVehicleEvidenceAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as { token?: string; vehiclePath?: string | null; platePath?: string | null };
+  const token = String(data.token || "");
+  if (!token) return actionFailure("ไม่พบลิงก์งาน");
+
+  const access = await getDriverAssignmentByToken(token);
+  if (!access) return actionFailure("QR หมดอายุหรือถูกยกเลิก");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ระบบไม่พร้อมบันทึกข้อมูล");
+
+  const { data: row, error: insertError } = await client
+    .from("vehicle_checkins")
+    .insert({
+      project_id: access.project.id,
+      assignment_id: access.assignment.id,
+      vehicle_id: access.vehicle.id,
+      driver_id: access.driver.id,
+      status: "confirmed",
+      photo_url: data.vehiclePath || null,
+      plate_photo_url: data.platePath || null,
+      metadata: { source: "driver_task_view", bucket: "driver-evidence" }
+    })
+    .select()
+    .single();
+
+  if (insertError) return actionFailure(`บันทึกหลักฐานตรวจรถไม่สำเร็จ: ${insertError.message}`);
+
+  await createTimelineEvent({
+    projectId: access.project.id,
+    objectType: "vehicle",
+    objectId: access.vehicle.id,
+    eventType: TIMELINE_EVENTS.VEHICLE_CHECKED_IN,
+    source: "driver_qr",
+    reason: "คนขับส่งรูปรถและป้ายทะเบียนก่อนรับงาน",
+    afterData: row
+  }).catch(() => undefined);
+
+  return actionSuccess({ checkin: row });
 }
 
 export async function assignmentStatusUpdateAction(input: unknown): Promise<ActionResult> {

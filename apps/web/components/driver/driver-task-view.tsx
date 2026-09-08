@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2, ChevronDown, MapPin, MessageSquare, Navigation, Phone, TriangleAlert } from "lucide-react";
-import { assignmentStatusUpdateAction, driverCheckinAction, driverIssueReportAction } from "@/app/actions/driver";
+import {
+  assignmentStatusUpdateAction,
+  driverCheckinAction,
+  driverIssueReportAction,
+  recordVehicleEvidenceAction
+} from "@/app/actions/driver";
+import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
-import { NotificationCard } from "@/components/ui/notification-card";
+import { DriverPhotoCheck } from "@/components/driver/driver-photo-check";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
+import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import type { DriverNotification } from "@tomp/types/domain";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
@@ -16,14 +23,6 @@ const TRIP_STEPS: Array<{ status: "arrived_pickup" | "passenger_onboard" | "comp
   { status: "arrived_pickup", label: "ถึงจุดรับแล้ว" },
   { status: "passenger_onboard", label: "รับผู้โดยสารแล้ว" },
   { status: "completed", label: "ส่งเสร็จแล้ว" }
-];
-
-const QUICK_MESSAGES = [
-  "ถึงจุดรับแล้ว",
-  "กำลังไปจุดส่ง",
-  "รถติด คาดว่าช้า ~15 นาที",
-  "ติดต่อผู้โดยสารไม่ได้",
-  "ถึงจุดส่งแล้ว"
 ];
 
 const ISSUE_TYPES: Array<{ type: string; label: string }> = [
@@ -55,14 +54,16 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   const [banner, setBanner] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [issueOpen, setIssueOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
-  const [messageText, setMessageText] = useState("");
-  const [messageOpen, setMessageOpen] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(true);
+  const [nextStepsOpen, setNextStepsOpen] = useState(false);
   const [notifications, setNotifications] = useState<DriverNotification[]>(driverAccess.notifications);
+  const [messages, setMessages] = useState<DriverIssueMessage[]>(driverAccess.messages);
   const [gpsLight, setGpsLight] = useState<"off" | "live" | "stale">("off");
   const [checkOpen, setCheckOpen] = useState(false);
   const [checks, setChecks] = useState({ name: false, phone: false, vehicle: false, gps: false });
+  const [photoPaths, setPhotoPaths] = useState<{ vehicle?: string; plate?: string }>({});
   const allChecked = checks.name && checks.phone && checks.vehicle && checks.gps;
+  const photosReady = Boolean(photoPaths.vehicle && photoPaths.plate);
 
   const ids = {
     projectId: driverAccess.project.id,
@@ -70,15 +71,20 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
     driverId: driverAccess.driver.id
   };
 
-  // poll the control centre for new messages + route changes every 15s
+  // poll the control centre for messages + route changes every 15s
   const seenIds = useRef(new Set(driverAccess.notifications.map((n) => n.id)));
   useEffect(() => {
     let alive = true;
     async function poll() {
       try {
         const res = await fetch(`/api/driver/updates?token=${encodeURIComponent(driverAccess.token)}`, { cache: "no-store" });
-        const json = (await res.json()) as { success?: boolean; data?: { notifications?: DriverNotification[] } };
-        if (alive && json.success && Array.isArray(json.data?.notifications)) {
+        const json = (await res.json()) as {
+          success?: boolean;
+          data?: { notifications?: DriverNotification[]; messages?: DriverIssueMessage[] };
+        };
+        if (!alive || !json.success || !json.data) return;
+        if (Array.isArray(json.data.messages)) setMessages(json.data.messages);
+        if (Array.isArray(json.data.notifications)) {
           setNotifications(json.data.notifications);
           for (const n of json.data.notifications) {
             if (!seenIds.current.has(n.id)) {
@@ -99,6 +105,10 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   }, [driverAccess.token]);
 
   function markReady() {
+    if (!photosReady) {
+      setBanner({ tone: "error", text: "กรุณาถ่ายรูปรถและป้ายทะเบียนก่อนกดพร้อมรับงาน" });
+      return;
+    }
     setBanner(null);
     startTransition(async () => {
       const result = await driverCheckinAction({
@@ -108,14 +118,15 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         confirmedPhone: checks.phone || allChecked,
         confirmedVehicle: checks.vehicle || allChecked,
         gpsConsent: checks.gps || allChecked,
-        metadata: { via: "driver_task_view", checklistComplete: allChecked }
+        metadata: { via: "driver_task_view", checklistComplete: allChecked, photoPaths }
       });
-      if (result.success) {
-        setPhase("ready");
-        setBanner({ tone: "ok", text: "แจ้งความพร้อมแล้ว ศูนย์ควบคุมได้รับข้อมูล" });
-      } else {
+      if (!result.success) {
         setBanner({ tone: "error", text: result.error || "บันทึกไม่สำเร็จ ลองอีกครั้ง" });
+        return;
       }
+      await recordVehicleEvidenceAction({ token: driverAccess.token, vehiclePath: photoPaths.vehicle, platePath: photoPaths.plate }).catch(() => undefined);
+      setPhase("ready");
+      setBanner({ tone: "ok", text: "แจ้งความพร้อมแล้ว ศูนย์ควบคุมได้รับข้อมูลและรูปแล้ว" });
     });
   }
 
@@ -151,34 +162,40 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
     });
   }
 
-  function sendMessage() {
-    const text = messageText.trim();
-    if (!text) return;
-    setBanner(null);
+  function sendMessage(text: string) {
+    const value = text.trim();
+    if (!value) return;
+    const optimistic: DriverIssueMessage = {
+      id: `local-${Date.now()}`,
+      text: value,
+      at: new Date().toISOString(),
+      issueType: "message",
+      severity: "info"
+    };
+    setMessages((current) => [...current, optimistic]);
     startTransition(async () => {
       const result = await driverIssueReportAction({
         ...ids,
         issueType: "message",
         severity: "info",
-        message: text,
+        message: value,
         metadata: { via: "driver_task_view", kind: "driver_message" }
       });
-      setMessageOpen(false);
-      setMessageText("");
-      setBanner(
-        result.success
-          ? { tone: "ok", text: "ส่งข้อความถึงศูนย์ควบคุมแล้ว" }
-          : { tone: "error", text: result.error || "ส่งข้อความไม่สำเร็จ" }
-      );
+      if (!result.success) {
+        setMessages((current) => current.filter((m) => m.id !== optimistic.id));
+        setBanner({ tone: "error", text: result.error || "ส่งข้อความไม่สำเร็จ" });
+      }
     });
   }
 
-  const primaryDisabled = isPending;
   const gpsDot = gpsLight === "live" ? "bg-emerald-500" : gpsLight === "stale" ? "bg-amber-500" : "bg-slate-300";
   const gpsLabel = gpsLight === "live" ? "GPS สด" : gpsLight === "stale" ? "GPS ช้า" : "ยังไม่แชร์ GPS";
+  const currentStep = TRIP_STEPS[tripStep];
+  const doneSteps = TRIP_STEPS.slice(0, tripStep);
+  const laterSteps = TRIP_STEPS.slice(tripStep + 1);
 
   return (
-    <div className="grid gap-3 pb-4">
+    <div className="grid gap-3 pb-6">
       {/* header */}
       <header className="grid gap-1">
         <div className="flex items-center justify-between gap-2">
@@ -195,6 +212,27 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
           </span>
         </div>
       </header>
+
+      {/* identity — driver / vehicle / plate, at the top, collapsible */}
+      <section className="rounded-card border border-border bg-white">
+        <button
+          type="button"
+          onClick={() => setIdentityOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
+        >
+          <span className="min-w-0 text-[13px]">
+            <span className="font-semibold text-ink">{driverAccess.driver.fullName}</span>
+            <span className="text-ink-faint"> · {driverAccess.vehicle.plateNumber}</span>
+          </span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-ink-faint transition ${identityOpen ? "rotate-180" : ""}`} />
+        </button>
+        {identityOpen ? (
+          <div className="grid gap-1 border-t border-border px-3 py-2.5 text-[13px] text-ink-soft">
+            <p><span className="font-semibold text-ink">คนขับ</span> · {driverAccess.driver.fullName} · {driverAccess.driver.phone || "ไม่มีเบอร์"}</p>
+            <p><span className="font-semibold text-ink">รถ</span> · {driverAccess.vehicle.plateNumber} · {driverAccess.vehicle.vehicleType} · {driverAccess.vehicle.capacity || 0} ที่นั่ง</p>
+          </div>
+        ) : null}
+      </section>
 
       {banner ? (
         <p className={`rounded-card px-3 py-2 text-[13px] font-semibold ${banner.tone === "ok" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-700"}`}>
@@ -229,11 +267,13 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       <section className="smart-card grid gap-3">
         {phase === "assigned" ? (
           <>
+            <DriverPhotoCheck token={driverAccess.token} onChange={setPhotoPaths} />
+
             <button
               type="button"
               onClick={() => setCheckOpen((v) => !v)}
               className={`flex items-center justify-between rounded-card border px-3 py-2 text-[13px] font-semibold ${
-                allChecked ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-amber-300 bg-amber-50 text-amber-800"
+                allChecked ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-border bg-white text-ink-soft"
               }`}
             >
               {allChecked ? "ตรวจก่อนรับงาน ครบแล้ว" : `ตรวจก่อนรับงาน (${Object.values(checks).filter(Boolean).length}/4)`}
@@ -264,11 +304,11 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
             <button
               type="button"
               onClick={markReady}
-              disabled={primaryDisabled}
+              disabled={isPending || !photosReady}
               className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-operation px-4 text-[16px] font-bold text-white disabled:opacity-60"
             >
               <CheckCircle2 className="h-5 w-5" />
-              {isPending ? "กำลังบันทึก..." : allChecked ? "พร้อมรับงาน" : "พร้อมรับงาน (ยังตรวจไม่ครบ)"}
+              {isPending ? "กำลังบันทึก..." : !photosReady ? "ถ่ายรูปให้ครบก่อน" : "พร้อมรับงาน"}
             </button>
           </>
         ) : null}
@@ -300,32 +340,58 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
               เปิดในแอป TOMP Driver — แชร์ GPS ต่อเนื่องแม้ปิดจอ
             </a>
             <DriverLocationShare driverAccess={driverAccess} />
-            <div className="grid gap-2">
-              <p className="text-[12px] font-semibold text-ink-soft">อัปเดตสถานะการเดินทาง</p>
-              {TRIP_STEPS.map((step, index) => (
+
+            {doneSteps.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {doneSteps.map((step) => (
+                  <span key={step.status} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> {step.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {currentStep ? (
+              <div className="grid gap-2">
+                <p className="text-[12px] font-semibold text-ink-soft">ขั้นตอนตอนนี้</p>
                 <button
-                  key={step.status}
                   type="button"
-                  disabled={isPending || index < tripStep}
-                  onClick={() => advanceTrip(step.status, index + 1)}
-                  className={`flex min-h-12 items-center justify-center gap-2 rounded-command px-4 text-[14px] font-semibold transition ${
-                    index < tripStep
-                      ? "bg-emerald-50 text-emerald-700"
-                      : index === tripStep
-                        ? "bg-operation text-white"
-                        : "border border-border bg-white text-ink-faint"
-                  }`}
+                  disabled={isPending}
+                  onClick={() => advanceTrip(currentStep.status, tripStep + 1)}
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-operation px-4 text-[16px] font-bold text-white disabled:opacity-60"
                 >
-                  {index < tripStep ? <CheckCircle2 className="h-4 w-4" /> : null}
-                  {step.label}
+                  {currentStep.label}
                 </button>
-              ))}
-            </div>
+                {laterSteps.length ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setNextStepsOpen((v) => !v)}
+                      className="flex items-center justify-between rounded-card border border-border bg-white px-3 py-2 text-[12px] font-semibold text-ink-soft"
+                    >
+                      ขั้นตอนถัดไป ({laterSteps.length})
+                      <ChevronDown className={`h-4 w-4 transition ${nextStepsOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {nextStepsOpen ? (
+                      <div className="grid gap-1.5">
+                        {laterSteps.map((step) => (
+                          <p key={step.status} className="rounded-card border border-border bg-canvas px-3 py-2 text-[13px] text-ink-faint">
+                            {step.label}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            ) : (
+              <p className="rounded-card bg-emerald-50 px-3 py-3 text-center text-[14px] font-bold text-emerald-800">งานนี้เสร็จแล้ว ขอบคุณครับ</p>
+            )}
           </div>
         ) : null}
       </section>
 
-      {/* secondary actions — สื่อสารทันที */}
+      {/* instant comms */}
       <div className="grid grid-cols-3 gap-2">
         {coordinatorPhone ? (
           <a
@@ -339,13 +405,12 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
             ไม่มีเบอร์
           </span>
         )}
-        <button
-          type="button"
-          onClick={() => setMessageOpen((v) => !v)}
+        <a
+          href="#driver-chat"
           className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command border border-border bg-white px-2 text-[12px] font-semibold text-ink"
         >
-          <MessageSquare className="h-4 w-4" /> ข้อความ
-        </button>
+          <MessageSquare className="h-4 w-4" /> แชท
+        </a>
         <button
           type="button"
           onClick={() => setIssueOpen((v) => !v)}
@@ -354,37 +419,6 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
           <TriangleAlert className="h-4 w-4" /> แจ้งปัญหา
         </button>
       </div>
-
-      {messageOpen ? (
-        <section className="smart-card grid gap-2">
-          <div className="flex flex-wrap gap-1.5">
-            {QUICK_MESSAGES.map((phrase) => (
-              <button
-                key={phrase}
-                type="button"
-                onClick={() => setMessageText(phrase)}
-                className="rounded-full border border-border bg-white px-2.5 py-1 text-[12px] font-medium text-ink-soft hover:border-operation hover:text-operation"
-              >
-                {phrase}
-              </button>
-            ))}
-          </div>
-          <textarea
-            className="field-input min-h-20"
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            placeholder="พิมพ์ข้อความถึงศูนย์ควบคุม เช่น รถติดหนัก คาดว่าถึงช้า 15 นาที"
-          />
-          <button
-            type="button"
-            disabled={isPending || !messageText.trim()}
-            onClick={sendMessage}
-            className="min-h-11 rounded-command bg-operation px-4 text-[13px] font-semibold text-white disabled:opacity-50"
-          >
-            ส่งข้อความ
-          </button>
-        </section>
-      ) : null}
 
       {issueOpen ? (
         <section className="smart-card grid gap-2">
@@ -405,33 +439,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         </section>
       ) : null}
 
-      {/* ข้อความจากศูนย์ (poll ทุก 15 วิ) */}
-      {notifications.length ? (
-        <section className="grid gap-2">
-          <p className="section-label">ข้อความจากศูนย์ควบคุม</p>
-          {notifications.slice(0, 3).map((n) => (
-            <NotificationCard key={n.id} title={n.title || "แจ้งเตือน"} body={n.body} at={n.createdAt} tone={n.priority === "critical" ? "critical" : "info"} />
-          ))}
-        </section>
-      ) : null}
-
-      {/* optional details */}
-      <button
-        type="button"
-        onClick={() => setNotesOpen((v) => !v)}
-        className="flex items-center justify-between rounded-card border border-border bg-white px-3 py-2.5 text-[13px] font-semibold text-ink-soft"
-      >
-        รายละเอียดเพิ่มเติม (ไม่บังคับ)
-        <ChevronDown className={`h-4 w-4 transition ${notesOpen ? "rotate-180" : ""}`} />
-      </button>
-      {notesOpen ? (
-        <section className="smart-card grid gap-1.5 text-[13px] text-ink-soft">
-          <p><span className="font-semibold text-ink">คนขับ</span> · {driverAccess.driver.fullName} · {driverAccess.driver.phone}</p>
-          <p><span className="font-semibold text-ink">รถ</span> · {driverAccess.vehicle.plateNumber} · {driverAccess.vehicle.vehicleType}</p>
-          <p><span className="font-semibold text-ink">เวอร์ชันงาน</span> · {driverAccess.assignment.currentVersion}</p>
-          <p className="text-ink-faint">ถ่ายรูปรถ/ป้ายทะเบียน — ทำได้ผ่านแอปมือถือ (ระยะถัดไป)</p>
-        </section>
-      ) : null}
+      <DriverChatThread messages={messages} notifications={notifications} onSend={sendMessage} sending={isPending} />
     </div>
   );
 }

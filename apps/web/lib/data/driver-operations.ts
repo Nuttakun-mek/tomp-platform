@@ -97,6 +97,50 @@ export async function getDriverNotificationsByAssignmentId(assignmentId: string)
   return data.map(mapNotification);
 }
 
+export interface DriverIssueMessage {
+  id: string;
+  text: string;
+  at: string;
+  issueType: string;
+  severity: string;
+}
+
+function mapIssueMessage(row: Row): DriverIssueMessage {
+  return {
+    id: text(row, "id"),
+    text: text(row, "message"),
+    at: text(row, "created_at", new Date().toISOString()),
+    issueType: text(row, "issue_type", "message"),
+    severity: text(row, "severity", "info")
+  };
+}
+
+// Driver -> control messages + issue reports for one assignment (for the driver's
+// own chat thread on the QR page).
+export async function getDriverIssueMessagesByAssignmentId(assignmentId: string): Promise<DriverIssueMessage[]> {
+  const { client } = await resolveReadClient();
+  if (client) {
+    try {
+      const result = await withTimeout(
+        client.from("driver_issue_reports").select("id, message, created_at, issue_type, severity").eq("assignment_id", assignmentId).order("created_at", { ascending: true }).limit(50),
+        1800,
+        "driver issue messages"
+      );
+      if (!result.error && Array.isArray(result.data)) return (result.data as Row[]).map(mapIssueMessage);
+    } catch {
+      /* fall through */
+    }
+  }
+  const sql = getPostgresClient();
+  if (!sql) return [];
+  try {
+    const data = await sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${assignmentId} order by created_at asc limit 50`;
+    return data.map(mapIssueMessage);
+  } catch {
+    return [];
+  }
+}
+
 export async function getRouteChangesByAssignmentId(assignmentId: string): Promise<RouteChangeInstruction[]> {
   const { client } = await resolveReadClient();
   if (!client) return getRouteChangesByAssignmentIdViaPostgres(assignmentId);

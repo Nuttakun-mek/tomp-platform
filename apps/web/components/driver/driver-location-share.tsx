@@ -1,8 +1,10 @@
 "use client";
 
 import { buildLocationPingPayload, evaluateLocationHealth } from "@tomp/driver-core";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { ChevronDown, MapPin } from "lucide-react";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
+import { LiveTrackingMap, type TrackedPoint } from "@/components/mission-control/live-tracking-map";
 
 type ShareState = "idle" | "requesting" | "sharing" | "error";
 type TrackingEvent = "sharing_started" | "location_ping" | "sharing_stopped";
@@ -15,11 +17,6 @@ interface LastLocation {
   sentAt: string;
 }
 
-function buildOsmEmbedUrl(location: LastLocation) {
-  const delta = 0.01;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - delta}%2C${location.latitude - delta}%2C${location.longitude + delta}%2C${location.latitude + delta}&layer=mapnik&marker=${location.latitude}%2C${location.longitude}`;
-}
-
 function buildGoogleMapsUrl(location: LastLocation) {
   return `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
 }
@@ -28,6 +25,7 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
   const [state, setState] = useState<ShareState>("idle");
   const [message, setMessage] = useState("ยังไม่ได้แชร์ตำแหน่ง");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
+  const [mapOpen, setMapOpen] = useState(true);
   const watchIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
   const lastLocationRef = useRef<LastLocation | null>(null);
@@ -44,10 +42,7 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
         accuracy: location.accuracy,
         recordedAt: location.recordedAt,
         source: "driver_web_app",
-        metadata: {
-          callSign: driverAccess.callSign.callSign,
-          trackingEvent
-        }
+        metadata: { callSign: driverAccess.callSign.callSign, trackingEvent }
       });
 
       const response = await fetch("/api/driver/location", {
@@ -90,11 +85,10 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
         recordedAt: new Date(position.timestamp).toISOString(),
         sentAt: new Date().toLocaleTimeString("th-TH")
       };
-
       await postLocation(location, trackingEvent);
       lastLocationRef.current = location;
       setLastLocation(location);
-      setMessage("ส่งตำแหน่งล่าสุดไปยังศูนย์ควบคุมแล้ว");
+      setMessage("ส่งตำแหน่งล่าสุดให้ศูนย์ควบคุมแล้ว");
     },
     [postLocation]
   );
@@ -105,10 +99,8 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
       setMessage("อุปกรณ์นี้ไม่รองรับการแชร์ตำแหน่ง");
       return;
     }
-
     setState("requesting");
-    setMessage("กำลังขอสิทธิ์เข้าถึงตำแหน่ง กรุณากดอนุญาตบน browser");
-
+    setMessage("กำลังขอสิทธิ์เข้าถึงตำแหน่ง กรุณากดอนุญาต");
     watchIdRef.current = navigator.geolocation.watchPosition(
       async (position) => {
         try {
@@ -130,12 +122,9 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
   }
 
   async function stopSharing() {
-    if (watchIdRef.current != null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-    }
+    if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
     watchIdRef.current = null;
     startedRef.current = false;
-
     if (lastLocationRef.current) {
       await postLocation(lastLocationRef.current, "sharing_stopped").catch(() => undefined);
     }
@@ -144,7 +133,6 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
   }
 
   const isSharing = state === "sharing" || state === "requesting";
-  const mapUrl = useMemo(() => (lastLocation ? buildOsmEmbedUrl(lastLocation) : null), [lastLocation]);
   const health = evaluateLocationHealth(
     lastLocation
       ? {
@@ -162,92 +150,82 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
       : null
   );
 
+  const mapPoint: TrackedPoint | null = lastLocation
+    ? {
+        id: driverAccess.assignment.id,
+        latitude: lastLocation.latitude,
+        longitude: lastLocation.longitude,
+        freshness: state === "sharing" ? "live" : "slow",
+        title: `Call Sign ${driverAccess.callSign.callSign}`,
+        subtitle: driverAccess.vehicle.plateNumber || "รถของฉัน",
+        ageLabel: `ส่งเมื่อ ${lastLocation.sentAt}`,
+        accuracy: lastLocation.accuracy
+      }
+    : null;
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-soft">
-      <div className="bg-blue-700 p-5 text-white">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-blue-100">แชร์ตำแหน่ง GPS</p>
-            <h3 className="mt-1 text-2xl font-semibold">ให้ศูนย์ควบคุมเห็นตำแหน่งรถ</h3>
-            <p className="mt-2 text-sm leading-6 text-blue-50">
-              ตำแหน่งนี้ผูกกับโครงการ Assignment, Call Sign, คนขับ และรถของงานนี้โดยตรง เจ้าหน้าที่จะเห็นว่า GPS มาจากใครและงานใดใน Mission Control
-            </p>
-          </div>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-800">
-            {state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์"}
-          </span>
+    <section className="grid gap-3 rounded-card border border-border bg-white p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[13px] font-bold text-ink">แชร์ตำแหน่ง GPS</p>
+          <p className="text-[12px] text-ink-faint">{message}</p>
         </div>
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${state === "sharing" ? "bg-emerald-100 text-emerald-800" : state === "error" ? "bg-rose-100 text-rose-700" : "bg-canvas text-ink-soft"}`}>
+          {state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์"}
+        </span>
       </div>
 
-      <div className="border-b border-blue-100 bg-blue-50 px-5 py-4">
-        <p className="text-sm font-semibold text-blue-950">ข้อจำกัดของ web app</p>
-        <p className="mt-1 text-sm leading-6 text-blue-900">
-          ระหว่างทดสอบ กรุณาเปิดหน้านี้ค้างไว้ หากล็อกจอหรือสลับไปแอปอื่น ระบบมือถืออาจหยุดส่งตำแหน่งชั่วคราว ถ้าต้องการติดตามตอนปิดจอจริง ต้องใช้ Mobile App ในระยะถัดไป
+      {lastLocation ? (
+        <p className="text-[12px] text-ink-soft">
+          ล่าสุด {lastLocation.sentAt} · ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} ม. · {health.message}
         </p>
+      ) : null}
+
+      <div className="grid gap-2">
+        <button
+          type="button"
+          disabled={isSharing}
+          onClick={startSharing}
+          className="min-h-13 rounded-command bg-route px-4 text-[15px] font-bold text-white disabled:opacity-50"
+        >
+          {isSharing ? "กำลังแชร์ตำแหน่ง…" : "เริ่มแชร์ตำแหน่ง"}
+        </button>
+        {isSharing ? (
+          <button
+            type="button"
+            onClick={() => void stopSharing()}
+            className="min-h-11 rounded-command border border-border bg-white px-4 text-[13px] font-semibold text-ink-soft"
+          >
+            หยุดแชร์ตำแหน่ง
+          </button>
+        ) : null}
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[0.85fr_1.15fr]">
-        <div className="p-5">
-          <div className="rounded-2xl bg-blue-50 p-4 text-sm text-slate-700">
-            <p className="font-medium text-slate-950">{message}</p>
-            <p className="mt-2 text-xs font-semibold text-blue-900">สถานะ session: {health.message}</p>
-            {lastLocation ? (
-              <div className="mt-2 space-y-1 text-sm">
-                <p>ล่าสุด {lastLocation.sentAt}</p>
-                <p>ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} เมตร</p>
-                <p className="text-xs text-slate-500">
-                  {lastLocation.latitude.toFixed(6)}, {lastLocation.longitude.toFixed(6)}
-                </p>
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-slate-600">กดเริ่มแชร์ แล้วอนุญาตตำแหน่งบนมือถือ</p>
-            )}
-          </div>
-
-          <div className="mt-4 grid gap-3">
-            <button
-              className="min-h-14 rounded-2xl bg-blue-700 px-4 py-3 text-base font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={isSharing}
-              type="button"
-              onClick={startSharing}
-            >
-              เริ่มแชร์ตำแหน่ง
-            </button>
-            <button
-              className="min-h-14 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:text-slate-400"
-              disabled={!isSharing}
-              type="button"
-              onClick={() => void stopSharing()}
-            >
-              หยุดแชร์ตำแหน่ง
-            </button>
-          </div>
-
-          {lastLocation ? (
-            <a
-              className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800"
-              href={buildGoogleMapsUrl(lastLocation)}
-              rel="noreferrer"
-              target="_blank"
-            >
-              เปิดตำแหน่งของฉันใน Google Maps
-            </a>
-          ) : null}
-        </div>
-
-        <div className="min-h-[260px] border-t border-slate-200 bg-slate-100 lg:border-l lg:border-t-0">
-          {mapUrl ? (
-            <iframe className="h-[300px] w-full border-0 lg:h-full lg:min-h-[360px]" loading="lazy" referrerPolicy="no-referrer" src={mapUrl} title="แผนที่ตำแหน่งล่าสุดของคนขับ" />
-          ) : (
-            <div className="flex min-h-[260px] items-center justify-center p-6 text-center">
-              <div>
-                <p className="font-semibold text-ink">แผนที่จะแสดงหลังเริ่มแชร์ GPS</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">เมื่อ browser ได้รับตำแหน่ง ระบบจะแสดงตำแหน่งล่าสุดทันที</p>
-              </div>
+      {mapPoint ? (
+        <div className="grid gap-1.5">
+          <button
+            type="button"
+            onClick={() => setMapOpen((v) => !v)}
+            className="flex items-center justify-between rounded-card border border-border bg-canvas px-3 py-2 text-[12px] font-semibold text-ink-soft"
+          >
+            <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> ตำแหน่งของฉันบนแผนที่</span>
+            <ChevronDown className={`h-4 w-4 transition ${mapOpen ? "rotate-180" : ""}`} />
+          </button>
+          {mapOpen ? (
+            <div className="overflow-hidden rounded-card border border-border">
+              <LiveTrackingMap points={[mapPoint]} height={220} />
             </div>
-          )}
+          ) : null}
+          <a
+            href={buildGoogleMapsUrl(lastLocation!)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-center text-[12px] font-semibold text-route underline"
+          >
+            เปิดตำแหน่งของฉันใน Google Maps
+          </a>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }

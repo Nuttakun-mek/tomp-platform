@@ -18,7 +18,8 @@ export async function GET(request: Request) {
     data: {
       assignmentStatus: driverAccess.assignment.status,
       notifications: driverAccess.notifications,
-      routeChanges: driverAccess.routeChanges
+      routeChanges: driverAccess.routeChanges,
+      messages: driverAccess.messages
     }
   });
 }

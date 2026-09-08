@@ -122,10 +122,10 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
           </div>
           <div className="min-w-0">
             {pin ? (
-              <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800">รหัสยืนยัน 6 หลัก</p>
-                <p className="mt-0.5 text-3xl font-bold tracking-[0.3em] text-amber-900">{pin}</p>
-                <p className="mt-1 text-[11px] leading-4 text-amber-700">บอกคนขับด้วยวาจา/โทร แยกจาก QR อย่าส่งพร้อมกัน</p>
+              <div className="mb-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800">รหัสยืนยัน 6 หลัก · คนขับต้องกรอกหลังสแกน QR</p>
+                <p className="mt-0.5 text-4xl font-bold tracking-[0.3em] text-amber-900">{pin}</p>
+                <p className="mt-1 text-[11px] leading-4 text-amber-700">บอกคนขับด้วยวาจา/โทร แยกจาก QR — อย่าส่งพร้อมกัน ดูรหัสนี้ได้ครั้งเดียว</p>
               </div>
             ) : null}
             <p className="text-xs font-semibold text-blue-900">ลิงก์สำหรับคนขับ</p>
