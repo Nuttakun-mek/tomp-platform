@@ -161,6 +161,77 @@ background GPS and the full current driver UI, without a store review.
 
 ---
 
+## 4b. iOS specifics for Option B
+
+### 🔴 Bug found — iOS background location is not actually enabled
+`app.json` has the usage strings but **`UIBackgroundModes` is missing**, and the
+`expo-location` plugin is configured without `isIosBackgroundLocationEnabled`.
+`startBackgroundLocationSharing()` calls `Location.startLocationUpdatesAsync(...)`
+— on iOS, without the background mode, updates stop the moment the app is
+backgrounded. **The single reason this app exists does not work on iOS today.**
+
+Fix in `app.json`:
+```jsonc
+["expo-location", {
+  "locationAlwaysAndWhenInUsePermission": "อนุญาตให้ TOMP ใช้ตำแหน่งระหว่างปฏิบัติงาน",
+  "isIosBackgroundLocationEnabled": true,      // adds UIBackgroundModes: ["location"]
+  "isAndroidBackgroundLocationEnabled": true,
+  "isAndroidForegroundServiceEnabled": true
+}]
+```
+Also add `NSPhotoLibraryUsageDescription` — `<input type="file" accept="image/*">`
+inside the WebView can offer the photo library, and iOS terminates the app if the
+key is absent. (`NSCameraUsageDescription` is present but still says
+"ในรุ่นถัดไป" — reword, reviewers read these.)
+
+### Why Option B is fine on iOS
+The WebView never needs geolocation: **native owns GPS** and posts to
+`/api/driver/location`. WKWebView geolocation is unreliable and dead in the
+background anyway, so this split avoids the problem instead of fighting it.
+`<input type="file" capture="environment">` opens the camera natively in
+WKWebView and is dependable — the iOS side of the M0.1 spike is low risk.
+
+### The real iOS risk: App Store Review 4.2 (Minimum Functionality)
+Apple rejects apps that are "a website bundled in a wrapper". Our defence is
+genuine: background location tracking, push notifications, native QR scanning,
+Keychain-backed token storage. That normally passes — but reviewers vary, and it
+is the one thing that can block a public release.
+
+**The answer is to not go through public review at all.** For an internal fleet
+tool, ranked:
+
+| route | review? | limits | fit |
+|---|---|---|---|
+| **TestFlight — internal testers** | **none** | 100 testers, each an App Store Connect user | ✅ **start here** — builds live in minutes |
+| TestFlight — external testers | light Beta App Review | 10,000 testers; builds expire in 90 days | pilot beyond 100 drivers |
+| **Custom App via Apple Business Manager** | yes, but unlisted | distributed privately to a specific org | ✅ best when TOMP is sold to a company |
+| Ad Hoc | none | 100 devices/yr, register every UDID | small pilot, admin-heavy |
+| Enterprise Program ($299/yr) | none | own employees only; Apple requires ~100+ staff + D-U-N-S and often refuses | ❌ don't plan on it |
+
+**Recommended: TestFlight internal for the pilot → Custom App (ABM) for
+customers.** Neither needs a public listing.
+
+### iOS behaviour to design for
+- **Two-step permission.** iOS grants "While Using" first; "Always" needs a
+  second prompt or a trip to Settings. Show an in-app explainer *before*
+  requesting, or drivers deny it.
+- **Silent downgrade.** iOS periodically asks "keep allowing background use?" and
+  a driver can flip it to "While Using", killing tracking with no error. On every
+  foreground, re-check `getBackgroundPermissionsAsync()`; if it dropped, warn the
+  driver *and* surface it to the centre as "GPS ถูกปิดสิทธิ์" rather than a silent
+  stale marker.
+- The blue status pill while background location runs is normal — tell drivers.
+- Low Power Mode throttles updates; iOS may terminate the app and only relaunch
+  on significant location change. Expect coarser tracks than Android's foreground
+  service, and don't set alert thresholds tighter than ~2 min.
+
+### Cost / prerequisites (iOS)
+- **Apple Developer Program — $99/yr, required even for TestFlight.**
+- A Mac is **not** needed — EAS builds and signs in the cloud
+  (`eas build -p ios --profile preview`); EAS can manage certificates.
+- For ABM Custom Apps the customer organisation needs an Apple Business Manager
+  account and gives you their ABM org ID.
+
 ## 5. What must NOT ship
 - The app in its current state: it bypasses the PIN and captures no photo
   evidence. Either complete Option B, or gate the app behind the same PIN +
