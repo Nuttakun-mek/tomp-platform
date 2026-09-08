@@ -11,9 +11,7 @@ describe("filterNav", () => {
       roleKeys: ["dispatcher"]
     });
     const hrefs = flat(dispatcher);
-    expect(hrefs).toContain("/");
-    expect(hrefs).toContain("/assignments");
-    expect(hrefs).toContain("/mission-control");
+    expect(hrefs).toContain("/projects");
     expect(hrefs).not.toContain("/superadmin");
     expect(hrefs).not.toContain("/superadmin/users");
   });
@@ -22,11 +20,12 @@ describe("filterNav", () => {
     const superAdmin = filterNav(NAV_SECTIONS, { permissions: ["*"], roleKeys: ["super_admin"] });
     expect(flat(superAdmin)).toContain("/superadmin");
     expect(flat(superAdmin)).toContain("/superadmin/users");
+    expect(flat(superAdmin)).toContain("/projects");
   });
 
-  it("always shows the overview to any logged-in viewer", () => {
+  it("hides project-gated nav from a viewer with no permissions", () => {
     const noPerm = filterNav(NAV_SECTIONS, { permissions: [], roleKeys: [] });
-    expect(flat(noPerm)).toEqual(["/"]);
+    expect(flat(noPerm)).not.toContain("/projects");
   });
 
   it("drops empty sections", () => {

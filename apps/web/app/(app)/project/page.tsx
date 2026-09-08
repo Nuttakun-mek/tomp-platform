@@ -1,43 +1,150 @@
+import Link from "next/link";
+import { AccessDenied } from "@/components/auth/access-denied";
+import { ProjectArchiveButton } from "@/components/projects/project-archive-button";
 import { ProjectAssignmentBoard } from "@/components/projects/project-assignment-board";
 import { ProjectChangePanel } from "@/components/projects/project-change-panel";
 import { ProjectMissionBoard } from "@/components/projects/project-mission-board";
-import { ProjectProgressRail } from "@/components/projects/project-progress-rail";
 import { ProjectPublishPanel } from "@/components/projects/project-publish-panel";
 import { ProjectReadinessSummary } from "@/components/projects/project-readiness-summary";
-import { ProjectWorkspaceHeader } from "@/components/projects/project-workspace-header";
+import { ProjectRenameForm } from "@/components/projects/project-rename-form";
+import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getMissionsByProjectId } from "@/lib/data/missions";
-import { getProjectById, getProjects } from "@/lib/data/projects";
+import { getProjectById } from "@/lib/data/projects";
+import { getProjectMembers } from "@/lib/data/project-members";
+import { getViewerAccess } from "@/lib/auth/access";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { checkProjectPublishReadiness } from "@/lib/domain/publish-readiness";
+import { formatStatusTh } from "@/lib/i18n/status-th";
+import { roleLabelTh } from "@/lib/i18n/role-th";
 
 interface ProjectPageProps {
-  searchParams?: Promise<{ projectId?: string }>;
+  searchParams?: Promise<{ projectId?: string; tab?: string }>;
 }
 
 export default async function ProjectPage({ searchParams }: ProjectPageProps) {
   const params = searchParams ? await searchParams : {};
-  const projects = await getProjects();
-  const projectId = params.projectId || projects[0]?.id || demoKernel.projects[0]?.id || "";
-  const [project, missions, assignments] = await Promise.all([getProjectById(projectId), getMissionsByProjectId(projectId), getAssignmentsByProjectId(projectId)]);
-  const operationDays = project ? demoKernel.operationDays.filter((day) => day.projectId === project.id) : [];
+  const projectId = params.projectId || "";
+  const tab = params.tab === "settings" ? "settings" : "overview";
+
+  const project = projectId ? await getProjectById(projectId) : null;
+  if (!project) {
+    return (
+      <AccessDenied
+        title="เข้าโครงการนี้ไม่ได้"
+        reason="โครงการนี้ไม่มีอยู่ หรือคุณยังไม่ได้เป็นสมาชิก ติดต่อผู้จัดการโครงการเพื่อขอสิทธิ์เข้าใช้งาน"
+      />
+    );
+  }
+
+  const { permissions, roleKeys } = await getViewerAccess();
+  const canManage = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.update");
+
+  return (
+    <div className="grid gap-4">
+      <ProjectWorkspaceTabs projectId={project.id} active="overview" />
+
+      <section className="enterprise-panel p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-operation">{project.projectCode}</p>
+            <h1 className="mt-1 text-xl font-bold text-ink">{project.projectName}</h1>
+            <p className="mt-1 text-sm text-slate-600">{project.startDate} – {project.endDate} · {project.timezone}</p>
+          </div>
+          <StatusBadge label={formatStatusTh(project.status)} tone={project.status === "published" || project.status === "operating" ? "ready" : "neutral"} />
+        </div>
+      </section>
+
+      {tab === "settings" ? (
+        <SettingsView projectId={project.id} canManage={canManage} archived={project.status === "archived"} projectName={project.projectName} />
+      ) : (
+        <OverviewView projectId={project.id} />
+      )}
+    </div>
+  );
+}
+
+async function OverviewView({ projectId }: { projectId: string }) {
+  const [missions, assignments] = await Promise.all([getMissionsByProjectId(projectId), getAssignmentsByProjectId(projectId)]);
+  const operationDays = demoKernel.operationDays.filter((day) => day.projectId === projectId);
+  const project = await getProjectById(projectId);
   const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
 
   return (
-    <>
-      <ProjectWorkspaceHeader project={project} />
-      <ProjectProgressRail activeIndex={assignments.length ? 2 : missions.length ? 1 : 0} />
-      <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
-        <div className="grid content-start gap-6">
-          <ProjectReadinessSummary missions={missions.length} assignments={assignments.length} />
-          <ProjectAssignmentBoard projectId={projectId} assignments={assignments} />
-          <ProjectPublishPanel projectId={projectId} readiness={readiness} />
-        </div>
-        <div className="grid content-start gap-6">
-          <ProjectMissionBoard missions={missions} />
-          <ProjectChangePanel projectId={projectId} />
-        </div>
+    <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr]">
+      <div className="grid content-start gap-5">
+        <ProjectReadinessSummary missions={missions.length} assignments={assignments.length} />
+        <ProjectAssignmentBoard projectId={projectId} assignments={assignments} />
+        <ProjectPublishPanel projectId={projectId} readiness={readiness} />
       </div>
-    </>
+      <div className="grid content-start gap-5">
+        <ProjectMissionBoard missions={missions} />
+        <ProjectChangePanel projectId={projectId} />
+      </div>
+    </div>
+  );
+}
+
+async function SettingsView({
+  projectId,
+  projectName,
+  canManage,
+  archived
+}: {
+  projectId: string;
+  projectName: string;
+  canManage: boolean;
+  archived: boolean;
+}) {
+  const members = await getProjectMembers(projectId);
+
+  return (
+    <div className="grid gap-4">
+      <section className="enterprise-panel grid gap-3 p-5">
+        <h2 className="text-lg font-semibold text-ink">ข้อมูลโครงการ</h2>
+        {canManage ? <ProjectRenameForm projectId={projectId} currentName={projectName} /> : <p className="text-sm text-slate-600">ชื่อโครงการ: {projectName}</p>}
+      </section>
+
+      <section className="enterprise-panel grid gap-3 p-5">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-ink">สมาชิกโครงการ ({members.length})</h2>
+          {canManage ? (
+            <Link href="/superadmin/users" className="text-xs font-semibold text-operation hover:underline">
+              เพิ่ม/จัดการผู้ใช้
+            </Link>
+          ) : null}
+        </div>
+        {members.length ? (
+          <ul className="divide-y divide-slate-100">
+            {members.map((m) => (
+              <li key={m.profileId} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <span>
+                  <span className="font-medium text-ink">{m.fullName}</span>
+                  <span className="ml-2 text-xs text-slate-500">{m.email}</span>
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{roleLabelTh(m.roleKey)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-600">ยังไม่มีสมาชิก — เพิ่มผู้ใช้ที่หน้า “ผู้ใช้และสิทธิ์”</p>
+        )}
+      </section>
+
+      {canManage ? (
+        <section className="enterprise-panel grid gap-3 p-5">
+          <h2 className="text-lg font-semibold text-ink">{archived ? "กู้คืนโครงการ" : "เก็บถาวรโครงการ"}</h2>
+          <p className="text-sm text-slate-600">
+            {archived
+              ? "โครงการนี้ถูกเก็บถาวรอยู่ กู้คืนเพื่อกลับมาใช้งาน"
+              : "เก็บถาวรจะซ่อนโครงการจากรายการหลัก ข้อมูลทั้งหมดยังอยู่และกู้คืนได้"}
+          </p>
+          <div>
+            <ProjectArchiveButton projectId={projectId} archived={archived} variant="full" />
+          </div>
+        </section>
+      ) : null}
+    </div>
   );
 }

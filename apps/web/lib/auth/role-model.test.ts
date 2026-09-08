@@ -18,7 +18,7 @@ describe("resolvePrimaryRole", () => {
 
 describe("resolveRedirectPath", () => {
   it("maps roles to their landing route", () => {
-    expect(resolveRedirectPath("super_admin")).toBe("/");
+    expect(resolveRedirectPath("super_admin")).toBe("/projects");
     expect(resolveRedirectPath("project_manager")).toBe("/projects");
     expect(resolveRedirectPath("dispatcher")).toBe("/projects");
     expect(resolveRedirectPath("coordinator")).toBe("/projects");

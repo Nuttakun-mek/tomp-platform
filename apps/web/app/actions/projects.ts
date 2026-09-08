@@ -76,6 +76,59 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   );
 }
 
+export async function archiveProjectAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as { projectId?: string; restore?: boolean };
+  const projectId = String(data.projectId || "");
+  if (!projectId) return actionFailure("ไม่พบโครงการ");
+
+  const { client, error, mode } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(projectId, "project.update");
+  if (!permission.allowed && mode !== "service_role") {
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์จัดการโครงการนี้");
+  }
+
+  const nextStatus = data.restore ? "planning" : "archived";
+  const { data: row, error: updateError } = await client
+    .from("projects")
+    .update({ status: nextStatus })
+    .eq("id", projectId)
+    .select("id, project_name, status")
+    .single();
+
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "อัปเดตสถานะโครงการไม่สำเร็จ"));
+
+  await createProjectTimelineEvent(projectId, projectId, row).catch(() => undefined);
+  return actionSuccess({ project: row }, undefined);
+}
+
+export async function renameProjectAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as { projectId?: string; projectName?: string };
+  const projectId = String(data.projectId || "");
+  const projectName = String(data.projectName || "").trim();
+  if (!projectId) return actionFailure("ไม่พบโครงการ");
+  if (projectName.length < 2) return actionFailure("ชื่อโครงการสั้นเกินไป");
+
+  const { client, error, mode } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(projectId, "project.update");
+  if (!permission.allowed && mode !== "service_role") {
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขโครงการนี้");
+  }
+
+  const { data: row, error: updateError } = await client
+    .from("projects")
+    .update({ project_name: projectName })
+    .eq("id", projectId)
+    .select("id, project_name")
+    .single();
+
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "เปลี่ยนชื่อโครงการไม่สำเร็จ"));
+  return actionSuccess({ project: row });
+}
+
 type WriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
 
 async function linkCreatorAsProjectManager(client: WriteClient, projectId: string, ownerProfileId: string | null): Promise<string | null> {

@@ -1,60 +1,15 @@
-import { AccessDenied } from "@/components/auth/access-denied";
-import { CreateMissionForm } from "@/components/missions/create-mission-form";
-import { ProjectAssignmentBoard } from "@/components/projects/project-assignment-board";
-import { ProjectChangePanel } from "@/components/projects/project-change-panel";
-import { ProjectMissionBoard } from "@/components/projects/project-mission-board";
-import { ProjectOperationDays } from "@/components/projects/project-operation-days";
-import { ProjectProgressRail } from "@/components/projects/project-progress-rail";
-import { ProjectPublishPanel } from "@/components/projects/project-publish-panel";
-import { ProjectReadinessSummary } from "@/components/projects/project-readiness-summary";
-import { ProjectWorkspaceHeader } from "@/components/projects/project-workspace-header";
-import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
-import { getAssignmentsByProjectId } from "@/lib/data/assignments";
-import { getMissionsByProjectId } from "@/lib/data/missions";
-import { getProjectById } from "@/lib/data/projects";
-import { demoKernel } from "@/lib/demo/demo-kernel";
-import { checkProjectPublishReadiness } from "@/lib/domain/publish-readiness";
+import { redirect } from "next/navigation";
 
 interface ProjectDetailPageProps {
   params: Promise<{ projectId: string }>;
+  searchParams?: Promise<{ tab?: string }>;
 }
 
-export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
+// Pretty URL. Production rewrites /projects/<id> -> /project?projectId=<id> via
+// vercel.json; locally we redirect so both behave the same.
+export default async function ProjectDetailPage({ params, searchParams }: ProjectDetailPageProps) {
   const { projectId } = await params;
-  const project = await getProjectById(projectId);
-
-  if (!project) {
-    return (
-      <AccessDenied
-        title="เข้าโครงการนี้ไม่ได้"
-        reason="โครงการนี้ไม่มีอยู่ หรือคุณยังไม่ได้เป็นสมาชิก ติดต่อผู้จัดการโครงการเพื่อขอสิทธิ์เข้าใช้งาน"
-      />
-    );
-  }
-
-  const [missions, assignments] = await Promise.all([getMissionsByProjectId(projectId), getAssignmentsByProjectId(projectId)]);
-  const operationDays = demoKernel.operationDays.filter((day) => day.projectId === project.id);
-  const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
-
-  return (
-    <>
-      <ProjectWorkspaceHeader project={project} />
-      <PublishedLockBanner project={project} />
-      <ProjectProgressRail activeIndex={assignments.length ? 2 : missions.length ? 1 : 0} />
-
-      <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
-        <div className="grid content-start gap-6">
-          <ProjectReadinessSummary missions={missions.length} assignments={assignments.length} />
-          <ProjectOperationDays operationDays={operationDays} />
-          <ProjectAssignmentBoard projectId={projectId} assignments={assignments} />
-          <ProjectPublishPanel projectId={projectId} readiness={readiness} />
-        </div>
-        <div className="grid content-start gap-6">
-          <CreateMissionForm projectId={projectId} />
-          <ProjectMissionBoard missions={missions} />
-          <ProjectChangePanel projectId={projectId} />
-        </div>
-      </div>
-    </>
-  );
+  const sp = searchParams ? await searchParams : {};
+  const tab = sp.tab === "settings" ? "&tab=settings" : "";
+  redirect(`/project?projectId=${encodeURIComponent(projectId)}${tab}`);
 }

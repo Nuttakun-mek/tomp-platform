@@ -5,8 +5,8 @@ export const PRIMARY_ROLE_ORDER = ["super_admin", "project_manager", "dispatcher
 export type PrimaryRole = (typeof PRIMARY_ROLE_ORDER)[number];
 
 const REDIRECT_BY_ROLE: Record<string, string> = {
-  super_admin: "/", // portfolio ทุกโครงการ
-  project_manager: "/projects", // เลือกโครงการก่อน
+  super_admin: "/projects", // เลือกโครงการก่อน (project-centric)
+  project_manager: "/projects",
   dispatcher: "/projects",
   coordinator: "/projects",
   customer_viewer: "/portal"

@@ -1,25 +1,25 @@
+import { redirect } from "next/navigation";
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
 import { CommsConsole } from "@/components/mission-control/comms-console";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
 import { LiveMapPanel } from "@/components/mission-control/live-map-panel";
 import { OperationKpiStrip } from "@/components/mission-control/operation-kpi-strip";
 import { OperationTimelinePanel } from "@/components/mission-control/operation-timeline-panel";
-import { ProjectSwitcher } from "@/components/mission-control/project-switcher";
 import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
 import { VehicleMonitorPanel } from "@/components/mission-control/vehicle-monitor-panel";
+import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getDriverCommsByProjectId } from "@/lib/data/driver-comms";
-import { getLatestDriverLocationsByProjectId, getProjectIdWithLatestDriverLocation } from "@/lib/data/locations";
+import { getLatestDriverLocationsByProjectId } from "@/lib/data/locations";
 import { getProjects } from "@/lib/data/projects";
 import { getDrivers, getVehicles } from "@/lib/data/resources";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getVehicleOperationProfilesByProjectId } from "@/lib/data/vehicle-operations";
-import { demoProject } from "@/lib/demo/demo-kernel";
 import Link from "next/link";
 
 interface MissionControlPageProps {
@@ -28,10 +28,7 @@ interface MissionControlPageProps {
 
 export default async function MissionControlPage({ searchParams }: MissionControlPageProps) {
   const params = searchParams ? await searchParams : {};
-  const [projects, latestLocationProjectId] = await Promise.all([
-    getProjects(),
-    params.projectId ? Promise.resolve(null) : getProjectIdWithLatestDriverLocation()
-  ]);
+  const projects = await getProjects();
 
   if (!projects.length) {
     return (
@@ -47,11 +44,12 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     );
   }
 
-  const activeProject =
-    projects.find((project) => project.id === params.projectId) ??
-    projects.find((project) => project.id === latestLocationProjectId) ??
-    projects[0] ??
-    demoProject;
+  // project-centric: a control room always belongs to a project
+  const activeProject = projects.find((project) => project.id === params.projectId);
+  if (!activeProject) {
+    if (projects.length === 1) redirect(`/mission-control?projectId=${projects[0].id}`);
+    redirect("/projects");
+  }
 
   const [events, locations, assignments, vehicleProfiles, assignmentStatuses, callSigns, comms, drivers, vehicles, evidence] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
@@ -74,8 +72,8 @@ export default async function MissionControlPage({ searchParams }: MissionContro
 
   return (
     <div className="grid gap-5">
+      <ProjectWorkspaceTabs projectId={activeProject.id} active="control" />
       <CommandCenterHeader project={activeProject} liveCount={locations.length} issueCount={followUps} />
-      <ProjectSwitcher projects={projects} activeProjectId={activeProject.id} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
 
       <FleetBoard

@@ -15,51 +15,15 @@ export interface NavSection {
 
 export const NAV_SECTIONS: NavSection[] = [
   {
-    title: "ปฏิบัติการ",
-    items: [
-      {
-        href: "/",
-        label: "ภาพรวม",
-        description: "สถานะรวมวันนี้",
-        icon: "Gauge",
-        help: "ดูภาพรวมโครงการ งานที่จัดสรร GPS ล่าสุด และรายการที่ต้องติดตาม"
-      },
-      {
-        href: "/mission-control",
-        label: "ศูนย์ควบคุม",
-        description: "แผนที่ รถ งาน ความเสี่ยง",
-        icon: "MapPinned",
-        help: "ติดตามรถบนแผนที่ สถานะงาน GPS ข้อความจากคนขับ และรายการเสี่ยง",
-        anyPermission: ["assignment.read"]
-      },
-      {
-        href: "/assignments",
-        label: "บอร์ด Assignment",
-        description: "มอบงานให้รถและคนขับ",
-        icon: "ClipboardList",
-        help: "จัดสรรงานให้ Call Sign คนขับ และรถ พร้อมสร้าง QR เฉพาะงาน",
-        anyPermission: ["assignment.read"]
-      }
-    ]
-  },
-  {
-    title: "วางแผน",
+    title: "พื้นที่ทำงาน",
     items: [
       {
         href: "/projects",
         label: "โครงการ",
-        description: "สร้างและจัดการพื้นที่ปฏิบัติการ",
+        description: "เลือกโครงการเพื่อเข้าทำงาน",
         icon: "FolderKanban",
-        help: "โครงการคือพื้นที่หลักสำหรับรวมภารกิจ งานที่จัดสรร คนขับ รถ QR และ Timeline",
+        help: "โครงการคือพื้นที่หลัก — เข้าโครงการแล้วจะเจอจัดงาน ศูนย์ควบคุม ทรัพยากร และตั้งค่าของโครงการนั้น",
         anyPermission: ["project.read"]
-      },
-      {
-        href: "/resources",
-        label: "ทรัพยากร",
-        description: "คนขับและรถ",
-        icon: "CarFront",
-        help: "ดูรายชื่อคนขับ รถ สถานะ และความพร้อมสำหรับรับงาน",
-        anyPermission: ["driver.read", "vehicle.read"]
       }
     ]
   },

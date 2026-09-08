@@ -1,18 +1,25 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, CarFront, UserRoundCheck } from "lucide-react";
+import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { ResourceOverview } from "@/components/resources/resource-overview";
 import { ResourceQualityCard } from "@/components/resources/resource-quality-card";
 import { VendorResourceSummary } from "@/components/resources/vendor-resource-summary";
 import { getDrivers, getVehicles } from "@/lib/data/resources";
 
-export default async function ResourcesPage() {
+interface ResourcesPageProps {
+  searchParams?: Promise<{ projectId?: string }>;
+}
+
+export default async function ResourcesPage({ searchParams }: ResourcesPageProps) {
+  const params = searchParams ? await searchParams : {};
   const [drivers, vehicles] = await Promise.all([getDrivers(), getVehicles()]);
   const missingDrivers = drivers.filter((driver) => !driver.phone).length;
   const missingVehicles = vehicles.filter((vehicle) => !vehicle.plateNumber).length;
 
   return (
-    <>
+    <div className="grid gap-4">
+      {params.projectId ? <ProjectWorkspaceTabs projectId={params.projectId} active="resources" /> : null}
       <ResourceOverview drivers={drivers} vehicles={vehicles} />
       <div className="grid gap-4 md:grid-cols-3">
         <ResourceQualityCard title="พร้อมใช้งาน" value={`${drivers.length - missingDrivers + vehicles.length - missingVehicles}`} detail="คนขับและรถที่มีข้อมูลหลักครบ" />
@@ -24,7 +31,7 @@ export default async function ResourcesPage() {
         <ResourceLink href="/resources/vehicles" title="จัดการรถ" detail="ดูโปรไฟล์รถ คิวงาน งานปัจจุบัน งานคงเหลือ QR ประจำรถ และแผนที่รวม" icon={<CarFront className="h-6 w-6" />} />
       </div>
       <VendorResourceSummary />
-    </>
+    </div>
   );
 }
 
