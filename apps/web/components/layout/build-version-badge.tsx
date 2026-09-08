@@ -1,24 +1,18 @@
 import { buildInfo } from "@/lib/build-info";
 
+// Minimal version marker. Full build detail (commit, timezone) shows only outside
+// production, where it is useful for debugging.
 export function BuildVersionBadge({ compact = false }: { compact?: boolean }) {
+  const isProduction = (process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV) === "production";
   const deployedCommit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? buildInfo.commit;
 
-  if (compact) {
-    return <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold text-teal-100">อัปเดต v{buildInfo.version}</span>;
+  if (compact || isProduction) {
+    return <span className="text-[10px] font-medium text-slate-500">v{buildInfo.version}</span>;
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900/85 px-3 py-2 text-xs text-slate-300">
-      <div className="flex items-center justify-between gap-3">
-        <span className="font-semibold text-slate-100">อัปเดตล่าสุด</span>
-        <span className="rounded-full bg-teal-400/15 px-2 py-0.5 font-semibold text-teal-100">v{buildInfo.version}</span>
-      </div>
-      <div className="mt-1 leading-5">
-        <p>{buildInfo.updatedAtText}</p>
-        <p className="text-slate-500">
-          commit {deployedCommit} / {buildInfo.timezone}
-        </p>
-      </div>
-    </div>
+    <p className="text-[10px] leading-4 text-slate-500">
+      v{buildInfo.version} · {deployedCommit} · {buildInfo.timezone}
+    </p>
   );
 }
