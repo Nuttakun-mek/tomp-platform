@@ -7,6 +7,10 @@ import { ShieldAlert } from "lucide-react";
 const TABS = [
   { href: "/superadmin", label: "ภาพรวม" },
   { href: "/superadmin/users", label: "ผู้ใช้และสิทธิ์" },
+  { href: "/superadmin/roles", label: "บทบาท" },
+  { href: "/superadmin/organizations", label: "องค์กร" },
+  { href: "/superadmin/projects", label: "โครงการ" },
+  { href: "/superadmin/audit", label: "บันทึกกิจกรรม" },
   { href: "/superadmin/dev-tools", label: "เครื่องมือพัฒนา" }
 ];
 
