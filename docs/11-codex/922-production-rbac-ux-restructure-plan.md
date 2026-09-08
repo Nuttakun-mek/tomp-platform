@@ -203,70 +203,75 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 
 ### 2.9 UX/UI ต่อ role (ตาม [400](../04-product/400-product-workspaces.md) + [504](../05-ux/504-product-experience-reset.md))
 
-หลัก: **ทุกหน้าตอบคำถามปฏิบัติการ 1 ข้อ · เน้น exception/readiness · ลด text density · empty state = onboarding**
+> **รายละเอียด UX ครบ + pattern กันสับสน/กันพลาด อยู่ใน §7** — ส่วนนี้เป็นแค่ role → หน้าหลัก
 
-| workspace | หน้าแรก | หน้าจอหลัก | สิ่งที่ **ไม่** เห็น |
+| workspace | หน้าแรก (route เดิม) | หน้าจอหลัก | สิ่งที่ **ไม่** เห็น |
 |---|---|---|---|
-| Operation Manager | `/operations` command center | Readiness Board · Mission Control · Timeline · Incident · Recovery | superadmin, org settings |
-| Planner / PM | `/projects` | Project setup · Mission editor · Assignment planner · Publish review | dispatch live actions, superadmin |
-| Dispatcher | `/dispatch` | Dispatch lanes · Call Sign · QR · driver/vehicle assign · status | project create/publish, org settings |
-| Coordinator | `/coordinator` | งานที่ได้รับ (scoped) · ยืนยัน arrival/boarding/completion · แจ้งปัญหา | โครงการอื่น, resource pool, planning |
-| Organizer / Customer | `/portal` | ภาพรวมโครงการ (permitted) · สถานะ mission · change request · อัปโหลดเอกสาร | ข้อมูลคนขับ, GPS ดิบ, dispatch |
-| Vendor | `/vendor` | คนขับ/รถ ของตัวเอง · availability · replacement request | โครงการ, GPS, assignment ของ vendor อื่น |
+| Operation Manager | `/mission-control` | Command center · Readiness · Timeline · Incident · Recovery | superadmin, planning edit |
+| Planner / PM | `/projects/[id]` | Project setup · Mission editor · Assignment planner · Publish review | dispatch live actions, superadmin |
+| Dispatcher | `/assignments` | Dispatch lanes · Call Sign · QR · driver/vehicle assign · status | project create/publish, org settings |
+| Coordinator | `/coordinator` (ใหม่) | งานที่ได้รับ (scoped) · ยืนยัน arrival/boarding/completion · แจ้งปัญหา | โครงการอื่น, resource pool, planning |
+| Organizer / Customer | `/portal` (ใหม่) | ภาพรวมโครงการ (permitted) · สถานะ mission · change request · เอกสาร | ข้อมูลคนขับ, GPS ดิบ, dispatch |
+| Vendor | `/vendor` (ใหม่, backlog) | คนขับ/รถ ของตัวเอง · availability · replacement request | โครงการ, GPS, assignment ของ vendor อื่น |
 | Driver | `/driver` (QR, มีแล้ว) | assignment card · route sheet · GPS share · issue report | ทุกอย่างนอกงานตัวเอง |
-
-**Phase นี้ทำจริงแค่:** shell + nav filtering + `/operations`,`/dispatch`,`/projects`,`/portal(min)`,`/no-access`,`/superadmin` — ที่เหลือ (`/coordinator`, `/vendor` เต็ม) เป็น backlog
 
 ### 2.10 Design-system (ต่อยอดจาก `72e822b`)
 
 - คง type scale / tokens / `.page-grid` เดิม
-- เพิ่ม: `<WorkspaceSwitcher>`, `<PermissionGate>` (client + server), `<RoleBadge>`, `<EmptyState>`, `<AccessDenied>`
-- Superadmin layout: reuse shell แต่ palette เข้ม + `data-area="superadmin"`
+- component ใหม่ทั้งหมดอยู่ใน **§7.7**
+- Superadmin layout: reuse shell แต่ palette เข้ม + แถบ "INTERNAL — platform staff" + `data-area="superadmin"`
 
 ---
 
 ## 3. Rollout phases
 
-> ทุก phase: typecheck + lint + test เขียว, ไม่ push จนกว่าจะ review
+> ทุก phase: typecheck + lint + test เขียว + ผ่าน **UX acceptance checklist (§8)** ที่เกี่ยวข้อง, ไม่ push จนกว่าจะ review
 
 ### Phase 0 — เตรียม (ไม่กระทบผู้ใช้)
-1. เขียน `getUserPrimaryRole()` + `getAccessibleWorkspaces()` ใน `lib/auth/`
+1. `getUserPrimaryRole()` + `getAccessibleWorkspaces()` + `getUserPermissions()` ใน `lib/auth/`
 2. migration `0018_seed_role_permissions.sql` (ย้าย matrix เข้า DB)
-3. `lib/auth/permissions.ts` → DB loader + fallback
-4. RLS test harness + seed users script
+3. `lib/auth/permissions.ts` → DB loader + fallback map
+4. RLS test harness + `scripts/seed-test-users.mjs` (4 role จำลอง)
 
-### Phase 1 — Auth flow + nav gating (กระทบ: nav เปลี่ยน)
-5. `/auth/callback` → resolve role → redirect map (§2.4)
-6. `/no-access` page
-7. `app-nav.tsx` → permission-filtered (server component ส่ง permission list ลง client)
-8. ลบ `AuthGate` (เหลือ middleware)
-9. `getCurrentUserProfile().roleLabel` → resolve จริง
+### Phase 1 — Auth flow + nav gating + UX baseline
+5. `/auth/callback` → resolve/auto-link profile (§2.4b) → redirect ตาม role (§2.4)
+6. `/no-access` + `<AccessDenied>` component
+7. `app-nav.tsx` → permission-filtered + จัดกลุ่มใหม่ (§2.3)
+8. ลบ `AuthGate` (เหลือ middleware) — ลด flash
+9. `getCurrentUserProfile().roleLabel` → resolve จริง + `<RoleBadge>` ใน sidebar footer
+10. UX: `<PermissionGate>`, `<EmptyState>` baseline, breadcrumb ในหน้า scoped
 
-### Phase 2 — Superadmin section + ย้าย test tools (กระทบ: URL test tools เปลี่ยน)
-10. `/superadmin/layout.tsx` + role gate
-11. ย้าย `/live-test`, `/admin/*`, `/pilot-checklist` → `/superadmin/dev-tools/*` + redirect เก่า
-12. `/superadmin/users` (v1: list + assign role) — ปลดล็อกให้ไม่ต้องยิง SQL
-13. `/superadmin/dev-tools` landing
+### Phase 2 — Superadmin section + ย้าย test tools
+11. `/superadmin/layout.tsx` + role gate + ธีมเข้ม + แถบ "INTERNAL"
+12. ย้าย `/live-test`, `/admin/*`, `/pilot-checklist` → `/superadmin/dev-tools/*` + `redirects()` เก่า
+13. `/superadmin/dev-tools` landing (จัดกลุ่มเครื่องมือ)
+14. `/superadmin/users` — list + **ฟอร์ม "เพิ่มผู้ใช้"** (pre-provision profile + assign role/project) — ปลดล็อกไม่ต้องยิง SQL
 
-10b. `/auth/callback` → auto-link profile ที่ `status='invited'` ด้วย email (§2.4b)
-12b. `/superadmin/users` → ฟอร์ม "เพิ่มผู้ใช้" (pre-provision profile + role)
+### Phase 3 — Data scoping (RLS) — กระทบสูงสุด
+15. migration `0019_rbac_rls_v2.sql` **มาก่อน**: `is_super_admin()` bypass · org-scope · drop `sprint2_*` ที่เหลือ · scoped policy สำหรับ drivers/vehicles/gps_locations/organizations/profiles
+16. RLS test suite ผ่านครบ (seeded users เห็นเฉพาะ scope)
+17. `getScopedDataClient()` (session-aware) + เปลี่ยน `lib/data/*` read → scoped client (หลัง flag `TOMP_SCOPED_READS=1`)
+18. create-project → สร้าง `project_members` (project_manager) + `owner_profile_id` ในทรานแซกชันเดียว
+19. แก้ `requirePermission` (`project.create` = org-scope) + ลบ escape hatch `mode !== "service_role"`
+20. UX: `<ProjectScopePill>` + scope switcher + scope cookie; `ข้อมูลตัวอย่าง` badge เข้มงวด
+21. เปิด flag ทีละ env → prod
 
-### Phase 3 — Data scoping (RLS) (กระทบสูงสุด — ต้องมี RLS test ผ่านก่อน)
-14. migration `0019_rbac_rls_v2.sql` **ก่อน** (super_admin `is_super_admin()` bypass, org-scope, drop `sprint2_*` ที่เหลือ, resource tables) — ทดสอบ RLS ผ่านก่อน
-15. `getScopedDataClient()` + เปลี่ยน `lib/data/*` read functions (หลัง flag `TOMP_SCOPED_READS=1`)
-16. แก้ create-project ให้สร้าง `project_members` + set `owner_profile_id`
-17. แก้ `requirePermission` + ลบ escape hatch `mode !== "service_role"`
-18. RLS test suite ผ่านครบ → เปิด flag ทีละ env
-
-### Phase 4 — Workspace UX (กระทบ: nav grouping + home)
-19. จัดกลุ่ม nav ใหม่ (§2.3) — คง route path เดิม
-20. `/portal` (organizer/customer read-only v1 — decision #3)
-21. home `/` ปรับ section ตาม permission
-22. `<ProjectScopeSwitcher>` + scope cookie
+### Phase 4 — Workspace UX + error-reduction patterns (§7.3–7.6)
+22. `/portal` (organizer/customer read-only v1 — decision #3): ภาพรวม + สถานะ mission + change request + ไม่เห็น GPS/คนขับ
+23. home `/` — section ตาม permission + redirect ที่ถูกต้องต่อ role
+24. `<OwnerTag>` ทุก object ปฏิบัติการ (assignment/incident/change/mission)
+25. `<ContactStrip>` ในทุกหน้า operational (dispatch, mission-control, coordinator, driver)
+26. `<ConflictWarning>` inline ตอน assign driver/vehicle (ASN-005/006, VEH-006)
+27. `<ReadinessGate>` + `<ConfirmImpactDialog>` ก่อน publish (PUB-004/005) — ปุ่ม publish ล็อกจนเขียว
+28. `<ChangeRequestButton>` แทนปุ่มแก้หลัง publish (PUB-003, CHG-*)
+29. `<NotificationCard>` — ข้อความ + ปุ่ม action + scoped (NOT-001/003)
+30. dispatch fluency: bulk assign, keyboard nav, inline edit + `<SavePanel>`, saved filter
+31. `<UndoToast>` + optimistic update + rollback ทุก action; toast → ลิงก์ Timeline
 
 ### Phase 5 — Superadmin depth + workspace เต็ม (backlog)
-23. `/superadmin/roles` matrix editor · `/organizations` · `/projects` · `/audit`
-24. `/coordinator`, `/vendor`, `/changes` เต็มรูปแบบ
+32. `/superadmin/roles` matrix editor · `/organizations` · `/superadmin/projects` (cross-org + member mgmt) · `/superadmin/audit`
+33. `/coordinator` (mobile-optimized: ปุ่มยืนยันใหญ่ thumb-reach) + `/vendor` + `/changes` เต็มรูปแบบ
+34. command palette (`Cmd/Ctrl+K`) · saved views
 
 ---
 
@@ -303,9 +308,13 @@ apps/web/app/auth/callback/route.ts         + role resolution + redirect
 apps/web/app/no-access/page.tsx             ใหม่
 apps/web/app/superadmin/**                  ใหม่ (~8-12 หน้า)
 apps/web/app/{live-test,admin,pilot-checklist,project}/  ลบ/redirect
-apps/web/components/app-nav.tsx             permission-filtered
-apps/web/components/app-shell.tsx           + ProjectScopeSwitcher, ลบ AuthGate
+apps/web/components/app-nav.tsx             permission-filtered + regroup
+apps/web/components/app-shell.tsx           + ProjectScopePill/switcher, ลบ AuthGate
 apps/web/components/auth/**                 + PermissionGate, RoleBadge, AccessDenied
+apps/web/components/ui/**                   + EmptyState, Breadcrumb, OwnerTag, ContactStrip,
+                                             ConflictWarning, ReadinessGate, ChangeRequestButton,
+                                             ConfirmImpactDialog, NotificationCard, UndoToast,
+                                             SavePanel, ConnectionStatus  (§7.7 — ทยอยตาม phase)
 apps/web/lib/auth/{permissions,rbac,current-user}.ts   DB loader + role resolution + scope
 apps/web/lib/supabase/server.ts            + getScopedDataClient
 apps/web/lib/data/*.ts (11)                 read → scoped client
@@ -316,3 +325,107 @@ database/tests/rls_*.sql                             ใหม่
 scripts/seed-test-users.mjs                          ใหม่
 next.config.ts                              + redirects()
 ```
+
+---
+
+## 7. UX & interaction design — ลดความสับสน + ลดความผิดพลาดการประสานงาน
+
+> อ้างอิง [501](../05-ux/501-ui-design-system.md) (visual tone), [505](../05-ux/505-thai-copy-guideline.md) (copy), [105](../01-business/105-business-rules.md) (rules ที่ต้องบังคับใน UI), [104](../01-business/104-operational-workflow.md) (workflow)
+
+### 7.1 North star
+
+ทุกหน้าจอต้องทำให้ผู้ใช้ตอบได้ทันทีใน 3 วินาที:
+
+1. **ฉันอยู่ที่ไหน** — โครงการ/scope ปัจจุบัน แสดงตลอด (บน sidebar + breadcrumb)
+2. **ฉันทำอะไรได้ที่นี่** — ปุ่ม action ที่มีสิทธิ์เท่านั้น; ที่ไม่มีสิทธิ์ = ไม่แสดง (ไม่ใช่ disable เงียบ ๆ)
+3. **อะไรที่รอฉันตัดสินใจ** — exception/readiness ขึ้นก่อนข้อมูลทั่วไปเสมอ
+4. **ใครรับผิดชอบอะไร** — ทุก object (assignment, incident, change, mission) แสดง **เจ้าของ + บทบาท + เวลาล่าสุด** ไม่มี "ลอย"
+
+### 7.2 Anti-confusion (นำทาง + บริบท)
+
+| ปัญหาเดิม | แก้ด้วย |
+|---|---|
+| nav เดียว flat, test tools ปนงานจริง | nav จัดกลุ่มตามงาน (ปฏิบัติการ/วางแผน/ประสานงาน/องค์กร) + กรอง permission + superadmin แยกธีม |
+| ไม่รู้กำลังดูโครงการไหน | **project scope pill** บนสุด sidebar (ชื่อ+รหัสโครงการ+lifecycle badge) กดเปลี่ยนได้; ทุกหน้าที่ scoped ขึ้น breadcrumb `โครงการ / <ชื่อ> / <หน้า>` |
+| เปิด URL ตรงเข้าได้หมด | ไม่มีสิทธิ์ → `<AccessDenied>` (อธิบายว่าต้อง role อะไร + ปุ่มกลับ) ไม่ใช่หน้าเปล่า/500 |
+| object เรียกชื่อไม่ตรงกันข้ามหน้า | ยึด [505 core terms](../05-ux/505-thai-copy-guideline.md): โครงการ · ภารกิจ · งานที่จัดสรร · Call Sign · คนขับ · รถ — ใช้คำเดียวทุกที่ |
+| หน้าเปล่าเมื่อไม่มีข้อมูล | `<EmptyState>` = onboarding: บอกขั้นถัดไป + ปุ่มทำเลย ("ยังไม่มีภารกิจ → เพิ่มภารกิจแรก") |
+| raw enum / ISO date | Thai label ทุกที่ (ทำแล้วบางส่วน `72e822b`) + `ยังไม่ระบุ` สำหรับข้อมูลว่าง + `ข้อมูลตัวอย่าง` badge สำหรับ fallback |
+| ปุ่มเยอะ ไม่รู้อันไหนหลัก | 1 primary action/หน้า (teal), ที่เหลือ secondary; destructive = แดง + ต้องยืนยัน |
+
+### 7.3 Anti-error (การประสานงาน) — บังคับผ่าน UI
+
+| business rule | UI pattern |
+|---|---|
+| ASN-005/006, VEH-006 — ห้ามจอง driver/vehicle ซ้อนเวลา | ตอนเลือก driver/รถ ใน assignment planner → **ตรวจ conflict inline**: ถ้าซ้อน แสดงแถบแดง "คนขับนี้มีงาน <Call Sign> เวลา <...>" + block; ต้องกด "ขอ override" + ใส่เหตุผล → ลง timeline |
+| PUB-004/005 — publish ต้องผ่าน conflict + readiness | ปุ่ม "ประกาศใช้แผน" **disabled จนกว่า readiness = เขียว**; กดแล้วเปิด panel สรุป: X ภารกิจ · Y งาน · Z blocker — ยืนยันอีกครั้งพร้อมเห็น impact |
+| MIS-007, PUB-003, CHG-* — publish แล้วห้ามแก้ตรง | หลัง publish: ปุ่ม "แก้ไข" ทั้งหมด → เปลี่ยนเป็น **"ขอเปลี่ยนแปลง"** (สีเหลือง); เปิด form change request บังคับ: เหตุผล + ผลกระทบ (ภารกิจ/งาน/คนขับ/รถ/Call Sign/commitment) ก่อนส่ง |
+| CHG-005 — critical change ต้อง approve | change ที่กระทบ published assignment → สถานะ "รออนุมัติ" + ระบุผู้อนุมัติ; ผู้มีสิทธิ์เห็นใน exception feed |
+| CHG-008, NOT-001/003 — แจ้งผู้เกี่ยวข้อง + notification ต้องมี action | ทุก notification card = ข้อความ + **ปุ่ม action** + ผู้รับที่ scoped; ไม่มี notification ลอยไม่มีปุ่ม |
+| MIS-009, GPS-006 — completion ต้องมี confirmation source | สถานะ mission/assignment แสดง **"ยืนยันโดย: <ชื่อ> (<บทบาท>) · <เวลา>"**; GPS แค่ "คาดว่าถึงแล้ว" ไม่เปลี่ยนสถานะเอง |
+| COO-008, DRV-009 — contact matrix ต้องเห็น | ทุกหน้า operational (dispatch, coordinator, driver card) มี **contact strip**: ผู้ประสานงาน + operation + คนขับ พร้อมปุ่มโทร/ข้อความ ไม่ต้องหา |
+| ASN-008, TIM-001 — status change = timeline | ทุก action ที่เปลี่ยนสถานะ → toast "บันทึกแล้ว" + ลิงก์ "ดูใน Timeline"; ไม่มีการเปลี่ยนสถานะเงียบ |
+| GPS-003/004 — GPS หายไม่ทำให้ mission fail | GPS หาย → หมุดเป็นสีเทา + ป้าย "ขาดสัญญาณ — ใช้การยืนยันด้วยคน"; ไม่ใช่สีแดง alarm |
+| INC-004 — critical incident → recovery mode | เปิด incident ระดับ critical → banner ทั้ง workspace + ลิงก์ recovery panel; recovery ไม่ลบแผนเดิม (แสดงคู่กัน "แผนเดิม / แผนกู้คืน") |
+
+### 7.4 Fluency (ทำงานคล่อง)
+
+- **Dispatch board**: เลือกงานหลายอันแล้ว bulk assign driver/vehicle; drag ระหว่าง lane เพื่อเปลี่ยนสถานะ; keyboard (`j/k` เลื่อน, `a` assign, `/` ค้นหา)
+- **Inline edit** แทน modal — แก้ค่าในการ์ดได้เลย, บันทึกอัตโนมัติ + indicator "บันทึกแล้ว"
+- **Side panel** แทน modal สำหรับรายละเอียด (assignment, incident, change) — ยังเห็น context ด้านหลัง
+- **Scope memory** — จำโครงการ + filter ล่าสุดต่อผู้ใช้ (cookie); เปิดเว็บมาอยู่ที่เดิม
+- **<3 คลิก** ถึง action หลักของแต่ละ role จากหน้าแรก
+- **Command palette** (`Cmd/Ctrl+K`) — ไปโครงการ/ภารกิจ/คนขับ/หน้า ได้เร็ว (phase หลัง)
+- **Saved views** — dispatcher เซฟ filter "งานวันนี้ที่ยังไม่มีคนขับ" ไว้
+
+### 7.5 Feedback & state
+
+- โหลด = **skeleton** ตรงตำแหน่งจริง ไม่ใช่ spinner กลางจอ
+- สำเร็จ = toast สั้น + undo (ถ้าทำได้) ภายใน 5 วิ
+- error = inline ตรง field/การ์ด + ข้อความบอกวิธีแก้ ไม่ใช่ error code
+- **optimistic update** + rollback ถ้า fail — ไม่ทำ action หายเงียบ
+- connection/realtime status ที่มุมเดียว: "เชื่อมต่อสด / สำรองด้วยการดึงข้อมูล / ออฟไลน์" (มีแล้วใน mission control — ขยายให้ทุกหน้า operational)
+
+### 7.6 Per-workspace — หน้าหลัก + คำถามที่ตอบ + กันพลาด
+
+| workspace | หน้าหลัก | คำถามที่ตอบ | primary action | กันพลาดเฉพาะทาง |
+|---|---|---|---|---|
+| Operation Manager `/mission-control` | Command Center | "ตอนนี้อะไรเสี่ยง อะไรต้องตัดสินใจ" | เปิด incident / อนุมัติ change | exception feed จัดลำดับตามความรุนแรง + เวลา; decision prompt มีปุ่ม |
+| Planner `/projects/[id]` | Planning workspace | "แผนพร้อม publish หรือยัง ติดอะไร" | ประกาศใช้แผน | readiness checklist บังคับ; conflict check ก่อน publish; ปุ่ม publish ล็อกจนเขียว |
+| Dispatcher `/assignments` | Dispatch lanes | "งานไหนยังไม่พร้อม ใครยังไม่มีคนขับ" | สร้าง QR / assign | conflict inline ตอน assign; QR สร้างได้เมื่อ Call Sign+คนขับ+รถ ครบ (แสดง "ขาด: รถ") |
+| Coordinator `/coordinator` (mobile) | งานที่ได้รับ (scoped) | "งานถัดไปของฉันคืออะไร ต้องยืนยันอะไร" | ยืนยัน arrival/boarding/completion | เห็นเฉพาะ scope ตัวเอง; ปุ่มยืนยันใหญ่ thumb-reach; แจ้งปัญหา = 2 แตะ |
+| Organizer `/portal` (read-only) | ภาพรวมโครงการ | "งานไปถึงไหนแล้ว มั่นใจได้ไหม" | ส่งคำขอเปลี่ยนแปลง | ไม่มีปุ่มแก้ตรง; change request เข้า workflow + เห็นสถานะคำขอตัวเอง; ไม่เห็น GPS ดิบ/ข้อมูลคนขับ |
+| Vendor `/vendor` | คนขับ/รถ ของตัวเอง | "รถ/คนขับฉันถูกใช้ที่ไหน ต้องเปลี่ยนตัวไหม" | ขอเปลี่ยนตัว (replacement) | เห็นเฉพาะ resource + assignment ของ vendor ตัวเอง |
+| Driver `/driver` (mobile, มีแล้ว) | Assignment card | "งานฉันคืออะไร ไปไง ติดต่อใคร" | แชร์ GPS / เปิด Google Maps / แจ้งปัญหา | 1 การ์ด 1 งาน; ปุ่มหลักล่างจอ; แจ้งปัญหา quick-action |
+
+### 7.7 Component ที่ต้องเพิ่ม
+
+`<ProjectScopePill>` · `<Breadcrumb>` · `<PermissionGate>` (client+server) · `<AccessDenied>` · `<EmptyState>` · `<RoleBadge>` · `<OwnerTag>` (ชื่อ+บทบาท+เวลา) · `<ContactStrip>` · `<ConflictWarning>` · `<ReadinessGate>` · `<ChangeRequestButton>` (แทนปุ่มแก้หลัง publish) · `<ConfirmImpactDialog>` (สรุปผลกระทบก่อน publish/cancel/replace) · `<NotificationCard>` (ข้อความ+action) · `<ConnectionStatus>` · `<SavePanel>` (side panel) · `<UndoToast>`
+
+### 7.8 UX เข้า phase ไหน (ไม่รอ Phase 4)
+
+- **Phase 1**: `<AccessDenied>`, `<PermissionGate>`, `<RoleBadge>`, nav grouping, breadcrumb, `<EmptyState>` baseline
+- **Phase 2**: superadmin ธีมแยก + แถบ "INTERNAL"; `/superadmin/users` ฟอร์มเพิ่มผู้ใช้ที่ชัดเจน
+- **Phase 3**: `<ProjectScopePill>` + scope switcher (จำเป็นเมื่อ data ถูก scope แล้ว), `ข้อมูลตัวอย่าง` badge เข้มงวด
+- **Phase 4**: `<OwnerTag>`, `<ContactStrip>`, `<ConflictWarning>`, `<ReadinessGate>`, `<ChangeRequestButton>`, `<ConfirmImpactDialog>`, `<NotificationCard>`, dispatch fluency (bulk/keyboard), inline edit + `<SavePanel>`, `/portal`
+- **Phase 5**: command palette, saved views, `/coordinator` + `/vendor` mobile-optimized
+
+---
+
+## 8. UX acceptance checklist (ใช้ตอน review แต่ละ phase)
+
+- [ ] เปิดหน้าไหนก็รู้ว่าอยู่โครงการไหน + role อะไร ภายใน 3 วิ
+- [ ] เมนู/ปุ่มที่ไม่มีสิทธิ์ = ไม่แสดง (ไม่มี dead-end 403)
+- [ ] ทุก object ปฏิบัติการมีเจ้าของ + เวลาล่าสุดที่มองเห็น
+- [ ] exception/readiness อยู่เหนือข้อมูลทั่วไปทุกหน้า operational
+- [ ] หน้าเปล่า = onboarding พร้อมปุ่มขั้นถัดไป (ไม่มีตารางว่างลอย)
+- [ ] ไม่มี raw enum / ISO datetime / คำ dev หลุดถึงผู้ใช้
+- [ ] publish ล็อกจน readiness เขียว + แสดง impact ก่อนยืนยัน
+- [ ] หลัง publish ไม่มีปุ่มแก้ตรง — เป็น "ขอเปลี่ยนแปลง" ที่เข้า workflow
+- [ ] conflict (คนขับ/รถ ซ้อนเวลา) เตือน inline + บังคับเหตุผลถ้า override
+- [ ] contact strip เห็นได้ทุกหน้า operational
+- [ ] ทุก notification มีปุ่ม action
+- [ ] action สำเร็จ = toast + ลิงก์ Timeline; fail = rollback + ข้อความแก้ไข
+- [ ] mobile: coordinator/driver ปุ่มหลักอยู่ในระยะนิ้วโป้ง แตะได้ ≤2 ครั้งถึง action หลัก
+- [ ] ≤3 คลิกจากหน้าแรกถึง action หลักของ role นั้น
+- [ ] 0 horizontal overflow ทุก breakpoint (คงจาก `72e822b`)
