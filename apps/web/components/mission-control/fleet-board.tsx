@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Check, ChevronDown, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
+import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
 import type { AssignmentStatusUpdate } from "@/lib/data/assignment-status";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
 import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
@@ -65,7 +66,15 @@ export function FleetBoard({
   const [inbound, setInbound] = useState(initialInbound);
   const [now, setNow] = useState(() => Date.now());
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [seenAt, setSeenAt] = useState<Record<string, number>>({});
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [, startResolve] = useTransition();
+
+  function resolveMessage(id: string) {
+    setResolvedIds((s) => new Set(s).add(id));
+    startResolve(async () => {
+      await resolveDriverMessageAction({ id, projectId }).catch(() => undefined);
+    });
+  }
 
   useEffect(() => {
     let alive = true;
@@ -118,19 +127,15 @@ export function FleetBoard({
     return map;
   }, [inbound]);
 
-  function markSeen(assignmentId: string) {
-    setSeenAt((s) => ({ ...s, [assignmentId]: Date.now() }));
-  }
-
   const rows = useMemo(() => {
     return assignments
       .map((assignment) => {
         const location = locationByAssignment.get(assignment.id);
         const freshness = freshnessOf(location, now);
         const msgs = inboundByAssignment.get(assignment.id) ?? [];
-        const lastMsgAt = msgs.length ? new Date(msgs[msgs.length - 1].at).getTime() : 0;
-        const unread = lastMsgAt > (seenAt[assignment.id] ?? 0) ? msgs.length : 0;
-        const hasIssue = msgs.some((m) => m.kind === "issue");
+        const openMsgs = msgs.filter((m) => m.status !== "closed" && !resolvedIds.has(m.id));
+        const unread = openMsgs.length;
+        const hasIssue = openMsgs.some((m) => m.kind === "issue");
         return {
           assignment,
           label: callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`,
@@ -150,7 +155,7 @@ export function FleetBoard({
         if (rank !== 0) return rank;
         return a.label.localeCompare(b.label, "th");
       });
-  }, [assignments, locationByAssignment, inboundByAssignment, seenAt, now, statuses, driverById, vehicleById, callSignById]);
+  }, [assignments, locationByAssignment, inboundByAssignment, resolvedIds, now, statuses, driverById, vehicleById, callSignById]);
 
   const alertCount = rows.filter((r) => r.unread).length;
 
@@ -182,11 +187,7 @@ export function FleetBoard({
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = open ? null : row.assignment.id;
-                    setExpanded(next);
-                    if (next) markSeen(row.assignment.id);
-                  }}
+                  onClick={() => setExpanded(open ? null : row.assignment.id)}
                   className="flex w-full items-start gap-3 px-4 py-3 text-left"
                 >
                   <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${FRESH_DOT[row.freshness]}`} title={FRESH_LABEL[row.freshness]} />
@@ -254,13 +255,34 @@ export function FleetBoard({
                     {row.msgs.length ? (
                       <div className="grid gap-1.5">
                         <p className="text-xs font-semibold text-slate-600">ข้อความจากคนขับ</p>
-                        {row.msgs.slice(-4).map((m) => (
-                          <p key={m.id} className={`rounded-xl border px-2.5 py-1.5 text-xs ${m.kind === "issue" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-700"}`}>
-                            {m.kind === "issue" ? <span className="font-semibold">[แจ้งปัญหา] </span> : null}
-                            {m.message || "(ไม่มีข้อความ)"}
-                            <span className="ml-1 text-slate-400">· {formatRelativeTh(m.at, now)}</span>
-                          </p>
-                        ))}
+                        {row.msgs.slice(-4).map((m) => {
+                          const done = m.status === "closed" || resolvedIds.has(m.id);
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex items-start justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-xs ${
+                                done ? "border-slate-200 bg-slate-50 text-slate-400" : m.kind === "issue" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-700"
+                              }`}
+                            >
+                              <span>
+                                {m.kind === "issue" ? <span className="font-semibold">[แจ้งปัญหา] </span> : null}
+                                {m.message || "(ไม่มีข้อความ)"}
+                                <span className="ml-1 text-slate-400">· {formatRelativeTh(m.at, now)}</span>
+                              </span>
+                              {done ? (
+                                <span className="shrink-0 text-emerald-600"><Check className="h-3.5 w-3.5" /></span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => resolveMessage(m.id)}
+                                  className="shrink-0 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:border-emerald-400 hover:text-emerald-700"
+                                >
+                                  รับทราบ
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
                         <p className="text-[11px] text-slate-400">ตอบกลับได้ที่แผง “การสื่อสารกับคนขับ” ด้านล่าง</p>
                       </div>
                     ) : null}

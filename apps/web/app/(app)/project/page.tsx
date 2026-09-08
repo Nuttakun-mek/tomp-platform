@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccessDenied } from "@/components/auth/access-denied";
+import { CreateMissionForm } from "@/components/missions/create-mission-form";
 import { ProjectArchiveButton } from "@/components/projects/project-archive-button";
 import { ProjectAssignmentBoard } from "@/components/projects/project-assignment-board";
 import { ProjectChangePanel } from "@/components/projects/project-change-panel";
@@ -79,6 +80,7 @@ async function OverviewView({ projectId }: { projectId: string }) {
         <ProjectPublishPanel projectId={projectId} readiness={readiness} />
       </div>
       <div className="grid content-start gap-5">
+        <CreateMissionForm projectId={projectId} />
         <ProjectMissionBoard missions={missions} />
         <ProjectChangePanel projectId={projectId} />
       </div>

@@ -102,6 +102,24 @@ export async function markDriverNotificationReadAction(input: { projectId: strin
   return actionSuccess({ notification: data });
 }
 
+// Control centre marks a driver message / issue report as handled.
+export async function resolveDriverMessageAction(input: { id: string; projectId: string }): Promise<ActionResult> {
+  if (!input.id || !input.projectId) return actionFailure("ข้อมูลไม่ครบ");
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const { data, error: updateError } = await client
+    .from("driver_issue_reports")
+    .update({ status: "closed" })
+    .eq("id", input.id)
+    .eq("project_id", input.projectId)
+    .select("id, status")
+    .single();
+
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "อัปเดตสถานะข้อความไม่สำเร็จ"));
+  return actionSuccess({ report: data });
+}
+
 export async function sendDriverNotificationAction(input: {
   projectId: string;
   assignmentId: string;
