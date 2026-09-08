@@ -3,6 +3,7 @@
 import { createProjectSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/rbac";
 import { mapProject } from "@/lib/data/mappers";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -57,10 +58,50 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   }
 
   const project = mapProject(data);
+
+  // Creator becomes an active project_manager member + owner so RLS (0019) lets
+  // them see the project they just made.
+  const membershipWarning = await linkCreatorAsProjectManager(client, project.id, parsed.data.ownerProfileId || null);
+
   const timelineResult = await createProjectTimelineEvent(project.id, project.id, data);
+
+  const warnings = [
+    membershipWarning,
+    timelineResult.success ? null : `บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
+  ].filter(Boolean);
 
   return actionSuccess(
     { mode, project, timelineEvent: timelineResult.data },
-    timelineResult.success ? undefined : `สร้างโครงการแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
+    warnings.length ? `สร้างโครงการแล้ว แต่: ${warnings.join(" · ")}` : undefined
   );
+}
+
+type WriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
+
+async function linkCreatorAsProjectManager(client: WriteClient, projectId: string, ownerProfileId: string | null): Promise<string | null> {
+  const profile = await getCurrentUserProfile();
+  if (profile.isDevelopmentFallback || !profile.authUserId || profile.id === "anonymous") {
+    // dev fallback / no session: nothing durable to link
+    if (ownerProfileId) await client.from("projects").update({ owner_profile_id: ownerProfileId }).eq("id", projectId);
+    return null;
+  }
+
+  const { data: role } = await client.from("roles").select("id").eq("role_key", "project_manager").maybeSingle();
+  const roleId = typeof role?.id === "string" ? role.id : null;
+  if (!roleId) return "ไม่พบบทบาทผู้จัดการโครงการ — ยังไม่ได้เพิ่มผู้สร้างเป็นสมาชิก";
+
+  const { error: memberError } = await client.from("project_members").insert({
+    project_id: projectId,
+    profile_id: profile.id,
+    role_id: roleId,
+    status: "active",
+    metadata: { source: "project_create" }
+  });
+  if (memberError && memberError.code !== "23505") {
+    return "เพิ่มผู้สร้างเป็นสมาชิกโครงการไม่สำเร็จ";
+  }
+
+  const owner = ownerProfileId || profile.id;
+  await client.from("projects").update({ owner_profile_id: owner }).eq("id", projectId);
+  return null;
 }
