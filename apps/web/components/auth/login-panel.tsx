@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowRight, LockKeyhole, Mail, MapPinned, ShieldCheck, UserRoundCheck } from "lucide-react";
-import { getGoogleSignInUrlAction, signInWithEmailAction } from "@/app/actions/auth";
+import { ArrowRight, KeyRound, LockKeyhole, Mail, MapPinned, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { getGoogleSignInUrlAction, signInWithEmailAction, signInWithPasswordAction } from "@/app/actions/auth";
 
 const roleCards = [
   {
@@ -25,13 +25,27 @@ const roleCards = [
 ];
 
 export function LoginPanel() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
   const reason = searchParams.get("reason");
+  const [mode, setMode] = useState<"password" | "magic-link">("password");
   const [message, setMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(
     reason === "missing-auth-config" ? { tone: "error", text: "ยังไม่ได้ตั้งค่า Supabase Auth บนระบบ production" } : null
   );
   const [isPending, startTransition] = useTransition();
+
+  function handlePassword(formData: FormData) {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await signInWithPasswordAction({ email: formData.get("email"), password: formData.get("password"), next });
+      if (result.success && result.data && typeof result.data === "object" && "redirectTo" in result.data) {
+        router.replace(String(result.data.redirectTo));
+        return;
+      }
+      setMessage({ tone: "error", text: result.error || "เข้าสู่ระบบไม่สำเร็จ" });
+    });
+  }
 
   function handleEmail(formData: FormData) {
     setMessage(null);
@@ -101,18 +115,50 @@ export function LoginPanel() {
             <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-soft sm:p-6">
               <p className="page-kicker">บัญชีเจ้าหน้าที่</p>
               <h2 className="mt-1 text-2xl font-semibold text-ink">เข้าสู่ระบบ</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">กรอกอีเมลที่เปิดใช้งานไว้ ระบบจะส่งลิงก์สำหรับยืนยันตัวตน</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {mode === "password"
+                  ? "กรอกอีเมลและรหัสผ่านที่ได้รับจากผู้ดูแลระบบ"
+                  : "กรอกอีเมลที่เปิดใช้งานไว้ ระบบจะส่งลิงก์สำหรับยืนยันตัวตน"}
+              </p>
 
-              <form action={handleEmail} className="mt-5 grid gap-3">
-                <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-                  อีเมล
-                  <input className="min-h-12 rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-operation focus:ring-4 focus:ring-teal-100" name="email" placeholder="name@company.com" type="email" required />
-                </label>
-                <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-operation px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(8,123,115,0.24)] transition hover:bg-operation-deep disabled:bg-slate-300" disabled={isPending} type="submit">
-                  <Mail className="h-4 w-4" />
-                  {isPending ? "กำลังส่งลิงก์..." : "ส่งลิงก์เข้าสู่ระบบ"}
-                </button>
-              </form>
+              {mode === "password" ? (
+                <form action={handlePassword} className="mt-5 grid gap-3">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                    อีเมล
+                    <input className="min-h-12 rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-operation focus:ring-4 focus:ring-teal-100" name="email" placeholder="name@company.com" type="email" autoComplete="email" required />
+                  </label>
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                    รหัสผ่าน
+                    <input className="min-h-12 rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-operation focus:ring-4 focus:ring-teal-100" name="password" type="password" autoComplete="current-password" required />
+                  </label>
+                  <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-operation px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(8,123,115,0.24)] transition hover:bg-operation-deep disabled:bg-slate-300" disabled={isPending} type="submit">
+                    <KeyRound className="h-4 w-4" />
+                    {isPending ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+                  </button>
+                </form>
+              ) : (
+                <form action={handleEmail} className="mt-5 grid gap-3">
+                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                    อีเมล
+                    <input className="min-h-12 rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-operation focus:ring-4 focus:ring-teal-100" name="email" placeholder="name@company.com" type="email" autoComplete="email" required />
+                  </label>
+                  <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-operation px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(8,123,115,0.24)] transition hover:bg-operation-deep disabled:bg-slate-300" disabled={isPending} type="submit">
+                    <Mail className="h-4 w-4" />
+                    {isPending ? "กำลังส่งลิงก์..." : "ส่งลิงก์เข้าสู่ระบบ"}
+                  </button>
+                </form>
+              )}
+
+              <button
+                className="mt-2 text-[13px] font-semibold text-operation transition hover:text-operation-deep"
+                onClick={() => {
+                  setMessage(null);
+                  setMode((current) => (current === "password" ? "magic-link" : "password"));
+                }}
+                type="button"
+              >
+                {mode === "password" ? "ใช้ลิงก์ทางอีเมลแทน" : "ใช้รหัสผ่านแทน"}
+              </button>
 
               <button className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-operation hover:bg-teal-50" disabled={isPending} onClick={handleGoogle} type="button">
                 เข้าสู่ระบบด้วย Google

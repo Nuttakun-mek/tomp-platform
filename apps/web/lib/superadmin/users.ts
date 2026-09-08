@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 export interface ProvisionUserInput {
@@ -87,9 +87,14 @@ export async function listProfilesWithRoles(): Promise<ProfileRow[]> {
   }));
 }
 
+function generateTempPassword(): string {
+  const bytes = randomBytes(12).toString("base64").replace(/[^a-zA-Z0-9]/g, "");
+  return `Tomp-${bytes.slice(0, 14)}`;
+}
+
 export async function provisionUser(
   input: ProvisionUserInput
-): Promise<{ ok: true; profileId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; profileId: string; tempPassword: string } | { ok: false; error: string }> {
   const client = getSupabaseServerDataClient();
   if (!client) return { ok: false, error: "ยังไม่ได้ตั้งค่าการเชื่อมต่อฐานข้อมูล" };
 
@@ -105,17 +110,35 @@ export async function provisionUser(
     if (!roleIdByKey.has(key)) return { ok: false, error: `ไม่พบบทบาท ${key}` };
   }
 
+  // Pre-create the auth user with a temporary password (email confirmed) so the
+  // invited person signs IN — not signs UP — and can log in without waiting for
+  // an email. The temp password is returned for the admin to hand over securely.
+  const tempPassword = generateTempPassword();
+  const created = await client.auth.admin.createUser({
+    email: input.email,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { full_name: input.fullName }
+  });
+  if (created.error) {
+    return { ok: false, error: `สร้างบัญชีเข้าสู่ระบบไม่สำเร็จ: ${created.error.message}` };
+  }
+  const authUserId = created.data.user?.id ?? null;
+
   const profileId = randomUUID();
   const { error: profileError } = await client.from("profiles").insert({
     id: profileId,
-    auth_user_id: null,
+    auth_user_id: authUserId,
     organization_id: input.organizationId,
     full_name: input.fullName,
     email: input.email,
-    status: "invited",
+    status: authUserId ? "active" : "invited",
     metadata: { source: "superadmin_provision" }
   });
-  if (profileError) return { ok: false, error: `สร้างผู้ใช้ไม่สำเร็จ: ${profileError.message}` };
+  if (profileError) {
+    if (authUserId) await client.auth.admin.deleteUser(authUserId);
+    return { ok: false, error: `สร้างผู้ใช้ไม่สำเร็จ: ${profileError.message}` };
+  }
 
   if (input.globalRoleKey) {
     await client.from("user_role_assignments").insert({
@@ -136,5 +159,5 @@ export async function provisionUser(
     });
   }
 
-  return { ok: true, profileId };
+  return { ok: true, profileId, tempPassword };
 }

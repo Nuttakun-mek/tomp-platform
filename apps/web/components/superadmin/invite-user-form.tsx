@@ -42,7 +42,15 @@ export function InviteUserForm({ organizations, projects }: { organizations: Opt
       });
       if (result.success) {
         setTone("success");
-        setMessage("เพิ่มผู้ใช้แล้ว — ให้ผู้ใช้เข้าสู่ระบบด้วยอีเมลนี้เพื่อเปิดใช้งานบัญชี");
+        const temp =
+          result.data && typeof result.data === "object" && "tempPassword" in result.data
+            ? String(result.data.tempPassword)
+            : null;
+        setMessage(
+          temp
+            ? `เพิ่มผู้ใช้แล้ว — ส่งรหัสผ่านชั่วคราวนี้ให้ผู้ใช้อย่างปลอดภัย แล้วให้เปลี่ยนหลังเข้าระบบครั้งแรก: ${temp}`
+            : "เพิ่มผู้ใช้แล้ว — ให้ผู้ใช้เข้าสู่ระบบด้วยอีเมลนี้เพื่อเปิดใช้งานบัญชี"
+        );
       } else {
         setTone("danger");
         setMessage(result.error || "เพิ่มผู้ใช้ไม่สำเร็จ");

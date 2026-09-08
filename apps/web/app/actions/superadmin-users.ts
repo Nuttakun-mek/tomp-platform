@@ -18,5 +18,5 @@ export async function provisionUserAction(input: unknown): Promise<ActionResult>
   if (!result.ok) return actionFailure(result.error);
 
   revalidatePath("/superadmin/users");
-  return actionSuccess({ profileId: result.profileId });
+  return actionSuccess({ profileId: result.profileId, tempPassword: result.tempPassword });
 }
