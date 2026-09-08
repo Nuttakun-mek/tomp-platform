@@ -2,11 +2,29 @@
 
 import { useRef, useState } from "react";
 import { Camera, Check, Loader2 } from "lucide-react";
-import { driverEvidenceUploadAction } from "@/app/actions/driver";
 
 type Kind = "vehicle" | "plate";
 
 const LABELS: Record<Kind, string> = { vehicle: "ถ่ายรูปรถ", plate: "ถ่ายรูปป้ายทะเบียน" };
+
+// Resize + re-encode to keep the upload small enough for a mobile connection.
+async function compressImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return file;
+  const maxEdge = 1600;
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.round(bitmap.width * scale);
+  const height = Math.round(bitmap.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return new Promise<Blob>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", 0.75);
+  });
+}
 
 export function DriverPhotoCheck({
   token,
@@ -21,26 +39,28 @@ export function DriverPhotoCheck({
   const [error, setError] = useState<string | null>(null);
   const inputs = { vehicle: useRef<HTMLInputElement>(null), plate: useRef<HTMLInputElement>(null) };
 
-  async function upload(kind: Kind, file: File) {
+  async function handleFile(kind: Kind, file: File) {
     setError(null);
     setBusy(kind);
     setPreviews((p) => ({ ...p, [kind]: URL.createObjectURL(file) }));
     try {
+      const blob = await compressImage(file);
       const form = new FormData();
       form.set("token", token);
       form.set("kind", kind);
-      form.set("file", file);
-      const result = await driverEvidenceUploadAction(form);
-      if (result.success && result.data) {
-        const next = { ...paths, [kind]: (result.data as { path?: string }).path };
+      form.set("file", new File([blob], `${kind}.jpg`, { type: "image/jpeg" }));
+      const res = await fetch("/api/driver/evidence", { method: "POST", body: form });
+      const json = (await res.json()) as { success?: boolean; path?: string; error?: string };
+      if (res.ok && json.success && json.path) {
+        const next = { ...paths, [kind]: json.path };
         setPaths(next);
         onChange(next);
       } else {
-        setError(result.error || "อัปโหลดรูปไม่สำเร็จ");
+        setError(json.error || "อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง");
         setPreviews((p) => ({ ...p, [kind]: undefined }));
       }
     } catch {
-      setError("อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง");
+      setError("อัปโหลดรูปไม่สำเร็จ ตรวจสอบสัญญาณแล้วลองใหม่");
       setPreviews((p) => ({ ...p, [kind]: undefined }));
     } finally {
       setBusy(null);
@@ -49,7 +69,7 @@ export function DriverPhotoCheck({
 
   return (
     <div className="grid gap-2">
-      <p className="text-[13px] font-semibold text-ink">ถ่ายรูปเป็นหลักฐานก่อนรับงาน (จำเป็น)</p>
+      <p className="text-[13px] font-semibold text-ink">ถ่ายรูปเป็นหลักฐานก่อนเริ่มงาน (จำเป็น)</p>
       <div className="grid grid-cols-2 gap-2">
         {(["vehicle", "plate"] as const).map((kind) => {
           const done = Boolean(paths[kind]);
@@ -63,7 +83,8 @@ export function DriverPhotoCheck({
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) void upload(kind, file);
+                  if (file) void handleFile(kind, file);
+                  e.target.value = "";
                 }}
               />
               <button
@@ -83,7 +104,7 @@ export function DriverPhotoCheck({
                 ) : (
                   <Camera className="h-5 w-5" />
                 )}
-                <span>{done ? `${LABELS[kind]} ✓` : LABELS[kind]}</span>
+                <span>{done ? `${LABELS[kind]} ✓` : busy === kind ? "กำลังอัปโหลด…" : LABELS[kind]}</span>
               </button>
             </div>
           );

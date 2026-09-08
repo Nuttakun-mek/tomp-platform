@@ -2,22 +2,16 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2, ChevronDown, MapPin, MessageSquare, Navigation, Phone, TriangleAlert } from "lucide-react";
-import {
-  assignmentStatusUpdateAction,
-  driverCheckinAction,
-  driverIssueReportAction,
-  recordVehicleEvidenceAction
-} from "@/app/actions/driver";
+import { assignmentStatusUpdateAction, driverIssueReportAction } from "@/app/actions/driver";
 import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
-import { DriverPhotoCheck } from "@/components/driver/driver-photo-check";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import type { DriverNotification } from "@tomp/types/domain";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
 
-type Phase = "assigned" | "ready" | "sharing";
+type Phase = "ready" | "sharing";
 
 const TRIP_STEPS: Array<{ status: "arrived_pickup" | "passenger_onboard" | "completed"; label: string }> = [
   { status: "arrived_pickup", label: "ถึงจุดรับแล้ว" },
@@ -49,7 +43,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
     ""
   );
 
-  const [phase, setPhase] = useState<Phase>("assigned");
+  const [phase, setPhase] = useState<Phase>("ready");
   const [tripStep, setTripStep] = useState(0);
   const [banner, setBanner] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -59,11 +53,6 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   const [notifications, setNotifications] = useState<DriverNotification[]>(driverAccess.notifications);
   const [messages, setMessages] = useState<DriverIssueMessage[]>(driverAccess.messages);
   const [gpsLight, setGpsLight] = useState<"off" | "live" | "stale">("off");
-  const [checkOpen, setCheckOpen] = useState(false);
-  const [checks, setChecks] = useState({ name: false, phone: false, vehicle: false, gps: false });
-  const [photoPaths, setPhotoPaths] = useState<{ vehicle?: string; plate?: string }>({});
-  const allChecked = checks.name && checks.phone && checks.vehicle && checks.gps;
-  const photosReady = Boolean(photoPaths.vehicle && photoPaths.plate);
 
   const ids = {
     projectId: driverAccess.project.id,
@@ -103,32 +92,6 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       window.clearInterval(timer);
     };
   }, [driverAccess.token]);
-
-  function markReady() {
-    if (!photosReady) {
-      setBanner({ tone: "error", text: "กรุณาถ่ายรูปรถและป้ายทะเบียนก่อนกดพร้อมรับงาน" });
-      return;
-    }
-    setBanner(null);
-    startTransition(async () => {
-      const result = await driverCheckinAction({
-        ...ids,
-        status: "ready",
-        confirmedName: checks.name || allChecked,
-        confirmedPhone: checks.phone || allChecked,
-        confirmedVehicle: checks.vehicle || allChecked,
-        gpsConsent: checks.gps || allChecked,
-        metadata: { via: "driver_task_view", checklistComplete: allChecked, photoPaths }
-      });
-      if (!result.success) {
-        setBanner({ tone: "error", text: result.error || "บันทึกไม่สำเร็จ ลองอีกครั้ง" });
-        return;
-      }
-      await recordVehicleEvidenceAction({ token: driverAccess.token, vehiclePath: photoPaths.vehicle, platePath: photoPaths.plate }).catch(() => undefined);
-      setPhase("ready");
-      setBanner({ tone: "ok", text: "แจ้งความพร้อมแล้ว ศูนย์ควบคุมได้รับข้อมูลและรูปแล้ว" });
-    });
-  }
 
   function advanceTrip(status: (typeof TRIP_STEPS)[number]["status"], nextIndex: number) {
     setBanner(null);
@@ -213,7 +176,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         </div>
       </header>
 
-      {/* identity — driver / vehicle / plate, at the top, collapsible */}
+      {/* identity — driver / vehicle / plate, collapsible */}
       <section className="rounded-card border border-border bg-white">
         <button
           type="button"
@@ -265,73 +228,18 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
 
       {/* primary action */}
       <section className="smart-card grid gap-3">
-        {phase === "assigned" ? (
-          <>
-            <DriverPhotoCheck token={driverAccess.token} onChange={setPhotoPaths} />
-
-            <button
-              type="button"
-              onClick={() => setCheckOpen((v) => !v)}
-              className={`flex items-center justify-between rounded-card border px-3 py-2 text-[13px] font-semibold ${
-                allChecked ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-border bg-white text-ink-soft"
-              }`}
-            >
-              {allChecked ? "ตรวจก่อนรับงาน ครบแล้ว" : `ตรวจก่อนรับงาน (${Object.values(checks).filter(Boolean).length}/4)`}
-              <ChevronDown className={`h-4 w-4 transition ${checkOpen ? "rotate-180" : ""}`} />
-            </button>
-            {checkOpen ? (
-              <div className="grid gap-1.5">
-                {(
-                  [
-                    ["name", "ยืนยันชื่อคนขับถูกต้อง"],
-                    ["phone", "ยืนยันเบอร์โทรถูกต้อง"],
-                    ["vehicle", "ยืนยันรถที่ได้รับมอบหมาย"],
-                    ["gps", "ยินยอมเปิด GPS ระหว่างปฏิบัติงาน"]
-                  ] as const
-                ).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2.5 rounded-card border border-border bg-white px-3 py-2 text-[13px]">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-teal-700"
-                      checked={checks[key]}
-                      onChange={(e) => setChecks((c) => ({ ...c, [key]: e.target.checked }))}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            ) : null}
-            <button
-              type="button"
-              onClick={markReady}
-              disabled={isPending || !photosReady}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-operation px-4 text-[16px] font-bold text-white disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-5 w-5" />
-              {isPending ? "กำลังบันทึก..." : !photosReady ? "ถ่ายรูปให้ครบก่อน" : "พร้อมรับงาน"}
-            </button>
-          </>
-        ) : null}
-
         {phase === "ready" ? (
-          <>
-            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-emerald-700">
-              <CheckCircle2 className="h-4 w-4" /> แจ้งความพร้อมแล้ว
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setPhase("sharing");
-                setGpsLight("live");
-              }}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-route px-4 text-[16px] font-bold text-white"
-            >
-              <Navigation className="h-5 w-5" /> เริ่มแชร์ตำแหน่ง GPS
-            </button>
-          </>
-        ) : null}
-
-        {phase === "sharing" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPhase("sharing");
+              setGpsLight("live");
+            }}
+            className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-route px-4 text-[16px] font-bold text-white"
+          >
+            <Navigation className="h-5 w-5" /> เริ่มแชร์ตำแหน่ง GPS
+          </button>
+        ) : (
           <div className="grid gap-3">
             <a
               href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
@@ -388,7 +296,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
               <p className="rounded-card bg-emerald-50 px-3 py-3 text-center text-[14px] font-bold text-emerald-800">งานนี้เสร็จแล้ว ขอบคุณครับ</p>
             )}
           </div>
-        ) : null}
+        )}
       </section>
 
       {/* instant comms */}

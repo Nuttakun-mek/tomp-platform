@@ -17,6 +17,7 @@ export interface DriverAccessAssignment {
   notifications: DriverNotification[];
   routeChanges: RouteChangeInstruction[];
   messages: DriverIssueMessage[];
+  activated: boolean;
   tokenValidated: boolean;
 }
 
@@ -107,12 +108,14 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     })
     .eq("token_hash", tokenHash);
 
-  const [packet, notifications, routeChanges, messages] = await Promise.all([
+  const [packet, notifications, routeChanges, messages, checkinRes] = await Promise.all([
     getDriverAssignmentPacketByAssignmentId(text(assignment, "id")),
     getDriverNotificationsByAssignmentId(text(assignment, "id")),
     getRouteChangesByAssignmentId(text(assignment, "id")),
-    getDriverIssueMessagesByAssignmentId(text(assignment, "id"))
+    getDriverIssueMessagesByAssignmentId(text(assignment, "id")),
+    client.from("driver_checkins").select("id").eq("assignment_id", text(assignment, "id")).eq("status", "ready").limit(1)
   ]);
+  const activated = Boolean((checkinRes.data as unknown[] | null)?.length);
 
   const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
 
@@ -125,6 +128,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     notifications,
     routeChanges,
     messages,
+    activated,
     project: {
       ...base(project),
       organizationId: text(project, "organization_id"),
@@ -201,7 +205,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   const assignment = assignmentRows[0];
   if (!assignment) return null;
 
-  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows] = await Promise.all([
+  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows, checkinRows] = await Promise.all([
     sql<Row[]>`select * from projects where id = ${String(tokenRow.project_id)} limit 1`,
     sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
     assignment.driver_id ? sql<Row[]>`select * from drivers where id = ${String(assignment.driver_id)} limit 1` : Promise.resolve([]),
@@ -209,7 +213,8 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 1`,
     sql<Row[]>`select * from driver_notifications where assignment_id = ${String(tokenRow.assignment_id)} order by sent_at desc limit 10`,
     sql<Row[]>`select * from route_change_instructions where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 5`,
-    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${String(tokenRow.assignment_id)} order by created_at asc limit 50`
+    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${String(tokenRow.assignment_id)} order by created_at asc limit 50`,
+    sql<Row[]>`select id from driver_checkins where assignment_id = ${String(tokenRow.assignment_id)} and status = 'ready' limit 1`
   ]);
 
   const project = projectRows[0];
@@ -242,6 +247,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     token,
     tokenValidated: true,
     packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,
+    activated: checkinRows.length > 0,
     messages: messageRows.map((row) => ({
       id: text(row, "id"),
       text: text(row, "message"),
