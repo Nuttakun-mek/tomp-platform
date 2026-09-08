@@ -11,5 +11,9 @@ const toneClasses = {
 };
 
 export function StatusBadge({ label, tone = "neutral" }: StatusBadgeProps) {
-  return <span className={`inline-flex whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-semibold ${toneClasses[tone]}`}>{label}</span>;
+  return (
+    <span className={`inline-flex max-w-full shrink-0 items-center rounded-md border px-2.5 py-1 text-center text-[11px] font-semibold leading-tight ${toneClasses[tone]}`}>
+      {label}
+    </span>
+  );
 }

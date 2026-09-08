@@ -83,7 +83,7 @@ export async function archivePilotSmokeTestDataAction(): Promise<ActionResult<{ 
     });
   }
 
-  revalidatePath("/admin/data-quality");
+  revalidatePath("/superadmin/dev-tools/data-quality");
   revalidatePath("/projects");
   revalidatePath("/mission-control");
 

@@ -1,12 +1,14 @@
 import type { Assignment } from "@tomp/types/domain";
+import { OwnerTag } from "@/components/ui/owner-tag";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 export function ExceptionList({ assignments }: { assignments: Assignment[] }) {
   const exceptions = assignments.flatMap((assignment) => {
-    const items: Array<{ title: string; detail: string }> = [];
-    if (!assignment.callSignId) items.push({ title: "ยังไม่มี Call Sign", detail: `Assignment ${assignment.id} ยังไม่มี Call Sign` });
-    if (!assignment.driverId) items.push({ title: "ยังไม่มีคนขับ", detail: `Assignment ${assignment.id} ยังไม่ได้ผูกคนขับ` });
-    if (!assignment.vehicleId) items.push({ title: "ยังไม่มีรถ", detail: `Assignment ${assignment.id} ยังไม่ได้ผูกรถ` });
+    const items: Array<{ title: string; detail: string; at: string }> = [];
+    const at = assignment.updatedAt || assignment.createdAt;
+    if (!assignment.callSignId) items.push({ title: "ยังไม่มี Call Sign", detail: `Assignment ${assignment.id} ยังไม่มี Call Sign`, at });
+    if (!assignment.driverId) items.push({ title: "ยังไม่มีคนขับ", detail: `Assignment ${assignment.id} ยังไม่ได้ผูกคนขับ`, at });
+    if (!assignment.vehicleId) items.push({ title: "ยังไม่มีรถ", detail: `Assignment ${assignment.id} ยังไม่ได้ผูกรถ`, at });
     return items;
   });
 
@@ -25,6 +27,9 @@ export function ExceptionList({ assignments }: { assignments: Assignment[] }) {
             <article key={`${item.title}-${item.detail}`} className="rounded-md border border-slate-200 bg-slate-50 p-4">
               <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
               <p className="mt-1 text-sm leading-6 text-slate-600">{item.detail}</p>
+              <div className="mt-2">
+                <OwnerTag name={null} at={item.at} />
+              </div>
             </article>
           ))
         ) : (

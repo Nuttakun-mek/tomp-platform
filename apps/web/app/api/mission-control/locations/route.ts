@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const projectId = url.searchParams.get("projectId");
   try {
-    const locations = await withTimeout(projectId ? getLatestDriverLocationsByProjectId(projectId) : getLatestDriverLocations(), 3200, "driver locations");
+    const locations = await withTimeout(projectId ? getLatestDriverLocationsByProjectId(projectId) : getLatestDriverLocations(), 9000, "driver locations");
 
     return NextResponse.json({ success: true, data: locations, checkedAt: new Date().toISOString() });
   } catch (error) {

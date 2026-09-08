@@ -1,15 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getViewerAccess } from "@/lib/auth/access";
+import { getSessionAwareAuthClient } from "@/lib/auth/auth-server";
+import { resolveRedirectPath } from "@/lib/auth/role-model";
+
+function safeNext(raw: string | null): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null;
+  if (raw === "/" || raw === "/login") return null;
+  return raw;
+}
 
 export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
-  const supabase = getSupabaseServerClient();
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
+  const supabase = await getSessionAwareAuthClient();
 
   if (code && supabase) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return NextResponse.redirect(new URL("/projects", requestUrl.origin));
-}
+  const explicitNext = safeNext(url.searchParams.get("next"));
+  if (explicitNext) {
+    return NextResponse.redirect(new URL(explicitNext, url.origin));
+  }
 
+  const { primaryRole } = await getViewerAccess();
+  return NextResponse.redirect(new URL(resolveRedirectPath(primaryRole), url.origin));
+}

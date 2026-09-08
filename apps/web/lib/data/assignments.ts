@@ -2,11 +2,11 @@ import type { Assignment } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
-import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapAssignment } from "./mappers";
 
 export async function getAssignmentsByProjectId(projectId: string): Promise<Assignment[]> {
-  const supabase = getSupabaseServerDataClient();
+  const { client: supabase } = await resolveReadClient();
   if (!supabase) return getAssignmentsByProjectIdViaPostgres(projectId);
 
   try {

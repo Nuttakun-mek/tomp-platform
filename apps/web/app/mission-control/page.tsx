@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { AssignmentMonitor } from "@/components/mission-control/assignment-monitor";
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
 import { DecisionPanel } from "@/components/mission-control/decision-panel";
@@ -11,11 +12,13 @@ import { ProjectSwitcher } from "@/components/mission-control/project-switcher";
 import { RealtimeStatusPanel } from "@/components/mission-control/realtime-status-panel";
 import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
 import { RouteChangeConsole } from "@/components/mission-control/route-change-console";
+import { VehicleMonitorPanel } from "@/components/mission-control/vehicle-monitor-panel";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getDriverOperationSummaryByProjectId } from "@/lib/data/driver-operations";
 import { getLatestDriverLocationsByProjectId, getProjectIdWithLatestDriverLocation } from "@/lib/data/locations";
 import { getProjects } from "@/lib/data/projects";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
+import { getVehicleOperationProfilesByProjectId } from "@/lib/data/vehicle-operations";
 import { demoProject } from "@/lib/demo/demo-kernel";
 
 interface MissionControlPageProps {
@@ -31,11 +34,12 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     projects[0] ??
     demoProject;
 
-  const [events, locations, assignments, driverOperations] = await Promise.all([
+  const [events, locations, assignments, driverOperations, vehicleProfiles] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
     getLatestDriverLocationsByProjectId(activeProject.id),
     getAssignmentsByProjectId(activeProject.id),
-    getDriverOperationSummaryByProjectId(activeProject.id)
+    getDriverOperationSummaryByProjectId(activeProject.id),
+    getVehicleOperationProfilesByProjectId(activeProject.id)
   ]);
 
   const locationAssignmentIds = new Set(locations.map((location) => location.assignmentId).filter(Boolean));
@@ -48,20 +52,21 @@ export default async function MissionControlPage({ searchParams }: MissionContro
       <ProjectSwitcher projects={projects} activeProjectId={activeProject.id} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
 
-      <div className="grid gap-5 xl:grid-cols-[1.32fr_0.88fr]">
-        <div className="grid gap-5">
+      <div className="page-grid" style={{ "--rail": "380px" } as CSSProperties}>
+        <div className="page-main">
           <LiveMapPanel projectId={activeProject.id} locations={locations} />
           <DriverOperationsPanel locations={locations} summary={driverOperations} />
           <AssignmentMonitor assignments={assignments} locations={locations} />
+          <RiskAndExceptionPanel assignments={assignments} locations={locations} />
+          <OperationTimelinePanel events={events} />
         </div>
-        <aside className="grid content-start gap-5">
+        <aside className="page-rail">
+          <DecisionPanel projectId={activeProject.id} followUps={followUps} />
+          <VehicleMonitorPanel profiles={vehicleProfiles} />
           <DriverSignalPanel locations={locations} />
           <DriverNotificationConsole />
           <RouteChangeConsole />
-          <RiskAndExceptionPanel assignments={assignments} locations={locations} />
-          <OperationTimelinePanel events={events} />
           <RealtimeStatusPanel projectId={activeProject.id} />
-          <DecisionPanel projectId={activeProject.id} followUps={followUps} />
         </aside>
       </div>
     </>

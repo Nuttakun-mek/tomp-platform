@@ -9,12 +9,9 @@ export default function NotFound() {
         <p className="mt-3 text-sm leading-7 text-slate-600">
           หน้านี้อาจถูกย้าย ลิงก์ QR อาจหมดอายุ หรือ deployment ยังไม่ใช่เวอร์ชันล่าสุด กรุณากลับไปที่ภาพรวมระบบแล้วเลือกเมนูที่ต้องการอีกครั้ง
         </p>
-        <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <div className="mt-5 flex justify-center">
           <Link className="rounded-2xl bg-operation px-5 py-3 text-sm font-semibold text-white shadow-sm" href="/">
             กลับภาพรวม
-          </Link>
-          <Link className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm" href="/admin/pilot-smoke-test">
-            ตรวจระบบ Pilot
           </Link>
         </div>
       </section>

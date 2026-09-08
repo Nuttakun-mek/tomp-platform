@@ -3,7 +3,7 @@ import type { OperationDay } from "@tomp/types/domain";
 export function ProjectOperationDays({ operationDays }: { operationDays: OperationDay[] }) {
   return (
     <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">Operation Days</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">วันปฏิบัติการ</p>
       <h2 className="mt-1 text-lg font-semibold text-ink">วันปฏิบัติการ</h2>
       <div className="mt-4 grid gap-3">
         {operationDays.length ? (

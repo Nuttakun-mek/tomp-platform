@@ -19,44 +19,48 @@ export function DriverCard({ driverAccess }: { driverAccess: DriverAccessAssignm
   const dropoffLabel = text(driverAccess.assignment.metadata.dropoffLocation || driverAccess.assignment.metadata.dropoff_location, "ยังไม่ระบุจุดส่ง");
   const commitmentTime = text(driverAccess.assignment.metadata.commitmentTime || driverAccess.assignment.metadata.commitment_time, "ยังไม่ระบุเวลา");
   const mapsUrl = buildGoogleMapsDirectionsUrl(dropoffLabel, pickupLabel);
-  const packet = driverAccess.packet ?? buildDriverAssignmentPacket({
-    id: driverAccess.assignment.id,
-    projectId: driverAccess.project.id,
-    assignmentId: driverAccess.assignment.id,
-    driverId: driverAccess.driver.id,
-    callSign: driverAccess.callSign.callSign,
-    status: "assigned",
-    packetVersion: driverAccess.assignment.currentVersion,
-    projectName: driverAccess.project.projectName,
-    missionName: null,
-    instructions: [{ id: driverAccess.assignment.id, title: "รับทราบงาน", status: "assigned", sequence: 1, required: true }],
-    routeInstruction: {
-      routePlan: { summary: `${pickupLabel} ไป ${dropoffLabel}`, stops: [{ label: pickupLabel }, { label: dropoffLabel }], googleMapsUrl: mapsUrl, metadata: {} },
-      pickup: { label: pickupLabel },
-      dropoff: { label: dropoffLabel }
-    },
-    contactInstruction: { coordinatorPhone: "ยังไม่ระบุ", operationPhone: "ยังไม่ระบุ" },
-    safetyInstructions: [{ message: "เปิด GPS ระหว่างปฏิบัติงานเมื่อพร้อม", required: true }],
-    metadata: { source: "web_driver" }
-  });
+  const packet =
+    driverAccess.packet ??
+    buildDriverAssignmentPacket({
+      id: driverAccess.assignment.id,
+      projectId: driverAccess.project.id,
+      assignmentId: driverAccess.assignment.id,
+      driverId: driverAccess.driver.id,
+      callSign: driverAccess.callSign.callSign,
+      status: "assigned",
+      packetVersion: driverAccess.assignment.currentVersion,
+      projectName: driverAccess.project.projectName,
+      missionName: null,
+      instructions: [{ id: driverAccess.assignment.id, title: "รับทราบงาน", status: "assigned", sequence: 1, required: true }],
+      routeInstruction: {
+        routePlan: { summary: `${pickupLabel} ไป ${dropoffLabel}`, stops: [{ label: pickupLabel }, { label: dropoffLabel }], googleMapsUrl: mapsUrl, metadata: {} },
+        pickup: { label: pickupLabel },
+        dropoff: { label: dropoffLabel }
+      },
+      contactInstruction: { coordinatorPhone: "ยังไม่ระบุ", operationPhone: "ยังไม่ระบุ" },
+      safetyInstructions: [{ message: "เปิด GPS ระหว่างปฏิบัติงานเมื่อพร้อม", required: true }],
+      metadata: { source: "web_driver" }
+    });
 
   return (
-    <div className="mx-auto grid max-w-2xl gap-5 pb-24 lg:max-w-5xl lg:grid-cols-[0.95fr_1.05fr] lg:pb-0">
-      <div className="grid content-start gap-5">
+    <div className="mx-auto grid max-w-2xl gap-4 pb-24 lg:max-w-5xl lg:grid-cols-[0.92fr_1.08fr] lg:gap-5 lg:pb-0">
+      <div className="grid content-start gap-4">
         <DriverTaskHero driverAccess={driverAccess} mapsUrl={mapsUrl} packet={packet} />
         <DriverRouteCard pickup={pickupLabel} dropoff={dropoffLabel} commitmentTime={commitmentTime} summary={packet.routeInstruction.routePlan.summary} />
         <DriverAssignmentAcknowledgement driverAccess={driverAccess} />
         <DriverEmergencyActions />
       </div>
-      <div className="grid content-start gap-5">
+
+      <div className="grid content-start gap-4">
         <DriverNextAction driverAccess={driverAccess} mapsUrl={mapsUrl} packet={packet} />
         <DriverLocationShare driverAccess={driverAccess} />
         <DriverReadinessCard driverAccess={driverAccess} />
         <DriverNotificationPanel driverAccess={driverAccess} />
         <DriverRouteChangeAlert driverAccess={driverAccess} />
       </div>
+
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-panel backdrop-blur lg:hidden">
-        <a className="flex min-h-14 items-center justify-center rounded-2xl bg-route px-4 py-3 text-base font-semibold text-white" href={mapsUrl}>
+        <a className="flex min-h-14 items-center justify-center rounded-2xl bg-route px-4 py-3 text-base font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.24)]" href={mapsUrl}>
           เปิด Google Maps
         </a>
       </div>

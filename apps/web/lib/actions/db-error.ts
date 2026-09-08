@@ -20,7 +20,7 @@ export function getDatabaseErrorMessage(error: DatabaseErrorLike | null | undefi
   if (error?.code === "23505" || combined.includes("duplicate key value")) {
     const matchedKey = Object.keys(uniqueFieldLabels).find((key) => combined.includes(key));
     const label = matchedKey ? uniqueFieldLabels[matchedKey] : "ข้อมูลนี้";
-    return `${label} ถูกใช้งานแล้ว กรุณาเปลี่ยนเป็นค่าอื่น`;
+    return `${label} ถูกใช้แล้ว กรุณาเปลี่ยนเป็นค่าอื่น`;
   }
 
   if (error?.code === "23503" || combined.includes("violates foreign key constraint")) {
@@ -29,6 +29,10 @@ export function getDatabaseErrorMessage(error: DatabaseErrorLike | null | undefi
 
   if (error?.code === "23502" || combined.includes("null value in column")) {
     return "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน";
+  }
+
+  if (message.toLowerCase().includes("fetch failed")) {
+    return "เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาตรวจสอบการตั้งค่า Supabase และลองใหม่อีกครั้ง";
   }
 
   return fallback;

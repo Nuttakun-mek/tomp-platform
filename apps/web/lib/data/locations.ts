@@ -3,6 +3,7 @@ import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 type LocationRow = Record<string, unknown>;
 
@@ -61,7 +62,7 @@ async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getS
     assignmentIds.length ? client.from("assignments").select("id, mission_id, call_sign_id, status").in("id", assignmentIds) : Promise.resolve({ data: [] }),
     driverIds.length ? client.from("drivers").select("id, full_name, phone").in("id", driverIds) : Promise.resolve({ data: [] }),
     vehicleIds.length ? client.from("vehicles").select("id, plate_number, vehicle_type").in("id", vehicleIds) : Promise.resolve({ data: [] })
-  ]), 1600, "location metadata");
+  ]), 3000, "location metadata");
 
   const callSignIds = Array.from(
     new Set((assignments || []).map((assignment) => (assignment as LocationRow).call_sign_id).filter((id): id is string => typeof id === "string"))
@@ -73,7 +74,7 @@ async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getS
   const [{ data: callSigns }, { data: missions }] = await withTimeout(Promise.all([
     callSignIds.length ? client.from("call_signs").select("id, call_sign").in("id", callSignIds) : Promise.resolve({ data: [] }),
     missionIds.length ? client.from("missions").select("id, mission_code, mission_name").in("id", missionIds) : Promise.resolve({ data: [] })
-  ]), 1600, "location assignment metadata");
+  ]), 3000, "location assignment metadata");
 
   const projectById = new Map((projects || []).map((project) => [String((project as LocationRow).id), project as LocationRow]));
   const assignmentById = new Map((assignments || []).map((assignment) => [String((assignment as LocationRow).id), assignment as LocationRow]));
@@ -188,16 +189,30 @@ async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
   }
 }
 
-async function getLatestDriverLocationsViaPostgres(projectId: string | null, limit: number): Promise<DriverLocation[]> {
+const LOCATIONS_UNAVAILABLE_MESSAGE = "บริการตำแหน่งคนขับไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่อีกครั้ง";
+
+// Fallback path when the Supabase data client is unavailable or fails.
+// - allowDemo: true  -> no database configured at all, demo data is expected
+// - allowDemo: false -> the database is configured but errored; surface the
+//   failure (throw) instead of silently serving fabricated demo rows.
+async function getLatestDriverLocationsFallback(
+  projectId: string | null,
+  limit: number,
+  { allowDemo }: { allowDemo: boolean }
+): Promise<DriverLocation[]> {
   const sql = getPostgresClient();
-  if (!sql) return getDemoDriverLocations(projectId, limit);
+  if (!sql) {
+    if (allowDemo) return getDemoDriverLocations(projectId, limit);
+    throw new Error(LOCATIONS_UNAVAILABLE_MESSAGE);
+  }
   let data: LocationRow[];
   try {
     data = projectId
       ? await sql<LocationRow[]>`select * from gps_locations where project_id = ${projectId} order by recorded_at desc limit ${limit}`
       : await sql<LocationRow[]>`select * from gps_locations order by recorded_at desc limit ${limit}`;
   } catch {
-    return getDemoDriverLocations(projectId, limit);
+    if (allowDemo) return getDemoDriverLocations(projectId, limit);
+    throw new Error(LOCATIONS_UNAVAILABLE_MESSAGE);
   }
 
   const latestByAssignment = new Map<string, DriverLocation>();
@@ -212,10 +227,10 @@ async function getLatestDriverLocationsViaPostgres(projectId: string | null, lim
 }
 
 export async function getLatestDriverLocationsByProjectId(projectId: string): Promise<DriverLocation[]> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
 
   if (!client) {
-    return getLatestDriverLocationsViaPostgres(projectId, 50);
+    return getLatestDriverLocationsFallback(projectId, 50, { allowDemo: true });
   }
 
   let data: LocationRow[] | null | undefined;
@@ -223,17 +238,21 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
   try {
     const result = await withTimeout(
       client.from("gps_locations").select("*").eq("project_id", projectId).order("recorded_at", { ascending: false }).limit(50),
-      2200,
+      6000,
       "project driver locations"
     );
     data = result.data as LocationRow[] | null;
     error = result.error;
   } catch {
-    return getLatestDriverLocationsViaPostgres(projectId, 50);
+    return getLatestDriverLocationsFallback(projectId, 50, { allowDemo: false });
   }
 
-  if (error || !data?.length) {
-    return getLatestDriverLocationsViaPostgres(projectId, 50);
+  if (error) {
+    return getLatestDriverLocationsFallback(projectId, 50, { allowDemo: false });
+  }
+
+  if (!data?.length) {
+    return [];
   }
 
   const latestByAssignment = new Map<string, DriverLocation>();
@@ -248,24 +267,28 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
 }
 
 export async function getLatestDriverLocations(limit = 50): Promise<DriverLocation[]> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
 
   if (!client) {
-    return getLatestDriverLocationsViaPostgres(null, limit);
+    return getLatestDriverLocationsFallback(null, limit, { allowDemo: true });
   }
 
   let data: LocationRow[] | null | undefined;
   let error: unknown;
   try {
-    const result = await withTimeout(client.from("gps_locations").select("*").order("recorded_at", { ascending: false }).limit(limit), 2200, "driver locations");
+    const result = await withTimeout(client.from("gps_locations").select("*").order("recorded_at", { ascending: false }).limit(limit), 6000, "driver locations");
     data = result.data as LocationRow[] | null;
     error = result.error;
   } catch {
-    return getLatestDriverLocationsViaPostgres(null, limit);
+    return getLatestDriverLocationsFallback(null, limit, { allowDemo: false });
   }
 
-  if (error || !data?.length) {
-    return getLatestDriverLocationsViaPostgres(null, limit);
+  if (error) {
+    return getLatestDriverLocationsFallback(null, limit, { allowDemo: false });
+  }
+
+  if (!data?.length) {
+    return [];
   }
 
   const latestByAssignment = new Map<string, DriverLocation>();
@@ -280,7 +303,7 @@ export async function getLatestDriverLocations(limit = 50): Promise<DriverLocati
 }
 
 export async function getProjectIdWithLatestDriverLocation(): Promise<string | null> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
 
   if (!client) {
     return getProjectIdWithLatestDriverLocationViaPostgres();
@@ -289,7 +312,7 @@ export async function getProjectIdWithLatestDriverLocation(): Promise<string | n
   let data: LocationRow | null | undefined;
   let error: unknown;
   try {
-    const result = await withTimeout(client.from("gps_locations").select("project_id").order("recorded_at", { ascending: false }).limit(1).maybeSingle(), 1800, "latest location project");
+    const result = await withTimeout(client.from("gps_locations").select("project_id").order("recorded_at", { ascending: false }).limit(1).maybeSingle(), 4000, "latest location project");
     data = result.data as LocationRow | null;
     error = result.error;
   } catch {

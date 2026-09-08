@@ -16,7 +16,7 @@ export function getSupabaseServerClient(): SupabaseClient | null {
 
   return createClient(supabaseUrl, supabaseAnonKey, {
     global: {
-      fetch: createTimeoutFetch(2000)
+      fetch: createTimeoutFetch(8000)
     },
     auth: {
       persistSession: false,
@@ -39,7 +39,7 @@ export function getSupabaseServerDataClient(): SupabaseClient | null {
 
   return createClient(supabaseUrl, supabaseServerKey, {
     global: {
-      fetch: createTimeoutFetch(2000)
+      fetch: createTimeoutFetch(8000)
     },
     auth: {
       persistSession: false,

@@ -4,13 +4,13 @@ const actions = [
   { href: "/mission-control", label: "เปิดศูนย์ควบคุม", detail: "ดูแผนที่ สถานะ GPS และความเสี่ยง" },
   { href: "/projects/new", label: "สร้างโครงการ", detail: "เริ่มพื้นที่ปฏิบัติการใหม่" },
   { href: "/assignments", label: "จัดสรร Assignment", detail: "เลือก Call Sign คนขับ และรถให้ครบ" },
-  { href: "/live-test", label: "ทดสอบ QR และ GPS", detail: "เส้นทางทดสอบระบบแบบจบขั้นตอน" }
+  { href: "/resources", label: "ตรวจทรัพยากร", detail: "ดูความพร้อมคนขับและรถ" }
 ];
 
 export function QuickActionPanel() {
   return (
     <section className="enterprise-panel p-5">
-      <p className="text-[11px] font-bold tracking-[0.18em] text-operation">QUICK ACTIONS</p>
+      <p className="section-label">ทางลัดปฏิบัติการ</p>
       <h2 className="mt-1 text-lg font-semibold text-ink">ทางลัดปฏิบัติการ</h2>
       <div className="mt-4 grid gap-3">
         {actions.map((action) => (

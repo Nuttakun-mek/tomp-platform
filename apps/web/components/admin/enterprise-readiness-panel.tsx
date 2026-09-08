@@ -23,7 +23,7 @@ export function EnterpriseReadinessPanel() {
   return (
     <div className="grid gap-6">
       <section className="enterprise-card p-5 lg:p-6">
-        <p className="text-sm font-semibold text-operation">Enterprise Readiness</p>
+        <p className="section-label">ความพร้อมองค์กร</p>
         <h2 className="mt-1 text-2xl font-semibold text-ink">ภาพรวม 12 แกนก่อนใช้งานจริง</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           หน้านี้แยกสิ่งที่ทดสอบได้แล้วออกจากสิ่งที่ยังต้อง harden เพื่อไม่ให้เข้าใจผิดว่าเป็น production 100% ทั้งหมด

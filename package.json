@@ -18,9 +18,24 @@
     "test": "npm run test -w @tomp/web && npm run test -w @tomp/driver-core",
     "test:watch": "npm run test:watch -w @tomp/web",
     "security:env": "node scripts/check-public-env.mjs",
-    "smoke:production": "node scripts/production-smoke.mjs"
+    "smoke:production": "node scripts/production-smoke.mjs",
+    "db:migrate": "node scripts/apply-migrations.mjs",
+    "db:migrate:dry": "node scripts/apply-migrations.mjs --dry-run",
+    "db:seed": "node scripts/apply-migrations.mjs --seed",
+    "db:production:reset": "node scripts/reset-production-data.mjs --production --dry-run",
+    "db:production:reset:confirm": "node scripts/reset-production-data.mjs --production --yes",
+    "auth:bootstrap-admin": "node scripts/bootstrap-production-admin.mjs",
+    "db:local:sync": "node scripts/sync-supabase-migrations.mjs",
+    "db:local:start": "npm run db:local:sync && npx --prefix apps/web supabase start",
+    "db:local:stop": "npx --prefix apps/web supabase stop",
+    "db:local:reset": "npm run db:local:sync && npx --prefix apps/web supabase db reset",
+    "db:local:status": "npx --prefix apps/web supabase status",
+    "live-test:smoke": "node scripts/live-test-smoke.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "postgres": "^3.4.7"
   }
 }

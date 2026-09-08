@@ -1,0 +1,42 @@
+// เรียงจากสิทธิ์สูงสุด → ต่ำสุด; ตัวแรกที่ user มี = primary role
+export const PRIMARY_ROLE_ORDER = [
+  "super_admin",
+  "organization_admin",
+  "operation_manager",
+  "project_manager",
+  "planner",
+  "dispatcher",
+  "coordinator",
+  "vendor",
+  "organizer",
+  "customer_viewer",
+  "driver"
+] as const;
+
+export type PrimaryRole = (typeof PRIMARY_ROLE_ORDER)[number];
+
+const REDIRECT_BY_ROLE: Record<string, string> = {
+  super_admin: "/",
+  organization_admin: "/",
+  operation_manager: "/mission-control",
+  project_manager: "/projects",
+  planner: "/projects",
+  dispatcher: "/assignments",
+  coordinator: "/coordinator",
+  vendor: "/vendor",
+  organizer: "/portal",
+  customer_viewer: "/portal"
+  // driver ไม่ redirect ผ่าน callback (ใช้ QR) — ตกไป /no-access ถ้า login ปกติ
+};
+
+export function resolvePrimaryRole(roleKeys: string[]): string | null {
+  for (const role of PRIMARY_ROLE_ORDER) {
+    if (roleKeys.includes(role)) return role;
+  }
+  return null;
+}
+
+export function resolveRedirectPath(primaryRole: string | null): string {
+  if (!primaryRole) return "/no-access";
+  return REDIRECT_BY_ROLE[primaryRole] ?? "/no-access";
+}

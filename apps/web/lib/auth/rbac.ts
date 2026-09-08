@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getCurrentUserProfile, getProjectMembership } from "@/lib/auth/current-user";
-import { ROLE_PERMISSIONS, roleHasPermission } from "@/lib/auth/permissions";
+import { ROLE_PERMISSIONS, isGlobalPermission, roleHasPermission } from "@/lib/auth/permissions";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 export async function requirePermission(first: string, second?: string): Promise<{ allowed: boolean; reason?: string }> {
@@ -9,8 +9,11 @@ export async function requirePermission(first: string, second?: string): Promise
   const permissionKey = firstLooksLikePermission ? first : String(second);
   const projectId = firstLooksLikePermission ? second : first;
 
-  if (!projectId) {
+  // Global/org-scoped permissions (e.g. project.create) are never granted through
+  // project_members — check global + org roles even when an id was passed in.
+  if (!projectId || isGlobalPermission(permissionKey)) {
     const profile = await getCurrentUserProfile();
+    if (profile.isDevelopmentFallback) return { allowed: true };
     const roles = await getUserRoles(profile.id);
     const allowed = roles.some((roleKey) => roleHasPermission(roleKey, permissionKey));
     return allowed ? { allowed: true } : { allowed: false, reason: `No role includes ${permissionKey}.` };
@@ -60,9 +63,25 @@ export async function getUserProjectMemberships(profileId: string): Promise<Arra
 
 export async function getUserRoles(profileId: string, projectId?: string): Promise<string[]> {
   if (profileId.startsWith("development")) return ["project_manager"];
+  const supabase = getSupabaseServerDataClient();
+  const globalRoles: string[] = [];
+  if (supabase) {
+    const { data } = await supabase
+      .from("user_role_assignments")
+      .select("roles(role_key)")
+      .eq("profile_id", profileId)
+      .eq("status", "active")
+      .is("project_id", null);
+
+    for (const row of data || []) {
+      const roles = row.roles as { role_key?: string } | { role_key?: string }[] | null;
+      const roleKey = Array.isArray(roles) ? roles[0]?.role_key : roles?.role_key;
+      if (roleKey) globalRoles.push(roleKey);
+    }
+  }
   const memberships = await getUserProjectMemberships(profileId);
   const scoped = projectId ? memberships.filter((membership) => membership.projectId === projectId) : memberships;
-  return scoped.map((membership) => membership.roleKey);
+  return [...new Set([...globalRoles, ...scoped.map((membership) => membership.roleKey)])];
 }
 
 async function currentProfileId(): Promise<string> {

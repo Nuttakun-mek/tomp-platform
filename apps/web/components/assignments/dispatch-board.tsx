@@ -24,18 +24,18 @@ export function DispatchBoard({ projectId, assignments, missions, callSigns, dri
   return (
     <section className="grid gap-6">
       <div className="enterprise-panel-soft p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] text-operation">บอร์ดจัดสรรงาน</p>
-            <h1 className="mt-1 text-2xl font-semibold text-ink">บอร์ดจัดสรรงาน</h1>
-            <p className="mt-1 text-sm text-slate-600">สแกนสถานะ Call Sign คนขับ รถ QR และความเสี่ยงของงานที่จัดสรร</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="section-label">บอร์ดจัดสรรงาน</p>
+            <h2 className="section-title mt-1">ติดตามงานที่มอบให้รถและคนขับ</h2>
+            <p className="section-description mt-1">แยกตามสถานะ เพื่อให้ dispatcher เห็นทันทีว่างานใดพร้อม งานใดต้องติดตาม และงานใดถูกถอนแล้ว</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{assignments.length} งาน</span>
+          <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{assignments.length} งาน</span>
         </div>
       </div>
       <DriverQrActionCard assignments={assignments} projectId={projectId} />
-      <div className="overflow-x-auto pb-2">
-        <div className="grid min-w-[1180px] grid-cols-6 gap-4">
+      <div className="-mx-1 overflow-x-auto px-1 pb-2">
+        <div className="grid grid-flow-col auto-cols-[minmax(272px,1fr)] gap-4">
           {laneDefinitions.map((lane) => (
             <AssignmentLane
               key={lane.title}

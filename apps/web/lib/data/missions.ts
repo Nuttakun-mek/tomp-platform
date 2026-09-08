@@ -1,11 +1,11 @@
 import type { Mission } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { demoKernel } from "@/lib/demo/demo-kernel";
-import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapMission } from "./mappers";
 
 export async function getMissionsByProjectId(projectId: string): Promise<Mission[]> {
-  const supabase = getSupabaseServerDataClient();
+  const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.missions.filter((mission) => mission.projectId === projectId);
 
   try {

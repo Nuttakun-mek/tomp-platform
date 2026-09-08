@@ -1,8 +1,24 @@
-export function EmptyState({ title, description }: { title: string; description: string }) {
+import type { ReactNode } from "react";
+import { Inbox } from "lucide-react";
+
+interface EmptyStateProps {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  icon?: ReactNode;
+}
+
+export function EmptyState({ title, description, action, icon }: EmptyStateProps) {
   return (
-    <div className="rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
-      <h3 className="text-base font-semibold text-ink">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    <div className="grid justify-items-center gap-3 rounded-panel border border-dashed border-border bg-canvas/50 px-6 py-10 text-center">
+      <span className="grid h-11 w-11 place-items-center rounded-panel bg-white text-ink-faint shadow-sm">
+        {icon ?? <Inbox className="h-5 w-5" />}
+      </span>
+      <div className="min-w-0">
+        <p className="card-title">{title}</p>
+        {description ? <p className="section-description mx-auto mt-1 max-w-sm">{description}</p> : null}
+      </div>
+      {action}
     </div>
   );
 }

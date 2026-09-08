@@ -16,8 +16,8 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
           <button className="rounded-2xl bg-operation px-5 py-3 text-sm font-semibold text-white shadow-sm" type="button" onClick={reset}>
             ลองโหลดใหม่
           </button>
-          <Link className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm" href="/admin/pilot-smoke-test">
-            ตรวจระบบ Pilot
+          <Link className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm" href="/">
+            กลับหน้าแรก
           </Link>
         </div>
       </section>
