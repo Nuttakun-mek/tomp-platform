@@ -227,13 +227,15 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 
 > ทุก phase: typecheck + lint + test เขียว + ผ่าน **UX acceptance checklist (§8)** ที่เกี่ยวข้อง, ไม่ push จนกว่าจะ review
 
-### Phase 0 — เตรียม (ไม่กระทบผู้ใช้)
+**สถานะ:** Phase 0 + Phase 1 ✅ เสร็จ (2026-09-08) — ดู [923 impl plan](923-rbac-phase-0-1-impl-plan.md) + [924 handoff](924-rbac-phase-0-1-done.md). Phase 2 เป็นลำดับถัดไป.
+
+### Phase 0 — เตรียม (ไม่กระทบผู้ใช้) ✅
 1. `getUserPrimaryRole()` + `getAccessibleWorkspaces()` + `getUserPermissions()` ใน `lib/auth/`
 2. migration `0018_seed_role_permissions.sql` (ย้าย matrix เข้า DB)
 3. `lib/auth/permissions.ts` → DB loader + fallback map
 4. RLS test harness + `scripts/seed-test-users.mjs` (4 role จำลอง)
 
-### Phase 1 — Auth flow + nav gating + UX baseline
+### Phase 1 — Auth flow + nav gating + UX baseline ✅
 5. `/auth/callback` → resolve/auto-link profile (§2.4b) → redirect ตาม role (§2.4)
 6. `/no-access` + `<AccessDenied>` component
 7. `app-nav.tsx` → permission-filtered + จัดกลุ่มใหม่ (§2.3)
