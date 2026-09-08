@@ -1,7 +1,7 @@
 export const buildInfo = {
-  version: "2026.09.07.0002",
+  version: "2026.09.08.0825",
   commit: "local",
-  updatedAtIso: "2026-09-07T00:00:00+07:00",
-  updatedAtText: "07/09/2026 00:00 น.",
+  updatedAtIso: "2026-09-08T08:25:00+07:00",
+  updatedAtText: "08/09/2026 08:25 น.",
   timezone: "Asia/Bangkok"
 } as const;
