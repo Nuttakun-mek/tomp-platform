@@ -72,7 +72,7 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "ภาพรวมและคำขอเปลี่ยนแปลง",
         icon: "PanelsTopLeft",
         help: "ดูสถานะโครงการที่ได้รับอนุญาต และส่งคำขอเปลี่ยนแปลง",
-        anyRole: ["organizer", "customer_viewer"]
+        anyRole: ["customer_viewer"]
       }
     ]
   },

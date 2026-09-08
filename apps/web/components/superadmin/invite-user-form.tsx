@@ -11,18 +11,10 @@ interface Option {
   label: string;
 }
 
-const GLOBAL_ROLES = [
-  "organization_admin",
-  "operation_manager",
-  "project_manager",
-  "planner",
-  "dispatcher",
-  "coordinator",
-  "organizer",
-  "customer_viewer",
-  "vendor"
-];
-const PROJECT_ROLES = ["project_manager", "operation_manager", "planner", "dispatcher", "coordinator", "organizer"];
+// Single-org: the only global role is platform admin. Everyone else is added to
+// specific projects with a per-project role.
+const GLOBAL_ROLES = ["super_admin"];
+const PROJECT_ROLES = ["project_manager", "dispatcher", "coordinator", "customer_viewer"];
 
 export function InviteUserForm({ organizations, projects }: { organizations: Option[]; projects: Option[] }) {
   const [message, setMessage] = useState<string | null>(null);

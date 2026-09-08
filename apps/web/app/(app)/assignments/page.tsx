@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
 import { DispatchBoard } from "@/components/assignments/dispatch-board";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";
@@ -15,6 +16,21 @@ interface AssignmentsPageProps {
 export default async function AssignmentsPage({ searchParams }: AssignmentsPageProps) {
   const params = searchParams ? await searchParams : {};
   const projects = await getProjects();
+
+  if (!projects.length) {
+    return (
+      <EmptyState
+        title="ยังไม่มีโครงการที่เข้าถึงได้"
+        description="บอร์ด Assignment ทำงานต่อโครงการ เลือกโครงการก่อนเพื่อจัดสรรงาน"
+        action={
+          <Link href="/projects" className="rounded-command bg-operation px-4 py-2 text-sm font-semibold text-white">
+            ไปหน้าโครงการ
+          </Link>
+        }
+      />
+    );
+  }
+
   const projectId = params.projectId || projects[0]?.id || demoKernel.projects[0]?.id || "";
   const activeProject = projects.find((project) => project.id === projectId) || demoKernel.projects.find((project) => project.id === projectId);
   const [assignments, missions, callSigns, drivers, vehicles] = await Promise.all([

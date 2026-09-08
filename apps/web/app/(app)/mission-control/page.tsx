@@ -20,6 +20,8 @@ import { getProjects } from "@/lib/data/projects";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
 import { getVehicleOperationProfilesByProjectId } from "@/lib/data/vehicle-operations";
 import { demoProject } from "@/lib/demo/demo-kernel";
+import Link from "next/link";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface MissionControlPageProps {
   searchParams?: Promise<{ projectId?: string }>;
@@ -28,6 +30,21 @@ interface MissionControlPageProps {
 export default async function MissionControlPage({ searchParams }: MissionControlPageProps) {
   const params = searchParams ? await searchParams : {};
   const [projects, latestLocationProjectId] = await Promise.all([getProjects(), params.projectId ? Promise.resolve(null) : getProjectIdWithLatestDriverLocation()]);
+
+  if (!projects.length) {
+    return (
+      <EmptyState
+        title="ยังไม่มีโครงการที่เข้าถึงได้"
+        description="ศูนย์ควบคุมทำงานต่อโครงการ เลือกหรือรอรับมอบหมายโครงการก่อน"
+        action={
+          <Link href="/projects" className="rounded-command bg-operation px-4 py-2 text-sm font-semibold text-white">
+            ไปหน้าโครงการ
+          </Link>
+        }
+      />
+    );
+  }
+
   const activeProject =
     projects.find((project) => project.id === params.projectId) ??
     projects.find((project) => project.id === latestLocationProjectId) ??

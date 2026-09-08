@@ -1,3 +1,4 @@
+import { AccessDenied } from "@/components/auth/access-denied";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
 import { DispatchBoard } from "@/components/assignments/dispatch-board";
 import { PublishedLockBanner } from "@/components/publish/published-lock-banner";
@@ -13,8 +14,12 @@ interface AssignmentsPageProps {
 
 export default async function AssignmentsPage({ params }: AssignmentsPageProps) {
   const { projectId } = await params;
-  const [project, assignments, missions, callSigns, drivers, vehicles] = await Promise.all([
-    getProjectById(projectId),
+  const project = await getProjectById(projectId);
+  if (!project) {
+    return <AccessDenied title="เข้าโครงการนี้ไม่ได้" reason="คุณยังไม่ได้เป็นสมาชิกโครงการนี้ ติดต่อผู้จัดการโครงการเพื่อขอสิทธิ์" />;
+  }
+
+  const [assignments, missions, callSigns, drivers, vehicles] = await Promise.all([
     getAssignmentsByProjectId(projectId),
     getMissionsByProjectId(projectId),
     getCallSignsByProjectId(projectId),

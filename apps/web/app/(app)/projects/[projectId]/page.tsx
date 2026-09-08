@@ -1,3 +1,4 @@
+import { AccessDenied } from "@/components/auth/access-denied";
 import { CreateMissionForm } from "@/components/missions/create-mission-form";
 import { ProjectAssignmentBoard } from "@/components/projects/project-assignment-board";
 import { ProjectChangePanel } from "@/components/projects/project-change-panel";
@@ -20,8 +21,19 @@ interface ProjectDetailPageProps {
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { projectId } = await params;
-  const [project, missions, assignments] = await Promise.all([getProjectById(projectId), getMissionsByProjectId(projectId), getAssignmentsByProjectId(projectId)]);
-  const operationDays = project ? demoKernel.operationDays.filter((day) => day.projectId === project.id) : [];
+  const project = await getProjectById(projectId);
+
+  if (!project) {
+    return (
+      <AccessDenied
+        title="เข้าโครงการนี้ไม่ได้"
+        reason="โครงการนี้ไม่มีอยู่ หรือคุณยังไม่ได้เป็นสมาชิก ติดต่อผู้จัดการโครงการเพื่อขอสิทธิ์เข้าใช้งาน"
+      />
+    );
+  }
+
+  const [missions, assignments] = await Promise.all([getMissionsByProjectId(projectId), getAssignmentsByProjectId(projectId)]);
+  const operationDays = demoKernel.operationDays.filter((day) => day.projectId === project.id);
   const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
 
   return (

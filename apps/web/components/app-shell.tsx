@@ -34,7 +34,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-300 text-[13px] font-bold text-teal-950">T</span>
               <span className="min-w-0">
                 <span className="block text-[11px] font-bold tracking-[0.28em] text-teal-200">TOMP</span>
-                <span className="block truncate text-[13px] font-semibold text-white">ระบบบริหารจัดการการเดินทางและบริการ</span>
+                <span className="block text-[12px] font-semibold leading-tight text-white">ระบบบริหารจัดการ<br />การเดินทางและบริการ</span>
               </span>
             </Link>
 
@@ -60,7 +60,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
               <div className="flex items-center justify-between gap-3">
                 <Link href="/" className="min-w-0">
                   <p className="text-[11px] font-bold tracking-[0.28em] text-operation">TOMP</p>
-                  <p className="truncate text-base font-semibold text-ink">ระบบบริหารจัดการการเดินทางและบริการ</p>
+                  <p className="text-[13px] font-semibold leading-tight text-ink">ระบบบริหารจัดการการเดินทางและบริการ</p>
                 </Link>
                 <UserMenu name={profile.fullName} email={profile.email} roleKey={primaryRole} signedIn={signedIn} variant="light" />
               </div>

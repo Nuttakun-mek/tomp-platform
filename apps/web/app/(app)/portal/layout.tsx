@@ -1,7 +1,7 @@
 import { AccessDenied } from "@/components/auth/access-denied";
 import { getViewerAccess } from "@/lib/auth/access";
 
-const PORTAL_ROLES = ["organizer", "customer_viewer", "super_admin"];
+const PORTAL_ROLES = ["customer_viewer", "super_admin"];
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const { roleKeys } = await getViewerAccess();

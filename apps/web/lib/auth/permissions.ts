@@ -1,18 +1,12 @@
-// Fallback matrix — must stay in sync with database/migrations/0018_seed_role_permissions.sql.
-// The DB (role_permissions) is the source of truth; this is used only when the DB
-// is unreachable (see loadRolePermissions).
+// Fallback matrix — must stay in sync with the latest role_permissions seed
+// (database/migrations/0021_rbac_v3_single_org.sql). The DB is the source of truth;
+// this is used only when the DB is unreachable (see loadRolePermissions).
+//
+// Single-org model: super_admin (platform) + 4 per-project roles. `driver` is the
+// QR flow only. Legacy roles (organization_admin, operation_manager, planner, vendor,
+// organizer) intentionally carry no permissions.
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: ["*"],
-  organization_admin: [
-    "project.read",
-    "project.create",
-    "project.update",
-    "mission.read",
-    "assignment.read",
-    "timeline.read",
-    "admin.manage_users",
-    "org.manage"
-  ],
   project_manager: [
     "project.read",
     "project.create",
@@ -20,43 +14,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "project.publish",
     "mission.read",
     "mission.create",
-    "mission.update",
     "assignment.read",
     "assignment.create",
     "assignment.update",
     "driver.read",
-    "driver.create",
-    "driver.update",
     "vehicle.read",
-    "vehicle.create",
-    "vehicle.update",
     "timeline.read",
-    "timeline.create",
-    "change.create",
-    "change.approve",
-    "change.apply",
-    "incident.create",
-    "incident.manage",
-    "recovery.manage"
+    "change.create"
   ],
-  operation_manager: [
-    "project.read",
-    "mission.read",
-    "assignment.read",
-    "assignment.update",
-    "driver.read",
-    "driver.update",
-    "vehicle.read",
-    "vehicle.update",
-    "timeline.read",
-    "timeline.create",
-    "change.create",
-    "change.apply",
-    "incident.create",
-    "incident.manage",
-    "recovery.manage"
-  ],
-  planner: ["project.read", "mission.read", "mission.create", "mission.update", "assignment.read", "assignment.create"],
   dispatcher: [
     "project.read",
     "mission.read",
@@ -64,21 +29,18 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "assignment.create",
     "assignment.update",
     "driver.read",
-    "driver.create",
     "vehicle.read",
-    "vehicle.create"
+    "timeline.read"
   ],
-  coordinator: ["project.read", "mission.read", "assignment.read", "timeline.read", "incident.create"],
-  driver: ["assignment.read"],
-  organizer: ["project.read", "mission.read", "timeline.read", "change.create"],
-  customer_viewer: ["project.read", "timeline.read"],
-  vendor: ["assignment.read", "driver.read", "vehicle.read"]
+  coordinator: ["project.read", "mission.read", "assignment.read", "timeline.read"],
+  customer_viewer: ["project.read", "mission.read", "timeline.read", "change.create"],
+  driver: []
 };
 
 // Permissions that are NOT project-scoped — they are granted by a global or
 // org-level role (user_role_assignments), never by project_members. requirePermission
 // must route these to the global-role check even when a project/org id is supplied.
-export const GLOBAL_PERMISSIONS = new Set(["project.create", "admin.manage_users", "org.manage", "superadmin.access"]);
+export const GLOBAL_PERMISSIONS = new Set(["project.create", "admin.manage_users", "superadmin.access"]);
 
 export function isGlobalPermission(permissionKey: string): boolean {
   return GLOBAL_PERMISSIONS.has(permissionKey);
