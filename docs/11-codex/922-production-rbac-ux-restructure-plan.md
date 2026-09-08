@@ -1,7 +1,7 @@
 # Production RBAC + UX/UI Restructure — Plan
 
 **วันที่:** 2026-09-08
-**สถานะ:** วางแผน (ยังไม่ลงมือ) — รอ review ก่อนแตกเป็น implementation plan
+**สถานะ:** Phase 0-1 ✅ · Phase 2 ถัดไป — impl plan [923](923-rbac-phase-0-1-impl-plan.md), handoff [924](924-rbac-phase-0-1-done.md)
 **ผู้เกี่ยวข้องก่อนหน้า:** `958d226` (stabilize) · `72e822b`–`cd70dea` (design-system pass) · `0b4f8bf`+`a98f4f7`+`464ef10` (auth foundation) · handoffs [920](920-pilot-stability-followup-handoff.md), [921](921-production-reset-auth-handoff.md)
 
 เป้าหมาย: เปลี่ยนจาก "internal pilot ทุกคนเห็นเท่ากัน" → **ระบบ production ที่แต่ละบัญชีเข้าถึงต่างกันตามบทบาท** โดยยึด docs ที่มีอยู่ ([001](../00-foundation/001-vision-and-philosophy.md), [102](../01-business/102-customer-and-stakeholder-model.md), [103](../01-business/103-project-lifecycle.md), [400](../04-product/400-product-workspaces.md), [500](../05-ux/500-ux-blueprint.md), [504](../05-ux/504-product-experience-reset.md), [805](../08-engineering/805-auth-and-rbac-foundation.md))
