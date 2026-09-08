@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
+import { ResetPasswordButton } from "@/components/superadmin/reset-password-button";
 import { roleLabelTh } from "@/lib/i18n/role-th";
 import type { ProfileRow } from "@/lib/superadmin/users";
 
@@ -21,19 +22,22 @@ export function UserList({ rows }: { rows: ProfileRow[] }) {
               <p className="truncate text-sm font-semibold text-ink">{row.fullName || "ยังไม่ระบุชื่อ"}</p>
               <p className="truncate text-xs text-ink-faint">{row.email || "ยังไม่ระบุอีเมล"}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-              <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">
-                {STATUS_TH[row.status] ?? row.status}
-              </span>
-              {row.roleKeys.length ? (
-                row.roleKeys.map((key) => (
-                  <span key={key} className="rounded-full bg-operation-soft px-2.5 py-1 text-[11px] font-semibold text-operation">
-                    {roleLabelTh(key)}
-                  </span>
-                ))
-              ) : (
-                <span className="rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700">ยังไม่มีบทบาท</span>
-              )}
+            <div className="grid gap-1.5 sm:justify-items-end">
+              <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">
+                  {STATUS_TH[row.status] ?? row.status}
+                </span>
+                {row.roleKeys.length ? (
+                  row.roleKeys.map((key) => (
+                    <span key={key} className="rounded-full bg-operation-soft px-2.5 py-1 text-[11px] font-semibold text-operation">
+                      {roleLabelTh(key)}
+                    </span>
+                  ))
+                ) : (
+                  <span className="rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700">ยังไม่มีบทบาท</span>
+                )}
+              </div>
+              <ResetPasswordButton profileId={row.id} hasLogin={row.hasLogin} />
             </div>
           </div>
         ))}

@@ -29,6 +29,9 @@ export function LoginPanel() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
   const reason = searchParams.get("reason");
+  // Email-based sign-in (magic link + Google) is opt-in — only meaningful once
+  // Supabase Site URL / redirect URLs / SMTP are configured for this environment.
+  const emailAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_EMAIL_LOGIN === "1";
   const [mode, setMode] = useState<"password" | "magic-link">("password");
   const [message, setMessage] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(
     reason === "missing-auth-config" ? { tone: "error", text: "ยังไม่ได้ตั้งค่า Supabase Auth บนระบบ production" } : null
@@ -149,20 +152,28 @@ export function LoginPanel() {
                 </form>
               )}
 
-              <button
-                className="mt-2 text-[13px] font-semibold text-operation transition hover:text-operation-deep"
-                onClick={() => {
-                  setMessage(null);
-                  setMode((current) => (current === "password" ? "magic-link" : "password"));
-                }}
-                type="button"
-              >
-                {mode === "password" ? "ใช้ลิงก์ทางอีเมลแทน" : "ใช้รหัสผ่านแทน"}
-              </button>
+              {emailAuthEnabled ? (
+                <>
+                  <button
+                    className="mt-2 text-[13px] font-semibold text-operation transition hover:text-operation-deep"
+                    onClick={() => {
+                      setMessage(null);
+                      setMode((current) => (current === "password" ? "magic-link" : "password"));
+                    }}
+                    type="button"
+                  >
+                    {mode === "password" ? "ใช้ลิงก์ทางอีเมลแทน" : "ใช้รหัสผ่านแทน"}
+                  </button>
 
-              <button className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-operation hover:bg-teal-50" disabled={isPending} onClick={handleGoogle} type="button">
-                เข้าสู่ระบบด้วย Google
-              </button>
+                  <button className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-operation hover:bg-teal-50" disabled={isPending} onClick={handleGoogle} type="button">
+                    เข้าสู่ระบบด้วย Google
+                  </button>
+                </>
+              ) : (
+                <p className="mt-3 text-[13px] leading-6 text-slate-500">
+                  ลืมรหัสผ่าน? ติดต่อผู้ดูแลระบบเพื่อออกรหัสผ่านชั่วคราวใหม่
+                </p>
+              )}
 
               {message ? <p className={`mt-4 rounded-2xl border p-3 text-sm font-semibold leading-6 ${messageClass}`}>{message.text}</p> : null}
 

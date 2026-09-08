@@ -39,6 +39,7 @@ export interface ProfileRow {
   status: string;
   organizationId: string | null;
   roleKeys: string[];
+  hasLogin: boolean;
 }
 
 type RoleJoin = { profile_id?: unknown; roles?: { role_key?: string } | { role_key?: string }[] | null };
@@ -55,7 +56,7 @@ export async function listProfilesWithRoles(): Promise<ProfileRow[]> {
 
   const { data: profiles } = await client
     .from("profiles")
-    .select("id, full_name, email, status, organization_id")
+    .select("id, full_name, email, status, organization_id, auth_user_id")
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -83,8 +84,26 @@ export async function listProfilesWithRoles(): Promise<ProfileRow[]> {
     email: typeof r.email === "string" ? r.email : null,
     status: typeof r.status === "string" ? r.status : "unknown",
     organizationId: typeof r.organization_id === "string" ? r.organization_id : null,
-    roleKeys: [...(byProfile.get(String(r.id)) ?? [])]
+    roleKeys: [...(byProfile.get(String(r.id)) ?? [])],
+    hasLogin: typeof r.auth_user_id === "string" && r.auth_user_id.length > 0
   }));
+}
+
+// Sets a fresh temporary password on a user's auth account (no email needed).
+// The admin hands it over securely; the user changes it after signing in.
+export async function resetUserPassword(profileId: string): Promise<{ ok: true; tempPassword: string } | { ok: false; error: string }> {
+  const client = getSupabaseServerDataClient();
+  if (!client) return { ok: false, error: "ยังไม่ได้ตั้งค่าการเชื่อมต่อฐานข้อมูล" };
+
+  const { data: profile } = await client.from("profiles").select("auth_user_id").eq("id", profileId).maybeSingle();
+  const authUserId = typeof profile?.auth_user_id === "string" ? profile.auth_user_id : null;
+  if (!authUserId) return { ok: false, error: "ผู้ใช้นี้ยังไม่มีบัญชีเข้าสู่ระบบ" };
+
+  const tempPassword = generateTempPassword();
+  const { error } = await client.auth.admin.updateUserById(authUserId, { password: tempPassword });
+  if (error) return { ok: false, error: `ตั้งรหัสผ่านใหม่ไม่สำเร็จ: ${error.message}` };
+
+  return { ok: true, tempPassword };
 }
 
 function generateTempPassword(): string {
