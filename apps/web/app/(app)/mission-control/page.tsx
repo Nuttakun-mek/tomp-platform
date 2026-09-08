@@ -20,6 +20,7 @@ import { getDrivers, getVehicles } from "@/lib/data/resources";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getVehicleOperationProfilesByProjectId } from "@/lib/data/vehicle-operations";
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import Link from "next/link";
 
 interface MissionControlPageProps {
@@ -28,6 +29,8 @@ interface MissionControlPageProps {
 
 export default async function MissionControlPage({ searchParams }: MissionControlPageProps) {
   const params = searchParams ? await searchParams : {};
+  const viewer = await getCurrentUserProfile();
+  if (!viewer.authUserId && !viewer.isDevelopmentFallback) redirect("/login");
   const projects = await getProjects();
 
   if (!projects.length) {

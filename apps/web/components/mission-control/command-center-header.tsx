@@ -4,7 +4,7 @@ import type { Project } from "@tomp/types/domain";
 
 export function CommandCenterHeader({ project, liveCount, issueCount }: { project: Project; liveCount: number; issueCount: number }) {
   return (
-    <section className="overflow-hidden rounded-[28px] bg-slate-950 text-white shadow-[0_28px_80px_rgba(12,34,52,0.28)]">
+    <section className="overflow-hidden rounded-panel bg-slate-950 text-white shadow-command">
       <div className="command-grid p-6 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="min-w-0">

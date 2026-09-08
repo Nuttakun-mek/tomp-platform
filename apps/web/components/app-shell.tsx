@@ -28,7 +28,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="command-panel-dark hidden text-white lg:block">
+        <aside className="command-panel-dark hidden rounded-none text-white lg:block" style={{ borderRadius: 0 }}>
           <div className="sticky top-0 flex h-screen flex-col overflow-y-auto border-r border-white/10 px-4 py-5">
             <Link href="/" className="group flex items-center gap-2.5 rounded-2xl px-1 py-1 transition hover:opacity-90">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-300 text-[13px] font-bold text-teal-950">T</span>

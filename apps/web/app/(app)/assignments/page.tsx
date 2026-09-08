@@ -9,6 +9,7 @@ import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getProjects } from "@/lib/data/projects";
 import { getDrivers, getVehicles } from "@/lib/data/resources";
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 
 interface AssignmentsPageProps {
   searchParams?: Promise<{ projectId?: string }>;
@@ -16,6 +17,8 @@ interface AssignmentsPageProps {
 
 export default async function AssignmentsPage({ searchParams }: AssignmentsPageProps) {
   const params = searchParams ? await searchParams : {};
+  const viewer = await getCurrentUserProfile();
+  if (!viewer.authUserId && !viewer.isDevelopmentFallback) redirect("/login");
   const projects = await getProjects();
 
   if (!projects.length) {

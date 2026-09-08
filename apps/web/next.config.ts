@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Baked at build time so the version badge always shows the real deploy moment.
+  env: {
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || "local").slice(0, 7)
+  },
   experimental: {
     // Driver evidence photos are compressed client-side, but keep headroom.
     serverActions: { bodySizeLimit: "6mb" }
