@@ -22,7 +22,18 @@
 - **`provisionUser`** สร้าง auth user (email_confirm) + temp password ตอน invite → ผู้ใช้ sign IN ไม่ใช่ sign UP → เปิด `disable_signup` ได้ปลอดภัย; UI แสดง temp password ให้ admin ส่งต่อ
 - `signInWithOtp` + `shouldCreateUser: false`
 
-## ⚠️ ต้องทำเอง (ผมถูก block จาก classifier)
+## โหมด ID + password อย่างเดียว (ยังไม่ใช้เมล) — ใช้ได้เลย
+
+password login **ไม่พึ่ง** site_url / redirect URLs / SMTP / NEXT_PUBLIC_APP_URL เลย — `signInWithPassword` คืน session ตรง ไม่มี redirect. ที่ทำแล้ว:
+- `/login` ซ่อน magic link + Google (แสดงเมื่อ `NEXT_PUBLIC_ENABLE_EMAIL_LOGIN=1` เท่านั้น) → เหลือ email + password
+- ลืมรหัสผ่าน = admin กด **"ตั้งรหัสผ่านใหม่"** ใน `/superadmin/users` → ได้ temp password ใหม่ (ไม่ใช้เมล)
+- เพิ่มผู้ใช้ = `/superadmin/users` สร้าง auth user + temp password ให้เลย
+
+**เหลือแค่ 1 อย่างที่ต้องทำใน Supabase dashboard:** ปิด signup (Auth → Providers → Email → "Allow new users to sign up" = OFF). ที่เหลือ (site_url ฯลฯ) ค่อยทำตอนจะเปิดเมล.
+
+---
+
+## ⚠️ ต้องทำเอง (ผมถูก block จาก classifier) — full list (รวมส่วนเมลตอนจะเปิด)
 
 ### 1. Supabase dashboard → Authentication
 - **URL Configuration:**
