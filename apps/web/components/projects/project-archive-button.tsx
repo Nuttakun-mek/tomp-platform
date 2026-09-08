@@ -17,14 +17,19 @@ export function ProjectArchiveButton({
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [justArchived, setJustArchived] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  function run() {
+  function run(restore: boolean) {
     setError(null);
     startTransition(async () => {
-      const result = await archiveProjectAction({ projectId, restore: archived });
+      const result = await archiveProjectAction({ projectId, restore });
       if (result.success) {
         setConfirming(false);
+        if (!restore) {
+          setJustArchived(true);
+          window.setTimeout(() => setJustArchived(false), 8000);
+        }
         router.refresh();
       } else {
         setError(result.error || "ทำรายการไม่สำเร็จ");
@@ -32,11 +37,22 @@ export function ProjectArchiveButton({
     });
   }
 
+  if (justArchived) {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs">
+        <span className="font-semibold text-slate-600">เก็บถาวรแล้ว</span>
+        <button type="button" onClick={() => run(true)} disabled={isPending} className="font-semibold text-operation underline disabled:opacity-50">
+          เลิกทำ
+        </button>
+      </span>
+    );
+  }
+
   if (archived) {
     return (
       <button
         type="button"
-        onClick={run}
+        onClick={() => run(true)}
         disabled={isPending}
         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 disabled:opacity-50"
       >
@@ -65,7 +81,7 @@ export function ProjectArchiveButton({
     <span className="inline-flex items-center gap-1.5">
       <button
         type="button"
-        onClick={run}
+        onClick={() => run(false)}
         disabled={isPending}
         className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
       >

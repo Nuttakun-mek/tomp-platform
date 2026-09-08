@@ -162,15 +162,15 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       {/* header */}
       <header className="grid gap-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-operation">{driverAccess.project.projectName}</p>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">
+          <p className="min-w-0 truncate text-[11px] font-bold uppercase tracking-[0.16em] text-operation">{driverAccess.project.projectName}</p>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">
             <span className={`h-2 w-2 rounded-full ${gpsDot}`} />
             {gpsLabel}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-xl font-bold text-ink">Call Sign {driverAccess.callSign.callSign}</h1>
-          <span className="rounded-full bg-operation-soft px-2.5 py-1 text-[11px] font-semibold text-operation">
+          <h1 className="min-w-0 truncate text-xl font-bold text-ink">Call Sign {driverAccess.callSign.callSign}</h1>
+          <span className="shrink-0 rounded-full bg-operation-soft px-2.5 py-1 text-[11px] font-semibold text-operation">
             {formatStatusTh(driverAccess.assignment.status)}
           </span>
         </div>
