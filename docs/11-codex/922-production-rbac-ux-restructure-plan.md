@@ -1,7 +1,7 @@
 # Production RBAC + UX/UI Restructure — Plan
 
 **วันที่:** 2026-09-08
-**สถานะ:** Phase 0-4 (core) ✅ · Phase 4b/5 ถัดไป — impl plans [923](923-rbac-phase-0-1-impl-plan.md) / [925](925-rbac-phase-2-impl-plan.md) / [927](927-rbac-phase-3-impl-plan.md) / [929](929-rbac-phase-4-impl-plan.md), handoffs [924](924-rbac-phase-0-1-done.md) / [926](926-rbac-phase-2-done.md) / [928](928-rbac-phase-3-done.md) / [930](930-rbac-phase-4-done.md) · Phase 3 กระทบ: `TOMP_SCOPED_READS` ยังไม่เปิดใน prod
+**สถานะ:** Phase 0-4 core + 5a ✅ · Phase 4b/5b ถัดไป — impl plans [923](923-rbac-phase-0-1-impl-plan.md) / [925](925-rbac-phase-2-impl-plan.md) / [927](927-rbac-phase-3-impl-plan.md) / [929](929-rbac-phase-4-impl-plan.md) / [931](931-rbac-phase-5-superadmin-plan.md), handoffs [924](924-rbac-phase-0-1-done.md) / [926](926-rbac-phase-2-done.md) / [928](928-rbac-phase-3-done.md) / [930](930-rbac-phase-4-done.md) / [932](932-rbac-phase-5a-done.md) · Phase 3 กระทบ: `TOMP_SCOPED_READS` ยังไม่เปิดใน prod
 **ผู้เกี่ยวข้องก่อนหน้า:** `958d226` (stabilize) · `72e822b`–`cd70dea` (design-system pass) · `0b4f8bf`+`a98f4f7`+`464ef10` (auth foundation) · handoffs [920](920-pilot-stability-followup-handoff.md), [921](921-production-reset-auth-handoff.md)
 
 เป้าหมาย: เปลี่ยนจาก "internal pilot ทุกคนเห็นเท่ากัน" → **ระบบ production ที่แต่ละบัญชีเข้าถึงต่างกันตามบทบาท** โดยยึด docs ที่มีอยู่ ([001](../00-foundation/001-vision-and-philosophy.md), [102](../01-business/102-customer-and-stakeholder-model.md), [103](../01-business/103-project-lifecycle.md), [400](../04-product/400-product-workspaces.md), [500](../05-ux/500-ux-blueprint.md), [504](../05-ux/504-product-experience-reset.md), [805](../08-engineering/805-auth-and-rbac-foundation.md))
@@ -270,10 +270,14 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 30. ⏳ dispatch fluency: bulk assign, keyboard nav, inline edit + `<SavePanel>` → Phase 4b (แยก plan)
 31. ⏳ `<UndoToast>` + optimistic update + rollback ทุก action → Phase 4b (แยก plan)
 
-### Phase 5 — Superadmin depth + workspace เต็ม (backlog)
-32. `/superadmin/roles` matrix editor · `/organizations` · `/superadmin/projects` (cross-org + member mgmt) · `/superadmin/audit`
-33. `/coordinator` (mobile-optimized: ปุ่มยืนยันใหญ่ thumb-reach) + `/vendor` + `/changes` เต็มรูปแบบ
-34. command palette (`Cmd/Ctrl+K`) · saved views
+### Phase 5 — Superadmin depth + workspace เต็ม
+**5a ✅** ([931 plan](931-rbac-phase-5-superadmin-plan.md) / [932 handoff](932-rbac-phase-5a-done.md)):
+32a. ✅ `/superadmin/roles` (matrix read-only) · `/superadmin/organizations` · `/superadmin/projects` (cross-org list) · `/superadmin/audit` (cross-project feed) + `lib/superadmin/overview.ts`
+
+**5b (backlog):**
+32b. role matrix **editor** (write `role_permissions`) · org/project member management
+33. `/coordinator` (mobile) + `/vendor` + `/changes` เต็มรูปแบบ · RLS write policies
+34. command palette (`Cmd/Ctrl+K`) · saved views · `<UndoToast>` · Phase 4b (ContactStrip/ReadinessGate/ChangeRequestButton wiring)
 
 ---
 
