@@ -227,7 +227,7 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 
 > ทุก phase: typecheck + lint + test เขียว + ผ่าน **UX acceptance checklist (§8)** ที่เกี่ยวข้อง, ไม่ push จนกว่าจะ review
 
-**สถานะ:** Phase 0 + Phase 1 ✅ เสร็จ (2026-09-08) — ดู [923 impl plan](923-rbac-phase-0-1-impl-plan.md) + [924 handoff](924-rbac-phase-0-1-done.md). Phase 2 เป็นลำดับถัดไป.
+**สถานะ:** Phase 0 + Phase 1 ✅ เสร็จ (2026-09-08) — ดู [923 impl plan](923-rbac-phase-0-1-impl-plan.md) + [924 handoff](924-rbac-phase-0-1-done.md). Phase 2 ✅ (2026-09-08) — [925 plan](925-rbac-phase-2-impl-plan.md) + [926 handoff](926-rbac-phase-2-done.md). Phase 3 (data scoping — RLS) เป็นลำดับถัดไป.
 
 ### Phase 0 — เตรียม (ไม่กระทบผู้ใช้) ✅
 1. `getUserPrimaryRole()` + `getAccessibleWorkspaces()` + `getUserPermissions()` ใน `lib/auth/`
