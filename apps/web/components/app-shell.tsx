@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { AppNav } from "@/components/app-nav";
+import { AuthGate } from "@/components/auth/auth-gate";
 import { AuthStatus } from "@/components/auth/auth-status";
 import { BuildVersionBadge } from "@/components/layout/build-version-badge";
 import { EnvironmentBadge } from "@/components/layout/environment-badge";
@@ -65,7 +67,11 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
             </div>
           </header>
 
-          <WorkspaceShell>{children}</WorkspaceShell>
+          <WorkspaceShell>
+            <Suspense fallback={<div className="p-6 text-sm font-semibold text-slate-600">กำลังเตรียมหน้าระบบ...</div>}>
+              <AuthGate>{children}</AuthGate>
+            </Suspense>
+          </WorkspaceShell>
         </div>
       </div>
     </div>
