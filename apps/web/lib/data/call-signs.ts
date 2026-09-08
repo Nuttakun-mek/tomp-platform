@@ -1,11 +1,11 @@
 import type { CallSign } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { demoKernel } from "@/lib/demo/demo-kernel";
-import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapCallSign } from "./mappers";
 
 export async function getCallSignsByProjectId(projectId: string): Promise<CallSign[]> {
-  const supabase = getSupabaseServerDataClient();
+  const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.callSigns.filter((callSign) => callSign.projectId === projectId);
 
   try {

@@ -1,7 +1,7 @@
 import type { DriverAssignmentPacket, DriverNotification, RouteChangeInstruction } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
-import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 type Row = Record<string, unknown>;
 
@@ -58,7 +58,7 @@ export interface DriverOperationSummary {
 }
 
 export async function getDriverAssignmentPacketByAssignmentId(assignmentId: string): Promise<DriverAssignmentPacket | null> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
   if (!client) return getDriverAssignmentPacketByAssignmentIdViaPostgres(assignmentId);
 
   let data: { payload?: unknown } | null | undefined;
@@ -81,7 +81,7 @@ export async function getDriverAssignmentPacketByAssignmentId(assignmentId: stri
 }
 
 export async function getDriverNotificationsByAssignmentId(assignmentId: string): Promise<DriverNotification[]> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
   if (!client) return getDriverNotificationsByAssignmentIdViaPostgres(assignmentId);
 
   let data: Row[] | null | undefined;
@@ -98,7 +98,7 @@ export async function getDriverNotificationsByAssignmentId(assignmentId: string)
 }
 
 export async function getRouteChangesByAssignmentId(assignmentId: string): Promise<RouteChangeInstruction[]> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
   if (!client) return getRouteChangesByAssignmentIdViaPostgres(assignmentId);
 
   let data: Row[] | null | undefined;
@@ -115,7 +115,7 @@ export async function getRouteChangesByAssignmentId(assignmentId: string): Promi
 }
 
 export async function getDriverOperationSummaryByProjectId(projectId: string): Promise<DriverOperationSummary> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
   if (!client) return getDriverOperationSummaryByProjectIdViaPostgres(projectId);
 
   let packets;

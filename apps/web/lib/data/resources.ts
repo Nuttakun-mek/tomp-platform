@@ -1,11 +1,11 @@
 import type { Driver, Vehicle } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { demoKernel } from "@/lib/demo/demo-kernel";
-import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapDriver, mapVehicle } from "./mappers";
 
 export async function getDrivers(): Promise<Driver[]> {
-  const supabase = getSupabaseServerDataClient();
+  const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.drivers;
 
   try {
@@ -18,7 +18,7 @@ export async function getDrivers(): Promise<Driver[]> {
 }
 
 export async function getVehicles(): Promise<Vehicle[]> {
-  const supabase = getSupabaseServerDataClient();
+  const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.vehicles;
 
   try {

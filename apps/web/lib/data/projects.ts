@@ -2,11 +2,11 @@ import type { Project } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
-import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapProject } from "./mappers";
 
 export async function getProjects(): Promise<Project[]> {
-  const supabase = getSupabaseServerDataClient();
+  const { client: supabase } = await resolveReadClient();
   if (!supabase) return getProjectsViaPostgres();
 
   try {
@@ -19,7 +19,7 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getProjectById(projectId: string): Promise<Project | null> {
-  const supabase = getSupabaseServerDataClient();
+  const { client: supabase } = await resolveReadClient();
   if (!supabase) return getProjectByIdViaPostgres(projectId);
 
   try {

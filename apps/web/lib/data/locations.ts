@@ -3,6 +3,7 @@ import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 type LocationRow = Record<string, unknown>;
 
@@ -226,7 +227,7 @@ async function getLatestDriverLocationsFallback(
 }
 
 export async function getLatestDriverLocationsByProjectId(projectId: string): Promise<DriverLocation[]> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
 
   if (!client) {
     return getLatestDriverLocationsFallback(projectId, 50, { allowDemo: true });
@@ -266,7 +267,7 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
 }
 
 export async function getLatestDriverLocations(limit = 50): Promise<DriverLocation[]> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
 
   if (!client) {
     return getLatestDriverLocationsFallback(null, limit, { allowDemo: true });
@@ -302,7 +303,7 @@ export async function getLatestDriverLocations(limit = 50): Promise<DriverLocati
 }
 
 export async function getProjectIdWithLatestDriverLocation(): Promise<string | null> {
-  const client = getSupabaseServerDataClient();
+  const { client } = await resolveReadClient();
 
   if (!client) {
     return getProjectIdWithLatestDriverLocationViaPostgres();
