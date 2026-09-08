@@ -75,6 +75,15 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   vendor: ["assignment.read", "driver.read", "vehicle.read"]
 };
 
+// Permissions that are NOT project-scoped — they are granted by a global or
+// org-level role (user_role_assignments), never by project_members. requirePermission
+// must route these to the global-role check even when a project/org id is supplied.
+export const GLOBAL_PERMISSIONS = new Set(["project.create", "admin.manage_users", "org.manage", "superadmin.access"]);
+
+export function isGlobalPermission(permissionKey: string): boolean {
+  return GLOBAL_PERMISSIONS.has(permissionKey);
+}
+
 export function roleHasPermission(roleKey: string, permissionKey: string): boolean {
   const permissions = ROLE_PERMISSIONS[roleKey] || [];
   return permissions.includes("*") || permissions.includes(permissionKey);

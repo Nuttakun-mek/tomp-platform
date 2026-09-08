@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { permissionsForRoles, roleHasPermission } from "../permissions";
+import { isGlobalPermission, permissionsForRoles, roleHasPermission } from "../permissions";
 
 describe("RBAC permissions", () => {
   it("allows project managers to publish and apply changes", () => {
@@ -24,6 +24,19 @@ describe("permissionsForRoles", () => {
   });
   it("unknown role contributes nothing", () => {
     expect(permissionsForRoles(["nope"])).toEqual([]);
+  });
+});
+
+describe("isGlobalPermission", () => {
+  it("treats project.create and admin.manage_users as global (not project-scoped)", () => {
+    expect(isGlobalPermission("project.create")).toBe(true);
+    expect(isGlobalPermission("admin.manage_users")).toBe(true);
+    expect(isGlobalPermission("org.manage")).toBe(true);
+  });
+  it("treats operational permissions as project-scoped", () => {
+    expect(isGlobalPermission("mission.create")).toBe(false);
+    expect(isGlobalPermission("assignment.read")).toBe(false);
+    expect(isGlobalPermission("project.publish")).toBe(false);
   });
 });
 

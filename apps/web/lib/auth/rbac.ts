@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getCurrentUserProfile, getProjectMembership } from "@/lib/auth/current-user";
-import { ROLE_PERMISSIONS, roleHasPermission } from "@/lib/auth/permissions";
+import { ROLE_PERMISSIONS, isGlobalPermission, roleHasPermission } from "@/lib/auth/permissions";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 export async function requirePermission(first: string, second?: string): Promise<{ allowed: boolean; reason?: string }> {
@@ -9,7 +9,9 @@ export async function requirePermission(first: string, second?: string): Promise
   const permissionKey = firstLooksLikePermission ? first : String(second);
   const projectId = firstLooksLikePermission ? second : first;
 
-  if (!projectId) {
+  // Global/org-scoped permissions (e.g. project.create) are never granted through
+  // project_members — check global + org roles even when an id was passed in.
+  if (!projectId || isGlobalPermission(permissionKey)) {
     const profile = await getCurrentUserProfile();
     if (profile.isDevelopmentFallback) return { allowed: true };
     const roles = await getUserRoles(profile.id);

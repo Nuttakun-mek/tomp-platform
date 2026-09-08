@@ -20,7 +20,7 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   }
 
   const permission = await requirePermission(parsed.data.organizationId, "project.create");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างโครงการ");
   }
 
