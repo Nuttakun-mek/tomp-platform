@@ -87,6 +87,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
         initialLocations={locations}
         initialStatuses={assignmentStatuses}
         initialEvidence={evidence}
+        initialInbound={comms.inbound}
       />
 
       <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDownLeft, ArrowUpRight, MessageSquare, Send } from "lucide-react";
 import type { Assignment, CallSign } from "@tomp/types/domain";
 import { sendDriverNotificationAction } from "@/app/actions/driver-notifications";
@@ -83,10 +83,16 @@ export function CommsConsole({ projectId, assignments, callSigns, initialInbound
       ...inbound.map((item) => ({ direction: "in" as const, ...item })),
       ...outbound.map((item) => ({ direction: "out" as const, ...item }))
     ];
-    items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-    if (filter === "all") return items.slice(0, 40);
-    return items.filter((item) => item.assignmentId === filter).slice(0, 40);
+    // oldest first, newest at the bottom — like a normal chat app
+    items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    const scoped = filter === "all" ? items : items.filter((item) => item.assignmentId === filter);
+    return scoped.slice(-60);
   }, [inbound, outbound, filter]);
+
+  const feedEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    feedEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [feed.length, filter]);
 
   const usedAssignmentIds = useMemo(() => {
     const ids = new Set<string>();
@@ -238,6 +244,7 @@ export function CommsConsole({ projectId, assignments, callSigns, initialInbound
                   </article>
                 );
               })}
+              <div ref={feedEndRef} />
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">

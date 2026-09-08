@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
-import { Tooltip } from "@/components/ui/tooltip";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
-import { formatStatusTh } from "@/lib/i18n/status-th";
 import { LiveTrackingMap, toTrackedPoint } from "@/components/mission-control/live-tracking-map";
 
 interface LiveLocationMapProps {
@@ -41,26 +39,8 @@ function getFreshness(location: DriverLocation, now: number): LocationFreshness 
   return "offline";
 }
 
-function getFreshnessLabel(status: LocationFreshness) {
-  if (status === "live") return "กำลังแชร์";
-  if (status === "slow") return "สัญญาณช้า";
-  if (status === "stopped") return "หยุดแชร์แล้ว";
-  return "ขาดการอัปเดต";
-}
-
-function getFreshnessClass(status: LocationFreshness) {
-  if (status === "live") return "border-emerald-300 bg-emerald-50 text-emerald-900";
-  if (status === "slow") return "border-amber-300 bg-amber-50 text-amber-900";
-  if (status === "stopped") return "border-slate-300 bg-slate-100 text-slate-700";
-  return "border-rose-300 bg-rose-50 text-rose-900";
-}
-
 function getAgeLabel(location: DriverLocation, now: number) {
   return formatRelativeTh(location.recordedAt, now);
-}
-
-function buildGoogleMapsUrl(location: DriverLocation) {
-  return `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
 }
 
 function initialClock(locations: DriverLocation[]) {
@@ -181,58 +161,23 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
             <MapMetric label="ต้องติดตาม" value={issueCount} tone="warning" />
           </div>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-ink">ตำแหน่งล่าสุด</p>
-              <Tooltip content="รายการนี้บอกว่าตำแหน่งมาจากโครงการใด รถคันใด คนขับคนใด และอัปเดตล่าสุดเมื่อไร">
-                <span className="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[11px] text-slate-500">?</span>
-              </Tooltip>
-            </div>
-            <p className="text-xs text-slate-500">แยกตาม Assignment เพื่อรู้ว่าใครอยู่ในงานใด</p>
-          </div>
-
           <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
             <LegendDot color="bg-emerald-500" label="กำลังแชร์: อัปเดตไม่เกิน 35 วินาที" />
             <LegendDot color="bg-amber-500" label="สัญญาณช้า: เกิน 35 วินาที" />
             <LegendDot color="bg-rose-500" label="ขาดการอัปเดต: เกิน 2 นาที" />
           </div>
 
+          <p className="text-xs leading-5 text-slate-500">
+            แตะหมุดบนแผนที่เพื่อดูว่าเป็นคันไหน · รายละเอียดคนขับ/รถ สถานะ และข้อความ ดูได้ที่การ์ด “ภาพรวมกองรถ”
+          </p>
+
           {lastError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{lastError}</div> : null}
 
-          {locations.length ? (
-            locations.map((location) => {
-              const identity = getLocationIdentity(location);
-              const status = hydrated ? getFreshness(location, effectiveNow) : "slow";
-              return (
-                <article key={location.id} className={`rounded-2xl border p-4 ${getFreshnessClass(status)}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{identity.callSign}</p>
-                      <p className="text-sm">{identity.vehiclePlate} / {identity.driverName}</p>
-                    </div>
-                    <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">{getFreshnessLabel(status)}</span>
-                  </div>
-                  <dl className="mt-3 grid gap-1 text-xs">
-                    <InfoRow label="โครงการ" value={`${identity.projectCode} / ${identity.projectName}`} />
-                    <InfoRow label="ภารกิจ" value={identity.missionName} />
-                    <InfoRow label="สถานะงาน" value={formatStatusTh(identity.assignmentStatus)} />
-                    <InfoRow label="อัปเดตล่าสุด" value={hydrated ? getAgeLabel(location, effectiveNow) : "กำลังตรวจ"} />
-                  </dl>
-                  <p className="mt-2 text-xs">
-                    {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                    {location.accuracy ? ` / ความแม่นยำ ${Math.round(location.accuracy)} เมตร` : ""}
-                  </p>
-                  <a className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-white/80 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" href={buildGoogleMapsUrl(location)} rel="noreferrer" target="_blank">
-                    เปิดตำแหน่งใน Google Maps
-                  </a>
-                </article>
-              );
-            })
-          ) : (
+          {!locations.length ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-              ยังไม่มีข้อมูลตำแหน่งสำหรับโครงการนี้ หากกำลังทดสอบ ให้เปิดหน้าคนขับบนมือถือและอนุญาตการเข้าถึงตำแหน่ง
+              ยังไม่มีข้อมูลตำแหน่งสำหรับโครงการนี้ เมื่อคนขับเปิดแชร์ GPS หมุดจะแสดงที่นี่
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </section>
@@ -258,11 +203,3 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="font-semibold">{label}</dt>
-      <dd className="text-right">{value}</dd>
-    </div>
-  );
-}

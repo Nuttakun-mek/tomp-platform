@@ -7,23 +7,34 @@ type Kind = "vehicle" | "plate";
 
 const LABELS: Record<Kind, string> = { vehicle: "ถ่ายรูปรถ", plate: "ถ่ายรูปป้ายทะเบียน" };
 
-// Resize + re-encode to keep the upload small enough for a mobile connection.
+const MAX_INPUT_BYTES = 10 * 1024 * 1024;
+
+function toBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality));
+}
+
+// Resize + re-encode so the upload is small (target < ~1 MB) regardless of the
+// camera. Falls back to the original file if the browser can't decode it (HEIC).
 async function compressImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) return file;
   const maxEdge = 1600;
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const width = Math.round(bitmap.width * scale);
-  const height = Math.round(bitmap.height * scale);
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
   const ctx = canvas.getContext("2d");
   if (!ctx) return file;
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  return new Promise<Blob>((resolve) => {
-    canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", 0.75);
-  });
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+
+  let quality = 0.75;
+  let blob = await toBlob(canvas, quality);
+  while (blob && blob.size > 1_000_000 && quality > 0.4) {
+    quality -= 0.15;
+    blob = await toBlob(canvas, quality);
+  }
+  return blob ?? file;
 }
 
 export function DriverPhotoCheck({
@@ -41,6 +52,10 @@ export function DriverPhotoCheck({
 
   async function handleFile(kind: Kind, file: File) {
     setError(null);
+    if (file.size > MAX_INPUT_BYTES) {
+      setError("รูปใหญ่เกิน 10 MB");
+      return;
+    }
     setBusy(kind);
     setPreviews((p) => ({ ...p, [kind]: URL.createObjectURL(file) }));
     try {

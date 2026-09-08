@@ -2,12 +2,13 @@ import "server-only";
 
 import { uploadDriverEvidencePhoto } from "@/lib/storage/photo-upload";
 
-const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-const maxBytes = 5 * 1024 * 1024;
+const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+const maxBytes = 10 * 1024 * 1024;
 
 export function validatePhotoFile(file: File): { valid: boolean; error?: string } {
-  if (!allowedTypes.includes(file.type)) return { valid: false, error: "Only JPEG, PNG, and WebP images are allowed." };
-  if (file.size > maxBytes) return { valid: false, error: "Photo must be 5 MB or smaller." };
+  // Photos are compressed client-side before upload; this is the safety ceiling.
+  if (file.type && !allowedTypes.includes(file.type)) return { valid: false, error: "รองรับเฉพาะไฟล์รูปภาพ (JPEG, PNG, WebP)" };
+  if (file.size > maxBytes) return { valid: false, error: "รูปต้องไม่เกิน 10 MB" };
   return { valid: true };
 }
 

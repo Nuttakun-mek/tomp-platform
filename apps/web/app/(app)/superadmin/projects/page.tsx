@@ -12,7 +12,7 @@ export default async function SuperadminProjectsPage() {
       <PageHeader
         eyebrow="ทีมแพลตฟอร์ม"
         title="โครงการทั้งหมด"
-        description="โครงการทุกองค์กร พร้อมเจ้าของ สถานะ และจำนวนสมาชิก"
+        description="โครงการทั้งหมดในระบบ พร้อมเจ้าของ สถานะ และจำนวนสมาชิก"
       />
       {projects.length ? (
         <div className="overflow-x-auto rounded-panel border border-border bg-white">
@@ -20,7 +20,6 @@ export default async function SuperadminProjectsPage() {
             <thead className="border-b border-border text-[11px] uppercase tracking-wide text-ink-faint">
               <tr>
                 <th className="px-3 py-2.5">โครงการ</th>
-                <th className="px-3 py-2.5">องค์กร</th>
                 <th className="px-3 py-2.5">สถานะ</th>
                 <th className="px-3 py-2.5">เจ้าของ</th>
                 <th className="px-3 py-2.5 text-right">สมาชิก</th>
@@ -35,7 +34,6 @@ export default async function SuperadminProjectsPage() {
                     </Link>
                     <span className="block text-ink-soft">{project.projectName}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-ink-soft">{project.organizationName}</td>
                   <td className="px-3 py-2.5 text-ink-soft">{formatStatusTh(project.status)}</td>
                   <td className="px-3 py-2.5 text-ink-soft">{project.ownerName ?? "ยังไม่ระบุ"}</td>
                   <td className="px-3 py-2.5 text-right font-semibold text-ink">{project.memberCount}</td>

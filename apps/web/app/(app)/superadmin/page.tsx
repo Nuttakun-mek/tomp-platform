@@ -16,7 +16,7 @@ export default function SuperadminPage() {
             <Users className="h-5 w-5" />
           </span>
           <h2 className="card-title mt-4">ผู้ใช้และสิทธิ์</h2>
-          <p className="section-description mt-1.5">เพิ่มผู้ใช้ กำหนดบทบาทระดับองค์กรและโครงการ</p>
+          <p className="section-description mt-1.5">เพิ่มผู้ใช้ และกำหนดบทบาทในแต่ละโครงการ</p>
         </Link>
         <Link className="smart-card p-5" href="/superadmin/dev-tools">
           <span className="grid h-11 w-11 place-items-center rounded-panel bg-command text-white">

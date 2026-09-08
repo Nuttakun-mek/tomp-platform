@@ -77,27 +77,22 @@ export const NAV_SECTIONS: NavSection[] = [
     ]
   },
   {
-    title: "องค์กร",
+    title: "ระบบ",
     items: [
       {
         href: "/superadmin/users",
         label: "ผู้ใช้และสิทธิ์",
         description: "จัดการสมาชิกและบทบาท",
         icon: "Users",
-        help: "เพิ่มผู้ใช้ กำหนดบทบาทระดับองค์กรและโครงการ",
+        help: "เพิ่มผู้ใช้ และกำหนดบทบาทในแต่ละโครงการ",
         anyPermission: ["admin.manage_users"]
-      }
-    ]
-  },
-  {
-    title: "ระบบ",
-    items: [
+      },
       {
         href: "/superadmin",
-        label: "Superadmin",
+        label: "เครื่องมือระบบ",
         description: "เครื่องมือแพลตฟอร์ม",
         icon: "ShieldAlert",
-        help: "จัดการผู้ใช้ องค์กร บทบาท และเครื่องมือพัฒนา — เฉพาะทีมแพลตฟอร์ม",
+        help: "จัดการผู้ใช้ บทบาท และเครื่องมือพัฒนา — เฉพาะทีมแพลตฟอร์ม",
         anyPermission: ["superadmin.access"],
         anyRole: ["super_admin"]
       }
