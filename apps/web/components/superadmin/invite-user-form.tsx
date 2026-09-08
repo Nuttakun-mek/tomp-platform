@@ -23,6 +23,7 @@ const PROJECT_ROLE_HINT: Record<string, string> = {
 export function InviteUserForm({ organizations, projects }: { organizations: Option[]; projects: Option[] }) {
   const orgId = organizations[0]?.id ?? "";
   const [kind, setKind] = useState<"staff" | "admin">("staff");
+  const [projectRole, setProjectRole] = useState("dispatcher");
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "danger">("danger");
   const [isPending, startTransition] = useTransition();
@@ -36,7 +37,7 @@ export function InviteUserForm({ organizations, projects }: { organizations: Opt
         organizationId: orgId,
         globalRoleKey: kind === "admin" ? "super_admin" : undefined,
         projectId: kind === "staff" ? formData.get("projectId") || undefined : undefined,
-        projectRoleKey: kind === "staff" ? formData.get("projectRoleKey") || undefined : undefined
+        projectRoleKey: kind === "staff" ? projectRole : undefined
       });
       if (result.success) {
         setTone("success");
@@ -104,19 +105,21 @@ export function InviteUserForm({ organizations, projects }: { organizations: Opt
               ))}
             </select>
           </label>
-          <label className="field-label">
-            บทบาทในโครงการ
-            <select className="field-input" name="projectRoleKey" required defaultValue="">
-              <option value="" disabled>
-                เลือกบทบาท
-              </option>
-              {PROJECT_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabelTh(r)} — {PROJECT_ROLE_HINT[r]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="grid gap-1.5">
+            <span className="field-label mb-0">บทบาทในโครงการ</span>
+            {PROJECT_ROLES.map((r) => (
+              <label
+                key={r}
+                className={`flex cursor-pointer items-start gap-2.5 rounded-card border p-2.5 ${projectRole === r ? "border-operation bg-operation-soft" : "border-border bg-white"}`}
+              >
+                <input type="radio" name="projectRoleKey" className="mt-0.5" checked={projectRole === r} onChange={() => setProjectRole(r)} />
+                <span>
+                  <span className="block text-[13px] font-semibold text-ink">{roleLabelTh(r)}</span>
+                  <span className="block text-[12px] text-ink-faint">{PROJECT_ROLE_HINT[r]}</span>
+                </span>
+              </label>
+            ))}
+          </div>
           {!projects.length ? <p className="text-[12px] text-rose-600">ยังไม่มีโครงการ สร้างโครงการก่อนเพิ่มเจ้าหน้าที่</p> : null}
         </div>
       ) : null}

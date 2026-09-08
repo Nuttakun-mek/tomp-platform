@@ -47,12 +47,21 @@ export function DriverChatThread({
 }) {
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const bubbles = useMemo(() => buildBubbles(messages, notifications), [messages, notifications]);
   const now = Date.now();
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
   }, [bubbles.length]);
+
+  // grow the composer with its content, up to ~6 lines (chat-app style)
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }, [text]);
 
   function submit() {
     const value = text.trim();
@@ -105,7 +114,8 @@ export function DriverChatThread({
 
       <div className="flex items-end gap-2">
         <textarea
-          className="field-input min-h-11 flex-1 resize-none"
+          ref={inputRef}
+          className="field-input min-h-11 flex-1 resize-none overflow-y-auto"
           rows={1}
           value={text}
           onChange={(e) => setText(e.target.value)}

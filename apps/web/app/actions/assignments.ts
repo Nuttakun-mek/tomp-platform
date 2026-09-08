@@ -39,6 +39,8 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
       call_sign_id: parsed.data.callSignId,
       vehicle_id: parsed.data.vehicleId || null,
       driver_id: parsed.data.driverId || null,
+      // a freshly dispatched job is "planned", not a hidden "draft"
+      status: "planned",
       start_time: parsed.data.startTime || null,
       end_time: parsed.data.endTime || null,
       commitment_id: parsed.data.commitmentId || null,

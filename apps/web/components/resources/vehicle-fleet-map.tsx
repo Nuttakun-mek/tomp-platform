@@ -1,78 +1,79 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
+import { LiveTrackingMap, type MarkerFreshness, type TrackedPoint } from "@/components/mission-control/live-tracking-map";
+import { formatRelativeTh } from "@/lib/ui/relative-time";
 
-function metadataText(location: DriverLocation, key: string, fallback: string) {
+function metaText(location: DriverLocation, key: string, fallback: string) {
   const value = location.metadata[key];
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function getMarkerPosition(location: DriverLocation, locations: DriverLocation[]) {
-  const latitudes = locations.map((item) => item.latitude);
-  const longitudes = locations.map((item) => item.longitude);
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLng = Math.min(...longitudes);
-  const maxLng = Math.max(...longitudes);
-  const latRange = Math.max(maxLat - minLat, 0.001);
-  const lngRange = Math.max(maxLng - minLng, 0.001);
-  return {
-    left: `${12 + ((location.longitude - minLng) / lngRange) * 76}%`,
-    top: `${12 + ((maxLat - location.latitude) / latRange) * 76}%`
-  };
+function freshnessOf(location: DriverLocation, now: number): MarkerFreshness {
+  if (location.sharingEvent === "sharing_stopped") return "stopped";
+  const age = Math.round((now - new Date(location.recordedAt).getTime()) / 1000);
+  if (age <= 35) return "live";
+  if (age <= 120) return "slow";
+  return "offline";
 }
 
-function mapUrl(locations: DriverLocation[]) {
-  const latest = locations[0];
-  const centerLatitude = latest?.latitude ?? 13.7563;
-  const centerLongitude = latest?.longitude ?? 100.5018;
-  const delta = 0.025;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${centerLongitude - delta}%2C${centerLatitude - delta}%2C${centerLongitude + delta}%2C${centerLatitude + delta}&layer=mapnik`;
-}
+export function VehicleFleetMap({ initialLocations }: { initialLocations: DriverLocation[] }) {
+  const [locations, setLocations] = useState(initialLocations);
+  const [now, setNow] = useState(() => Date.now());
 
-export function VehicleFleetMap({ locations }: { locations: DriverLocation[] }) {
+  useEffect(() => {
+    let alive = true;
+    async function poll() {
+      try {
+        const res = await fetch("/api/mission-control/locations", { cache: "no-store" });
+        const json = (await res.json()) as { success?: boolean; data?: DriverLocation[] };
+        if (alive && json.success !== false && Array.isArray(json.data)) setLocations(json.data);
+        if (alive) setNow(Date.now());
+      } catch {
+        /* keep last known */
+      }
+    }
+    const timer = window.setInterval(poll, 10000);
+    const clock = window.setInterval(() => setNow(Date.now()), 10000);
+    void poll();
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      window.clearInterval(clock);
+    };
+  }, []);
+
+  const points: TrackedPoint[] = locations
+    .filter((location) => Number.isFinite(location.latitude) && Number.isFinite(location.longitude) && (location.latitude !== 0 || location.longitude !== 0))
+    .map((location) => ({
+      id: location.assignmentId || location.vehicleId || location.id,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      freshness: freshnessOf(location, now),
+      title: metaText(location, "callSign", "ยังไม่ระบุ Call Sign"),
+      subtitle: `${metaText(location, "vehiclePlate", "รถ")} / ${metaText(location, "driverName", "คนขับ")}`,
+      ageLabel: formatRelativeTh(location.recordedAt, now),
+      accuracy: location.accuracy ?? null
+    }));
+
   return (
     <section className="enterprise-panel overflow-hidden">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-slate-950 px-5 py-4 text-white">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.18em] text-blue-200">แผนที่รวมรถ</p>
-          <h2 className="mt-1 text-lg font-semibold">ตำแหน่ง GPS ล่าสุดของรถหลายคัน</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-300">ตำแหน่งผูกกับโครงการ Assignment คนขับ และรถจากข้อมูลจริงในระบบ</p>
+          <p className="text-[11px] font-bold tracking-[0.16em] text-operation">แผนที่รวมรถ</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink">ตำแหน่ง GPS ล่าสุดของรถทุกคัน</h2>
+          <p className="mt-1 text-xs text-slate-500">หมุดขยับตามตำแหน่งจริง · อัปเดตทุก 10 วินาที · สีตามความสดของสัญญาณ</p>
         </div>
-        <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">{locations.length} จุดล่าสุด</span>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{points.length} คันกำลังแชร์</span>
       </div>
-      <div className="relative min-h-[420px] overflow-hidden bg-slate-100">
-        <iframe className="h-[420px] w-full border-0 opacity-85" loading="lazy" referrerPolicy="no-referrer" src={mapUrl(locations)} title="แผนที่รวมรถ" />
-        {locations.map((location) => {
-          const position = getMarkerPosition(location, locations);
-          const callSign = metadataText(location, "callSign", "ไม่พบ Call Sign");
-          const vehiclePlate = metadataText(location, "vehiclePlate", "ไม่พบทะเบียน");
-          const driverName = metadataText(location, "driverName", "ไม่พบชื่อคนขับ");
-          return (
-            <a
-              key={location.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              href={`https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`}
-              rel="noreferrer"
-              style={position}
-              target="_blank"
-              title={`${vehiclePlate} / ${driverName}`}
-            >
-              <span className="absolute inline-flex h-8 w-8 -translate-x-2 -translate-y-2 animate-ping rounded-full bg-emerald-400 opacity-40" />
-              <span className="relative block h-4 w-4 rounded-full bg-emerald-500 ring-8 ring-emerald-200" />
-              <span className="absolute left-5 top-0 min-w-44 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow-soft">
-                <span className="block font-semibold text-ink">{vehiclePlate}</span>
-                <span className="block text-slate-600">{callSign} / {driverName}</span>
-              </span>
-            </a>
-          );
-        })}
-        {!locations.length ? (
-          <div className="absolute inset-x-5 bottom-5 rounded-2xl border border-slate-200 bg-white/95 p-4 text-sm text-slate-600 shadow-soft">
-            ยังไม่มีตำแหน่ง GPS จากรถในระบบ เมื่อคนขับเปิดงานและยินยอมแชร์ GPS หมุดรถจะแสดงบนแผนที่นี้
-          </div>
-        ) : null}
-      </div>
+      {points.length ? (
+        <LiveTrackingMap points={points} height={420} />
+      ) : (
+        <div className="flex min-h-[240px] items-center justify-center p-6 text-center text-sm leading-6 text-slate-600">
+          ยังไม่มีตำแหน่ง GPS จากรถ — เมื่อคนขับเปิดงานและแชร์ GPS หมุดรถจะแสดงและขยับบนแผนที่นี้
+        </div>
+      )}
     </section>
   );
 }

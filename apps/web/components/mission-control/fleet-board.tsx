@@ -87,8 +87,9 @@ export function FleetBoard({
         if (!alive) return;
         if (locRes?.success !== false && Array.isArray(locRes?.data)) setLocations(locRes.data as DriverLocation[]);
         if (commsRes?.success && commsRes.data) {
-          if (commsRes.data.statuses) setStatuses(commsRes.data.statuses as Record<string, AssignmentStatusUpdate>);
-          if (commsRes.data.evidence) setEvidence(commsRes.data.evidence as Record<string, VehicleEvidence>);
+          // merge — a transient empty response must not wipe a known status
+          if (commsRes.data.statuses) setStatuses((prev) => ({ ...prev, ...(commsRes.data.statuses as Record<string, AssignmentStatusUpdate>) }));
+          if (commsRes.data.evidence) setEvidence((prev) => ({ ...prev, ...(commsRes.data.evidence as Record<string, VehicleEvidence>) }));
           if (Array.isArray(commsRes.data.inbound)) setInbound(commsRes.data.inbound as DriverInboundMessage[]);
         }
         setNow(Date.now());
@@ -129,6 +130,7 @@ export function FleetBoard({
 
   const rows = useMemo(() => {
     return assignments
+      .filter((assignment) => !["cancelled", "archived", "draft"].includes(assignment.status))
       .map((assignment) => {
         const location = locationByAssignment.get(assignment.id);
         const freshness = freshnessOf(location, now);
@@ -215,6 +217,9 @@ export function FleetBoard({
                       <span className={`rounded-full px-2 py-0.5 ${row.freshness === "live" ? "bg-emerald-50 text-emerald-700" : row.freshness === "slow" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
                         {FRESH_LABEL[row.freshness]}
                       </span>
+                      {ev && (ev.vehiclePhotoUrl || ev.platePhotoUrl) ? (
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">📷 มีรูปตรวจรถ</span>
+                      ) : null}
                     </span>
                   </span>
                   <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />

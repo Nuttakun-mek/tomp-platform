@@ -1,5 +1,7 @@
 import type { Assignment, Driver, DriverLocation, DriverNotification, Mission, Project, Vehicle } from "@tomp/types/domain";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
+import { getLatestAssignmentStatuses, type AssignmentStatusUpdate } from "@/lib/data/assignment-status";
+import { getVehicleEvidenceByProjectId, type VehicleEvidence } from "@/lib/data/vehicle-evidence";
 import { getDriverNotificationsByAssignmentId } from "@/lib/data/driver-operations";
 import { getLatestDriverLocations } from "@/lib/data/locations";
 import { getMissionsByProjectId } from "@/lib/data/missions";
@@ -12,6 +14,8 @@ export interface VehicleOperationTask {
   mission?: Mission;
   driver?: Driver;
   location?: DriverLocation;
+  reportedStatus?: AssignmentStatusUpdate;
+  evidence?: VehicleEvidence;
   notifications: DriverNotification[];
   unreadNotifications: number;
 }
@@ -42,8 +46,12 @@ export async function getVehicleOperationProfiles(): Promise<VehicleOperationPro
   ]);
   const assignmentsByProject = await Promise.all(projects.map((project) => getAssignmentsByProjectId(project.id)));
   const missionsByProject = await Promise.all(projects.map((project) => getMissionsByProjectId(project.id)));
+  const statusesByProject = await Promise.all(projects.map((project) => getLatestAssignmentStatuses(project.id).catch(() => ({}))));
+  const evidenceByProject = await Promise.all(projects.map((project) => getVehicleEvidenceByProjectId(project.id).catch(() => ({}))));
   const assignments = assignmentsByProject.flat();
   const missions = missionsByProject.flat();
+  const reportedStatuses: Record<string, AssignmentStatusUpdate> = Object.assign({}, ...statusesByProject);
+  const evidenceByAssignment: Record<string, VehicleEvidence> = Object.assign({}, ...evidenceByProject);
 
   return Promise.all(vehicles.map(async (vehicle) => {
     const vehicleAssignments = assignments.filter((assignment) => assignment.vehicleId === vehicle.id);
@@ -57,6 +65,8 @@ export async function getVehicleOperationProfiles(): Promise<VehicleOperationPro
         mission: missions.find((mission) => mission.id === assignment.missionId),
         driver: drivers.find((driver) => driver.id === assignment.driverId),
         location,
+        reportedStatus: reportedStatuses[assignment.id],
+        evidence: evidenceByAssignment[assignment.id],
         notifications,
         unreadNotifications: notifications.filter((notification) => notification.status === "unread").length
       };

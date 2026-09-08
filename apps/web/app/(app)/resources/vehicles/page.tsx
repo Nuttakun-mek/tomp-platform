@@ -36,7 +36,7 @@ export default async function VehiclesPage() {
         <ResourceQualityCard title="งานที่ทำแล้ว" value={`${completedTasks}`} detail="ประวัติงานที่เสร็จสิ้น" />
       </div>
 
-      <VehicleFleetMap locations={locations} />
+      <VehicleFleetMap initialLocations={locations} />
 
       <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
         <CreateVehicleForm />

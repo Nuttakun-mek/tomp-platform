@@ -31,6 +31,16 @@ export async function driverCheckinAction(input: unknown): Promise<ActionResult>
   }).select().single();
 
   if (insertError) return actionFailure(`Driver check-in failed: ${insertError.message}`);
+
+  // Driver passed pre-flight and confirmed readiness → the assignment is live.
+  if (parsed.data.status === "ready") {
+    await client
+      .from("assignments")
+      .update({ status: "active" })
+      .eq("id", parsed.data.assignmentId)
+      .in("status", ["draft", "planned", "published"]);
+  }
+
   const timelineResult = await createTimelineEvent({
     projectId: parsed.data.projectId,
     objectType: "assignment",
@@ -155,6 +165,17 @@ export async function assignmentStatusUpdateAction(input: unknown): Promise<Acti
   }).select().single();
 
   if (insertError) return actionFailure(`Assignment status update failed: ${insertError.message}`);
+
+  // Reflect the driver's progress on the assignment itself so every control-centre
+  // view (task cards, dispatch board, project overview) shows a live status —
+  // the detailed step still lives in assignment_status_updates.
+  const planStatus = parsed.data.status === "completed" ? "completed" : "active";
+  await client
+    .from("assignments")
+    .update({ status: planStatus })
+    .eq("id", parsed.data.assignmentId)
+    .in("status", ["draft", "planned", "published", "active"]);
+
   const timelineResult = await createTimelineEvent({
     projectId: parsed.data.projectId,
     objectType: "assignment",
