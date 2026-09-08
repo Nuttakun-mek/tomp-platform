@@ -256,12 +256,16 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
   }
 
   const latestByAssignment = new Map<string, DriverLocation>();
-  data.map(mapDriverLocation).forEach((location) => {
-    const key = location.assignmentId || location.driverId || location.id;
-    if (!latestByAssignment.has(key)) {
-      latestByAssignment.set(key, location);
-    }
-  });
+  data
+    .map(mapDriverLocation)
+    // drop seed/placeholder rows — they never move and read as a "stuck" marker
+    .filter((location) => !["placeholder", "demo"].includes(String(location.source)) && (location.latitude !== 0 || location.longitude !== 0))
+    .forEach((location) => {
+      const key = location.assignmentId || location.driverId || location.id;
+      if (!latestByAssignment.has(key)) {
+        latestByAssignment.set(key, location);
+      }
+    });
 
   return enrichLocationMetadata(client, Array.from(latestByAssignment.values()));
 }
@@ -292,12 +296,16 @@ export async function getLatestDriverLocations(limit = 50): Promise<DriverLocati
   }
 
   const latestByAssignment = new Map<string, DriverLocation>();
-  data.map(mapDriverLocation).forEach((location) => {
-    const key = location.assignmentId || location.driverId || location.id;
-    if (!latestByAssignment.has(key)) {
-      latestByAssignment.set(key, location);
-    }
-  });
+  data
+    .map(mapDriverLocation)
+    // drop seed/placeholder rows — they never move and read as a "stuck" marker
+    .filter((location) => !["placeholder", "demo"].includes(String(location.source)) && (location.latitude !== 0 || location.longitude !== 0))
+    .forEach((location) => {
+      const key = location.assignmentId || location.driverId || location.id;
+      if (!latestByAssignment.has(key)) {
+        latestByAssignment.set(key, location);
+      }
+    });
 
   return enrichLocationMetadata(client, Array.from(latestByAssignment.values()));
 }

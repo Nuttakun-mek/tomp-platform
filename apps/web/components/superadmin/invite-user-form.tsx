@@ -11,12 +11,18 @@ interface Option {
   label: string;
 }
 
-// Single-org: the only global role is platform admin. Everyone else is added to
-// specific projects with a per-project role.
-const GLOBAL_ROLES = ["super_admin"];
 const PROJECT_ROLES = ["project_manager", "dispatcher", "coordinator", "customer_viewer"];
 
+const PROJECT_ROLE_HINT: Record<string, string> = {
+  project_manager: "จัดการโครงการทั้งหมด รวมประกาศใช้แผน",
+  dispatcher: "จัดสรรงาน สร้าง QR ดูคนขับและรถ",
+  coordinator: "ดูงานและยืนยันสถานะในพื้นที่",
+  customer_viewer: "ดูอย่างเดียว + ส่งคำขอเปลี่ยนแปลง"
+};
+
 export function InviteUserForm({ organizations, projects }: { organizations: Option[]; projects: Option[] }) {
+  const orgId = organizations[0]?.id ?? "";
+  const [kind, setKind] = useState<"staff" | "admin">("staff");
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "danger">("danger");
   const [isPending, startTransition] = useTransition();
@@ -27,21 +33,19 @@ export function InviteUserForm({ organizations, projects }: { organizations: Opt
       const result = await provisionUserAction({
         email: formData.get("email"),
         fullName: formData.get("fullName"),
-        organizationId: formData.get("organizationId"),
-        globalRoleKey: formData.get("globalRoleKey") || undefined,
-        projectId: formData.get("projectId") || undefined,
-        projectRoleKey: formData.get("projectRoleKey") || undefined
+        organizationId: orgId,
+        globalRoleKey: kind === "admin" ? "super_admin" : undefined,
+        projectId: kind === "staff" ? formData.get("projectId") || undefined : undefined,
+        projectRoleKey: kind === "staff" ? formData.get("projectRoleKey") || undefined : undefined
       });
       if (result.success) {
         setTone("success");
         const temp =
-          result.data && typeof result.data === "object" && "tempPassword" in result.data
-            ? String(result.data.tempPassword)
-            : null;
+          result.data && typeof result.data === "object" && "tempPassword" in result.data ? String(result.data.tempPassword) : null;
         setMessage(
           temp
-            ? `เพิ่มผู้ใช้แล้ว — ส่งรหัสผ่านชั่วคราวนี้ให้ผู้ใช้อย่างปลอดภัย แล้วให้เปลี่ยนหลังเข้าระบบครั้งแรก: ${temp}`
-            : "เพิ่มผู้ใช้แล้ว — ให้ผู้ใช้เข้าสู่ระบบด้วยอีเมลนี้เพื่อเปิดใช้งานบัญชี"
+            ? `เพิ่มผู้ใช้แล้ว — ส่งอีเมลและรหัสผ่านชั่วคราวนี้ให้ผู้ใช้ (ให้เปลี่ยนหลังเข้าครั้งแรก): ${temp}`
+            : "เพิ่มผู้ใช้แล้ว"
         );
       } else {
         setTone("danger");
@@ -54,64 +58,69 @@ export function InviteUserForm({ organizations, projects }: { organizations: Opt
     <form action={submit} className="enterprise-panel grid content-start gap-4 p-5">
       <div>
         <p className="section-label">เพิ่มผู้ใช้</p>
-        <h2 className="section-title mt-1">เตรียมบัญชีและกำหนดบทบาท</h2>
-        <p className="section-description mt-1">
-          ระบบจะสร้างข้อมูลผู้ใช้ไว้ล่วงหน้า ผู้ใช้เข้าสู่ระบบด้วยอีเมลเดียวกันแล้วบัญชีจะผูกอัตโนมัติ
-        </p>
+        <h2 className="section-title mt-1">สร้างบัญชีและกำหนดสิทธิ์</h2>
+        <p className="section-description mt-1">ผู้ใช้เข้าสู่ระบบด้วยอีเมลนี้ + รหัสผ่านชั่วคราวที่ระบบสร้างให้</p>
       </div>
+
       <label className="field-label">
         อีเมล
         <input className="field-input" name="email" type="email" required placeholder="name@company.com" />
       </label>
       <label className="field-label">
-        ชื่อผู้ใช้
+        ชื่อ-นามสกุล
         <input className="field-input" name="fullName" required placeholder="ชื่อ-นามสกุล" />
       </label>
-      <label className="field-label">
-        องค์กร
-        <select className="field-input" name="organizationId" required>
-          {organizations.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field-label">
-        บทบาทระดับองค์กร (ไม่บังคับ)
-        <select className="field-input" name="globalRoleKey" defaultValue="">
-          <option value="">— ไม่กำหนด —</option>
-          {GLOBAL_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {roleLabelTh(r)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="field-label">
-          โครงการ (ไม่บังคับ)
-          <select className="field-input" name="projectId" defaultValue="">
-            <option value="">— ไม่กำหนด —</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+
+      <fieldset className="grid gap-2">
+        <span className="field-label mb-0">ประเภทผู้ใช้</span>
+        <label className={`flex cursor-pointer items-start gap-2.5 rounded-card border p-3 ${kind === "staff" ? "border-operation bg-operation-soft" : "border-border"}`}>
+          <input type="radio" name="kind" className="mt-0.5" checked={kind === "staff"} onChange={() => setKind("staff")} />
+          <span>
+            <span className="block text-[13px] font-semibold text-ink">เจ้าหน้าที่โครงการ</span>
+            <span className="block text-[12px] text-ink-faint">เห็นเฉพาะโครงการที่ได้รับมอบหมาย</span>
+          </span>
         </label>
-        <label className="field-label">
-          บทบาทในโครงการ
-          <select className="field-input" name="projectRoleKey" defaultValue="">
-            <option value="">— ไม่กำหนด —</option>
-            {PROJECT_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {roleLabelTh(r)}
-              </option>
-            ))}
-          </select>
+        <label className={`flex cursor-pointer items-start gap-2.5 rounded-card border p-3 ${kind === "admin" ? "border-operation bg-operation-soft" : "border-border"}`}>
+          <input type="radio" name="kind" className="mt-0.5" checked={kind === "admin"} onChange={() => setKind("admin")} />
+          <span>
+            <span className="block text-[13px] font-semibold text-ink">ผู้ดูแลแพลตฟอร์ม</span>
+            <span className="block text-[12px] text-ink-faint">เห็นทุกโครงการ จัดการผู้ใช้ สร้างโครงการใหม่</span>
+          </span>
         </label>
-      </div>
+      </fieldset>
+
+      {kind === "staff" ? (
+        <div className="grid gap-3 rounded-card border border-border bg-canvas/40 p-3">
+          <label className="field-label">
+            โครงการ
+            <select className="field-input" name="projectId" required defaultValue="">
+              <option value="" disabled>
+                เลือกโครงการ
+              </option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field-label">
+            บทบาทในโครงการ
+            <select className="field-input" name="projectRoleKey" required defaultValue="">
+              <option value="" disabled>
+                เลือกบทบาท
+              </option>
+              {PROJECT_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {roleLabelTh(r)} — {PROJECT_ROLE_HINT[r]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!projects.length ? <p className="text-[12px] text-rose-600">ยังไม่มีโครงการ สร้างโครงการก่อนเพิ่มเจ้าหน้าที่</p> : null}
+        </div>
+      ) : null}
+
       <ActionFeedback message={message} tone={tone} />
       <button
         className="inline-flex min-h-11 w-fit items-center gap-2 rounded-panel bg-operation px-5 text-sm font-semibold text-white transition hover:bg-operation-deep disabled:bg-slate-300"

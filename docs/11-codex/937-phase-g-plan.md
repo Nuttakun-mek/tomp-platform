@@ -2,6 +2,15 @@
 
 > superpowers:executing-plans — task-by-task, verify, commit + deploy per task.
 
+## รอบที่ 1 (deployed) — เสร็จ
+- ✅ หน้า login ไม่โล่ง (brand + จุดเด่น 3 ข้อ + ฟอร์ม)
+- ✅ เพิ่มผู้ใช้: radio "เจ้าหน้าที่โครงการ" / "ผู้ดูแลแพลตฟอร์ม" + คำอธิบายบทบาท · ตัด org dropdown
+- ✅ G4 vehicle 404 → fallback profile เปล่า
+- ✅ G3 (บางส่วน) กรอง `placeholder`/`demo` locations + marker pin บน OSM
+- ✅ G2 (บางส่วน) `/api/driver/updates` + poll 15 วิ ในหน้าคนขับ → ข้อความจากศูนย์เด้งเอง · ปุ่ม "ข้อความ" ส่งหาศูนย์ · ไฟสถานะ GPS · ปุ่มสื่อสาร 3 ปุ่มแถวเดียว
+
+## รอบถัดไป
+
 **Goal:** สิ่งที่คนขับส่ง (สถานะ, ตำแหน่ง) ขึ้นศูนย์ควบคุมจริง · ข้อความจากศูนย์ถึงคนขับ · หน้าคนขับ 1 หน้าจอไม่ต้อง scroll · vehicle detail ไม่ 404
 
 ## ปัญหาที่พบ (จากการตรวจโค้ด)

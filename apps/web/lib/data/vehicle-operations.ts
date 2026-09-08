@@ -75,7 +75,13 @@ export async function getVehicleOperationProfiles(): Promise<VehicleOperationPro
 
 export async function getVehicleOperationProfileById(vehicleId: string): Promise<VehicleOperationProfile | null> {
   const profiles = await getVehicleOperationProfiles();
-  return profiles.find((profile) => profile.vehicle.id === vehicleId) ?? null;
+  const found = profiles.find((profile) => profile.vehicle.id === vehicleId);
+  if (found) return found;
+
+  // Vehicle exists but has no operational history yet — still show its profile.
+  const vehicle = (await getVehicles()).find((item) => item.id === vehicleId);
+  if (!vehicle) return null;
+  return { vehicle, currentTasks: [], remainingTasks: [], completedTasks: [], cancelledTasks: [], latestLocation: undefined };
 }
 
 export async function getVehicleOperationProfilesByProjectId(projectId: string): Promise<VehicleOperationProfile[]> {

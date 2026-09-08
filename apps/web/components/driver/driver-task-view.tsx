@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CheckCircle2, ChevronDown, MapPin, Navigation, Phone, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { CheckCircle2, ChevronDown, MapPin, MessageSquare, Navigation, Phone, TriangleAlert } from "lucide-react";
 import { assignmentStatusUpdateAction, driverCheckinAction, driverIssueReportAction } from "@/app/actions/driver";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
 import { NotificationCard } from "@/components/ui/notification-card";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
+import type { DriverNotification } from "@tomp/types/domain";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
 
@@ -47,12 +48,44 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   const [isPending, startTransition] = useTransition();
   const [issueOpen, setIssueOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [messageText, setMessageText] = useState("");
+  const [messageOpen, setMessageOpen] = useState(false);
+  const [notifications, setNotifications] = useState<DriverNotification[]>(driverAccess.notifications);
+  const [gpsLight, setGpsLight] = useState<"off" | "live" | "stale">("off");
 
   const ids = {
     projectId: driverAccess.project.id,
     assignmentId: driverAccess.assignment.id,
     driverId: driverAccess.driver.id
   };
+
+  // poll the control centre for new messages + route changes every 15s
+  const seenIds = useRef(new Set(driverAccess.notifications.map((n) => n.id)));
+  useEffect(() => {
+    let alive = true;
+    async function poll() {
+      try {
+        const res = await fetch(`/api/driver/updates?token=${encodeURIComponent(driverAccess.token)}`, { cache: "no-store" });
+        const json = (await res.json()) as { success?: boolean; data?: { notifications?: DriverNotification[] } };
+        if (alive && json.success && Array.isArray(json.data?.notifications)) {
+          setNotifications(json.data.notifications);
+          for (const n of json.data.notifications) {
+            if (!seenIds.current.has(n.id)) {
+              seenIds.current.add(n.id);
+              setBanner({ tone: "ok", text: `ข้อความจากศูนย์: ${n.title || n.body}` });
+            }
+          }
+        }
+      } catch {
+        /* keep last known */
+      }
+    }
+    const timer = window.setInterval(poll, 15000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [driverAccess.token]);
 
   function markReady() {
     setBanner(null);
@@ -107,7 +140,31 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
     });
   }
 
+  function sendMessage() {
+    const text = messageText.trim();
+    if (!text) return;
+    setBanner(null);
+    startTransition(async () => {
+      const result = await driverIssueReportAction({
+        ...ids,
+        issueType: "message",
+        severity: "info",
+        message: text,
+        metadata: { via: "driver_task_view", kind: "driver_message" }
+      });
+      setMessageOpen(false);
+      setMessageText("");
+      setBanner(
+        result.success
+          ? { tone: "ok", text: "ส่งข้อความถึงศูนย์ควบคุมแล้ว" }
+          : { tone: "error", text: result.error || "ส่งข้อความไม่สำเร็จ" }
+      );
+    });
+  }
+
   const primaryDisabled = isPending;
+  const gpsDot = gpsLight === "live" ? "bg-emerald-500" : gpsLight === "stale" ? "bg-amber-500" : "bg-slate-300";
+  const gpsLabel = gpsLight === "live" ? "GPS สด" : gpsLight === "stale" ? "GPS ช้า" : "ยังไม่แชร์ GPS";
 
   return (
     <div className="grid gap-3 pb-4">
@@ -115,11 +172,17 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       <header className="grid gap-1">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-operation">{driverAccess.project.projectName}</p>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">
+            <span className={`h-2 w-2 rounded-full ${gpsDot}`} />
+            {gpsLabel}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-xl font-bold text-ink">Call Sign {driverAccess.callSign.callSign}</h1>
           <span className="rounded-full bg-operation-soft px-2.5 py-1 text-[11px] font-semibold text-operation">
             {formatStatusTh(driverAccess.assignment.status)}
           </span>
         </div>
-        <h1 className="text-xl font-bold text-ink">Call Sign {driverAccess.callSign.callSign}</h1>
       </header>
 
       {banner ? (
@@ -172,7 +235,10 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
             </p>
             <button
               type="button"
-              onClick={() => setPhase("sharing")}
+              onClick={() => {
+                setPhase("sharing");
+                setGpsLight("live");
+              }}
               className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-route px-4 text-[16px] font-bold text-white"
             >
               <Navigation className="h-5 w-5" /> เริ่มแชร์ตำแหน่ง GPS
@@ -208,28 +274,54 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         ) : null}
       </section>
 
-      {/* secondary actions */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => setIssueOpen((v) => !v)}
-          className="flex min-h-12 items-center justify-center gap-1.5 rounded-command border border-amber-300 bg-amber-50 px-3 text-[13px] font-semibold text-amber-800"
-        >
-          <TriangleAlert className="h-4 w-4" /> แจ้งปัญหา
-        </button>
+      {/* secondary actions — สื่อสารทันที */}
+      <div className="grid grid-cols-3 gap-2">
         {coordinatorPhone ? (
           <a
             href={`tel:${coordinatorPhone.replace(/[^\d+]/g, "")}`}
-            className="flex min-h-12 items-center justify-center gap-1.5 rounded-command border border-border bg-white px-3 text-[13px] font-semibold text-ink"
+            className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command bg-operation px-2 text-[12px] font-semibold text-white"
           >
-            <Phone className="h-4 w-4" /> โทรผู้ประสานงาน
+            <Phone className="h-4 w-4" /> โทรศูนย์
           </a>
         ) : (
-          <span className="flex min-h-12 items-center justify-center rounded-command border border-border bg-white px-3 text-[12px] text-ink-faint">
-            ไม่มีเบอร์ติดต่อ
+          <span className="flex min-h-12 items-center justify-center rounded-command border border-border bg-white px-2 text-[11px] text-ink-faint">
+            ไม่มีเบอร์
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => setMessageOpen((v) => !v)}
+          className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command border border-border bg-white px-2 text-[12px] font-semibold text-ink"
+        >
+          <MessageSquare className="h-4 w-4" /> ข้อความ
+        </button>
+        <button
+          type="button"
+          onClick={() => setIssueOpen((v) => !v)}
+          className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command border border-amber-300 bg-amber-50 px-2 text-[12px] font-semibold text-amber-800"
+        >
+          <TriangleAlert className="h-4 w-4" /> แจ้งปัญหา
+        </button>
       </div>
+
+      {messageOpen ? (
+        <section className="smart-card grid gap-2">
+          <textarea
+            className="field-input min-h-20"
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            placeholder="พิมพ์ข้อความถึงศูนย์ควบคุม เช่น รถติดหนัก คาดว่าถึงช้า 15 นาที"
+          />
+          <button
+            type="button"
+            disabled={isPending || !messageText.trim()}
+            onClick={sendMessage}
+            className="min-h-11 rounded-command bg-operation px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+          >
+            ส่งข้อความ
+          </button>
+        </section>
+      ) : null}
 
       {issueOpen ? (
         <section className="smart-card grid gap-2">
@@ -250,10 +342,11 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         </section>
       ) : null}
 
-      {/* notifications */}
-      {driverAccess.notifications.length ? (
+      {/* ข้อความจากศูนย์ (poll ทุก 15 วิ) */}
+      {notifications.length ? (
         <section className="grid gap-2">
-          {driverAccess.notifications.slice(0, 3).map((n) => (
+          <p className="section-label">ข้อความจากศูนย์ควบคุม</p>
+          {notifications.slice(0, 3).map((n) => (
             <NotificationCard key={n.id} title={n.title || "แจ้งเตือน"} body={n.body} at={n.createdAt} tone={n.priority === "critical" ? "critical" : "info"} />
           ))}
         </section>

@@ -147,10 +147,12 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
   }, [projectId]);
 
   const mapUrl = useMemo(() => {
+    const hasFix = typeof latestLatitude === "number" && typeof latestLongitude === "number";
     const centerLatitude = latestLatitude ?? 13.7563;
     const centerLongitude = latestLongitude ?? 100.5018;
     const delta = 0.012;
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${centerLongitude - delta}%2C${centerLatitude - delta}%2C${centerLongitude + delta}%2C${centerLatitude + delta}&layer=mapnik`;
+    const marker = hasFix ? `&marker=${centerLatitude}%2C${centerLongitude}` : "";
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${centerLongitude - delta}%2C${centerLatitude - delta}%2C${centerLongitude + delta}%2C${centerLatitude + delta}&layer=mapnik${marker}`;
   }, [latestLatitude, latestLongitude]);
 
   const effectiveNow = now || initialClock(locations) || 0;
