@@ -1,7 +1,8 @@
-import Link from "next/link";
-import { DriverCard } from "@/components/driver/driver-card";
-import { PageHeader } from "@/components/page-header";
+import { cookies } from "next/headers";
+import { DriverPinGate } from "@/components/driver/driver-pin-gate";
+import { DriverTaskView } from "@/components/driver/driver-task-view";
 import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
+import { DRIVER_PIN_COOKIE_PREFIX } from "@/lib/driver-access/token";
 
 interface DriverPageProps {
   searchParams?: Promise<{ token?: string }>;
@@ -12,26 +13,23 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
   const token = params.token || "";
   const driverAccess = token ? await getDriverAssignmentByToken(token) : null;
 
-  return (
-    <>
-      <PageHeader
-        eyebrow="หน้าคนขับ"
-        title="เข้าถึงงานด้วย QR"
-        description={driverAccess ? "ตรวจสอบงานสำเร็จ คนขับสามารถดูรายละเอียดงาน ยืนยันความพร้อม และแชร์ตำแหน่ง GPS ได้" : "เปิดลิงก์จาก QR ที่ศูนย์ควบคุมสร้างให้เท่านั้น เพื่อเข้าถึงงานที่ได้รับมอบหมาย"}
-      />
+  if (!driverAccess) {
+    return (
+      <div className="grid min-h-[70vh] content-center gap-3 text-center">
+        <p className="text-4xl">🚫</p>
+        <h1 className="text-lg font-bold text-ink">ไม่พบงานสำหรับ QR นี้</h1>
+        <p className="mx-auto max-w-sm text-[13px] leading-6 text-ink-soft">
+          QR อาจหมดอายุหรือถูกยกเลิก กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR และรหัสใหม่
+        </p>
+      </div>
+    );
+  }
 
-      {!driverAccess ? (
-        <section className="mx-auto grid max-w-2xl gap-4 rounded-[24px] border border-red-200 bg-red-50 p-5 text-sm font-medium leading-7 text-red-900 shadow-soft">
-          <p>ไม่พบงานที่ผูกกับ QR นี้ หรือ QR หมดอายุแล้ว กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR ใหม่</p>
-          <div className="flex flex-wrap gap-3">
-            <Link className="rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-800" href="/mission-control">
-              กลับศูนย์ควบคุม
-            </Link>
-          </div>
-        </section>
-      ) : (
-        <DriverCard driverAccess={driverAccess} />
-      )}
-    </>
-  );
+  if (driverAccess.pinRequired) {
+    const store = await cookies();
+    const verified = store.get(`${DRIVER_PIN_COOKIE_PREFIX}${driverAccess.tokenId}`)?.value === "1";
+    if (!verified) return <DriverPinGate token={token} />;
+  }
+
+  return <DriverTaskView driverAccess={driverAccess} />;
 }

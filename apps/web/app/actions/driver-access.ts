@@ -3,7 +3,7 @@
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
-import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
+import { generateDriverAccessToken, generateDriverPin, getDefaultDriverTokenExpiry, hashDriverAccessToken, hashDriverPin } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { getRequestBaseUrl } from "@/lib/request-origin";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -150,6 +150,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     expiresAt: data.expiresAt
   });
   const expiresAt = data.expiresAt || getDefaultDriverTokenExpiry();
+  const pin = generateDriverPin();
 
   const { data: row, error: insertError } = await client
     .from("driver_access_tokens")
@@ -160,7 +161,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
       token_hash: hashDriverAccessToken(token),
       status: "active",
       expires_at: expiresAt,
-      metadata: { tokenVersion: 1 }
+      metadata: { tokenVersion: 2, pinHash: hashDriverPin(pin), pinAttempts: 0 }
     })
     .select()
     .single();
@@ -191,6 +192,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
 
   return actionSuccess({
     token,
+    pin,
     accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
     tokenRecord: { id: row.id, expires_at: row.expires_at, status: row.status },
     packetRecord: packetResult?.packetRecord || null,

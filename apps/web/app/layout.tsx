@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
-import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
 const notoSansThai = Noto_Sans_Thai({
@@ -11,8 +10,8 @@ const notoSansThai = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "TOMP",
-  description: "แพลตฟอร์มควบคุมปฏิบัติการขนส่ง",
+  title: "TOMP — Transportation Operations Management Platform",
+  description: "ระบบบริหารจัดการการเดินทางและบริการ",
   applicationName: "TOMP"
 };
 
@@ -29,9 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th">
-      <body className={notoSansThai.variable}>
-        <AppShell>{children}</AppShell>
-      </body>
+      <body className={notoSansThai.variable}>{children}</body>
     </html>
   );
 }

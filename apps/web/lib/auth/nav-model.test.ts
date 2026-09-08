@@ -15,13 +15,13 @@ describe("filterNav", () => {
     expect(hrefs).toContain("/assignments");
     expect(hrefs).toContain("/mission-control");
     expect(hrefs).not.toContain("/superadmin");
-    expect(hrefs).not.toContain("/org/members");
+    expect(hrefs).not.toContain("/superadmin/users");
   });
 
   it("wildcard permission unlocks everything", () => {
     const superAdmin = filterNav(NAV_SECTIONS, { permissions: ["*"], roleKeys: ["super_admin"] });
     expect(flat(superAdmin)).toContain("/superadmin");
-    expect(flat(superAdmin)).toContain("/org/members");
+    expect(flat(superAdmin)).toContain("/superadmin/users");
   });
 
   it("always shows the overview to any logged-in viewer", () => {

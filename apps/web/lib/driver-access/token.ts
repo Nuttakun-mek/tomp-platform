@@ -30,3 +30,24 @@ export function getDefaultDriverTokenExpiry(hours = 24): string {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 
+// Second factor: a 6-digit PIN the control centre reads to the driver separately
+// from the QR link. Stored only as a hash on the token row.
+export function generateDriverPin(): string {
+  return String(100000 + (randomBytes(4).readUInt32BE(0) % 900000));
+}
+
+export function hashDriverPin(pin: string): string {
+  const secret = process.env.DRIVER_ACCESS_TOKEN_SECRET ?? "development-driver-token-secret";
+  return createHash("sha256").update(`pin:${secret}:${pin.trim()}`).digest("hex");
+}
+
+export const DRIVER_PIN_COOKIE_PREFIX = "dpin_";
+
+export function verifyDriverPin(pin: string, expectedHash: string): boolean {
+  if (!expectedHash) return false;
+  const actual = Buffer.from(hashDriverPin(pin), "hex");
+  const expected = Buffer.from(expectedHash, "hex");
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(actual, expected);
+}
+

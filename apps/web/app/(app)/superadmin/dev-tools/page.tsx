@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, ClipboardList, DatabaseZap, Gauge, ListChecks, ServerCog } from "lucide-react";
+import { Activity, ClipboardList, DatabaseZap, Gauge, ListChecks, ServerCog, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 
 const TOOLS = [
@@ -8,7 +8,8 @@ const TOOLS = [
   { href: "/superadmin/dev-tools/data-quality", label: "คุณภาพข้อมูล", detail: "หาชื่อไทยเพี้ยน Assignment ไม่ครบ QR ที่ยังใช้ไม่ได้", icon: DatabaseZap },
   { href: "/superadmin/dev-tools/readiness", label: "ความพร้อม 12 แกน", detail: "สิ่งที่พร้อม สิ่งที่ต้อง harden ก่อน production", icon: Gauge },
   { href: "/superadmin/dev-tools/runbook", label: "Runbook ดูแลระบบ", detail: "ขั้นตอนตรวจสุขภาพระบบและรับมือเหตุผิดปกติ", icon: ListChecks },
-  { href: "/superadmin/dev-tools/pilot-checklist", label: "Pilot checklist", detail: "ลำดับทดสอบ end-to-end ทีละบทบาท", icon: ClipboardList }
+  { href: "/superadmin/dev-tools/pilot-checklist", label: "Pilot checklist", detail: "ลำดับทดสอบ end-to-end ทีละบทบาท", icon: ClipboardList },
+  { href: "/superadmin/dev-tools/purge-test-data", label: "ล้างข้อมูลทดสอบ", detail: "ลบข้อมูลที่เครื่องมือทดสอบสร้าง (smokeTest) ออกจากฐานข้อมูลจริง", icon: Trash2 }
 ];
 
 export default function DevToolsPage() {

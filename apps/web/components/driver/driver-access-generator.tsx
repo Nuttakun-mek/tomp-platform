@@ -18,6 +18,7 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
   const [accessUrl, setAccessUrl] = useState<string | null>(null);
+  const [pin, setPin] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const readyAssignments = assignments.filter((assignment) => assignment.callSignId && assignment.driverId && assignment.vehicleId && assignment.status !== "cancelled");
@@ -45,6 +46,7 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
   function createAccess(formData: FormData) {
     setMessage(null);
     setAccessUrl(null);
+    setPin(null);
     const assignmentId = String(formData.get("assignmentId") || "");
     const assignment = assignments.find((item) => item.id === assignmentId);
 
@@ -67,10 +69,11 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
         return;
       }
 
-      const data = result.data as { accessUrl?: string };
+      const data = result.data as { accessUrl?: string; pin?: string };
       setAccessUrl(data.accessUrl || null);
+      setPin(data.pin || null);
       setTone("success");
-      setMessage("สร้าง QR สำเร็จ ส่งลิงก์นี้ให้คนขับเฉพาะงานนี้เท่านั้น");
+      setMessage("สร้าง QR สำเร็จ ส่ง QR และรหัสให้คนขับแยกช่องทางกัน");
     });
   }
 
@@ -118,6 +121,13 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
             {qrDataUrl ? <Image alt="QR สำหรับคนขับ" className="h-full w-full" height={220} src={qrDataUrl} unoptimized width={220} /> : <span className="text-sm font-semibold text-blue-900">กำลังสร้าง QR...</span>}
           </div>
           <div className="min-w-0">
+            {pin ? (
+              <div className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800">รหัสยืนยัน 6 หลัก</p>
+                <p className="mt-0.5 text-3xl font-bold tracking-[0.3em] text-amber-900">{pin}</p>
+                <p className="mt-1 text-[11px] leading-4 text-amber-700">บอกคนขับด้วยวาจา/โทร แยกจาก QR อย่าส่งพร้อมกัน</p>
+              </div>
+            ) : null}
             <p className="text-xs font-semibold text-blue-900">ลิงก์สำหรับคนขับ</p>
             <a className="mt-2 block break-all text-sm font-semibold text-blue-800 underline" href={accessUrl} target="_blank" rel="noreferrer">
               {accessUrl}

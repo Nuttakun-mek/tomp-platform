@@ -67,14 +67,6 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "ประสานงาน",
     items: [
       {
-        href: "/coordinator",
-        label: "งานที่ได้รับมอบหมาย",
-        description: "ยืนยันสถานะงานในพื้นที่",
-        icon: "UserRoundCheck",
-        help: "รายการงานที่ได้รับ ยืนยันรถถึง ผู้โดยสารขึ้นรถ และงานเสร็จ",
-        anyRole: ["coordinator"]
-      },
-      {
         href: "/portal",
         label: "พอร์ทัลผู้จัดงาน",
         description: "ภาพรวมและคำขอเปลี่ยนแปลง",
@@ -88,7 +80,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "องค์กร",
     items: [
       {
-        href: "/org/members",
+        href: "/superadmin/users",
         label: "ผู้ใช้และสิทธิ์",
         description: "จัดการสมาชิกและบทบาท",
         icon: "Users",

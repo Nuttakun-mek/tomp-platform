@@ -6,6 +6,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
 export interface DriverAccessAssignment {
   token: string;
+  tokenId: string;
+  pinRequired: boolean;
   project: Project;
   assignment: Assignment;
   callSign: CallSign;
@@ -67,7 +69,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
 
   const { data: tokenRow } = await client
     .from("driver_access_tokens")
-    .select("project_id, assignment_id, driver_id, status, expires_at")
+    .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata")
     .eq("token_hash", tokenHash)
     .eq("status", "active")
     .maybeSingle();
@@ -110,8 +112,12 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     getRouteChangesByAssignmentId(text(assignment, "id"))
   ]);
 
+  const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
+
   return {
     token,
+    tokenId: String(tokenRow.id),
+    pinRequired: typeof tokenMeta.pinHash === "string" && tokenMeta.pinHash.length > 0,
     tokenValidated: true,
     packet,
     notifications,
@@ -176,7 +182,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   if (!sql) return null;
 
   const tokenRows = await sql<Row[]>`
-    select project_id, assignment_id, driver_id, status, expires_at
+    select id, project_id, assignment_id, driver_id, status, expires_at, metadata
     from driver_access_tokens
     where token_hash = ${tokenHash}
       and status = 'active'
@@ -224,8 +230,11 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   });
 
   const packetPayload = packetRows[0]?.payload;
+  const pgTokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
 
   return {
+    tokenId: String(tokenRow.id),
+    pinRequired: typeof pgTokenMeta.pinHash === "string" && pgTokenMeta.pinHash.length > 0,
     token,
     tokenValidated: true,
     packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,
