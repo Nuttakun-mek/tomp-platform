@@ -14,6 +14,8 @@ import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exc
 import { RouteChangeConsole } from "@/components/mission-control/route-change-console";
 import { VehicleMonitorPanel } from "@/components/mission-control/vehicle-monitor-panel";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
+import { getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
+import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getDriverOperationSummaryByProjectId } from "@/lib/data/driver-operations";
 import { getLatestDriverLocationsByProjectId, getProjectIdWithLatestDriverLocation } from "@/lib/data/locations";
 import { getProjects } from "@/lib/data/projects";
@@ -51,12 +53,14 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     projects[0] ??
     demoProject;
 
-  const [events, locations, assignments, driverOperations, vehicleProfiles] = await Promise.all([
+  const [events, locations, assignments, driverOperations, vehicleProfiles, assignmentStatuses, callSigns] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
     getLatestDriverLocationsByProjectId(activeProject.id),
     getAssignmentsByProjectId(activeProject.id),
     getDriverOperationSummaryByProjectId(activeProject.id),
-    getVehicleOperationProfilesByProjectId(activeProject.id)
+    getVehicleOperationProfilesByProjectId(activeProject.id),
+    getLatestAssignmentStatuses(activeProject.id),
+    getCallSignsByProjectId(activeProject.id)
   ]);
 
   const locationAssignmentIds = new Set(locations.map((location) => location.assignmentId).filter(Boolean));
@@ -73,7 +77,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
         <div className="page-main">
           <LiveMapPanel projectId={activeProject.id} locations={locations} />
           <DriverOperationsPanel locations={locations} summary={driverOperations} />
-          <AssignmentMonitor assignments={assignments} locations={locations} />
+          <AssignmentMonitor assignments={assignments} locations={locations} statuses={assignmentStatuses} callSigns={callSigns} />
           <RiskAndExceptionPanel assignments={assignments} locations={locations} />
           <OperationTimelinePanel events={events} />
         </div>

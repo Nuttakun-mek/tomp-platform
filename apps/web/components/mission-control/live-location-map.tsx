@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
 import { formatStatusTh } from "@/lib/i18n/status-th";
+import { LiveTrackingMap, toTrackedPoint } from "@/components/mission-control/live-tracking-map";
 
 interface LiveLocationMapProps {
   projectId: string;
@@ -54,34 +55,12 @@ function getFreshnessClass(status: LocationFreshness) {
   return "border-rose-300 bg-rose-50 text-rose-900";
 }
 
-function getMarkerClass(status: LocationFreshness) {
-  if (status === "live") return "bg-emerald-500 ring-emerald-200";
-  if (status === "slow") return "bg-amber-500 ring-amber-200";
-  if (status === "stopped") return "bg-slate-500 ring-slate-200";
-  return "bg-rose-500 ring-rose-200";
-}
-
 function getAgeLabel(location: DriverLocation, now: number) {
   return formatRelativeTh(location.recordedAt, now);
 }
 
 function buildGoogleMapsUrl(location: DriverLocation) {
   return `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
-}
-
-function getMarkerPosition(location: DriverLocation, locations: DriverLocation[]) {
-  const latitudes = locations.map((item) => item.latitude);
-  const longitudes = locations.map((item) => item.longitude);
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLng = Math.min(...longitudes);
-  const maxLng = Math.max(...longitudes);
-  const latRange = Math.max(maxLat - minLat, 0.001);
-  const lngRange = Math.max(maxLng - minLng, 0.001);
-  return {
-    left: `${12 + ((location.longitude - minLng) / lngRange) * 76}%`,
-    top: `${12 + ((maxLat - location.latitude) / latRange) * 76}%`
-  };
 }
 
 function initialClock(locations: DriverLocation[]) {
@@ -96,9 +75,6 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
   const [lastError, setLastError] = useState<string | null>(null);
   const [now, setNow] = useState(() => initialClock(initialLocations));
   const [hydrated, setHydrated] = useState(false);
-  const latest = locations[0];
-  const latestLatitude = latest?.latitude;
-  const latestLongitude = latest?.longitude;
 
   useEffect(() => {
     let mounted = true;
@@ -146,15 +122,6 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
     };
   }, [projectId]);
 
-  const mapUrl = useMemo(() => {
-    const hasFix = typeof latestLatitude === "number" && typeof latestLongitude === "number";
-    const centerLatitude = latestLatitude ?? 13.7563;
-    const centerLongitude = latestLongitude ?? 100.5018;
-    const delta = 0.012;
-    const marker = hasFix ? `&marker=${centerLatitude}%2C${centerLongitude}` : "";
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${centerLongitude - delta}%2C${centerLatitude - delta}%2C${centerLongitude + delta}%2C${centerLatitude + delta}&layer=mapnik${marker}`;
-  }, [latestLatitude, latestLongitude]);
-
   const effectiveNow = now || initialClock(locations) || 0;
   const liveCount = hydrated ? locations.filter((location) => getFreshness(location, effectiveNow) === "live").length : 0;
   const issueCount = hydrated ? locations.filter((location) => ["slow", "offline", "stopped"].includes(getFreshness(location, effectiveNow))).length : 0;
@@ -180,33 +147,31 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
       </div>
 
       <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
-        <div className="min-h-[380px] bg-slate-100">
-          <div className="relative h-full min-h-[380px] overflow-hidden">
-            <iframe className="h-[380px] w-full border-0 opacity-80 lg:h-full lg:min-h-[500px]" loading="lazy" referrerPolicy="no-referrer" src={mapUrl} title="แผนที่ตำแหน่งคนขับ" />
-
-            {locations.map((location) => {
-              const status = hydrated ? getFreshness(location, effectiveNow) : "slow";
-              const identity = getLocationIdentity(location);
-              const position = getMarkerPosition(location, locations);
-              return (
-                <div key={location.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={position}>
-                  {status === "live" ? <span className="absolute inline-flex h-8 w-8 -translate-x-2 -translate-y-2 animate-ping rounded-full bg-emerald-400 opacity-60" /> : null}
-                  <a className={`relative flex h-4 w-4 rounded-full ring-8 ${getMarkerClass(status)}`} href={buildGoogleMapsUrl(location)} rel="noreferrer" target="_blank" title={`${identity.callSign} / ${identity.driverName}`} />
-                  <div className="absolute left-5 top-0 min-w-44 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs shadow-soft">
-                    <p className="font-semibold text-ink">{identity.callSign}</p>
-                    <p className="text-slate-600">{identity.vehiclePlate} / {identity.driverName}</p>
-                    <p className={`mt-1 inline-flex rounded-full border px-2 py-0.5 font-semibold ${getFreshnessClass(status)}`}>{getFreshnessLabel(status)}</p>
-                  </div>
-                </div>
-              );
-            })}
-            {!latest ? (
-              <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-slate-200 bg-white/95 p-4 text-sm shadow-soft">
+        <div className="relative min-h-[380px] bg-slate-100">
+          {hydrated && locations.length ? (
+            <LiveTrackingMap
+              height={480}
+              points={locations.map((location) => {
+                const identity = getLocationIdentity(location);
+                return toTrackedPoint(
+                  location,
+                  getFreshness(location, effectiveNow),
+                  identity.callSign,
+                  `${identity.vehiclePlate} / ${identity.driverName}`,
+                  getAgeLabel(location, effectiveNow)
+                );
+              })}
+            />
+          ) : (
+            <div className="flex h-full min-h-[380px] items-center justify-center p-6 text-center">
+              <div>
                 <p className="font-semibold text-ink">รอตำแหน่ง GPS จากคนขับ</p>
-                <p className="mt-1 leading-6 text-slate-600">เมื่อคนขับเปิด QR และกดแชร์ GPS หมุดรถจะแสดงบนแผนที่นี้พร้อมสีตามสถานะสัญญาณ</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  เมื่อคนขับเปิด QR และกดแชร์ GPS หมุดรถจะแสดงบนแผนที่นี้ พร้อมเส้นทางและสีตามสถานะสัญญาณ
+                </p>
               </div>
-            ) : null}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="grid content-start gap-3 border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">

@@ -1,84 +1,40 @@
-# TOMP Driver Mobile App
+# TOMP Driver (mobile)
 
-แอปนี้คือ MVP สำหรับคนขับบน Android และ iOS โดยใช้ React Native + Expo
+React Native / Expo app for drivers. Handles the full field flow **including
+background GPS** — location keeps streaming to the control centre with the screen
+off or the app backgrounded (web `/driver` cannot do this).
 
-## สถานะปัจจุบัน
+## What it does
+- Scan the job QR (or open the QR link — deep-links via `tompdriver://` scheme)
+- Send readiness, trip status (arrived / onboard / completed), report issues
+- Share GPS: foreground `watchPositionAsync` + **background** `startLocationUpdatesAsync`
+  with an Android foreground-service notification
+- Offline queue — actions are stored and retried when the signal returns
 
-ใช้งานได้สำหรับการทดสอบภายใน:
+All endpoints hit the same production API (`src/config.ts` → `TOMP_API_BASE_URL`,
+default `https://tomp-platform.vercel.app`): `/api/driver/assignment|readiness|status|issue|location`.
 
-- เปิดงานจาก QR/token
-- สแกน QR ด้วยกล้องในแอป
-- โหลด assignment packet จาก TOMP Web API
-- แสดง Call Sign, โครงการ, จุดรับ, จุดส่ง, เวลา และรถ
-- เปิด Google Maps
-- ส่งข้อมูลความพร้อม
-- ส่งสถานะงาน
-- แจ้งปัญหาไปศูนย์ควบคุม
-- แชร์ GPS แบบ foreground
-- เก็บ readiness/status/issue/location ไว้ส่งซ้ำเมื่อสัญญาณไม่พร้อม
-- เตรียม background location เมื่อระบบมือถือและ permission อนุญาต
-
-## วิธีรัน
-
-จาก root repository:
-
-```bash
+## Run locally (dev)
+```
+cd apps/mobile-driver
 npm install
-npm run dev:mobile
+npx expo start          # scan with Expo Go for foreground-only testing
 ```
+Background location needs a **dev client or a real build** (Expo Go can't run the
+background task). Use `npx expo run:android` / `npx expo run:ios` on a device.
 
-จากนั้นสแกน QR ของ Expo ด้วย Expo Go หรือกดเปิดบน Android/iOS simulator
-
-## Environment
-
-ค่าเริ่มต้นของ mobile app จะยิงไปที่ production:
-
-```bash
-EXPO_PUBLIC_TOMP_API_BASE_URL=https://tomp-platform.vercel.app
+## Build for distribution (EAS)
 ```
-
-ถ้าต้องการทดสอบกับเครื่อง local ให้ตั้งค่าเป็น URL ที่มือถือเข้าถึงได้ เช่น ngrok หรือ LAN URL:
-
-```bash
-EXPO_PUBLIC_TOMP_API_BASE_URL=https://your-tunnel-url.ngrok.app
-```
-
-## ข้อจำกัด
-
-- ยังไม่ได้ทำ App Store / Play Store build
-- ยังไม่ได้ทำ push notification จริง
-- ยังไม่ได้ทำ photo upload จากมือถือ
-- offline queue ยังเป็น MVP ขนาดเล็ก เก็บรายการล่าสุดไม่เกิน 20 รายการ
-- background location ขึ้นกับ policy ของ Android/iOS และต้องทดสอบบนเครื่องจริง
-- การ build สำหรับ Android/iOS ต้องใช้ EAS และบัญชี developer ของแต่ละ platform
-
-## Build สำหรับทดสอบบนเครื่องจริง
-
-ติดตั้ง EAS CLI:
-
-```bash
-npm install -g eas-cli
-```
-
-เข้าสู่ระบบ Expo:
-
-```bash
+npm i -g eas-cli
 eas login
+eas build --profile preview --platform android   # APK for side-loading / internal testing
+eas build --profile production --platform all     # store builds
 ```
+`eas.json` and `app.json` are already configured (bundle IDs `com.tomp.driver`,
+Android `ACCESS_BACKGROUND_LOCATION` + `FOREGROUND_SERVICE`, iOS
+`NSLocationAlwaysAndWhenInUseUsageDescription`). EAS `projectId` is set in
+`app.json` → `extra.eas.projectId`.
 
-สร้าง Android APK สำหรับ internal test:
-
-```bash
-cd apps/mobile-driver
-eas build -p android --profile preview
-```
-
-สร้าง development build:
-
-```bash
-cd apps/mobile-driver
-eas build -p android --profile development
-eas build -p ios --profile development
-```
-
-หมายเหตุ: background location ควรทดสอบด้วย development build หรือ production build บนเครื่องจริง ไม่ควรสรุปผลจาก Expo Go เพียงอย่างเดียว
+## Deep link
+`tompdriver://?token=<token>` opens the app straight into a job. The web
+`/driver` page shows an "เปิดในแอป" button that uses this while sharing GPS.

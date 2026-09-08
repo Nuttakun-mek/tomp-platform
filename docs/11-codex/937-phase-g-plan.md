@@ -9,7 +9,13 @@
 - ✅ G3 (บางส่วน) กรอง `placeholder`/`demo` locations + marker pin บน OSM
 - ✅ G2 (บางส่วน) `/api/driver/updates` + poll 15 วิ ในหน้าคนขับ → ข้อความจากศูนย์เด้งเอง · ปุ่ม "ข้อความ" ส่งหาศูนย์ · ไฟสถานะ GPS · ปุ่มสื่อสาร 3 ปุ่มแถวเดียว
 
-## รอบถัดไป
+## รอบที่ 2 (deployed) — เสร็จ
+- ✅ **แผนที่ Leaflet จริง** (`<LiveTrackingMap>`) — หมุด circleMarker ต่อคนขับ · สีตามความสด · เส้นทาง polyline (เก็บ 30 จุดล่าสุดต่อคน) · popup · auto-fit bounds · อัปเดตทุก 7 วิ · แทน OSM iframe + overlay markers เดิม (ที่หมุดไม่ตรงตำแหน่ง)
+- ✅ **G1** `getLatestAssignmentStatuses()` อ่านจาก `assignment_status_updates` → `<AssignmentMonitor>` แสดง "● <สถานะ> · แจ้งโดยคนขับ N นาทีที่แล้ว" + Call Sign แทน UUID ดิบ
+- ✅ **G5** checklist ก่อนรับงาน 4 ช่อง (ชื่อ/เบอร์/รถ/GPS) — collapsible, soft (กด "พร้อมรับงาน" ได้แม้ยังไม่ครบ แต่ปุ่มบอก "ยังตรวจไม่ครบ")
+- ✅ **G7** พบว่า `apps/mobile-driver` (Expo) **ทำเสร็จแล้ว** — background location + foreground service + offline queue + QR scan + deep link ครบ · แค่ต้อง EAS build + ติดตั้ง (ดู `apps/mobile-driver/README.md`) · เพิ่มปุ่ม "เปิดในแอป TOMP Driver" ในหน้าคนขับ (deep link `tompdriver://`)
+
+## รอบถัดไป (ถ้ามี)
 
 **Goal:** สิ่งที่คนขับส่ง (สถานะ, ตำแหน่ง) ขึ้นศูนย์ควบคุมจริง · ข้อความจากศูนย์ถึงคนขับ · หน้าคนขับ 1 หน้าจอไม่ต้อง scroll · vehicle detail ไม่ 404
 

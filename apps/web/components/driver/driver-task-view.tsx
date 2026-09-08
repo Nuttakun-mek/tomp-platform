@@ -52,6 +52,9 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   const [messageOpen, setMessageOpen] = useState(false);
   const [notifications, setNotifications] = useState<DriverNotification[]>(driverAccess.notifications);
   const [gpsLight, setGpsLight] = useState<"off" | "live" | "stale">("off");
+  const [checkOpen, setCheckOpen] = useState(false);
+  const [checks, setChecks] = useState({ name: false, phone: false, vehicle: false, gps: false });
+  const allChecked = checks.name && checks.phone && checks.vehicle && checks.gps;
 
   const ids = {
     projectId: driverAccess.project.id,
@@ -93,11 +96,11 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       const result = await driverCheckinAction({
         ...ids,
         status: "ready",
-        confirmedName: true,
-        confirmedPhone: true,
-        confirmedVehicle: true,
-        gpsConsent: true,
-        metadata: { via: "driver_task_view" }
+        confirmedName: checks.name || allChecked,
+        confirmedPhone: checks.phone || allChecked,
+        confirmedVehicle: checks.vehicle || allChecked,
+        gpsConsent: checks.gps || allChecked,
+        metadata: { via: "driver_task_view", checklistComplete: allChecked }
       });
       if (result.success) {
         setPhase("ready");
@@ -217,15 +220,49 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       {/* primary action */}
       <section className="smart-card grid gap-3">
         {phase === "assigned" ? (
-          <button
-            type="button"
-            onClick={markReady}
-            disabled={primaryDisabled}
-            className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-operation px-4 text-[16px] font-bold text-white disabled:opacity-60"
-          >
-            <CheckCircle2 className="h-5 w-5" />
-            {isPending ? "กำลังบันทึก..." : "พร้อมรับงาน"}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setCheckOpen((v) => !v)}
+              className={`flex items-center justify-between rounded-card border px-3 py-2 text-[13px] font-semibold ${
+                allChecked ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-amber-300 bg-amber-50 text-amber-800"
+              }`}
+            >
+              {allChecked ? "ตรวจก่อนรับงาน ครบแล้ว" : `ตรวจก่อนรับงาน (${Object.values(checks).filter(Boolean).length}/4)`}
+              <ChevronDown className={`h-4 w-4 transition ${checkOpen ? "rotate-180" : ""}`} />
+            </button>
+            {checkOpen ? (
+              <div className="grid gap-1.5">
+                {(
+                  [
+                    ["name", "ยืนยันชื่อคนขับถูกต้อง"],
+                    ["phone", "ยืนยันเบอร์โทรถูกต้อง"],
+                    ["vehicle", "ยืนยันรถที่ได้รับมอบหมาย"],
+                    ["gps", "ยินยอมเปิด GPS ระหว่างปฏิบัติงาน"]
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2.5 rounded-card border border-border bg-white px-3 py-2 text-[13px]">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-teal-700"
+                      checked={checks[key]}
+                      onChange={(e) => setChecks((c) => ({ ...c, [key]: e.target.checked }))}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={markReady}
+              disabled={primaryDisabled}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-operation px-4 text-[16px] font-bold text-white disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-5 w-5" />
+              {isPending ? "กำลังบันทึก..." : allChecked ? "พร้อมรับงาน" : "พร้อมรับงาน (ยังตรวจไม่ครบ)"}
+            </button>
+          </>
         ) : null}
 
         {phase === "ready" ? (
@@ -248,6 +285,12 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
 
         {phase === "sharing" ? (
           <div className="grid gap-3">
+            <a
+              href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
+              className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
+            >
+              เปิดในแอป TOMP Driver — แชร์ GPS ต่อเนื่องแม้ปิดจอ
+            </a>
             <DriverLocationShare driverAccess={driverAccess} />
             <div className="grid gap-2">
               <p className="text-[12px] font-semibold text-ink-soft">อัปเดตสถานะการเดินทาง</p>
