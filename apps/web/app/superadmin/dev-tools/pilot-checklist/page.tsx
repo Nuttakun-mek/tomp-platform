@@ -1,4 +1,3 @@
-import { PermissionGate } from "@/components/auth/permission-gate";
 import { PilotRoleCard } from "@/components/pilot/pilot-role-card";
 import { PilotScenarioBoard } from "@/components/pilot/pilot-scenario-board";
 import { PilotStepper } from "@/components/pilot/pilot-stepper";
@@ -19,14 +18,14 @@ export default async function PilotChecklistPage() {
     { title: "จัดสรรรถและคนขับ", detail: "เชื่อมภารกิจ Call Sign คนขับ รถ และช่วงเวลา", href: assignmentsHref },
     { title: "สร้าง QR", detail: "สร้างลิงก์เข้าหน้างานสำหรับคนขับแบบ assignment-scoped", href: assignmentsHref },
     { title: "คนขับยืนยันความพร้อม", detail: "เปิดหน้าคนขับ ยืนยันข้อมูล และพร้อมเริ่มงาน", href: "/driver" },
-    { title: "แชร์ GPS", detail: "คนขับกดเริ่มแชร์ตำแหน่งจาก web app", href: "/live-test" },
+    { title: "แชร์ GPS", detail: "คนขับกดเริ่มแชร์ตำแหน่งจาก web app", href: "/superadmin/dev-tools/live-test" },
     { title: "ศูนย์ควบคุมติดตามสถานะ", detail: "ดูหมุด สีสัญญาณ ความเสี่ยง และรายการที่ต้องติดตาม", href: `/mission-control?projectId=${activeProject.id}` },
     { title: "ตรวจ Timeline", detail: "ยืนยันว่าลำดับเหตุการณ์สำคัญถูกบันทึก", href: `/mission-control?projectId=${activeProject.id}` },
-    { title: "สรุปข้อสังเกต", detail: "บันทึกสิ่งที่ต้องแก้ก่อน pilot รอบถัดไป", href: "/pilot-checklist" }
+    { title: "สรุปข้อสังเกต", detail: "บันทึกสิ่งที่ต้องแก้ก่อน pilot รอบถัดไป", href: "/superadmin/dev-tools/pilot-checklist" }
   ];
 
   return (
-    <PermissionGate anyRole={["super_admin"]}>
+    <>
       <PilotScenarioBoard projectCode={activeProject.projectCode} />
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <PilotStepper steps={steps} />
@@ -37,6 +36,6 @@ export default async function PilotChecklistPage() {
           <PilotTestResultPanel />
         </aside>
       </div>
-    </PermissionGate>
+    </>
   );
 }

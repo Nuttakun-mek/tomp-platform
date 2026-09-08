@@ -7,12 +7,12 @@ const runbookItems = [
   {
     title: "ตรวจข้อมูล Pilot",
     detail: "ใช้ Data Quality เพื่อตรวจชื่อเพี้ยน, Assignment ไม่ครบ, QR และ GPS ก่อนส่งให้ทีมทดสอบ",
-    href: "/admin/data-quality"
+    href: "/superadmin/dev-tools/data-quality"
   },
   {
     title: "สร้างชุดทดสอบ GPS",
     detail: "ใช้ Live Test เพื่อสร้าง Assignment + QR + Driver link สำหรับทดสอบตำแหน่งจริง",
-    href: "/live-test"
+    href: "/superadmin/dev-tools/live-test"
   },
   {
     title: "ติดตามศูนย์ควบคุม",

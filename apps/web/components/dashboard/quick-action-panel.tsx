@@ -4,7 +4,7 @@ const actions = [
   { href: "/mission-control", label: "เปิดศูนย์ควบคุม", detail: "ดูแผนที่ สถานะ GPS และความเสี่ยง" },
   { href: "/projects/new", label: "สร้างโครงการ", detail: "เริ่มพื้นที่ปฏิบัติการใหม่" },
   { href: "/assignments", label: "จัดสรร Assignment", detail: "เลือก Call Sign คนขับ และรถให้ครบ" },
-  { href: "/live-test", label: "ทดสอบ QR และ GPS", detail: "เส้นทางทดสอบระบบแบบจบขั้นตอน" }
+  { href: "/resources", label: "ตรวจทรัพยากร", detail: "ดูความพร้อมคนขับและรถ" }
 ];
 
 export function QuickActionPanel() {

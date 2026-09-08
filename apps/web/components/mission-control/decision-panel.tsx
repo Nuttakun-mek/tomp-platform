@@ -9,8 +9,8 @@ export function DecisionPanel({ projectId, followUps }: { projectId: string; fol
         <Link className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950" href={`/projects/${projectId}/assignments`}>
           ตรวจบอร์ด Assignment
         </Link>
-        <Link className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white" href="/live-test">
-          ทดสอบ QR และ GPS
+        <Link className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white" href={`/projects/${projectId}`}>
+          เปิดพื้นที่โครงการ
         </Link>
       </div>
       <p className="mt-4 text-sm leading-6 text-slate-300">

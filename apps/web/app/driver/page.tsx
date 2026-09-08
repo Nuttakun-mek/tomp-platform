@@ -24,9 +24,6 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
         <section className="mx-auto grid max-w-2xl gap-4 rounded-[24px] border border-red-200 bg-red-50 p-5 text-sm font-medium leading-7 text-red-900 shadow-soft">
           <p>ไม่พบงานที่ผูกกับ QR นี้ หรือ QR หมดอายุแล้ว กรุณาติดต่อศูนย์ควบคุมเพื่อขอ QR ใหม่</p>
           <div className="flex flex-wrap gap-3">
-            <Link className="rounded-2xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white" href="/live-test">
-              สร้าง QR ทดสอบใหม่
-            </Link>
             <Link className="rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-800" href="/mission-control">
               กลับศูนย์ควบคุม
             </Link>

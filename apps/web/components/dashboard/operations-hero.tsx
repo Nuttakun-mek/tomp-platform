@@ -23,9 +23,9 @@ export function OperationsHero({ projectCount, assignmentCount, gpsCount, follow
               เปิดศูนย์ควบคุม
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link className="inline-flex min-h-11 items-center gap-2 rounded-panel border border-white/18 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15" href="/live-test">
+            <Link className="inline-flex min-h-11 items-center gap-2 rounded-panel border border-white/18 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15" href="/projects">
               <RadioTower className="h-4 w-4" />
-              ทดสอบ QR และ GPS
+              ดูโครงการทั้งหมด
             </Link>
           </div>
 

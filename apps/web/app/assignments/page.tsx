@@ -29,18 +29,10 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
     <div className="grid gap-5">
       <section className="enterprise-panel overflow-hidden">
         <div className="enterprise-surface p-5 lg:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="section-label">บอร์ด Assignment</p>
-              <h1 className="page-title mt-2">{activeProject?.projectName || "เลือกโครงการเพื่อจัดสรรงาน"}</h1>
-              <p className="page-description mt-2.5">เลือกโครงการให้ถูกต้องก่อนสร้าง Assignment และ QR สำหรับคนขับ</p>
-            </div>
-            <Link
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-panel bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-operation-deep"
-              href="/live-test"
-            >
-              ทดสอบระบบจบขั้นตอน
-            </Link>
+          <div className="min-w-0">
+            <p className="section-label">บอร์ด Assignment</p>
+            <h1 className="page-title mt-2">{activeProject?.projectName || "เลือกโครงการเพื่อจัดสรรงาน"}</h1>
+            <p className="page-description mt-2.5">เลือกโครงการให้ถูกต้องก่อนสร้าง Assignment และ QR สำหรับคนขับ</p>
           </div>
           {projects.length > 1 ? (
             <div className="mt-4 flex flex-wrap gap-2">
