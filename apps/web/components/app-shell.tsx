@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { AppNav } from "@/components/app-nav";
 import { AuthStatus } from "@/components/auth/auth-status";
@@ -5,12 +6,24 @@ import { RoleBadge } from "@/components/auth/role-badge";
 import { BuildVersionBadge } from "@/components/layout/build-version-badge";
 import { EnvironmentBadge } from "@/components/layout/environment-badge";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
+import { ProjectScopePill } from "@/components/workspace/project-scope-pill";
 import { getViewerAccess } from "@/lib/auth/access";
 import { NAV_SECTIONS, filterNav } from "@/lib/auth/nav-model";
+import { getProjects } from "@/lib/data/projects";
+import { SCOPE_COOKIE, resolveActiveScope } from "@/lib/workspace/scope";
 
 export async function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const { permissions, roleKeys, primaryRole } = await getViewerAccess();
   const sections = filterNav(NAV_SECTIONS, { permissions, roleKeys });
+
+  const projects = (await getProjects()).map((project) => ({
+    id: project.id,
+    projectCode: project.projectCode,
+    projectName: project.projectName,
+    status: project.status
+  }));
+  const cookieStore = await cookies();
+  const activeScope = resolveActiveScope(projects, cookieStore.get(SCOPE_COOKIE)?.value);
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
@@ -38,6 +51,10 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
                 </div>
               </div>
             </Link>
+
+            <div className="mt-4">
+              <ProjectScopePill projects={projects} activeId={activeScope?.id ?? null} variant="dark" />
+            </div>
 
             <div className="mt-5 flex-1">
               <AppNav sections={sections} />
@@ -68,6 +85,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
                   <BuildVersionBadge compact />
                 </div>
               </div>
+              <ProjectScopePill projects={projects} activeId={activeScope?.id ?? null} variant="light" />
               <AppNav sections={sections} />
             </div>
           </header>
