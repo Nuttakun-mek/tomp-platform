@@ -60,9 +60,25 @@ export async function getUserProjectMemberships(profileId: string): Promise<Arra
 
 export async function getUserRoles(profileId: string, projectId?: string): Promise<string[]> {
   if (profileId.startsWith("development")) return ["project_manager"];
+  const supabase = getSupabaseServerDataClient();
+  const globalRoles: string[] = [];
+  if (supabase) {
+    const { data } = await supabase
+      .from("user_role_assignments")
+      .select("roles(role_key)")
+      .eq("profile_id", profileId)
+      .eq("status", "active")
+      .is("project_id", null);
+
+    for (const row of data || []) {
+      const roles = row.roles as { role_key?: string } | { role_key?: string }[] | null;
+      const roleKey = Array.isArray(roles) ? roles[0]?.role_key : roles?.role_key;
+      if (roleKey) globalRoles.push(roleKey);
+    }
+  }
   const memberships = await getUserProjectMemberships(profileId);
   const scoped = projectId ? memberships.filter((membership) => membership.projectId === projectId) : memberships;
-  return scoped.map((membership) => membership.roleKey);
+  return [...new Set([...globalRoles, ...scoped.map((membership) => membership.roleKey)])];
 }
 
 async function currentProfileId(): Promise<string> {

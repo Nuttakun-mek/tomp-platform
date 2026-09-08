@@ -8,27 +8,27 @@ import { WorkspaceShell } from "@/components/layout/workspace-shell";
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="min-h-screen bg-canvas text-ink">
-      <div className="grid min-h-screen lg:grid-cols-[272px_minmax(0,1fr)]">
+      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="command-panel-dark hidden text-white lg:block">
           <div className="sticky top-0 flex h-screen flex-col overflow-y-auto border-r border-white/10 px-4 py-5">
-            <Link href="/" className="group block rounded-panel border border-white/10 bg-white/[0.08] p-4 shadow-command transition hover:bg-white/[0.12]">
-              <div className="flex items-start justify-between gap-2">
+            <Link href="/" className="group block rounded-[26px] border border-white/10 bg-white/[0.08] p-4 shadow-command transition hover:bg-white/[0.12]">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold tracking-[0.32em] text-teal-200">TOMP</p>
-                  <h1 className="mt-2.5 text-[19px] font-semibold leading-6 text-white">ศูนย์ควบคุมขนส่ง</h1>
+                  <h1 className="mt-2.5 text-[20px] font-semibold leading-7 text-white">ศูนย์ปฏิบัติการขนส่ง</h1>
                   <p className="mt-2 text-[12px] leading-6 text-slate-300">
-                    วางแผน มอบงาน ติดตาม GPS และควบคุมการปฏิบัติการจากภาพเดียว
+                    วางแผน มอบหมายงาน ติดตาม GPS และควบคุมการปฏิบัติการจากพื้นที่เดียว
                   </p>
                 </div>
-                <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-300 px-2.5 py-1 text-[10px] font-bold tracking-wide text-amber-950">PILOT</span>
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-teal-300 px-2.5 py-1 text-[10px] font-bold tracking-wide text-teal-950">LIVE</span>
               </div>
 
               <div className="mt-4 rounded-[18px] border border-white/10 bg-slate-950/40 p-3">
                 <p className="text-[11px] font-semibold text-slate-400">พื้นที่ทำงาน</p>
-                <p className="mt-1 text-sm font-semibold text-white">ปฏิบัติการทดสอบภายใน</p>
+                <p className="mt-1 text-sm font-semibold text-white">Internal Operations</p>
                 <div className="mt-2 flex items-center gap-2 text-[12px] font-medium text-emerald-200">
                   <span className="status-pulse status-pulse-live h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                  พร้อมทดสอบ QR และ GPS สด
+                  พร้อมติดตามงานและตำแหน่งตามสิทธิ์
                 </div>
               </div>
             </Link>
@@ -42,7 +42,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
               <BuildVersionBadge />
               <AuthStatus />
               <p className="text-[11px] leading-5 text-slate-400">
-                ใช้ตำแหน่งเพื่อควบคุมงานตามความยินยอมของคนขับเท่านั้น ไม่ใช่ระบบติดตามส่วนบุคคลนอกเวลางาน
+                ใช้ตำแหน่งเพื่อควบคุมงานตามความยินยอมของคนขับเท่านั้น ไม่ใช่ระบบติดตามนอกเวลาปฏิบัติงาน
               </p>
             </div>
           </div>
@@ -54,7 +54,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
               <div className="flex items-center justify-between gap-3">
                 <Link href="/" className="min-w-0">
                   <p className="text-[11px] font-bold tracking-[0.28em] text-operation">TOMP</p>
-                  <p className="truncate text-base font-semibold text-ink">ศูนย์ควบคุมขนส่ง</p>
+                  <p className="truncate text-base font-semibold text-ink">ศูนย์ปฏิบัติการขนส่ง</p>
                 </Link>
                 <div className="grid justify-items-end gap-1">
                   <EnvironmentBadge />

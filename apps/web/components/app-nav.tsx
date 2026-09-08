@@ -8,22 +8,22 @@ import { Tooltip } from "@/components/ui/tooltip";
 
 const navSections = [
   {
-    title: "ปฏิบัติการ",
+    title: "ใช้งานจริง",
     items: [
-      { href: "/", label: "ภาพรวม", description: "สถานะรวมวันนี้", icon: Gauge, help: "ดูภาพรวมโครงการ งานที่จัดสรร ความพร้อม GPS และรายการที่ต้องติดตาม" },
-      { href: "/mission-control", label: "ศูนย์ควบคุม", description: "แผนที่ รถ งาน ความเสี่ยง", icon: MapPinned, help: "หน้าหลักสำหรับติดตามรถหลายคันบนแผนที่ ดูสถานะ GPS งาน และข้อความจากคนขับ" },
-      { href: "/projects", label: "โครงการ", description: "วางแผนและควบคุมงาน", icon: FolderKanban, help: "โครงการคือพื้นที่หลักสำหรับรวมภารกิจ Assignment คนขับ รถ QR และ Timeline" },
+      { href: "/", label: "ภาพรวม", description: "สถานะรวมวันนี้", icon: Gauge, help: "ดูภาพรวมโครงการ งานที่จัดสรร GPS ล่าสุด และรายการที่ต้องติดตาม" },
+      { href: "/mission-control", label: "ศูนย์ควบคุม", description: "แผนที่ รถ งาน ความเสี่ยง", icon: MapPinned, help: "ติดตามรถหลายคันบนแผนที่ ดูสถานะงาน GPS ข้อความจากคนขับ และรายการเสี่ยง" },
+      { href: "/projects", label: "โครงการ", description: "สร้างและจัดการพื้นที่ปฏิบัติการ", icon: FolderKanban, help: "โครงการคือพื้นที่หลักสำหรับรวมภารกิจ งานที่จัดสรร คนขับ รถ QR และ Timeline" },
       { href: "/assignments", label: "บอร์ด Assignment", description: "มอบงานให้รถและคนขับ", icon: ClipboardList, help: "จัดสรรงานให้ Call Sign คนขับ และรถ พร้อมสร้าง QR เฉพาะงาน" },
       { href: "/resources/vehicles", label: "จัดการรถ", description: "โปรไฟล์รถและคิวงาน", icon: CarFront, help: "ดูรถแต่ละคัน งานปัจจุบัน งานคงเหลือ งานที่เสร็จแล้ว และ GPS ล่าสุด" },
-      { href: "/driver", label: "หน้าคนขับ", description: "เปิดงานผ่าน QR", icon: UserRoundCheck, help: "หน้าสำหรับคนขับดูงาน ยืนยันความพร้อม และแชร์ GPS" }
+      { href: "/driver", label: "หน้าคนขับ", description: "เปิดงานผ่าน QR", icon: UserRoundCheck, help: "หน้าสำหรับคนขับดูงาน ยืนยันความพร้อม แชร์ GPS และแจ้งปัญหา" }
     ]
   },
   {
-    title: "ทดสอบและผู้ดูแล",
+    title: "ตรวจระบบ",
     items: [
-      { href: "/live-test", label: "ทดสอบระบบ", description: "QR และ GPS สด", icon: Activity, help: "ใช้สำหรับทดสอบ flow จริงแบบ end-to-end เท่านั้น" },
-      { href: "/login", label: "เข้าสู่ระบบ", description: "บัญชีและสิทธิ์", icon: LockKeyhole, help: "เข้าสู่ระบบด้วยบัญชีที่เปิดใช้งานไว้ใน Supabase Auth" },
-      { href: "/admin", label: "ผู้ดูแลระบบ", description: "สุขภาพระบบ", icon: Settings, help: "ตรวจระบบ ฐานข้อมูล สิทธิ์ และ runbook สำหรับผู้ดูแล" }
+      { href: "/live-test", label: "ทดสอบระบบ", description: "QR และ GPS สด", icon: Activity, help: "ใช้ทดสอบ flow แบบ end-to-end เท่านั้น แยกจากงานจริงเพื่อลดความสับสน" },
+      { href: "/admin", label: "ผู้ดูแลระบบ", description: "สุขภาพระบบและข้อมูล", icon: Settings, help: "ตรวจฐานข้อมูล สิทธิ์ ข้อมูลผิดปกติ และ runbook สำหรับผู้ดูแล" },
+      { href: "/login", label: "เข้าสู่ระบบ", description: "บัญชีและสิทธิ์", icon: LockKeyhole, help: "เข้าสู่ระบบด้วยบัญชีที่เปิดใช้งานไว้ใน Supabase Auth" }
     ]
   }
 ];
