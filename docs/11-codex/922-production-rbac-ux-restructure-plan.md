@@ -52,10 +52,11 @@
 ```
 เปิดเว็บ https://<app>
   ├─ ไม่มี session → /login  (แบรนด์ + email/Google, ไม่ใช่ marketing page)
-  ├─ /auth/callback → exchange code → resolve profile + roles
+  ├─ /auth/callback → exchange code → resolve/link profile + roles (ดู §2.4b)
+  │     ├─ มี profile (auth_user_id ตรง) → redirect ตาม primary role (§2.4)
+  │     ├─ มี profile ที่ email ตรง + auth_user_id ว่าง (invited) → auto-link → redirect
   │     ├─ ไม่มี profile และ DB profiles ว่าง → bootstrap super_admin (มีแล้ว)
-  │     ├─ ไม่มี profile และ DB มี profile อื่น → /no-access  (แจ้ง admin ให้เพิ่มสิทธิ์)
-  │     └─ มี profile → redirect ตาม "primary role" (ดู §2.4)
+  │     └─ ไม่มี profile และ DB มี profile อื่น → /no-access
   └─ /driver, /driver/[token], /api/driver/*  → public (QR flow, ไม่แตะ)
 ```
 
@@ -79,26 +80,27 @@
 └─────────────┴──────────────────────────────────────────┘
 ```
 
-- **Workspace/scope switcher** (บนสุด sidebar): เลือก organization (สำหรับ multi-org) และ/หรือ project scope; จำ context ล่าสุดใน cookie
+- **Project scope switcher** (บนสุด sidebar): เลือก project scope ปัจจุบัน; จำ context ล่าสุดใน cookie. **Org switcher = backlog** (phase นี้มี org เดียวจาก bootstrap — decision #1)
 - **Nav = permission-filtered**: เมนูที่ไม่มี permission → **ไม่ render** (ไม่ใช่ render แล้ว 403)
 - ลบ `AuthGate` (middleware พอแล้ว) — เหลือ server-side guard อย่างเดียว ลด flash
 
 ### 2.3 Nav model (core, ทุก workspace ใช้ shell เดียว)
 
-| กลุ่ม | เมนู | permission ที่ต้องมี | route |
+**คง route path เดิมไว้** (decision #2) — ไม่ rename `/mission-control`, `/assignments`. เหตุผล: `missionControlUrl: /mission-control?projectId=...` ถูก generate + ส่งกลับ client + อาจเก็บใน metadata แล้ว; rename = ต้อง migrate data + permanent redirect; ประโยชน์ด้านความชัดเจนของ URL operator ภายในน้อย. จัดกลุ่ม nav ใหม่ + redirect หลัง login พอ.
+
+| กลุ่ม | เมนู | permission ที่ต้องมี | route (เดิม) |
 |---|---|---|---|
 | **ปฏิบัติการ** | ภาพรวม | (login) | `/` |
-| | ศูนย์ควบคุม | `assignment.read` (project ใดก็ได้) | `/operations` (rename จาก `/mission-control`) |
-| | บอร์ด Assignment | `assignment.read` | `/dispatch` (rename จาก `/assignments`) |
+| | ศูนย์ควบคุม | `assignment.read` (project ใดก็ได้) | `/mission-control` |
+| | บอร์ด Assignment | `assignment.read` | `/assignments` |
 | **วางแผน** | โครงการ | `project.read` | `/projects` |
 | | ทรัพยากร (คนขับ/รถ) | `driver.read` \|\| `vehicle.read` | `/resources` |
 | **ประสานงาน** | งานที่ได้รับมอบหมาย | role `coordinator` | `/coordinator` |
 | | คำขอเปลี่ยนแปลง | `change.create` \|\| role `organizer` | `/changes` |
 | **องค์กร** | ผู้ใช้ & สิทธิ์ | `admin.manage_users` | `/org/members` |
-| | ตั้งค่าองค์กร | role `organization_admin`+ | `/org/settings` |
 | **ระบบ** (เฉพาะ super_admin) | Superadmin | role `super_admin` | `/superadmin` |
 
-> หมายเหตุ: การ rename route (`/mission-control`→`/operations`, `/assignments`→`/dispatch`) เป็น optional — ทำได้ใน phase หลังพร้อม redirect เก่า; ถ้าเสี่ยงเกินให้คงชื่อเดิม
+> เอาแค่ `/portal` เพิ่มเป็น route ใหม่จริง (organizer/customer read-only — decision #3 ทำใน scope นี้); `/coordinator`, `/vendor`, `/changes`, `/org/members` = route ใหม่ที่ทำเป็น v1 ตาม phase
 
 ### 2.4 Role → primary workspace (post-login redirect)
 
@@ -106,15 +108,37 @@
 |---|---|---|
 | `super_admin` | `/` (portfolio) พร้อมแบนเนอร์ลิงก์ `/superadmin` | เห็นทุกอย่าง |
 | `organization_admin` | `/` | ภาพรวม org |
-| `operation_manager` | `/operations` | command center |
+| `operation_manager` | `/mission-control` | command center |
 | `project_manager` / `planner` | `/projects` | เริ่มจากวางแผน |
-| `dispatcher` | `/dispatch` | บอร์ดจัดสรร |
+| `dispatcher` | `/assignments` | บอร์ดจัดสรร |
 | `coordinator` | `/coordinator` | scope งานตัวเอง |
 | `organizer` / `customer_viewer` | `/portal` | read-only + change request |
 | `vendor` | `/vendor` | คนขับ/รถของตัวเอง |
 | ไม่มี role | `/no-access` | |
 
 หน้า `/` (ภาพรวม) ปรับ card/section ตาม permission — ไม่ redirect ซ้ำ ให้เป็น home ที่ทุก role เปิดได้แต่เห็นต่างกัน
+
+### 2.4b Invite / เพิ่มผู้ใช้ใหม่ (decision #5)
+
+**เลือก: pre-provision + auto-link ตอน login** (ต่อยอดจาก `bootstrapFirstProfileIfEmpty` ที่มีอยู่)
+
+```
+1. admin ที่ /superadmin/users → "เพิ่มผู้ใช้"
+     กรอก: email · ชื่อ · organization · role (global/org) และ/หรือ project + role ต่อ project
+2. ระบบสร้าง profiles (auth_user_id = NULL, status = 'invited')
+     + user_role_assignments / project_members ตามที่เลือก
+3. คนนั้นเปิด /login → login ด้วย email เดียวกัน (magic link หรือ Google)
+4. /auth/callback:
+     - เจอ profiles ที่ email ตรง และ auth_user_id เป็น NULL
+       → UPDATE auth_user_id, status = 'active'  (auto-link)
+       → ได้ role ที่ admin ตั้งไว้ทันที
+     - เจอ profiles ที่ auth_user_id ตรงแล้ว → login ปกติ
+     - ไม่เจอ profiles และ DB profiles ว่าง → bootstrap super_admin (เดิม)
+     - ไม่เจอ profiles และ DB มี profile อื่น → /no-access
+```
+
+ไม่ต้องใช้ Supabase admin invite API / email template แยก — ใช้ Supabase Auth ปกติ + จับคู่ด้วย email. admin ควบคุมสิทธิ์ล่วงหน้าได้เต็มที่.
+ความเสี่ยง: email ที่ admin กรอกต้องตรงกับ email ที่ login เป๊ะ — UI ควรเตือน + admin แก้ profile ที่ยัง `invited` ได้
 
 ### 2.5 RBAC model — source of truth
 
@@ -224,22 +248,25 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 12. `/superadmin/users` (v1: list + assign role) — ปลดล็อกให้ไม่ต้องยิง SQL
 13. `/superadmin/dev-tools` landing
 
+10b. `/auth/callback` → auto-link profile ที่ `status='invited'` ด้วย email (§2.4b)
+12b. `/superadmin/users` → ฟอร์ม "เพิ่มผู้ใช้" (pre-provision profile + role)
+
 ### Phase 3 — Data scoping (RLS) (กระทบสูงสุด — ต้องมี RLS test ผ่านก่อน)
-14. `getScopedDataClient()` + เปลี่ยน `lib/data/*` read functions
-15. migration `0019_rbac_rls_v2.sql` (super_admin bypass, org-scope, resource tables)
-16. แก้ create-project ให้สร้าง `project_members`
-17. แก้ `requirePermission` + ลบ escape hatch
-18. RLS test suite ผ่านครบ
+14. migration `0019_rbac_rls_v2.sql` **ก่อน** (super_admin `is_super_admin()` bypass, org-scope, drop `sprint2_*` ที่เหลือ, resource tables) — ทดสอบ RLS ผ่านก่อน
+15. `getScopedDataClient()` + เปลี่ยน `lib/data/*` read functions (หลัง flag `TOMP_SCOPED_READS=1`)
+16. แก้ create-project ให้สร้าง `project_members` + set `owner_profile_id`
+17. แก้ `requirePermission` + ลบ escape hatch `mode !== "service_role"`
+18. RLS test suite ผ่านครบ → เปิด flag ทีละ env
 
-### Phase 4 — Workspace UX (กระทบ: layout ของ page)
-19. `/operations`, `/dispatch` (rename + redirect)
-20. `/portal` (organizer/customer read-only v1)
+### Phase 4 — Workspace UX (กระทบ: nav grouping + home)
+19. จัดกลุ่ม nav ใหม่ (§2.3) — คง route path เดิม
+20. `/portal` (organizer/customer read-only v1 — decision #3)
 21. home `/` ปรับ section ตาม permission
-22. `<WorkspaceSwitcher>` + scope cookie
+22. `<ProjectScopeSwitcher>` + scope cookie
 
-### Phase 5 — Superadmin depth (backlog)
+### Phase 5 — Superadmin depth + workspace เต็ม (backlog)
 23. `/superadmin/roles` matrix editor · `/organizations` · `/projects` · `/audit`
-24. `/coordinator`, `/vendor` เต็มรูปแบบ
+24. `/coordinator`, `/vendor`, `/changes` เต็มรูปแบบ
 
 ---
 
@@ -247,7 +274,7 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 
 | ความเสี่ยง | บรรเทา |
 |---|---|
-| เปลี่ยน data layer เป็น RLS แล้ว **super_admin มองไม่เห็นอะไร** | ต้องมี `is_super_admin()` bypass **ก่อน** เปลี่ยน data client (Phase 3 ลำดับ 15 ก่อน 14) |
+| เปลี่ยน data layer เป็น RLS แล้ว **super_admin มองไม่เห็นอะไร** | migration `0019` (`is_super_admin()` bypass) มาก่อนเปลี่ยน data client เสมอ (Phase 3 ลำดับ 14 → 15) |
 | session client อ่านช้ากว่า service-role (RLS join) | index `project_members(project_id, profile_id, status)` มีแล้ว; วัด p95; cache membership ต่อ request |
 | middleware เรียก `supabase.auth.getUser()` ทุก request | acceptable (Supabase แนะนำ) — แต่ให้ `matcher` แคบลง ไม่ครอบ `/api/*` ที่ไม่ต้อง |
 | Postgres/demo fallback bypass scope | production ปิด `TOMP_ENABLE_POSTGRES_FALLBACK`; fallback path throw แทน return demo (ทำแล้วบางส่วนใน `aae50cd`) |
@@ -258,13 +285,13 @@ route แยก, layout แยก (ธีมเข้ม + แถบ "INTERNAL �
 
 ---
 
-## 5. Decisions ที่ยังเปิด (ขอ confirm ตอน review)
+## 5. Decisions (confirmed 2026-09-08)
 
-1. **Multi-org จริงไหมใน phase นี้?** — ถ้าตอนนี้มี org เดียว (bootstrap "TOMP Operations") workspace switcher ทำแค่ project scope พอ, org switcher เป็น backlog
-2. **rename `/mission-control`→`/operations`, `/assignments`→`/dispatch`** — เอา/ไม่เอา (ถ้าไม่เอา คงชื่อเดิม ประหยัด 1 phase)
-3. **`/portal` (organizer)** — ทำใน scope นี้ หรือเลื่อนเป็น backlog (ถ้ายังไม่มี organizer user จริง)
-4. **dev-tools ใน production** — เปิดให้ super_admin ใช้บน prod เลย (ตามที่ระบุ "ใช้พัฒนาแต่ละฟังก์ชัน") หรือ prod เห็นแต่ readonly
-5. **invite flow** — เพิ่ม user ใหม่: admin สร้าง profile ล่วงหน้า + user login แล้ว auto-link ด้วย email, หรือใช้ Supabase invite
+1. **Multi-org** — ❌ ไม่ทำ phase นี้ (org เดียวจาก bootstrap); switcher = project scope เท่านั้น, org switcher = backlog
+2. **rename route** — ❌ ไม่ rename; คง `/mission-control`, `/assignments`; จัดกลุ่ม nav + redirect หลัง login พอ (ดู §2.3)
+3. **`/portal` (organizer/customer read-only)** — ✅ ทำใน scope นี้ (Phase 4)
+4. **dev-tools บน production** — ✅ ใช้เต็ม; gate ด้วย role `super_admin` ไม่ใช่ env; ทำงานได้ทั้ง dev และ prod
+5. **invite flow** — ✅ pre-provision + auto-link ด้วย email (ดู §2.4b); ไม่ใช้ Supabase invite API
 
 ---
 
@@ -277,7 +304,7 @@ apps/web/app/no-access/page.tsx             ใหม่
 apps/web/app/superadmin/**                  ใหม่ (~8-12 หน้า)
 apps/web/app/{live-test,admin,pilot-checklist,project}/  ลบ/redirect
 apps/web/components/app-nav.tsx             permission-filtered
-apps/web/components/app-shell.tsx           + WorkspaceSwitcher, ลบ AuthGate
+apps/web/components/app-shell.tsx           + ProjectScopeSwitcher, ลบ AuthGate
 apps/web/components/auth/**                 + PermissionGate, RoleBadge, AccessDenied
 apps/web/lib/auth/{permissions,rbac,current-user}.ts   DB loader + role resolution + scope
 apps/web/lib/supabase/server.ts            + getScopedDataClient
