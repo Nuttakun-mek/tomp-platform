@@ -18,6 +18,14 @@ const TRIP_STEPS: Array<{ status: "arrived_pickup" | "passenger_onboard" | "comp
   { status: "completed", label: "ส่งเสร็จแล้ว" }
 ];
 
+const QUICK_MESSAGES = [
+  "ถึงจุดรับแล้ว",
+  "กำลังไปจุดส่ง",
+  "รถติด คาดว่าช้า ~15 นาที",
+  "ติดต่อผู้โดยสารไม่ได้",
+  "ถึงจุดส่งแล้ว"
+];
+
 const ISSUE_TYPES: Array<{ type: string; label: string }> = [
   { type: "delay", label: "รถติด / มาช้า" },
   { type: "vehicle", label: "รถมีปัญหา" },
@@ -349,6 +357,18 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
 
       {messageOpen ? (
         <section className="smart-card grid gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_MESSAGES.map((phrase) => (
+              <button
+                key={phrase}
+                type="button"
+                onClick={() => setMessageText(phrase)}
+                className="rounded-full border border-border bg-white px-2.5 py-1 text-[12px] font-medium text-ink-soft hover:border-operation hover:text-operation"
+              >
+                {phrase}
+              </button>
+            ))}
+          </div>
           <textarea
             className="field-input min-h-20"
             value={messageText}

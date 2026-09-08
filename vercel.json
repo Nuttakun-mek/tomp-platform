@@ -37,6 +37,10 @@
       "dest": "/apps/web/projects/new"
     },
     {
+      "src": "/resources/vehicles/([^/]+)",
+      "dest": "/apps/web/resources/vehicle?vehicleId=$1"
+    },
+    {
       "src": "/projects/([^/]+)/assignments",
       "dest": "/apps/web/assignments?projectId=$1"
     },
