@@ -84,9 +84,11 @@ async function main() {
     check("all profiles visible >= 4", (await count(tx, "profiles")) >= 4, true);
   });
 
-  console.log("orgadmin@tomp.test — whole org");
+  // Phase F: single-org — organization_admin is a dropped role with no membership,
+  // so it should see NOTHING (no org-wide read anymore).
+  console.log("orgadmin@tomp.test — no membership => no projects");
   await asUser(u.orgadmin.authUserId, async (tx) => {
-    check("projects >= 2 (org-wide)", (await count(tx, "projects")) >= 2, true);
+    check("sees 0 projects", await count(tx, "projects"), 0);
     check("is_super_admin() false", (await tx.unsafe("select public.is_super_admin() s"))[0].s, false);
   });
 
