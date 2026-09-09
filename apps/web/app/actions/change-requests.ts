@@ -80,9 +80,6 @@ async function updateChangeStatus(projectId: string, changeRequestId: string, st
   const permission = await requirePermission(projectId, status === "applied" ? "change.apply" : "change.approve");
   if (!permission.allowed) return actionFailure(permission.reason || "Missing change permission");
 
-  // Read the current change request first so we can apply the target change
-  // BEFORE flipping the status — a failed target update then leaves the request
-  // as 'approved' (retryable), not falsely 'applied'.
   const { data: current, error: readError } = await client
     .from("change_requests")
     .select("*")
@@ -92,27 +89,27 @@ async function updateChangeStatus(projectId: string, changeRequestId: string, st
   if (readError) return actionFailure(`อ่านคำขอเปลี่ยนแปลงไม่สำเร็จ: ${readError.message}`);
   if (!current) return actionFailure("ไม่พบคำขอเปลี่ยนแปลงในโครงการนี้");
 
-  const patch = (afterData || current.after_data) as Record<string, unknown> | null;
-  let appliedObject: unknown = null;
-
-  if (status === "applied" && current.object_type && current.object_id && patch && typeof patch === "object") {
-    const tableByType: Record<string, string> = { project: "projects", mission: "missions", assignment: "assignments" };
-    const table = tableByType[String(current.object_type)];
-    if (table) {
-      const { data: updatedObject, error: applyError } = await client
-        .from(table)
-        .update(patch)
-        .eq("id", current.object_id)
-        .select()
-        .single();
-      if (applyError) return actionFailure(`ปรับใช้การเปลี่ยนแปลงกับเป้าหมายไม่สำเร็จ: ${applyError.message}`);
-      appliedObject = updatedObject;
+  if (status === "applied") {
+    // Atomic (migration 0027): patch the target row AND flip the request to
+    // 'applied' in one transaction; a failed patch can't leave a false 'applied'.
+    const patch = (afterData || current.after_data) as Record<string, unknown> | null;
+    const { data: applied, error: rpcError } = await client.rpc("change_apply_command", {
+      p_change_request_id: changeRequestId,
+      p_patch: patch ?? {}
+    });
+    if (rpcError) {
+      const msg = (rpcError as { message?: string }).message || "";
+      if (/change_request_not_applicable/.test(msg)) return actionFailure("คำขอนี้ปรับใช้ไปแล้วหรือยังไม่ได้อนุมัติ");
+      return actionFailure(`ปรับใช้คำขอเปลี่ยนแปลงไม่สำเร็จ: ${msg}`);
     }
+    const row = (Array.isArray(applied) ? applied[0] : applied) as Record<string, unknown>;
+    const timelineResult = await appendChangeTimeline(projectId, changeRequestId, eventType, reason, row);
+    return actionSuccess({ mode, changeRequest: row, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
   }
 
   const { data, error: updateError } = await client
     .from("change_requests")
-    .update({ status, after_data: afterData || undefined })
+    .update({ status })
     .eq("id", changeRequestId)
     .eq("project_id", projectId)
     .select()
@@ -121,5 +118,5 @@ async function updateChangeStatus(projectId: string, changeRequestId: string, st
   if (updateError) return actionFailure(`อัปเดตสถานะคำขอเปลี่ยนแปลงไม่สำเร็จ: ${updateError.message}`);
 
   const timelineResult = await appendChangeTimeline(projectId, changeRequestId, eventType, reason, data);
-  return actionSuccess({ mode, changeRequest: data, appliedObject, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
+  return actionSuccess({ mode, changeRequest: data, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
 }
