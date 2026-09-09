@@ -26,7 +26,9 @@ export function DriverSessionGate({ token, children }: { token: string; children
     setState("establishing");
     const result = await establishDriverSessionAction({ token });
     if (result.success) {
-      await establishMobileSessionIfNeeded();
+      // Best-effort: the mobile shell handshake must never block or fail the
+      // driver's task view (it only matters inside the native app).
+      await establishMobileSessionIfNeeded().catch(() => undefined);
       setState("ready");
       return;
     }

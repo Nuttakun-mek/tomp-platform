@@ -73,11 +73,15 @@ try {
     create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets(id), name text, owner uuid, created_at timestamptz default now(), metadata jsonb);
     create or replace function storage.foldername(name text) returns text[] language sql stable as $$ select string_to_array(name, '/') $$;
     do $$ begin
-      if not exists (select 1 from pg_roles where rolname='service_role') then create role service_role bypassrls; end if;
+      if not exists (select 1 from pg_roles where rolname='service_role') then create role service_role; end if;
       if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
       if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;
       if not exists (select 1 from pg_publication where pubname='supabase_realtime') then create publication supabase_realtime; end if;
     end $$;
+    -- Force it even if the role pre-exists from a prior script on the same DB
+    -- (the CI database job runs verify-schema, verify-rls and load-scenario
+    -- against one Postgres). Supabase service_role is BYPASSRLS.
+    alter role service_role with bypassrls;
     grant usage on schema auth, storage to authenticated, anon, service_role;
   `);
 
