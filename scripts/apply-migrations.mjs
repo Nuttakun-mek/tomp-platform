@@ -34,6 +34,11 @@ const DRY_RUN = args.has("--dry-run");
 const RUN_SEED = args.has("--seed");
 const DIRECT = args.has("--direct");
 const ASSUME_YES = args.has("--yes");
+// Re-record the checksum of already-applied migrations whose file changed after
+// apply (comments / idempotency guards only — verify equivalence with
+// scripts/check-migration-drift.mjs first). Clears the "CHANGED" warning
+// without re-running anything. 957 P1-2.
+const RECONCILE = args.has("--reconcile-checksums");
 
 function getUrlArg() {
   const argv = process.argv.slice(2);
@@ -207,7 +212,14 @@ async function main() {
       if (priorChecksum == null) {
         console.log(`  applied   ${file.name}  (no checksum on record)`);
       } else if (priorChecksum !== sha256(file.sql)) {
-        console.log(`  CHANGED   ${file.name}  (already applied with a different checksum — not re-run)`);
+        if (RECONCILE && !DRY_RUN) {
+          await sql.unsafe(
+            `update public.schema_migrations_tomp set checksum = ${quote(sha256(file.sql))} where filename = ${quote(file.name)};`
+          );
+          console.log(`  RECONCILED ${file.name}  (checksum re-recorded to match the current file)`);
+        } else {
+          console.log(`  CHANGED   ${file.name}  (already applied with a different checksum — not re-run${RECONCILE ? "; --reconcile needs APPLY mode" : ""})`);
+        }
       } else {
         console.log(`  applied   ${file.name}`);
       }
