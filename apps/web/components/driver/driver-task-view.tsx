@@ -93,9 +93,17 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
 
   useEffect(() => {
     let alive = true;
+    let etag: string | null = null;
     async function poll() {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       try {
-        const res = await fetch(`/api/driver/updates?token=${encodeURIComponent(driverAccess.token)}`, { cache: "no-store" });
+        const res = await fetch(`/api/driver/updates?token=${encodeURIComponent(driverAccess.token)}`, {
+          cache: "no-store",
+          headers: etag ? { "if-none-match": etag } : undefined
+        });
+        if (!alive) return;
+        etag = res.headers.get("etag") ?? etag;
+        if (res.status === 304) return; // nothing changed since the last poll
         const json = (await res.json()) as {
           success?: boolean;
           data?: {
@@ -105,7 +113,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
             messages?: DriverIssueMessage[];
           };
         };
-        if (!alive || !json.success || !json.data) return;
+        if (!json.success || !json.data) return;
         if (json.data.latestStatus?.status) {
           setTripStep((current) => Math.max(current, stepFromStatus(json.data?.latestStatus?.status)));
         }
@@ -125,10 +133,15 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       }
     }
     const timer = window.setInterval(poll, 15000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     void poll();
     return () => {
       alive = false;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [driverAccess.token]);
 
