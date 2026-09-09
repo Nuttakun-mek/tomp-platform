@@ -6,6 +6,15 @@ import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 type LocationInput = typeof driverLocationUpdateSchema._type;
+
+// The embedded assignment comes back as an object (to-one) or, on some PostgREST
+// versions, a single-element array. `undefined` = the embed wasn't present.
+function extractVehicleId(embedded: unknown): string | null | undefined {
+  const row = Array.isArray(embedded) ? embedded[0] : embedded;
+  if (!row || typeof row !== "object") return undefined;
+  const value = (row as Record<string, unknown>).vehicle_id;
+  return typeof value === "string" ? value : null;
+}
 type TokenRow = {
   project_id: string;
   assignment_id: string;
@@ -37,25 +46,17 @@ async function updateLocationSession(input: {
     return;
   }
 
-  const { data: session } = await input.client
+  // Update the open session directly by predicate — no separate select. There is
+  // only ever one session per assignment with stopped_at IS NULL.
+  await input.client
     .from("driver_location_sessions")
-    .select("id")
+    .update({
+      status: input.trackingEvent === "sharing_stopped" ? "offline" : "healthy",
+      last_ping_at: input.recordedAt,
+      stopped_at: input.trackingEvent === "sharing_stopped" ? input.recordedAt : null
+    })
     .eq("assignment_id", input.assignmentId)
-    .is("stopped_at", null)
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (session?.id) {
-    await input.client
-      .from("driver_location_sessions")
-      .update({
-        status: input.trackingEvent === "sharing_stopped" ? "offline" : "healthy",
-        last_ping_at: input.recordedAt,
-        stopped_at: input.trackingEvent === "sharing_stopped" ? input.recordedAt : null
-      })
-      .eq("id", session.id);
-  }
+    .is("stopped_at", null);
 }
 
 export async function POST(request: Request) {
@@ -91,9 +92,10 @@ export async function POST(request: Request) {
 
 async function writeDriverLocationViaSupabase(client: NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>, input: LocationInput, request: Request) {
   const tokenHash = hashDriverAccessToken(input.token);
+  // One round trip for the token and its assignment's vehicle (embedded).
   const { data: tokenRow, error: tokenError } = await client
     .from("driver_access_tokens")
-    .select("project_id, assignment_id, driver_id, status, expires_at")
+    .select("project_id, assignment_id, driver_id, status, expires_at, assignments(vehicle_id)")
     .eq("token_hash", tokenHash)
     .eq("status", "active")
     .maybeSingle();
@@ -106,8 +108,12 @@ async function writeDriverLocationViaSupabase(client: NonNullable<ReturnType<typ
     return NextResponse.json({ success: false, error: "QR หมดอายุแล้ว กรุณาขอ QR ใหม่จากศูนย์ควบคุม" }, { status: 403 });
   }
 
-  const { data: assignment } = await client.from("assignments").select("vehicle_id").eq("id", tokenRow.assignment_id).maybeSingle();
-  const vehicleId = typeof assignment?.vehicle_id === "string" ? assignment.vehicle_id : null;
+  let vehicleId = extractVehicleId(tokenRow.assignments);
+  if (vehicleId === undefined) {
+    // Embed didn't resolve (older PostgREST relationship cache) — fetch directly.
+    const { data: assignment } = await client.from("assignments").select("vehicle_id").eq("id", tokenRow.assignment_id).maybeSingle();
+    vehicleId = typeof assignment?.vehicle_id === "string" ? assignment.vehicle_id : null;
+  }
   const recordedAt = input.recordedAt || new Date().toISOString();
 
   const { data: inserted, error: insertError } = await client
@@ -219,13 +225,8 @@ async function writeDriverLocationViaPostgres(input: LocationInput, request: Req
       set status = ${input.trackingEvent === "sharing_stopped" ? "offline" : "healthy"},
           last_ping_at = ${recordedAt},
           stopped_at = ${input.trackingEvent === "sharing_stopped" ? recordedAt : null}
-      where id = (
-        select id from driver_location_sessions
-        where assignment_id = ${tokenRow.assignment_id}
-          and stopped_at is null
-        order by started_at desc
-        limit 1
-      )
+      where assignment_id = ${tokenRow.assignment_id}
+        and stopped_at is null
     `;
   }
 
