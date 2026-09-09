@@ -13,17 +13,48 @@ function hasUnsafePublicSecret() {
   return Object.keys(process.env).some((key) => key.startsWith("NEXT_PUBLIC_") && /SERVICE|SECRET/i.test(key));
 }
 
+function getBuildStamp() {
+  const iso = process.env.NEXT_PUBLIC_BUILD_TIME || buildInfo.updatedAtIso;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return {
+      version: buildInfo.version,
+      updatedAt: buildInfo.updatedAtIso,
+      updatedAtText: buildInfo.updatedAtText
+    };
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "00";
+
+  return {
+    version: `${part("year")}.${part("month")}.${part("day")}.${part("hour")}${part("minute")}`,
+    updatedAt: iso,
+    updatedAtText: `${part("day")}/${part("month")}/${part("year")} ${part("hour")}:${part("minute")} น.`
+  };
+}
+
 export function GET() {
   const unsafePublicSecret = hasUnsafePublicSecret();
   const status = unsafePublicSecret ? "degraded" : "ok";
+  const stamp = getBuildStamp();
 
   return NextResponse.json(
     {
       status,
       service: "tomp-web",
       checkedAt: new Date().toISOString(),
-      version: buildInfo.version,
-      updatedAt: buildInfo.updatedAtIso,
+      version: stamp.version,
+      updatedAt: stamp.updatedAt,
+      updatedAtText: stamp.updatedAtText,
       timezone: buildInfo.timezone,
       checks: {
         serverSupabaseConfig: hasServerSupabaseConfig(),

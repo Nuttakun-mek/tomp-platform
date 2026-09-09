@@ -14,7 +14,7 @@ function formatBuildTime(): string {
   });
 }
 
-// Version marker — deploy date + time (Bangkok) so it's obvious how fresh the
+// Version marker: deploy date + time (Bangkok) so it is obvious how fresh the
 // running build is; commit sha shows outside production for debugging.
 export function BuildVersionBadge({ compact = false }: { compact?: boolean }) {
   const isProduction = (process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV) === "production";
