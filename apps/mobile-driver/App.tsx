@@ -30,7 +30,8 @@ import {
   startForegroundLocationSharing,
   stopLocationSharing
 } from "./src/services/location";
-import { getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
+import { exchangeMobileSessionChallenge } from "./src/services/mobile-session-api";
+import { getInstallationId, getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
 import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
 import { parseDriverLink } from "./src/services/driver-link";
 import { decideWebViewNavigation } from "./src/services/webview-navigation";
@@ -133,6 +134,23 @@ export default function App() {
 
       if (parsed.type === "mobile-session.set") {
         await saveMobileDriverSession(parsed.payload);
+        setSessionReady(true);
+        postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
+        return;
+      }
+
+      if (parsed.type === "mobile-session.challenge") {
+        const installationId = await getInstallationId();
+        const result = await exchangeMobileSessionChallenge({
+          code: parsed.payload.code,
+          installationId
+        });
+        if (!result.success || !result.data) {
+          setSessionReady(false);
+          postStatusToWeb("session_missing", result.error || "แลก mobile session ไม่สำเร็จ");
+          return;
+        }
+        await saveMobileDriverSession(result.data);
         setSessionReady(true);
         postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
         return;

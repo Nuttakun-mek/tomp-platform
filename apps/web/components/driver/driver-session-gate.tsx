@@ -4,6 +4,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { establishDriverSessionAction } from "@/app/actions/driver-pin";
 
+type MobileShellWindow = Window & {
+  TOMP_MOBILE_SHELL?: {
+    namespace: "tomp.driver";
+    version: 1;
+    postMessage: (message: unknown) => void;
+  };
+};
+
 // The page's server checks (token, device, PIN cookie) decide whether the driver
 // views render. This then exchanges the QR token for the scoped session cookie
 // that the /api/driver/* calls carry — done once, before any of them fire.
@@ -18,6 +26,7 @@ export function DriverSessionGate({ token, children }: { token: string; children
     (async () => {
       const result = await establishDriverSessionAction({ token });
       if (result.success) {
+        await establishMobileSessionIfNeeded();
         setState("ready");
         return;
       }
@@ -54,4 +63,22 @@ export function DriverSessionGate({ token, children }: { token: string; children
       )}
     </div>
   );
+}
+
+async function establishMobileSessionIfNeeded() {
+  const shell = (window as MobileShellWindow).TOMP_MOBILE_SHELL;
+  if (!shell || shell.namespace !== "tomp.driver" || shell.version !== 1) return;
+
+  const response = await fetch("/api/driver/mobile-session/challenge", { method: "POST" });
+  const result = (await response.json().catch(() => null)) as { success?: boolean; data?: { code: string; expiresAt: string }; error?: string } | null;
+  if (!result?.success || !result.data) {
+    return;
+  }
+
+  shell.postMessage({
+    namespace: "tomp.driver",
+    version: 1,
+    type: "mobile-session.challenge",
+    payload: result.data
+  });
 }

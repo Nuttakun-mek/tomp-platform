@@ -14,6 +14,19 @@ interface WakeLockSentinelLike {
   release: () => Promise<void>;
 }
 
+interface TompMobileShell {
+  namespace: "tomp.driver";
+  version: 1;
+  canBackgroundLocation?: boolean;
+  postMessage: (message: unknown) => void;
+}
+
+declare global {
+  interface Window {
+    TOMP_MOBILE_SHELL?: TompMobileShell;
+  }
+}
+
 interface LastLocation {
   latitude: number;
   longitude: number;
@@ -33,6 +46,11 @@ function buildGoogleMapsUrl(location: LastLocation) {
 
 function consentKey(token: string) {
   return `tomp:gps-consent:${token}`;
+}
+
+function getMobileShell() {
+  const shell = window.TOMP_MOBILE_SHELL;
+  return shell?.namespace === "tomp.driver" && shell.version === 1 ? shell : null;
 }
 
 function formatTime(iso: string) {
@@ -152,6 +170,21 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
 
   const startSharing = useCallback(async () => {
     if (watchIdRef.current != null) return;
+    const shell = getMobileShell();
+    if (shell?.canBackgroundLocation) {
+      window.localStorage.setItem(consentKey(driverAccess.token), "1");
+      setCanResume(true);
+      setState("requesting");
+      setMessage("กำลังขอให้แอป TOMP Driver เริ่มแชร์ตำแหน่ง");
+      shell.postMessage({
+        namespace: "tomp.driver",
+        version: 1,
+        type: "gps.start",
+        payload: { reason: "driver_requested" }
+      });
+      return;
+    }
+
     if (!("geolocation" in navigator)) {
       setState("error");
       setSignal("off");
@@ -190,6 +223,22 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   }, [driverAccess.token, requestWakeLock, sendPosition, setSignal]);
 
   const stopSharing = useCallback(async () => {
+    const shell = getMobileShell();
+    if (shell?.canBackgroundLocation) {
+      shell.postMessage({
+        namespace: "tomp.driver",
+        version: 1,
+        type: "gps.stop",
+        payload: { reason: "driver_requested" }
+      });
+      window.localStorage.removeItem(consentKey(driverAccess.token));
+      setCanResume(false);
+      setState("idle");
+      setSignal("off");
+      setMessage("ส่งคำสั่งหยุดแชร์ตำแหน่งไปยังแอปแล้ว");
+      return;
+    }
+
     if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
     watchIdRef.current = null;
     startedRef.current = false;
@@ -205,6 +254,53 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
     setSignal("off");
     setMessage("หยุดแชร์ตำแหน่งแล้ว");
   }, [driverAccess.token, postLocation, releaseWakeLock, setSignal]);
+
+  useEffect(() => {
+    const handleNativeStatus = (event: Event) => {
+      const detail = (event as CustomEvent).detail as {
+        payload?: {
+          status?: string;
+          message?: string;
+          detail?: {
+            latitude?: number;
+            longitude?: number;
+            accuracy?: number | null;
+            recordedAt?: string;
+          };
+        };
+      };
+      const payload = detail?.payload;
+      if (!payload?.status) return;
+
+      if (payload.message) setMessage(payload.message);
+      if (payload.status === "gps_sharing") {
+        const locationDetail = payload.detail;
+        if (typeof locationDetail?.latitude === "number" && typeof locationDetail.longitude === "number") {
+          markFresh({
+            latitude: locationDetail.latitude,
+            longitude: locationDetail.longitude,
+            accuracy: locationDetail.accuracy ?? null,
+            recordedAt: locationDetail.recordedAt || new Date().toISOString(),
+            sentAt: new Date().toISOString()
+          });
+        } else {
+          setState("sharing");
+          setSignal("live");
+        }
+      }
+      if (payload.status === "gps_stopped") {
+        setState("idle");
+        setSignal("off");
+      }
+      if (payload.status === "gps_error" || payload.status === "session_missing") {
+        setState("error");
+        setSignal("off");
+      }
+    };
+
+    window.addEventListener("tomp:native-status", handleNativeStatus);
+    return () => window.removeEventListener("tomp:native-status", handleNativeStatus);
+  }, [markFresh, setSignal]);
 
   useEffect(() => {
     const storedConsent = window.localStorage.getItem(consentKey(driverAccess.token)) === "1";

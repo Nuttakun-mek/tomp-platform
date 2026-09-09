@@ -5,6 +5,7 @@ export type BridgeMessage =
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.start"; payload?: { reason?: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.stop"; payload?: { reason?: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "open.url"; payload: { url: string } }
+  | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "mobile-session.challenge"; payload: { code: string; expiresAt: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "mobile-session.set"; payload: { session: string; expiresAt: string } };
 
 export type NativeStatus =
@@ -50,6 +51,15 @@ export function parseBridgeMessage(raw: string): BridgeMessage | null {
   }
 
   if (parsed.type === "open.url" && isRecord(parsed.payload) && typeof parsed.payload.url === "string") {
+    return parsed as BridgeMessage;
+  }
+
+  if (
+    parsed.type === "mobile-session.challenge" &&
+    isRecord(parsed.payload) &&
+    typeof parsed.payload.code === "string" &&
+    typeof parsed.payload.expiresAt === "string"
+  ) {
     return parsed as BridgeMessage;
   }
 
