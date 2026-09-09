@@ -18,3 +18,22 @@ export const getMissionsByProjectId = cache(async function getMissionsByProjectI
     return demoKernel.missions.filter((mission) => mission.projectId === projectId);
   }
 });
+
+// One query for several projects — avoids the N+1 the vehicle-operations
+// aggregation used to run (one getMissionsByProjectId per project). Not
+// cache()-wrapped: the array argument would never hit an identity key.
+export async function getMissionsByProjectIds(projectIds: readonly string[]): Promise<Mission[]> {
+  const ids = [...new Set(projectIds)].filter(Boolean);
+  if (!ids.length) return [];
+
+  const { client: supabase } = await resolveReadClient();
+  if (!supabase) return demoKernel.missions.filter((mission) => ids.includes(mission.projectId));
+
+  try {
+    const { data, error } = await withTimeout(supabase.from("missions").select("*").in("project_id", ids).order("planned_start_time"), 2200, "missions");
+    if (error || !data) return demoKernel.missions.filter((mission) => ids.includes(mission.projectId));
+    return data.map(mapMission);
+  } catch {
+    return demoKernel.missions.filter((mission) => ids.includes(mission.projectId));
+  }
+}

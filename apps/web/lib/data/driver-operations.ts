@@ -97,6 +97,45 @@ export async function getDriverNotificationsByAssignmentId(assignmentId: string)
   return data.map(mapNotification);
 }
 
+// Notifications for many assignments in one query, grouped by assignment id.
+// The vehicle-operations aggregation used to call the single-id version once
+// per assignment.
+export async function getDriverNotificationsByAssignmentIds(assignmentIds: readonly string[]): Promise<Map<string, DriverNotification[]>> {
+  const ids = [...new Set(assignmentIds)].filter(Boolean);
+  const grouped = new Map<string, DriverNotification[]>();
+  if (!ids.length) return grouped;
+
+  const push = (list: DriverNotification[]) => {
+    for (const notification of list) {
+      if (!notification.assignmentId) continue;
+      const bucket = grouped.get(notification.assignmentId) ?? [];
+      bucket.push(notification);
+      grouped.set(notification.assignmentId, bucket);
+    }
+  };
+
+  const { client } = await resolveReadClient();
+  if (client) {
+    try {
+      const result = await withTimeout(
+        client.from("driver_notifications").select("*").in("assignment_id", ids).order("sent_at", { ascending: false }),
+        2200,
+        "driver notifications (multi-assignment)"
+      );
+      if (!result.error && Array.isArray(result.data)) {
+        push((result.data as Row[]).map(mapNotification));
+        return grouped;
+      }
+    } catch {
+      // fall through to the postgres path
+    }
+  }
+
+  const rows = await Promise.all(ids.map((id) => getDriverNotificationsByAssignmentIdViaPostgres(id)));
+  push(rows.flat());
+  return grouped;
+}
+
 export interface DriverIssueMessage {
   id: string;
   text: string;

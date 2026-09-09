@@ -19,6 +19,50 @@ export const getAssignmentsByProjectId = cache(async function getAssignmentsByPr
     return getAssignmentsByProjectIdViaPostgres(projectId);
   }
 });
+// One query for several projects. The vehicle-operations aggregation used to
+// call getAssignmentsByProjectId once per project (N+1). Not cache()-wrapped:
+// the array argument would never hit an identity key.
+export async function getAssignmentsByProjectIds(projectIds: readonly string[]): Promise<Assignment[]> {
+  const ids = [...new Set(projectIds)].filter(Boolean);
+  if (!ids.length) return [];
+
+  const { client: supabase } = await resolveReadClient();
+  if (!supabase) {
+    const rows = await Promise.all(ids.map((id) => getAssignmentsByProjectIdViaPostgres(id)));
+    return rows.flat();
+  }
+
+  try {
+    const { data, error } = await withTimeout(supabase.from("assignments").select("*").in("project_id", ids).order("start_time"), 2600, "assignments (multi-project)");
+    if (error || !data) {
+      const rows = await Promise.all(ids.map((id) => getAssignmentsByProjectIdViaPostgres(id)));
+      return rows.flat();
+    }
+    return data.map(mapAssignment);
+  } catch {
+    const rows = await Promise.all(ids.map((id) => getAssignmentsByProjectIdViaPostgres(id)));
+    return rows.flat();
+  }
+}
+
+// Every assignment for a set of vehicles, across all projects. Lets the
+// single-vehicle profile page stop loading the whole fleet's history.
+export async function getAssignmentsByVehicleIds(vehicleIds: readonly string[]): Promise<Assignment[]> {
+  const ids = [...new Set(vehicleIds)].filter(Boolean);
+  if (!ids.length) return [];
+
+  const { client: supabase } = await resolveReadClient();
+  if (!supabase) return demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId));
+
+  try {
+    const { data, error } = await withTimeout(supabase.from("assignments").select("*").in("vehicle_id", ids).order("start_time"), 2200, "assignments (by vehicle)");
+    if (error || !data) return demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId));
+    return data.map(mapAssignment);
+  } catch {
+    return demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId));
+  }
+}
+
 async function getAssignmentsByProjectIdViaPostgres(projectId: string): Promise<Assignment[]> {
   const sql = getPostgresClient();
   if (!sql) return demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
