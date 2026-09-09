@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { TimelineEvent } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
@@ -5,7 +6,8 @@ import { demoKernel } from "@/lib/demo/demo-kernel";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapTimelineEvent } from "./mappers";
 
-export async function getTimelineEventsByProjectId(projectId: string): Promise<TimelineEvent[]> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getTimelineEventsByProjectId = cache(async function getTimelineEventsByProjectId(projectId: string): Promise<TimelineEvent[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return getTimelineEventsByProjectIdViaPostgres(projectId);
 
@@ -16,8 +18,7 @@ export async function getTimelineEventsByProjectId(projectId: string): Promise<T
   } catch {
     return getTimelineEventsByProjectIdViaPostgres(projectId);
   }
-}
-
+});
 async function getTimelineEventsByProjectIdViaPostgres(projectId: string): Promise<TimelineEvent[]> {
   const sql = getPostgresClient();
   if (!sql) return demoKernel.timelineEvents.filter((event) => event.projectId === projectId);

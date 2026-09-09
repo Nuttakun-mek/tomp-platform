@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { rowLoose, type Row } from "@/lib/data/row";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
@@ -25,7 +26,8 @@ function collapse(rows: Row[]): Record<string, AssignmentStatusUpdate> {
 // Latest driver-reported status per assignment, straight from
 // assignment_status_updates (mission control was only inferring status from GPS
 // ping metadata before, so a status change without a ping never showed up).
-export async function getLatestAssignmentStatuses(projectId: string): Promise<Record<string, AssignmentStatusUpdate>> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getLatestAssignmentStatuses = cache(async function getLatestAssignmentStatuses(projectId: string): Promise<Record<string, AssignmentStatusUpdate>> {
   const { client } = await resolveReadClient();
   if (client) {
     const { data, error } = await client
@@ -51,4 +53,4 @@ export async function getLatestAssignmentStatuses(projectId: string): Promise<Re
   } catch {
     return {};
   }
-}
+});

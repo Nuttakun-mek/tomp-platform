@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { rowText, type Row } from "@/lib/data/row";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
@@ -12,7 +13,8 @@ const str = (row: Row, key: string) => rowText(row, key);
 
 // Latest vehicle check-in photo per assignment for a project, as short-lived
 // signed URLs (the driver-evidence bucket is private).
-export async function getVehicleEvidenceByProjectId(projectId: string): Promise<Record<string, VehicleEvidence>> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getVehicleEvidenceByProjectId = cache(async function getVehicleEvidenceByProjectId(projectId: string): Promise<Record<string, VehicleEvidence>> {
   const { client } = getSupabaseWriteClient();
   if (!client) return {};
 
@@ -64,4 +66,4 @@ export async function getVehicleEvidenceByProjectId(projectId: string): Promise<
     };
   }
   return result;
-}
+});

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { rowLoose, rowObject, type Row } from "@/lib/data/row";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
@@ -61,7 +62,8 @@ function mapOutbound(row: Row): DriverOutboundMessage {
 
 // Two-way message log for a project: driver -> control (driver_issue_reports,
 // including free-text messages) and control -> driver (driver_notifications).
-export async function getDriverCommsByProjectId(projectId: string): Promise<DriverComms> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getDriverCommsByProjectId = cache(async function getDriverCommsByProjectId(projectId: string): Promise<DriverComms> {
   const { client } = await resolveReadClient();
   if (client) {
     const [inbound, outbound] = await Promise.all([
@@ -76,8 +78,7 @@ export async function getDriverCommsByProjectId(projectId: string): Promise<Driv
     }
   }
   return getDriverCommsByProjectIdViaPostgres(projectId);
-}
-
+});
 async function getDriverCommsByProjectIdViaPostgres(projectId: string): Promise<DriverComms> {
   const sql = getPostgresClient();
   if (!sql) return { inbound: [], outbound: [] };

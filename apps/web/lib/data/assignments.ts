@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Assignment } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
@@ -5,7 +6,8 @@ import { demoKernel } from "@/lib/demo/demo-kernel";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapAssignment } from "./mappers";
 
-export async function getAssignmentsByProjectId(projectId: string): Promise<Assignment[]> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getAssignmentsByProjectId = cache(async function getAssignmentsByProjectId(projectId: string): Promise<Assignment[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return getAssignmentsByProjectIdViaPostgres(projectId);
 
@@ -16,8 +18,7 @@ export async function getAssignmentsByProjectId(projectId: string): Promise<Assi
   } catch {
     return getAssignmentsByProjectIdViaPostgres(projectId);
   }
-}
-
+});
 async function getAssignmentsByProjectIdViaPostgres(projectId: string): Promise<Assignment[]> {
   const sql = getPostgresClient();
   if (!sql) return demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);

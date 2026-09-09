@@ -1,10 +1,12 @@
+import { cache } from "react";
 import type { Mission } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapMission } from "./mappers";
 
-export async function getMissionsByProjectId(projectId: string): Promise<Mission[]> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getMissionsByProjectId = cache(async function getMissionsByProjectId(projectId: string): Promise<Mission[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.missions.filter((mission) => mission.projectId === projectId);
 
@@ -15,4 +17,4 @@ export async function getMissionsByProjectId(projectId: string): Promise<Mission
   } catch {
     return demoKernel.missions.filter((mission) => mission.projectId === projectId);
   }
-}
+});

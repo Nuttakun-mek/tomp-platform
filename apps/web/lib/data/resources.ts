@@ -1,10 +1,12 @@
+import { cache } from "react";
 import type { Driver, Vehicle } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapDriver, mapVehicle } from "./mappers";
 
-export async function getDrivers(): Promise<Driver[]> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getDrivers = cache(async function getDrivers(): Promise<Driver[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.drivers;
 
@@ -15,9 +17,9 @@ export async function getDrivers(): Promise<Driver[]> {
   } catch {
     return demoKernel.drivers;
   }
-}
-
-export async function getVehicles(): Promise<Vehicle[]> {
+});
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getVehicles = cache(async function getVehicles(): Promise<Vehicle[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.vehicles;
 
@@ -28,4 +30,4 @@ export async function getVehicles(): Promise<Vehicle[]> {
   } catch {
     return demoKernel.vehicles;
   }
-}
+});

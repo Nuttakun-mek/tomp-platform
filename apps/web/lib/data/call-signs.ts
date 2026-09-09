@@ -1,10 +1,12 @@
+import { cache } from "react";
 import type { CallSign } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapCallSign } from "./mappers";
 
-export async function getCallSignsByProjectId(projectId: string): Promise<CallSign[]> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getCallSignsByProjectId = cache(async function getCallSignsByProjectId(projectId: string): Promise<CallSign[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoKernel.callSigns.filter((callSign) => callSign.projectId === projectId);
 
@@ -15,4 +17,4 @@ export async function getCallSignsByProjectId(projectId: string): Promise<CallSi
   } catch {
     return demoKernel.callSigns.filter((callSign) => callSign.projectId === projectId);
   }
-}
+});

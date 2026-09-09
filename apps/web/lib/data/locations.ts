@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
@@ -226,7 +227,8 @@ async function getLatestDriverLocationsFallback(
   return enrichLocationMetadataViaPostgres(Array.from(latestByAssignment.values()));
 }
 
-export async function getLatestDriverLocationsByProjectId(projectId: string): Promise<DriverLocation[]> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getLatestDriverLocationsByProjectId = cache(async function getLatestDriverLocationsByProjectId(projectId: string): Promise<DriverLocation[]> {
   const { client } = await resolveReadClient();
 
   if (!client) {
@@ -268,9 +270,9 @@ export async function getLatestDriverLocationsByProjectId(projectId: string): Pr
     });
 
   return enrichLocationMetadata(client, Array.from(latestByAssignment.values()));
-}
-
-export async function getLatestDriverLocations(limit = 50): Promise<DriverLocation[]> {
+});
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getLatestDriverLocations = cache(async function getLatestDriverLocations(limit = 50): Promise<DriverLocation[]> {
   const { client } = await resolveReadClient();
 
   if (!client) {
@@ -308,9 +310,9 @@ export async function getLatestDriverLocations(limit = 50): Promise<DriverLocati
     });
 
   return enrichLocationMetadata(client, Array.from(latestByAssignment.values()));
-}
-
-export async function getProjectIdWithLatestDriverLocation(): Promise<string | null> {
+});
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getProjectIdWithLatestDriverLocation = cache(async function getProjectIdWithLatestDriverLocation(): Promise<string | null> {
   const { client } = await resolveReadClient();
 
   if (!client) {
@@ -332,8 +334,7 @@ export async function getProjectIdWithLatestDriverLocation(): Promise<string | n
   }
 
   return text(data as LocationRow, "project_id") || null;
-}
-
+});
 async function getProjectIdWithLatestDriverLocationViaPostgres(): Promise<string | null> {
   const sql = getPostgresClient();
   if (!sql) return null;

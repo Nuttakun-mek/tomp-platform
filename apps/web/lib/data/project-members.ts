@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { rowLoose, rowObject, type Row } from "@/lib/data/row";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
@@ -32,7 +33,8 @@ function mapFlat(row: Row): ProjectMemberRow {
   };
 }
 
-export async function getProjectMembers(projectId: string): Promise<ProjectMemberRow[]> {
+// cache(): one render often needs this list from several components; keep it to one query per request.
+export const getProjectMembers = cache(async function getProjectMembers(projectId: string): Promise<ProjectMemberRow[]> {
   const { client } = await resolveReadClient();
   if (client) {
     const { data, error } = await client
@@ -56,4 +58,4 @@ export async function getProjectMembers(projectId: string): Promise<ProjectMembe
   } catch {
     return [];
   }
-}
+});
