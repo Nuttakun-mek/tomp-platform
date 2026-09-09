@@ -52,24 +52,26 @@ The permission check now actually runs in production. Confirm on the deployed si
 
 These are real and large. Each is a batch in 957 §5; none is a quick edit.
 
-| Audit item | Why it is out of scope for an incremental pass |
-|---|---|
-| **P0-4** remaining: generic `command_id` idempotency bus | The 8 create/status commands **and** `change_apply` are now atomic (triggers + three RPCs, all live — `0027` shipped `change_apply_command`). Duplicate-write protection today comes from domain uniqueness: a retried `create_project` hits the `project_code` unique index (23505 → "รหัสโครงการนี้ถูกใช้งานแล้ว"), a retried publish hits `project_already_published`. Both create and publish UIs now disable their button while the action is in flight (`useTransition`). The `command_log` + `claim_command` primitive is applied to production and reserved for a future generic command bus — wiring a client `command_id` into every form would burn ids on domain failures without a `release_command`, so it is deferred rather than half-wired. |
-| **P1-2** migration checksum drift (`0011,0018,0019,0020`) | The clean-DB harness exists (`npm run db:verify-schema`). Still need: diff the 4 applied files against the repo on the live DB and write forward-repair migrations. Needs live DB access. |
-| **Batch H** E2E scaffold | `e2e/` — `playwright.config.ts`, `unauthenticated.spec.ts` (runs today: anon→/login, health honesty, driver no-token notice), `operator-flow.spec.ts` (login→project→mission→dispatch, `test.skip` until `E2E_OPERATOR_EMAIL/PASSWORD` set), README with the run + remaining steps. `npm run e2e`. Not in CI; needs `npm i -D @playwright/test`. Driver-flow / publish-flow / RBAC-negative specs + the CI job still to write. |
-| **P1-4** legacy `vercel.json` routing | Set the Vercel project root to `apps/web`, drop `builds`/`routes`, use native App Router. **This is a Vercel dashboard change the owner must make**, plus removing every route shim after redirect tests. High blast radius. 957 Batch H / §1-4. |
-| **P1-5** form-first, over-long IA | Summary-first workspace, drawer-based create flows, responsive dispatch list/table, compact Mission Control first viewport. 957 Batch D — a product-design workstream, not a refactor. |
-| **P1-6** inconsistent feedback / `window.location.reload()` / `window.confirm()` | Shared toast/live-region, typed form errors, accessible confirm dialog, optimistic rollback, `router.refresh()` instead of full reload, persisted read/resolved state. 957 Batch E. |
-| **P2-1** scale not proven (50 vehicles / 250 jobs / 10k pings) | Delta/cursor reads, bounded payloads, `EXPLAIN (ANALYZE)` on the hot queries, a staging load scenario. UI caps (`useVisibleSlice`) are done; DB pagination + load proof are not. 957 Batch F. |
-| **P2-2** mobile outside the quality gate | Mobile CI (`expo-doctor`, typecheck/lint/test), staging env with no service-role key in the bundle, EAS preview builds, real-device background-GPS test. 957 Batch G — needs devices and an Expo/EAS account. |
-| **Batch H** authenticated E2E | No browser→API→DB→Timeline suite exists. Everything above needs this to be considered "done" per the 957 release gate. |
+Every P0 is closed. Every incremental item an agent can do without new
+infrastructure is done. What is left needs the owner, an external account, or a
+product decision.
 
-## Recommendation
+| Audit item | Why an agent can't finish it now | Owner action |
+|---|---|---|
+| **P0-4** generic `command_id` idempotency bus | Duplicate writes are already blocked by domain uniqueness (`project_code` index, `project_already_published`) and both create/publish buttons disable while in flight. The `command_log` + `claim_command` primitive is live but not wired to forms — doing so needs a `release_command` first (else a domain failure burns the id). Deferred by design, not blocked. | decide if the generic bus is worth a plan |
+| **P1-2** reconcile the drift checksums on prod | Analysis done — **no real schema drift** (doc 961). Only the `schema_migrations_tomp` checksum bookkeeping is stale. | run `node scripts/apply-migrations.mjs --reconcile-checksums --yes` |
+| **0028** (P2-1 indexes) apply to prod | Written + schema-verified; the sandbox blocks the migration write. | run `node scripts/apply-migrations.mjs --yes` |
+| **P1-4** legacy `vercel.json` routing | The project-root change is a Vercel dashboard setting; route-shim removal + redirect retest follows it. High blast radius. | set Vercel project root to `apps/web`, then hand back for the shim removal |
+| **P1-5** form-first IA redesign | Product-design workstream (summary-first workspace, drawer create flows, responsive dispatch table). Not a refactor. | brief + sign-off on the new IA |
+| **P2-2 / Batch G** mobile quality gate | Mobile CI, staging bundle without the service-role key, EAS preview, real-device GPS test. Owned by the mobile agent (doc 959); needs devices + an Expo/EAS account. | — (mobile agent) |
+| **`/api/driver/assignment`** still takes `?token=` | The mobile packet read. Moving it to the session model must be coordinated with the mobile client rewrite. | coordinate with the mobile agent |
+| **Batch H** authenticated E2E in CI | The specs exist (`operator-flow`, `driver-flow`, `rbac-negative`) but are `test.skip` until a **staging deploy with its own Supabase project** exists — they seed/mutate and must never touch production. | stand up a staging environment |
 
-Both critical security holes (P0-1 auth bypass, P0-2 driver token) and P0-5 (publish correctness) are closed. The safe next increments a single agent can take without new infrastructure:
+## Batch E status
 
-1. **P0-3 `DataResult<T>`** — mechanical once the contract is set; do it one data module at a time behind the existing `resolveReadClient` boundary, then a visible "ข้อมูลไม่พร้อมใช้งาน / ลองใหม่" surface on the pages.
-2. **P1-2 clean-DB migration test** — a script (`0001 → latest` on a disposable DB + constraint/RLS assertions), not a redesign. Also repairs the four checksum-drifted files via forward migrations.
-3. **P0-4 transactional kernel** — needs a DB owner and forward migrations; scope it as its own plan.
-
-The rest (Batches D, E, F, G, H, vercel.json) each need either a design decision from the owner, external accounts/devices, or a multi-file coordinated change that should be its own plan document.
+Largely done across earlier passes: shared `<ToastProvider>`/`useToast`,
+`<DataUnavailable>` retry surface (this pass), `router.refresh()` everywhere a
+full reload was used, inline two-step confirms instead of `window.confirm()`,
+inline field errors. Not done: a single shared confirm-dialog component (three
+bespoke inline confirms work and are accessible), and persisted read/resolved
+state for the timeline/comms feeds (a feature, needs its own small plan).
