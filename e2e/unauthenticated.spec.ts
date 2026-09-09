@@ -21,7 +21,7 @@ test("login page renders its form", async ({ page }) => {
 test("driver entry with no token shows the 'no job' notice, not an error", async ({ page }) => {
   const response = await page.goto("/driver");
   expect(response?.status()).toBe(200);
-  await expect(page.getByText(/ไม่พบงาน|ลิงก์.*หมดอายุ/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /ไม่พบงาน/ })).toBeVisible();
 });
 
 test("api/health is honest", async ({ request }) => {
@@ -31,3 +31,25 @@ test("api/health is honest", async ({ request }) => {
   expect(body.status).toBe("ok");
   expect(body.checks.publicSecretSafe).toBe(true);
 });
+
+// P0-2: the driver operational endpoints take project/assignment/driver from a
+// signed session cookie, never a query string. With no cookie they must 401,
+// not leak data.
+const DRIVER_ENDPOINTS = [
+  { method: "GET" as const, path: "/api/driver/updates" },
+  { method: "POST" as const, path: "/api/driver/status" },
+  { method: "POST" as const, path: "/api/driver/location" },
+  { method: "POST" as const, path: "/api/driver/issue" },
+  { method: "POST" as const, path: "/api/driver/readiness" }
+];
+
+for (const { method, path } of DRIVER_ENDPOINTS) {
+  test(`${method} ${path} rejects a caller with no session (and ignores ?token=)`, async ({ request }) => {
+    const noSession = method === "GET" ? await request.get(path) : await request.post(path, { data: {} });
+    expect(noSession.status(), `${path} must reject an unauthenticated caller`).toBe(401);
+
+    const url = `${path}?token=tomp_not_a_real_token`;
+    const withToken = method === "GET" ? await request.get(url) : await request.post(url, { data: {} });
+    expect(withToken.status(), `${path} must not honour a query-string token`).toBe(401);
+  });
+}

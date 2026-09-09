@@ -45,6 +45,11 @@ async function updateLocationSession(input: {
 }
 
 export async function POST(request: Request) {
+  // Session first — an unauthenticated caller gets 401, never a 400 that
+  // confirms the endpoint shape (P0-2: no work before the session check).
+  const auth = await resolveDriverSession(request);
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+
   const body = await request.json().catch(() => null);
   const parsed = driverLocationUpdateSchema.safeParse(body);
 
@@ -54,9 +59,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-
-  const auth = await resolveDriverSession(request);
-  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
 
   const { client, error } = getSupabaseWriteClient();
   if (!client) {

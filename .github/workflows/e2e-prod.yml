@@ -1,0 +1,41 @@
+name: E2E (production, unauthenticated)
+
+# The release-gate checks that need no session, run against the live site:
+# an anonymous browser must never reach protected data, the public pages must
+# serve, /api/health must be honest, and every /api/driver/* endpoint must 401
+# without a session. Read-only.
+#
+# Not on `push` — a push races the Vercel deploy, so a just-shipped fix would
+# show red until the deploy lands. Scheduled + manual instead.
+
+on:
+  schedule:
+    - cron: "17 */3 * * *" # every 3 hours
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Base URL to test
+        default: https://tomp-platform.vercel.app
+
+jobs:
+  unauthenticated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      E2E_BASE_URL: ${{ github.event.inputs.base_url || 'https://tomp-platform.vercel.app' }}
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright (unauthenticated)
+        run: npx playwright test --config e2e/playwright.config.ts unauthenticated

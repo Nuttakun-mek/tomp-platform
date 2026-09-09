@@ -1,7 +1,17 @@
 # 958 — Execution status of the 957 effectiveness audit
 
-Base: through commit `7aa9aee`. **Migrations 0024/0025/0026/0027 are applied to production and verified.**
+Base: through commit `410aaa2`. **Migrations 0024/0025/0026/0027 are applied to production and verified. 0028 (P2-1 indexes) is written + schema-verified — needs `apply-migrations.mjs --yes` on production.**
 This tracks what was actually done against [957](957-system-effectiveness-audit-and-agent-plan.md) and what still needs a dedicated workstream.
+
+## Second pass (P0-3 finish, P1-2, P2-1, Batch H)
+
+| Audit item | What changed | Commit |
+|---|---|---|
+| **P0-3** finished — `DataResult<T>` | `lib/data/data-result.ts`: every operational list loader (change-requests, operation-days, missions, assignments, call-signs, timeline) returns `DataResult` = ok\|fail, both carrying an empty fallback. A real backend failure is `ok:false`; the no-client demo/Postgres path stays `ok:true`. `ChangeRequestList` / project overview / dispatch page / mission-control render `<DataUnavailable>` (retry = `router.refresh()`) on failure. `publishProjectAction` refuses to publish when any plan read failed. Test: `data-result.test.ts`. | `8c38c4c` |
+| **P1-2** checksum drift — analysed, no real drift | `scripts/check-migration-drift.mjs` (`npm run db:check-drift`) applies the repo history to a disposable Postgres and diffs the RBAC surface (35 RLS policies, 39 `role_permissions`, 6 helper fns) against production. **All match** — `0011/0018/0019/0020` edits were comments/idempotency only; `0018→0027` reconciled the live objects. No forward-repair migration. `apply-migrations.mjs --reconcile-checksums` clears the `CHANGED` warning (checksum bookkeeping only) — still to run on prod. Doc 961. | `55980f9` |
+| **P2-1** bounded reads + hot-path indexes | `getTimelineEventsByProjectId` had lost its LIMIT (and the 0025 triggers write a row per insert) — capped at 100. Migration `0028`: composite `(project_id, created_at desc)` on `assignment_status_updates` / `driver_issue_reports`, `(project_id, sent_at desc)` on `driver_notifications`. Load scenario (250 assignments / 10k pings) confirms all four hot reads are index range scans, no Seq Scan, sub-ms. `load-scenario.mjs` now EXPLAINs the timeline/status/issue windows. | `410aaa2` |
+| **Batch H** — driver-API guard tests + CI | `unauthenticated.spec.ts` now asserts `updates` / `status` / `location` / `issue` / `readiness` 401 with no session and ignore `?token=`. New skip-guarded `driver-flow.spec.ts` and `rbac-negative.spec.ts`. `ci.yml` gains a `database` job (Postgres 17 service → `db:verify-schema` / `db:verify-rls` / `db:load-scenario`); new `e2e-prod.yml` runs `unauthenticated.spec.ts` vs production on a 3h schedule + manual (off `push` — races the deploy). `@playwright/test` in root devDeps. | (this pass) |
+| **P0-2** follow-up found by the new test | `/api/driver/location` validated the body **before** the session check, so an unauthenticated `{}` POST got a 400 (endpoint-shape confirmation) instead of 401. Moved `resolveDriverSession` first, matching `status` / `issue` / `readiness`. No data was reachable either way. | (this pass) |
 
 ## Done in this pass
 

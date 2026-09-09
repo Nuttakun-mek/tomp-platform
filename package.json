@@ -41,6 +41,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "postgres": "^3.4.7"
   }
 }
