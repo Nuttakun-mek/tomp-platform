@@ -17,6 +17,16 @@ describe("mobile bridge protocol", () => {
     expect(parseBridgeMessage(message)).toBeNull();
   });
 
+  it("accepts one-time mobile session challenges", () => {
+    const message = JSON.stringify({
+      namespace: BRIDGE_NAMESPACE,
+      version: BRIDGE_VERSION,
+      type: "mobile-session.challenge",
+      payload: { code: "abc", expiresAt: "2026-09-09T10:00:00.000Z" }
+    });
+    expect(parseBridgeMessage(message)?.type).toBe("mobile-session.challenge");
+  });
+
   it("builds status messages for WebView", () => {
     const status = buildNativeStatusMessage("session_missing", "รอ session จากระบบ");
     expect(status.payload.canBackgroundLocation).toBe(false);
