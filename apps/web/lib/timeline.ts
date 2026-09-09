@@ -42,11 +42,40 @@ export interface CreateTimelineEventInput {
   metadata?: Record<string, unknown>;
 }
 
+// Event types that migration 0025 writes automatically via an AFTER trigger on
+// the business insert/update — inside that write's transaction, so the audit
+// event is now guaranteed. For these, this helper must not write a second row.
+const TRIGGER_OWNED_EVENTS = new Set<string>([
+  "PROJECT_CREATED",
+  "MISSION_CREATED",
+  "ASSIGNMENT_CREATED",
+  "ASSIGNMENT_STATUS_CHANGED",
+  "ASSIGNMENT_CANCELLED",
+  "DRIVER_CHECKED_IN",
+  "DRIVER_ISSUE_REPORTED",
+  "CHANGE_REQUEST_CREATED",
+  "PROJECT_PUBLISHED"
+]);
+
 export async function createTimelineEvent(input: CreateTimelineEventInput): Promise<ActionResult<TimelineEvent>> {
   const { client, error } = getSupabaseWriteClient();
 
   if (!client) {
     return actionFailure(error || "Supabase write client is not configured.");
+  }
+
+  // If a DB trigger already recorded this exact event (0025), don't duplicate it.
+  if (TRIGGER_OWNED_EVENTS.has(input.eventType) && input.objectId) {
+    const { data: existing } = await client
+      .from("timeline_events")
+      .select("*")
+      .eq("event_type", input.eventType)
+      .eq("object_id", input.objectId)
+      .gt("created_at", new Date(Date.now() - 30_000).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existing) return actionSuccess(mapTimelineEvent(existing));
   }
 
   const { data, error: insertError } = await client
