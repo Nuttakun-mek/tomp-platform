@@ -151,6 +151,81 @@ Set-Location -LiteralPath "D:\Dev-Pro\tomp-platform-android-shell"
 5. ห้ามนำไฟล์ modified/untracked จาก working tree อื่นติด commit
 6. ตรวจ `git diff --name-only origin/main...HEAD` ก่อน push ทุกครั้ง
 
+### 5.1 กลยุทธ์พัฒนาโดยไม่รอ EAS Build
+
+ห้ามใช้ EAS Build เป็นวงจรทดลองประจำวัน เพราะมีเวลารอและโควต้า ให้แยกการทดสอบเป็นสามระดับ:
+
+| ระดับ | ใช้ทำอะไร | วิธี | ใช้ EAS quota |
+|---|---|---|---:|
+| Development | แก้ App Shell, bridge, GPS service และ queue | Local Android Development Build + Metro ผ่าน USB | ไม่ใช้ |
+| Integration | ทดสอบ Driver Web/API รุ่นของ branch | Vercel Preview URL ภายใน Development Build เดิม | ไม่ใช้ |
+| Release candidate | แจก APK ให้ผู้ทดสอบที่ไม่ใช่นักพัฒนา | EAS Preview APK | ใช้เมื่อผ่าน gate เท่านั้น |
+
+Local development loop:
+
+```powershell
+Set-Location -LiteralPath "D:\Dev-Pro\tomp-platform-android-shell\apps\mobile-driver"
+npm.cmd ci
+npx.cmd expo install expo-dev-client
+npx.cmd expo run:android --device
+```
+
+หลังติดตั้ง Development Build บนโทรศัพท์แล้ว การแก้ TypeScript/JavaScript ส่วนใหญ่ใช้ Metro และ Fast Refresh โดยไม่ build APK ใหม่:
+
+```powershell
+adb reverse tcp:8081 tcp:8081
+npx.cmd expo start --dev-client --localhost
+```
+
+หากต้องเรียก Web ในเครื่องผ่าน USB สามารถ reverse port เพิ่มได้ แต่ค่าเริ่มต้นควรใช้ Vercel Preview HTTPS เพื่อให้ WebView, cookie และ permission ใกล้ production มากกว่า:
+
+```powershell
+adb reverse tcp:7000 tcp:7000
+```
+
+กำหนด URL ผ่าน environment แทนการ hardcode:
+
+```text
+EXPO_PUBLIC_TOMP_API_BASE_URL=https://<branch-preview>.vercel.app
+```
+
+ต้อง build Native ใหม่เฉพาะเมื่อเปลี่ยน:
+
+- `app.json`, Android permission, plugin หรือ package configuration
+- Expo/native dependency
+- native background task, foreground service, QR/camera หรือ SecureStore/SQLite integration
+- native side ของ bridge
+- icon, splash, package ID, app version หรือ Android version code
+
+ไม่ต้อง build Native ใหม่เมื่อเปลี่ยน:
+
+- UI/ข้อความ/ฟอร์มของ Driver Web ใน WebView
+- Web API ที่ยัง backward-compatible
+- server validation, Mission Control และ Timeline
+- Web side ของ bridge ที่ message เดิมใน Native รองรับอยู่แล้ว
+
+ปัจจุบันยังไม่ให้ EAS Update เป็น release path หลัก จนกว่าจะตั้ง `expo-updates`, `runtimeVersion`, channel, rollback และ compatibility policy ครบ การเป็น App Shell ทำให้ UI ส่วนใหญ่ปรับผ่าน Web deployment ได้อยู่แล้ว
+
+### 5.2 EAS quota gate
+
+อนุญาตให้เริ่ม EAS Preview Build รอบแรกเมื่อครบทุกข้อ:
+
+- Local Android build ติดตั้งและเปิดได้
+- QR/deep link เปิด WebView ถูก environment
+- PIN สร้าง Web session และ Mobile session ได้
+- Native bridge start/stop GPS ผ่าน
+- Background/lock-screen test ผ่านอย่างน้อย 10 นาทีบนเครื่องจริง
+- Offline/reconnect ส่งข้อมูลค้างได้
+- Mission Control ผูกตำแหน่งกับ project/assignment/driver/vehicle ถูกต้อง
+- Mobile typecheck, unit tests และ Expo Doctor ผ่าน
+
+ใช้ EAS ไม่เกินสอง milestone ก่อน pilot:
+
+1. Integration Preview เพื่อให้ทีม QA ทดสอบ
+2. Pilot Candidate หลังปิดข้อบกพร่องจาก Integration Preview
+
+หาก EAS build ล้มเหลวเพราะ compile/config ห้ามกด build ซ้ำทันที ให้ทำ `expo prebuild --platform android --clean` และ local Gradle build ให้ผ่านก่อน
+
 ## 6. Phase A0 — baseline และ dependency audit
 
 Agent ต้องทำก่อนแก้ไฟล์:
@@ -652,3 +727,91 @@ Android App Shell พร้อมให้ทดสอบภายในเม�
 ## 21. คำสั่งสำหรับ Agent
 
 เริ่มจาก worktree แยกและทำ A0–A2 ใน `apps/mobile-driver` เท่านั้นก่อน จากนั้นรอ/rebase งาน security ของ Web แล้วออกแบบ A3 Mobile Session Exchange ให้ผ่าน PIN โดยห้ามเปิด raw-token API กลับมา เมื่อ A3 ผ่านจึงทำ bridge, background GPS, SQLite outbox และ Preview APK ตามลำดับ ต้องรายงานผลจาก Android เครื่องจริง ไม่ใช้ Expo Go หรือ simulator เป็นหลักฐาน background GPS และห้ามประกาศพร้อมใช้งานจน Definition of Done ทุกข้อผ่าน
+
+## 22. แผนดำเนินงานและสถานะ
+
+สถานะเริ่มต้นทุกงานด้านล่างคือ `ยังไม่เริ่ม` จนกว่า Agent จะแนบ commit และหลักฐานตามเกณฑ์ ห้ามอ้างสถานะจากเอกสารเก่าว่าเป็นผลทดสอบปัจจุบัน
+
+| ลำดับ | งาน | ขอบเขตไฟล์หลัก | สิ่งที่ต้องได้ | Dependency | Gate |
+|---:|---|---|---|---|---|
+| 1 | A0 Baseline | `apps/mobile-driver/package*.json`, CI scripts | install/typecheck/doctor/config report | ไม่มี | G0 |
+| 2 | A1 Android config | `app.json`, `eas.json` | permission และ prebuild ถูกต้อง | A0 | G0 |
+| 3 | A2 WebView shell | `App.tsx`, `src/screens`, `src/components` | QR/deep link เปิด Driver Web; ไม่มี Native UI ซ้ำ | A1 | G1 |
+| 4 | A3 Session contract | Driver session API, forward migration, SecureStore | PIN แลก scoped mobile session; revoke ได้ | งาน security ฝั่ง Web merge แล้ว | G2 |
+| 5 | A4 Bridge | Web location component + mobile bridge | start/stop/status protocol ผ่าน schema | A2, A3 | G2 |
+| 6 | A5 GPS | mobile location service + server resolver | background ping ผูก scope ถูกต้อง ไม่มี stream ซ้ำ | A4 | G3 |
+| 7 | A6 Offline queue | `expo-sqlite`, outbox/retry | offline 10 นาทีแล้วส่งซ้ำครบ | A5 | G4 |
+| 8 | A7 Activation UX | scanner/deep link/error states | คนขับเข้าใจ flow และข้อผิดพลาด | A2–A6 | G4 |
+| 9 | A9 Device QA | test instrumentation/docs | lock-screen/device matrix ผ่าน | A0–A7 | G5 |
+| 10 | EAS Preview 1 | EAS preview profile | Integration APK | G0–G5 ผ่าน | G6 |
+| 11 | A8 Push | notifications + registration API | งาน/ข้อความแจ้งเตือนเมื่อ background | GPS pilot ผ่าน | G7 |
+| 12 | EAS Pilot Candidate | version/build evidence | APK สำหรับ internal pilot | defects จาก Preview 1 ปิดแล้ว | Release gate |
+
+นิยาม Gate:
+
+| Gate | เงื่อนไขผ่าน |
+|---|---|
+| G0 Configuration | typecheck, Expo Doctor, public config และ Android prebuild ผ่าน |
+| G1 Shell | WebView เปิดเฉพาะ allow-list, QR/deep link และ Android Back ทำงาน |
+| G2 Security | operational API ปฏิเสธ raw token; PIN/mobile session/revoke ผ่าน negative tests |
+| G3 Location | start/stop/background/lock screen ส่งตำแหน่งและ attribution ถูกต้อง |
+| G4 Resilience | offline queue, reconnect, expiry, permission revoke และ error UX ผ่าน |
+| G5 Device | Android จริงผ่าน test matrix และมี log/ภาพ Mission Control |
+| G6 Integration APK | APK ติดตั้งได้และ QA ทำ flow ตั้งแต่ QR ถึง Mission Control สำเร็จ |
+| G7 Notification | notification มาถึง, deep-link ถูกงาน และไม่เปิดเผยข้อมูลเกินจำเป็น |
+
+### งานที่ทำคู่ขนานได้ทันที
+
+Mobile Agent ทำได้โดยไม่รอ Web Agent:
+
+- A0 baseline และ mobile CI skeleton
+- A1 Android configuration
+- A2 WebView shell โดยใช้ interface ของ bridge แบบ versioned
+- A6 SQLite repository/unit tests โดยยังไม่ต่อ production session
+- Activation/loading/offline/error UX
+
+ต้องรอหรือประสาน Web Agent:
+
+- A3 Mobile Driver Session API และ migration
+- A4 Web side ของ bridge
+- การเปลี่ยน `resolveDriverSession`
+- E2E ที่เขียน Timeline และ Mission Control
+
+### งานชุดแรกที่ Agent ต้องส่งกลับ
+
+Pull request แรกต้องจำกัดเฉพาะ Mobile และมี:
+
+1. Android app configuration ที่ prebuild ผ่าน
+2. `react-native-webview`, `expo-dev-client`, `expo-network`, `expo-sqlite`
+3. App Shell แทน Native Driver UI เดิม
+4. QR/deep-link parser tests
+5. WebView navigation allow-list tests
+6. Bridge protocol types/schemas แต่ยังไม่เปิด production GPS จน session gate ผ่าน
+7. คำสั่ง Local Android Build ผ่าน USB
+8. รายงาน `npm ci`, typecheck และ Expo Doctor
+
+Pull request ที่สองจึงทำ session/API/bridge/GPS หลัง rebase งาน Web ล่าสุด
+
+## 23. รูปแบบรายงานของ Agent
+
+Agent ต้องรายงานทุก phase ด้วยรูปแบบนี้:
+
+```text
+Phase:
+Commit:
+Files created:
+Files modified:
+Commands and exact results:
+Android device/model/version:
+Web/API environment:
+Session mode:
+GPS foreground result:
+GPS background result:
+Lock-screen duration:
+Offline/retry result:
+Mission Control attribution result:
+Known failures:
+Decision: pass / fail / blocked
+```
+
+ห้ามรายงาน `pass` หากมีเพียง typecheck หรือ simulator โดยไม่มี Android physical-device evidence สำหรับ background GPS

@@ -80,6 +80,36 @@ async function updateChangeStatus(projectId: string, changeRequestId: string, st
   const permission = await requirePermission(projectId, status === "applied" ? "change.apply" : "change.approve");
   if (!permission.allowed) return actionFailure(permission.reason || "Missing change permission");
 
+  // Read the current change request first so we can apply the target change
+  // BEFORE flipping the status — a failed target update then leaves the request
+  // as 'approved' (retryable), not falsely 'applied'.
+  const { data: current, error: readError } = await client
+    .from("change_requests")
+    .select("*")
+    .eq("id", changeRequestId)
+    .eq("project_id", projectId)
+    .maybeSingle();
+  if (readError) return actionFailure(`อ่านคำขอเปลี่ยนแปลงไม่สำเร็จ: ${readError.message}`);
+  if (!current) return actionFailure("ไม่พบคำขอเปลี่ยนแปลงในโครงการนี้");
+
+  const patch = (afterData || current.after_data) as Record<string, unknown> | null;
+  let appliedObject: unknown = null;
+
+  if (status === "applied" && current.object_type && current.object_id && patch && typeof patch === "object") {
+    const tableByType: Record<string, string> = { project: "projects", mission: "missions", assignment: "assignments" };
+    const table = tableByType[String(current.object_type)];
+    if (table) {
+      const { data: updatedObject, error: applyError } = await client
+        .from(table)
+        .update(patch)
+        .eq("id", current.object_id)
+        .select()
+        .single();
+      if (applyError) return actionFailure(`ปรับใช้การเปลี่ยนแปลงกับเป้าหมายไม่สำเร็จ: ${applyError.message}`);
+      appliedObject = updatedObject;
+    }
+  }
+
   const { data, error: updateError } = await client
     .from("change_requests")
     .update({ status, after_data: afterData || undefined })
@@ -88,27 +118,7 @@ async function updateChangeStatus(projectId: string, changeRequestId: string, st
     .select()
     .single();
 
-  if (updateError) return actionFailure(`Change request update failed: ${updateError.message}`);
-
-  let appliedObject: unknown = null;
-  if (status === "applied" && data?.object_type && data?.object_id && data?.after_data && typeof data.after_data === "object") {
-    const tableByType: Record<string, string> = {
-      project: "projects",
-      mission: "missions",
-      assignment: "assignments"
-    };
-    const table = tableByType[String(data.object_type)];
-    if (table) {
-      const { data: updatedObject, error: applyError } = await client
-        .from(table)
-        .update(data.after_data as Record<string, unknown>)
-        .eq("id", data.object_id)
-        .select()
-        .single();
-      if (applyError) return actionFailure(`Change request status updated, but target application failed: ${applyError.message}`);
-      appliedObject = updatedObject;
-    }
-  }
+  if (updateError) return actionFailure(`อัปเดตสถานะคำขอเปลี่ยนแปลงไม่สำเร็จ: ${updateError.message}`);
 
   const timelineResult = await appendChangeTimeline(projectId, changeRequestId, eventType, reason, data);
   return actionSuccess({ mode, changeRequest: data, appliedObject, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : timelineResult.error);
