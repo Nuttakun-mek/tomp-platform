@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
 import { buildDriverAssignmentPacket, buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
-import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
+import { resolveDriverSession } from "@/lib/api/driver-token";
+import { getDriverAssignmentBySession } from "@/lib/data/driver-access";
 
 function text(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token")?.trim();
-  if (!token) {
-    return NextResponse.json({ success: false, error: "ต้องระบุ token จาก QR" }, { status: 400 });
-  }
+  const auth = await resolveDriverSession(request);
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
 
-  const driverAccess = await getDriverAssignmentByToken(token);
+  const driverAccess = await getDriverAssignmentBySession(auth.context);
   if (!driverAccess) {
-    return NextResponse.json({ success: false, error: "ไม่พบงานที่เชื่อมกับ QR นี้ หรือ QR หมดอายุแล้ว" }, { status: 404 });
+    return NextResponse.json({ success: false, error: "ไม่พบงานที่เชื่อมกับ session นี้ หรือสิทธิ์การเข้าถึงหมดอายุแล้ว" }, { status: 404 });
   }
 
   const pickupLabel = text(driverAccess.assignment.metadata.pickupLocation || driverAccess.assignment.metadata.pickup_location, "ยังไม่ระบุจุดรับ");
@@ -48,7 +46,6 @@ export async function GET(request: Request) {
   return NextResponse.json({
     success: true,
     data: {
-      token,
       packet,
       project: driverAccess.project,
       assignment: driverAccess.assignment,
@@ -64,5 +61,5 @@ export async function GET(request: Request) {
       notifications: driverAccess.notifications,
       routeChanges: driverAccess.routeChanges
     }
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }

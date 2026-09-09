@@ -32,9 +32,9 @@
 
 ## API Boundary
 
-Mobile app ไม่อ่าน Supabase ตรงเป็นค่าเริ่มต้น แต่เรียกผ่าน TOMP Web API:
+Mobile app ไม่อ่าน Supabase ตรงเป็นค่าเริ่มต้น แต่เรียกผ่าน TOMP Web API หลังจาก QR/PIN/device gate สร้าง driver session แล้ว:
 
-- `GET /api/driver/assignment?token=...`
+- `GET /api/driver/assignment` พร้อม header `x-driver-session`
 - `POST /api/driver/readiness`
 - `POST /api/driver/status`
 - `POST /api/driver/issue`
@@ -43,6 +43,7 @@ Mobile app ไม่อ่าน Supabase ตรงเป็นค่าเร�
 เหตุผล:
 
 - ไม่เปิด service-role key ในมือถือ
+- ไม่ส่ง raw QR token ไปยัง operational API หลังเริ่ม session แล้ว
 - รวม validation และ timeline event ไว้ฝั่ง server
 - ง่ายต่อการเพิ่ม auth/RBAC ภายหลัง
 

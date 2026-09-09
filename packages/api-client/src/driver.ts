@@ -3,6 +3,7 @@ import type { AssignmentStatusUpdateInput, DriverCheckinInput } from "@tomp/type
 
 export interface DriverApiConfig {
   baseUrl: string;
+  driverSession?: string;
   fetcher?: typeof fetch;
 }
 
@@ -19,6 +20,7 @@ async function requestJson<T>(config: DriverApiConfig, path: string, init?: Requ
     ...init,
     headers: {
       "content-type": "application/json",
+      ...(config.driverSession ? { "x-driver-session": config.driverSession } : {}),
       ...(init?.headers ?? {})
     }
   });
@@ -29,10 +31,19 @@ async function requestJson<T>(config: DriverApiConfig, path: string, init?: Requ
 }
 
 export async function fetchDriverAssignmentByToken(token: string, config?: DriverApiConfig): Promise<DriverAssignmentPacket> {
+  void token;
+  void config;
+  throw new Error("fetchDriverAssignmentByToken is deprecated. Establish a driver session first and call fetchDriverAssignmentBySession().");
+}
+
+export async function fetchDriverAssignmentBySession(config?: DriverApiConfig): Promise<DriverAssignmentPacket> {
   if (!config?.baseUrl) {
     throw new Error("Driver API baseUrl is required.");
   }
-  const result = await requestJson<{ packet: DriverAssignmentPacket }>(config, `/api/driver/assignment?token=${encodeURIComponent(token)}`);
+  if (!config.driverSession) {
+    throw new Error("Driver session is required.");
+  }
+  const result = await requestJson<{ packet: DriverAssignmentPacket }>(config, "/api/driver/assignment");
   if (!result.success || !result.data?.packet) throw new Error(result.error ?? "Driver assignment was not found.");
   return result.data.packet;
 }

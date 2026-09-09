@@ -8,7 +8,8 @@ export interface DriverRouteSummary {
 }
 
 export interface MobileDriverAssignment {
-  token: string;
+  /** Legacy QR token is never returned by the session-based assignment API. */
+  token?: string;
   packet: DriverAssignmentPacket;
   project: Project;
   assignment: Assignment;

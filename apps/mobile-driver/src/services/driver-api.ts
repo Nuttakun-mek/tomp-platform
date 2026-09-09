@@ -23,8 +23,21 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<ApiResu
   return payload;
 }
 
-export async function fetchAssignmentByToken(token: string) {
-  return requestJson<MobileDriverAssignment>(`/api/driver/assignment?token=${encodeURIComponent(token)}`);
+export async function fetchAssignmentBySession(mobileSession?: MobileDriverSession | null) {
+  if (!mobileSession?.session) {
+    return {
+      success: false,
+      error: "ยังไม่มี mobile session สำหรับอ่านข้อมูลงาน กรุณาเปิดงานจาก QR และยืนยันรหัสก่อน"
+    };
+  }
+
+  return requestJson<MobileDriverAssignment>("/api/driver/assignment", {
+    headers: { "x-driver-session": mobileSession.session }
+  });
+}
+
+export async function fetchAssignmentByToken(_token: string, mobileSession?: MobileDriverSession | null) {
+  return fetchAssignmentBySession(mobileSession);
 }
 
 export async function submitLocation(input: DriverLocationUpdateInput, mobileSession?: MobileDriverSession | null) {

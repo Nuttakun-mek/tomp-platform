@@ -6,7 +6,8 @@ This contract prepares a stable boundary for Web Driver and a future Mobile Driv
 
 ## Driver
 
-- `fetchDriverAssignmentByToken(token)`
+- `fetchDriverAssignmentBySession(config)` - requires an `x-driver-session` value minted after QR/PIN/device checks.
+- `fetchDriverAssignmentByToken(token)` - deprecated compatibility wrapper; must not call the assignment API with a query token.
 - `submitDriverReadiness(input)`
 - `submitDriverStatusUpdate(input)`
 - `submitDriverIssueReport(input)`
@@ -33,7 +34,7 @@ This contract prepares a stable boundary for Web Driver and a future Mobile Driv
 
 ## Current Behavior
 
-`@tomp/api-client` exposes typed function boundaries. Functions intentionally throw "Not implemented" until the shared API is wired to stable Web endpoints or API routes.
+`@tomp/api-client` exposes typed function boundaries. Driver operational endpoints use the scoped driver session, not raw QR tokens in a query string. Native/mobile callers send the session as `x-driver-session`; Web calls use the HttpOnly session cookie.
 
 ## Timeline Requirement
 

@@ -105,6 +105,13 @@ export interface DriverDayAssignment {
   urgent: boolean;
 }
 
+export interface DriverAssignmentSessionContext {
+  tokenId: string;
+  projectId: string;
+  assignmentId: string;
+  driverId: string;
+}
+
 type Row = Record<string, unknown>;
 
 function text(row: Row | null | undefined, key: string, fallback = "") {
@@ -348,6 +355,155 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
   };
 }
 
+export async function getDriverAssignmentBySession(context: DriverAssignmentSessionContext): Promise<DriverAccessAssignment | null> {
+  const { client } = getSupabaseWriteClient();
+  if (!client) {
+    return getDriverAssignmentBySessionViaPostgres(context);
+  }
+
+  const { data: tokenRow } = await client
+    .from("driver_access_tokens")
+    .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata")
+    .eq("id", context.tokenId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!tokenRow || tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) {
+    return getDriverAssignmentBySessionViaPostgres(context);
+  }
+
+  if (
+    String(tokenRow.project_id) !== context.projectId ||
+    String(tokenRow.assignment_id) !== context.assignmentId ||
+    String(tokenRow.driver_id) !== context.driverId
+  ) {
+    return null;
+  }
+
+  const [{ data: project }, { data: assignment }] = await Promise.all([
+    client.from("projects").select("*").eq("id", context.projectId).maybeSingle(),
+    client.from("assignments").select("*").eq("id", context.assignmentId).maybeSingle()
+  ]);
+
+  if (!project || !assignment) {
+    return getDriverAssignmentBySessionViaPostgres(context);
+  }
+
+  const assignmentRow = assignment as Row;
+  if (text(assignmentRow, "project_id") !== context.projectId || text(assignmentRow, "driver_id") !== context.driverId) {
+    return null;
+  }
+
+  const [{ data: callSign }, { data: driver }, { data: vehicle }] = await Promise.all([
+    client.from("call_signs").select("*").eq("id", text(assignmentRow, "call_sign_id")).maybeSingle(),
+    client.from("drivers").select("*").eq("id", context.driverId).maybeSingle(),
+    text(assignmentRow, "vehicle_id") ? client.from("vehicles").select("*").eq("id", text(assignmentRow, "vehicle_id")).maybeSingle() : Promise.resolve({ data: null })
+  ]);
+
+  if (!callSign || !driver || !vehicle) {
+    return getDriverAssignmentBySessionViaPostgres(context);
+  }
+
+  const [packet, notifications, routeChanges, messages, checkinRes, latestStatusRes] = await Promise.all([
+    getDriverAssignmentPacketByAssignmentId(context.assignmentId),
+    getDriverNotificationsByAssignmentId(context.assignmentId),
+    getRouteChangesByAssignmentId(context.assignmentId),
+    getDriverIssueMessagesByAssignmentId(context.assignmentId),
+    client.from("driver_checkins").select("id").eq("assignment_id", context.assignmentId).eq("status", "ready").limit(1),
+    client
+      .from("assignment_status_updates")
+      .select("status, created_at")
+      .eq("assignment_id", context.assignmentId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ]);
+
+  const operationAnchor = nullableText(assignmentRow, "start_time") || new Date().toISOString();
+  const { data: dayAssignmentRows } = await client
+    .from("assignments")
+    .select("id, call_sign_id, start_time, end_time, status, metadata, created_at")
+    .eq("project_id", context.projectId)
+    .eq("driver_id", context.driverId)
+    .neq("status", "cancelled")
+    .order("start_time", { ascending: true });
+  const visibleDayRows = ((dayAssignmentRows || []) as Row[]).filter((row) => sameOperationDay(nullableText(row, "start_time"), operationAnchor));
+  const dayCallSignIds = [...new Set(visibleDayRows.map((row) => text(row, "call_sign_id")).filter(Boolean))];
+  const { data: dayCallSignRows } = dayCallSignIds.length
+    ? await client.from("call_signs").select("id, call_sign").in("id", dayCallSignIds)
+    : { data: [] as Row[] };
+  const dayCallSignById = new Map(((dayCallSignRows || []) as Row[]).map((row) => [text(row, "id"), text(row, "call_sign")]));
+  const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
+  const latestStatusRow = latestStatusRes.data as Row | null;
+
+  return {
+    token: "",
+    tokenId: String(tokenRow.id),
+    pinRequired: typeof tokenMeta.pinHash === "string" && tokenMeta.pinHash.length > 0,
+    deviceBoundTo: typeof tokenMeta.deviceHash === "string" && tokenMeta.deviceHash ? tokenMeta.deviceHash : null,
+    tokenValidated: true,
+    packet,
+    notifications,
+    routeChanges,
+    messages,
+    latestStatus: latestStatusRow ? { status: text(latestStatusRow, "status"), at: text(latestStatusRow, "created_at") } : null,
+    dayAssignments: buildDayAssignments(visibleDayRows, context.assignmentId, (id) => dayCallSignById.get(id)),
+    activated: Boolean((checkinRes.data as unknown[] | null)?.length),
+    project: {
+      ...base(project as Row),
+      organizationId: text(project as Row, "organization_id"),
+      ownerProfileId: nullableText(project as Row, "owner_profile_id"),
+      projectCode: text(project as Row, "project_code"),
+      projectName: text(project as Row, "project_name"),
+      startDate: text(project as Row, "start_date"),
+      endDate: text(project as Row, "end_date"),
+      timezone: text(project as Row, "timezone", "Asia/Bangkok"),
+      status: text(project as Row, "status", "planning") as Project["status"],
+      visibilityLevel: text(project as Row, "visibility_level", "internal"),
+      serviceLevel: text(project as Row, "service_level", "standard")
+    },
+    assignment: {
+      ...base(assignmentRow),
+      projectId: text(assignmentRow, "project_id"),
+      missionId: text(assignmentRow, "mission_id"),
+      callSignId: text(assignmentRow, "call_sign_id"),
+      vehicleId: nullableText(assignmentRow, "vehicle_id"),
+      driverId: nullableText(assignmentRow, "driver_id"),
+      status: text(assignmentRow, "status", "planned") as Assignment["status"],
+      startTime: nullableText(assignmentRow, "start_time"),
+      endTime: nullableText(assignmentRow, "end_time"),
+      commitmentId: nullableText(assignmentRow, "commitment_id"),
+      currentVersion: numberValue(assignmentRow, "current_version", 1)
+    },
+    callSign: {
+      ...base(callSign as Row),
+      projectId: text(callSign as Row, "project_id"),
+      callSign: text(callSign as Row, "call_sign"),
+      groupName: nullableText(callSign as Row, "group_name"),
+      status: text(callSign as Row, "status", "active") as CallSign["status"]
+    },
+    driver: {
+      ...base(driver as Row),
+      organizationId: nullableText(driver as Row, "organization_id"),
+      vendorId: nullableText(driver as Row, "vendor_id"),
+      fullName: text(driver as Row, "full_name"),
+      phone: text(driver as Row, "phone"),
+      licenseType: nullableText(driver as Row, "license_type"),
+      languages: Array.isArray((driver as Row).languages) ? ((driver as Row).languages as string[]) : [],
+      status: text(driver as Row, "status", "assigned") as Driver["status"]
+    },
+    vehicle: {
+      ...base(vehicle as Row),
+      organizationId: nullableText(vehicle as Row, "organization_id"),
+      vendorId: nullableText(vehicle as Row, "vendor_id"),
+      plateNumber: text(vehicle as Row, "plate_number"),
+      vehicleType: text(vehicle as Row, "vehicle_type"),
+      capacity: numberValue(vehicle as Row, "capacity"),
+      status: text(vehicle as Row, "status", "assigned") as Vehicle["status"]
+    }
+  };
+}
+
 async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: string): Promise<DriverAccessAssignment | null> {
   const sql = getPostgresClient();
   if (!sql) return null;
@@ -432,6 +588,168 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     activated: checkinRows.length > 0,
     latestStatus: latestStatusRows[0] ? { status: text(latestStatusRows[0], "status"), at: text(latestStatusRows[0], "created_at") } : null,
     dayAssignments,
+    messages: messageRows.map((row) => ({
+      id: text(row, "id"),
+      text: text(row, "message"),
+      at: text(row, "created_at", new Date().toISOString()),
+      issueType: text(row, "issue_type", "message"),
+      severity: text(row, "severity", "info")
+    })),
+    notifications: notificationRows.map((row) => ({
+      id: text(row, "id"),
+      projectId: text(row, "project_id"),
+      assignmentId: nullableText(row, "assignment_id"),
+      driverId: nullableText(row, "driver_id"),
+      notificationType: text(row, "notification_type"),
+      priority: text(row, "priority", "normal") as DriverNotification["priority"],
+      title: text(row, "title"),
+      body: text(row, "body"),
+      action: "acknowledge",
+      actionLabel: nullableText(row, "action_label"),
+      actionUrl: nullableText(row, "action_url"),
+      status: text(row, "status", "unread") as DriverNotification["status"],
+      createdAt: text(row, "sent_at", text(row, "created_at", new Date().toISOString())),
+      expiresAt: nullableText(row, "expires_at"),
+      metadata: metadata(row)
+    })),
+    routeChanges: routeChangeRows.map((row) => ({
+      id: text(row, "id"),
+      assignmentId: text(row, "assignment_id"),
+      reason: text(row, "reason"),
+      impactSummary: nullableText(row, "impact_summary"),
+      oldRoute: row.old_route && typeof row.old_route === "object" ? (row.old_route as RouteChangeInstruction["oldRoute"]) : null,
+      newRoute: row.new_route && typeof row.new_route === "object" ? (row.new_route as RouteChangeInstruction["newRoute"]) : { summary: "เส้นทางที่ศูนย์ควบคุมแจ้ง", stops: [], metadata: {} },
+      status: text(row, "status", "pending") as RouteChangeInstruction["status"]
+    })),
+    project: {
+      ...base(project),
+      organizationId: text(project, "organization_id"),
+      ownerProfileId: nullableText(project, "owner_profile_id"),
+      projectCode: text(project, "project_code"),
+      projectName: text(project, "project_name"),
+      startDate: text(project, "start_date"),
+      endDate: text(project, "end_date"),
+      timezone: text(project, "timezone", "Asia/Bangkok"),
+      status: text(project, "status", "planning") as Project["status"],
+      visibilityLevel: text(project, "visibility_level", "internal"),
+      serviceLevel: text(project, "service_level", "standard")
+    },
+    assignment: {
+      ...base(assignment),
+      projectId: text(assignment, "project_id"),
+      missionId: text(assignment, "mission_id"),
+      callSignId: text(assignment, "call_sign_id"),
+      vehicleId: nullableText(assignment, "vehicle_id"),
+      driverId: nullableText(assignment, "driver_id"),
+      status: text(assignment, "status", "planned") as Assignment["status"],
+      startTime: nullableText(assignment, "start_time"),
+      endTime: nullableText(assignment, "end_time"),
+      commitmentId: nullableText(assignment, "commitment_id"),
+      currentVersion: numberValue(assignment, "current_version", 1)
+    },
+    callSign: {
+      ...base(callSign),
+      projectId: text(callSign, "project_id"),
+      callSign: text(callSign, "call_sign"),
+      groupName: nullableText(callSign, "group_name"),
+      status: text(callSign, "status", "active") as CallSign["status"]
+    },
+    driver: {
+      ...base(driver),
+      organizationId: nullableText(driver, "organization_id"),
+      vendorId: nullableText(driver, "vendor_id"),
+      fullName: text(driver, "full_name"),
+      phone: text(driver, "phone"),
+      licenseType: nullableText(driver, "license_type"),
+      languages: Array.isArray(driver.languages) ? (driver.languages as string[]) : [],
+      status: text(driver, "status", "assigned") as Driver["status"]
+    },
+    vehicle: {
+      ...base(vehicle),
+      organizationId: nullableText(vehicle, "organization_id"),
+      vendorId: nullableText(vehicle, "vendor_id"),
+      plateNumber: text(vehicle, "plate_number"),
+      vehicleType: text(vehicle, "vehicle_type"),
+      capacity: numberValue(vehicle, "capacity"),
+      status: text(vehicle, "status", "assigned") as Vehicle["status"]
+    }
+  };
+}
+
+async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignmentSessionContext): Promise<DriverAccessAssignment | null> {
+  const sql = getPostgresClient();
+  if (!sql) return null;
+
+  const tokenRows = await sql<Row[]>`
+    select id, project_id, assignment_id, driver_id, status, expires_at, metadata
+    from driver_access_tokens
+    where id = ${context.tokenId}
+      and status = 'active'
+    limit 1
+  `;
+  const tokenRow = tokenRows[0];
+  if (!tokenRow?.project_id || !tokenRow.assignment_id || !tokenRow.driver_id) return null;
+  if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) return null;
+  if (
+    String(tokenRow.project_id) !== context.projectId ||
+    String(tokenRow.assignment_id) !== context.assignmentId ||
+    String(tokenRow.driver_id) !== context.driverId
+  ) {
+    return null;
+  }
+
+  const assignmentRows = await sql<Row[]>`
+    select * from assignments where id = ${context.assignmentId} limit 1
+  `;
+  const assignment = assignmentRows[0];
+  if (!assignment) return null;
+  if (text(assignment, "project_id") !== context.projectId || text(assignment, "driver_id") !== context.driverId) return null;
+
+  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows, checkinRows, latestStatusRows] = await Promise.all([
+    sql<Row[]>`select * from projects where id = ${context.projectId} limit 1`,
+    sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
+    sql<Row[]>`select * from drivers where id = ${context.driverId} limit 1`,
+    assignment.vehicle_id ? sql<Row[]>`select * from vehicles where id = ${String(assignment.vehicle_id)} limit 1` : Promise.resolve([]),
+    sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${context.assignmentId} order by created_at desc limit 1`,
+    sql<Row[]>`select * from driver_notifications where assignment_id = ${context.assignmentId} order by sent_at desc limit 10`,
+    sql<Row[]>`select * from route_change_instructions where assignment_id = ${context.assignmentId} order by created_at desc limit 5`,
+    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${context.assignmentId} order by created_at asc limit 50`,
+    sql<Row[]>`select id from driver_checkins where assignment_id = ${context.assignmentId} and status = 'ready' limit 1`,
+    sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${context.assignmentId} order by created_at desc limit 1`
+  ]);
+
+  const project = projectRows[0];
+  const callSign = callSignRows[0];
+  const driver = driverRows[0];
+  const vehicle = vehicleRows[0];
+  if (!project || !callSign || !driver || !vehicle) return null;
+
+  const operationAnchor = nullableText(assignment, "start_time") || new Date().toISOString();
+  const dayAssignmentRows = await sql<Row[]>`
+    select id, call_sign_id, start_time, end_time, status, metadata, created_at
+    from assignments
+    where project_id = ${context.projectId}
+      and driver_id = ${context.driverId}
+      and status <> 'cancelled'
+    order by start_time asc nulls last, created_at asc
+  `;
+  const visibleDayRows = dayAssignmentRows.filter((row) => sameOperationDay(nullableText(row, "start_time"), operationAnchor));
+  const dayCallSignIds = [...new Set(visibleDayRows.map((row) => text(row, "call_sign_id")).filter(Boolean))];
+  const dayCallSignRows = dayCallSignIds.length ? await sql<Row[]>`select id, call_sign from call_signs where id in ${sql(dayCallSignIds)}` : [];
+  const dayCallSignById = new Map(dayCallSignRows.map((row) => [text(row, "id"), text(row, "call_sign")]));
+  const packetPayload = packetRows[0]?.payload;
+  const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
+
+  return {
+    token: "",
+    tokenId: String(tokenRow.id),
+    pinRequired: typeof tokenMeta.pinHash === "string" && tokenMeta.pinHash.length > 0,
+    deviceBoundTo: typeof tokenMeta.deviceHash === "string" && tokenMeta.deviceHash ? tokenMeta.deviceHash : null,
+    tokenValidated: true,
+    packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,
+    activated: checkinRows.length > 0,
+    latestStatus: latestStatusRows[0] ? { status: text(latestStatusRows[0], "status"), at: text(latestStatusRows[0], "created_at") } : null,
+    dayAssignments: buildDayAssignments(visibleDayRows, context.assignmentId, (id) => dayCallSignById.get(id)),
     messages: messageRows.map((row) => ({
       id: text(row, "id"),
       text: text(row, "message"),

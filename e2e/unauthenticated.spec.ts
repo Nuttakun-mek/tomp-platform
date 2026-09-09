@@ -36,6 +36,7 @@ test("api/health is honest", async ({ request }) => {
 // signed session cookie, never a query string. With no cookie they must 401,
 // not leak data.
 const DRIVER_ENDPOINTS = [
+  { method: "GET" as const, path: "/api/driver/assignment" },
   { method: "GET" as const, path: "/api/driver/updates" },
   { method: "POST" as const, path: "/api/driver/status" },
   { method: "POST" as const, path: "/api/driver/location" },
