@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import type { DriverNotification } from "@tomp/types/domain";
 import type { DriverIssueMessage } from "@/lib/data/driver-operations";
-import { formatRelativeTh } from "@/lib/ui/relative-time";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 
 export interface ChatBubble {
   id: string;

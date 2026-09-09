@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
 import { LiveTrackingMap, type MarkerFreshness, type TrackedPoint } from "@/components/mission-control/live-tracking-map";
-import { formatRelativeTh } from "@/lib/ui/relative-time";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 
 function metaText(location: DriverLocation, key: string, fallback: string) {
   const value = location.metadata[key];

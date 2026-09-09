@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { VehicleOperationTask } from "@/lib/data/vehicle-operations";
 import { formatStatusTh } from "@/lib/i18n/status-th";
-import { formatRelativeTh } from "@/lib/ui/relative-time";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { CancelAssignmentButton } from "@/components/assignments/cancel-assignment-button";
 import { Badge } from "@/components/ui/badge";
 

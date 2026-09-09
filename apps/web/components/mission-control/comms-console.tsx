@@ -5,7 +5,7 @@ import { ArrowDownLeft, ArrowUpRight, MessageSquare, Send } from "lucide-react";
 import type { Assignment, CallSign } from "@tomp/types/domain";
 import { sendDriverNotificationAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage, DriverOutboundMessage } from "@/lib/data/driver-comms";
-import { formatRelativeTh } from "@/lib/ui/relative-time";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 
 interface CommsConsoleProps {
   projectId: string;

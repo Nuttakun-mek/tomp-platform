@@ -1,5 +1,5 @@
 import { roleLabelTh } from "@/lib/i18n/role-th";
-import { formatRelativeTh } from "./relative-time";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 
 export interface OwnerLineInput {
   name?: string | null;

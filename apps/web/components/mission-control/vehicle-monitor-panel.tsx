@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CarFront, MapPinned, MessageCircle } from "lucide-react";
 import type { VehicleOperationProfile } from "@/lib/data/vehicle-operations";
+import { gpsFreshness, gpsFreshnessLabelTh, gpsFreshnessTone } from "@/lib/domain/gps-freshness";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatStatusTh } from "@/lib/i18n/status-th";
@@ -8,10 +9,8 @@ import { VehicleMessageForm } from "./vehicle-message-form";
 
 function gpsTone(profile: VehicleOperationProfile): { label: string; tone: "success" | "warning" | "danger" | "neutral" } {
   if (!profile.latestLocation) return { label: "ยังไม่มี GPS", tone: "neutral" };
-  const ageSeconds = Math.max(0, Math.round((Date.now() - new Date(profile.latestLocation.recordedAt).getTime()) / 1000));
-  if (ageSeconds <= 35) return { label: "GPS สด", tone: "success" };
-  if (ageSeconds <= 120) return { label: "GPS ช้า", tone: "warning" };
-  return { label: "GPS ขาดช่วง", tone: "danger" };
+  const freshness = gpsFreshness(profile.latestLocation.recordedAt, profile.latestLocation.sharingEvent, Date.now());
+  return { label: gpsFreshnessLabelTh(freshness), tone: gpsFreshnessTone(freshness) };
 }
 
 export function VehicleMonitorPanel({ profiles }: { profiles: VehicleOperationProfile[] }) {

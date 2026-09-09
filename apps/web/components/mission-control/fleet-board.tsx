@@ -7,8 +7,10 @@ import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
 import type { AssignmentStatusUpdate } from "@/lib/data/assignment-status";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
 import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
+import { metaString } from "@/lib/data/location-meta";
+import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatStatusTh } from "@/lib/i18n/status-th";
-import { formatRelativeTh } from "@/lib/ui/relative-time";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { Tooltip } from "@/components/ui/tooltip";
 
 interface FleetBoardProps {
@@ -23,35 +25,31 @@ interface FleetBoardProps {
   initialInbound?: DriverInboundMessage[];
 }
 
-type Freshness = "live" | "slow" | "offline" | "none";
+// "none" = this assignment has never shared a location; the shared helper covers
+// the rest (live / slow / offline / stopped).
+type Freshness = GpsFreshness | "none";
 
 const FRESH_DOT: Record<Freshness, string> = {
   live: "bg-emerald-500",
   slow: "bg-amber-500",
   offline: "bg-rose-500",
+  stopped: "bg-slate-400",
   none: "bg-slate-300"
 };
 
 const FRESH_LABEL: Record<Freshness, string> = {
   live: "GPS สด",
-  slow: "GPS ขาดช่วง",
-  offline: "ไม่พบสัญญาณ GPS",
+  slow: "สัญญาณช้า",
+  offline: "ขาดการอัปเดต",
+  stopped: "หยุดแชร์",
   none: "ยังไม่แชร์ GPS"
 };
 
-const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, slow: 2, live: 3 };
+const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, stopped: 1, slow: 2, live: 3 };
 
 function freshnessOf(location: DriverLocation | undefined, now: number): Freshness {
   if (!location) return "none";
-  if (location.sharingEvent === "sharing_stopped") return "offline";
-  const age = Math.round((now - new Date(location.recordedAt).getTime()) / 1000);
-  if (age <= 35) return "live";
-  if (age <= 120) return "slow";
-  return "offline";
-}
-
-function safeMeta(value: unknown, fallback: string) {
-  return typeof value === "string" && value.trim() ? value : fallback;
+  return gpsFreshness(location.recordedAt, location.sharingEvent, now);
 }
 
 export function FleetBoard({
@@ -152,8 +150,8 @@ export function FleetBoard({
           label: callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`,
           driver: assignment.driverId ? driverById.get(assignment.driverId) : undefined,
           vehicle: assignment.vehicleId ? vehicleById.get(assignment.vehicleId) : undefined,
-          pickup: safeMeta(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ"),
-          dropoff: safeMeta(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง"),
+          pickup: metaString(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ"),
+          dropoff: metaString(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง"),
           location,
           freshness,
           reported: statuses[assignment.id],

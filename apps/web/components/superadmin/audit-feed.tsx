@@ -1,6 +1,6 @@
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatTimelineEventTh } from "@/lib/i18n/timeline-th";
-import { formatRelativeTh } from "@/lib/ui/relative-time";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import type { AuditRow } from "@/lib/superadmin/overview";
 
 export function AuditFeed({ rows }: { rows: AuditRow[] }) {

@@ -5,15 +5,12 @@ import { VehicleProfileQr } from "@/components/resources/vehicle-profile-qr";
 import { VehicleTaskCard } from "@/components/resources/vehicle-task-card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
+import { gpsFreshness, gpsFreshnessLabelTh } from "@/lib/domain/gps-freshness";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
 function gpsLabel(profile: VehicleOperationProfile) {
   if (!profile.latestLocation) return "ยังไม่มี GPS";
-  const recorded = new Date(profile.latestLocation.recordedAt).getTime();
-  const ageSeconds = Math.max(0, Math.round((Date.now() - recorded) / 1000));
-  if (ageSeconds <= 35) return "GPS สด";
-  if (ageSeconds <= 120) return "GPS ช้า";
-  return "GPS ขาดช่วง";
+  return gpsFreshnessLabelTh(gpsFreshness(profile.latestLocation.recordedAt, profile.latestLocation.sharingEvent, Date.now()));
 }
 
 export function VehicleOperationsBoard({ profiles }: { profiles: VehicleOperationProfile[] }) {

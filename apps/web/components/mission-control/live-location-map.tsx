@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
+import { locationMetaText } from "@/lib/data/location-meta";
+import { gpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
 import { LiveTrackingMap, toTrackedPoint } from "@/components/mission-control/live-tracking-map";
@@ -11,11 +13,8 @@ interface LiveLocationMapProps {
   initialLocations: DriverLocation[];
 }
 
-type LocationFreshness = "live" | "slow" | "offline" | "stopped";
-
 function metadataText(location: DriverLocation, key: string, fallback: string) {
-  const value = location.metadata[key];
-  return typeof value === "string" && value.trim() ? value : fallback;
+  return locationMetaText(location, key, fallback);
 }
 
 function getLocationIdentity(location: DriverLocation) {
@@ -31,12 +30,8 @@ function getLocationIdentity(location: DriverLocation) {
   };
 }
 
-function getFreshness(location: DriverLocation, now: number): LocationFreshness {
-  if (location.sharingEvent === "sharing_stopped") return "stopped";
-  const ageSeconds = Math.max(0, Math.round((now - new Date(location.recordedAt).getTime()) / 1000));
-  if (ageSeconds <= 35) return "live";
-  if (ageSeconds <= 120) return "slow";
-  return "offline";
+function getFreshness(location: DriverLocation, now: number) {
+  return gpsFreshness(location.recordedAt, location.sharingEvent, now);
 }
 
 function getAgeLabel(location: DriverLocation, now: number) {
