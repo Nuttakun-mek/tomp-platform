@@ -8,6 +8,13 @@ import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapTimelineEvent } from "./mappers";
 
 // cache(): one render often needs this list from several components; keep it to one query per request.
+// The 0025 triggers write a timeline row on every business insert / status
+// change, so this table grows fast during an operation. The UI panel shows a
+// recent window — cap the read so a multi-day project doesn't pull thousands of
+// rows into the server component. `TIMELINE_WINDOW` is also the Postgres path's
+// `limit`.
+export const TIMELINE_WINDOW = 100;
+
 export const getTimelineEventsByProjectId = cache(async function getTimelineEventsByProjectId(
   projectId: string
 ): Promise<DataResult<TimelineEvent[]>> {
@@ -17,7 +24,13 @@ export const getTimelineEventsByProjectId = cache(async function getTimelineEven
   return runListQuery({
     fallback: [],
     label: "timeline events",
-    query: () => supabase.from("timeline_events").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+    query: () =>
+      supabase
+        .from("timeline_events")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(TIMELINE_WINDOW),
     map: (rows) => rows.map(mapTimelineEvent)
   });
 });

@@ -107,9 +107,19 @@ try {
   await time("driver day list (one driver)", async () => (await sql`
     select count(*)::int n from assignments where project_id = ${project.id} and driver_id = ${drivers[0].id} and status <> 'cancelled'`)[0].n);
 
-  console.log("\nEXPLAIN — latest GPS per assignment:");
-  const plan = await sql.unsafe(`explain (analyze, buffers, format text) select distinct on (assignment_id) id from gps_locations where project_id = '${project.id}' order by assignment_id, recorded_at desc`);
-  for (const row of plan) console.log("  " + row["QUERY PLAN"]);
+  const explains = [
+    ["latest GPS per assignment", `select distinct on (assignment_id) id from gps_locations where project_id = '${project.id}' order by assignment_id, recorded_at desc`],
+    ["timeline window (100)", `select * from timeline_events where project_id = '${project.id}' order by created_at desc limit 100`],
+    ["assignment status window (200)", `select * from assignment_status_updates where project_id = '${project.id}' order by created_at desc limit 200`],
+    ["driver issue reports (60)", `select * from driver_issue_reports where project_id = '${project.id}' order by created_at desc limit 60`]
+  ];
+  for (const [label, query] of explains) {
+    console.log(`\nEXPLAIN — ${label}:`);
+    const plan = await sql.unsafe(`explain (analyze, buffers, format text) ${query}`);
+    for (const row of plan) console.log("  " + row["QUERY PLAN"]);
+    const usesSeqScan = plan.some((row) => /Seq Scan/i.test(row["QUERY PLAN"]));
+    if (usesSeqScan) console.log(`  ⚠ sequential scan — consider an index for: ${label}`);
+  }
 
   console.log(`\nSeeded. Run with --clean to remove, or 'delete from projects where metadata->>''loadTest'' = ''true'''.`);
 } catch (error) {
