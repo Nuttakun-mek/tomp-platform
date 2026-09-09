@@ -1,6 +1,6 @@
 # 956 — Agent handoff: job ordering (centre side) + page length
 
-**สถานะ:** ยังไม่เริ่ม
+**สถานะ:** เสร็จทั้ง 4 task (commit b85c912, 4d5c1e8)
 **ฐาน:** commit `751b75d` (หลังงานฝั่งคนขับ: today-list ordering + tap-to-expand)
 **ที่มา:** ผู้ใช้ทดสอบแล้วพบ 3 เรื่อง — ฝั่งคนขับแก้ไปแล้วบางส่วนใน `751b75d` ที่เหลือคือฝั่งศูนย์
 
