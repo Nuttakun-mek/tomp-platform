@@ -41,7 +41,7 @@ export function CreateMissionForm({ projectId }: { projectId: string }) {
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid gap-4 p-4">
+    <form action={handleSubmit} className="enterprise-panel grid content-start gap-4 p-4">
       <div className="border-b border-slate-100 pb-4">
         <h2 className="text-lg font-semibold text-ink">สร้างภารกิจ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">ภารกิจคือกิจกรรมบริการ เช่น รับผู้โดยสาร ส่งผู้ร่วมงาน หรือรถรับรอง</p>

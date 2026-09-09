@@ -1,6 +1,7 @@
 import { IncidentForm } from "@/components/recovery/incident-form";
 import { RecoveryCommandPanel } from "@/components/recovery/recovery-command-panel";
 import { PageHeader } from "@/components/page-header";
+import { BackLink } from "@/components/ui/back-link";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getProjects } from "@/lib/data/projects";
 import { demoKernel } from "@/lib/demo/demo-kernel";
@@ -13,6 +14,7 @@ export default async function RecoveryPage() {
 
   return (
     <>
+      <BackLink href="/projects" label="หน้าโครงการ" />
       <PageHeader
         eyebrow="ศูนย์ควบคุม"
         title="กู้คืนสถานการณ์"

@@ -48,14 +48,14 @@ async function ensureMissionPlanningContainer(
 
   let projectDayId = typeof existingDay?.id === "string" ? existingDay.id : null;
   if (!projectDayId) {
+    // project_days has no `label` column — operation_date + day_number is all it needs.
     const { data: insertedDay, error: dayInsertError } = await client
       .from("project_days")
       .insert({
         project_id: projectId,
         day_number: 1,
         operation_date: project.start_date || new Date().toISOString().slice(0, 10),
-        label: "วันปฏิบัติการหลัก",
-        metadata: { source: "auto_created_for_mission" }
+        metadata: { source: "auto_created_for_mission", label: "วันปฏิบัติการหลัก" }
       })
       .select("id")
       .single();
@@ -86,24 +86,23 @@ async function ensureMissionPlanningContainer(
     return { projectDayId, sessionId: String(existingSession.id) };
   }
 
-  const { data: insertedSession, error: sessionInsertError } = await client
+  // sessions has no `session_code` column and its status check is
+  // draft|ready|operating|closed|archived (no "planning"). A mission's
+  // session_id is nullable, so a failed session insert must not block the
+  // mission — fall back to no session.
+  const { data: insertedSession } = await client
     .from("sessions")
     .insert({
       project_id: projectId,
       project_day_id: projectDayId,
-      session_code: "MAIN",
       session_name: "รอบปฏิบัติการหลัก",
-      status: "planning",
+      status: "draft",
       metadata: { source: "auto_created_for_mission" }
     })
     .select("id")
     .single();
 
-  if (sessionInsertError || !insertedSession?.id) {
-    return { error: getDatabaseErrorMessage(sessionInsertError, "สร้างรอบปฏิบัติการไม่สำเร็จ") };
-  }
-
-  return { projectDayId, sessionId: String(insertedSession.id) };
+  return { projectDayId, sessionId: insertedSession?.id ? String(insertedSession.id) : null };
 }
 
 export async function createMissionAction(input: unknown): Promise<ActionResult> {

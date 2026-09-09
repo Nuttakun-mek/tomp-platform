@@ -27,12 +27,16 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
         <ResourceQualityCard title="ต้องตรวจสอบ" value="0" detail="ยังไม่พบรายการเสี่ยงในรอบทดสอบภายใน" />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <ResourceLink href="/resources/drivers" title="คนขับ" detail="จัดการรายชื่อ เบอร์โทร สถานะ และความพร้อมสำหรับรับงาน" icon={<UserRoundCheck className="h-6 w-6" />} />
-        <ResourceLink href="/resources/vehicles" title="จัดการรถ" detail="ดูโปรไฟล์รถ คิวงาน งานปัจจุบัน งานคงเหลือ QR ประจำรถ และแผนที่รวม" icon={<CarFront className="h-6 w-6" />} />
+        <ResourceLink href={withProject("/resources/drivers", params.projectId)} title="คนขับ" detail="จัดการรายชื่อ เบอร์โทร สถานะ และความพร้อมสำหรับรับงาน" icon={<UserRoundCheck className="h-6 w-6" />} />
+        <ResourceLink href={withProject("/resources/vehicles", params.projectId)} title="จัดการรถ" detail="ดูโปรไฟล์รถ คิวงาน งานปัจจุบัน งานคงเหลือ QR ประจำรถ และแผนที่รวม" icon={<CarFront className="h-6 w-6" />} />
       </div>
       <VendorResourceSummary />
     </div>
   );
+}
+
+function withProject(href: string, projectId?: string) {
+  return projectId ? `${href}?projectId=${encodeURIComponent(projectId)}` : href;
 }
 
 function ResourceLink({ href, title, detail, icon }: { href: string; title: string; detail: string; icon: ReactNode }) {

@@ -50,7 +50,7 @@ export function CreateVehicleForm() {
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid gap-4 p-4">
+    <form action={handleSubmit} className="enterprise-panel grid content-start gap-4 p-4">
       <div>
         <h2 className="text-lg font-semibold text-ink">สร้างโปรไฟล์รถ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">เพิ่มรถสำหรับใช้งานจริง พร้อมกำหนดข้อปฏิบัติก่อนรับงานของรถคันนั้น</p>

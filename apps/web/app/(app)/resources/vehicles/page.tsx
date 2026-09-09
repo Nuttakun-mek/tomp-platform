@@ -2,9 +2,16 @@ import { LiveLocationMap } from "@/components/mission-control/live-location-map"
 import { CreateVehicleForm } from "@/components/resources/create-vehicle-form";
 import { ResourceQualityCard } from "@/components/resources/resource-quality-card";
 import { VehicleOperationsBoard } from "@/components/resources/vehicle-operations-board";
+import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
+import { BackLink } from "@/components/ui/back-link";
 import { getVehicleOperationProfiles } from "@/lib/data/vehicle-operations";
 
-export default async function VehiclesPage() {
+interface VehiclesPageProps {
+  searchParams?: Promise<{ projectId?: string }>;
+}
+
+export default async function VehiclesPage({ searchParams }: VehiclesPageProps) {
+  const params = searchParams ? await searchParams : {};
   const profiles = await getVehicleOperationProfiles();
   const vehicles = profiles.map((profile) => profile.vehicle);
   const activeVehicles = profiles.filter((profile) => profile.currentTasks.length > 0).length;
@@ -16,6 +23,11 @@ export default async function VehiclesPage() {
 
   return (
     <>
+      {params.projectId ? (
+        <ProjectWorkspaceTabs projectId={params.projectId} active="resources" />
+      ) : (
+        <BackLink href="/resources" label="ทรัพยากร" />
+      )}
       <section className="enterprise-panel p-4">
         <p className="page-kicker">จัดการรถ</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
@@ -38,7 +50,7 @@ export default async function VehiclesPage() {
 
       <LiveLocationMap initialLocations={locations} height={420} />
 
-      <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr]">
+      <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr] xl:items-start">
         <CreateVehicleForm />
         <VehicleOperationsBoard profiles={profiles} />
       </div>
