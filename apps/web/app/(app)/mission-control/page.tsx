@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
 import { CommsConsole } from "@/components/mission-control/comms-console";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
-import { LiveMapPanel } from "@/components/mission-control/live-map-panel";
+import { LiveLocationMap } from "@/components/mission-control/live-location-map";
 import { MissionControlFeedProvider } from "@/components/mission-control/mission-control-feed";
 import { OperationKpiStrip } from "@/components/mission-control/operation-kpi-strip";
 import { OperationTimelinePanel } from "@/components/mission-control/operation-timeline-panel";
@@ -88,7 +88,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
         initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, evidence }}
       >
         <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">
-          <LiveMapPanel projectId={activeProject.id} locations={locations} />
+          <LiveLocationMap projectId={activeProject.id} initialLocations={locations} />
         </CollapsibleSection>
 
         <FleetBoard

@@ -1,6 +1,6 @@
+import { LiveLocationMap } from "@/components/mission-control/live-location-map";
 import { CreateVehicleForm } from "@/components/resources/create-vehicle-form";
 import { ResourceQualityCard } from "@/components/resources/resource-quality-card";
-import { VehicleFleetMap } from "@/components/resources/vehicle-fleet-map";
 import { VehicleOperationsBoard } from "@/components/resources/vehicle-operations-board";
 import { getVehicleOperationProfiles } from "@/lib/data/vehicle-operations";
 
@@ -36,7 +36,7 @@ export default async function VehiclesPage() {
         <ResourceQualityCard title="งานที่ทำแล้ว" value={`${completedTasks}`} detail="ประวัติงานที่เสร็จสิ้น" />
       </div>
 
-      <VehicleFleetMap initialLocations={locations} />
+      <LiveLocationMap initialLocations={locations} height={420} />
 
       <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr]">
         <CreateVehicleForm />
