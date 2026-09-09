@@ -19,6 +19,7 @@
     "test:watch": "npm run test:watch -w @tomp/web",
     "security:env": "node scripts/check-public-env.mjs",
     "smoke:production": "node scripts/production-smoke.mjs",
+    "e2e": "playwright test --config e2e/playwright.config.ts",
     "db:migrate": "node scripts/apply-migrations.mjs",
     "db:migrate:dry": "node scripts/apply-migrations.mjs --dry-run",
     "db:verify-schema": "node scripts/verify-schema.mjs",
