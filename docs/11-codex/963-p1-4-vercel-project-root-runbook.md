@@ -5,6 +5,28 @@ Next.js middleware and forces a hand-maintained rewrite per nested route. After
 this, Vercel builds `apps/web` as a normal Next.js app: middleware runs, and
 routing is the filesystem + `next.config.ts`.
 
+## Status update - 2026-09-10
+
+Completed:
+
+- Branch `p1-4-vercel-project-root` was merged into `main`.
+- Vercel project `tomp-platform` was updated to `rootDirectory = apps/web`.
+- `sourceFilesOutsideRootDirectory = true` remains enabled.
+- Framework was set to `nextjs`.
+- Production redeployed successfully at commit `e665679`.
+- Production smoke passed.
+- Security headers are present.
+- `/admin` and `/live-test` redirect correctly.
+- Pretty URL shims resolve through Next.js routes and protected pages are now
+  handled by middleware.
+- `e2e/unauthenticated.spec.ts` passed against production: 15/15.
+- Follow-up cleanup was completed by deleting the repo-root `vercel.json`.
+
+Current rollback note: because the repo-root `vercel.json` has now been removed,
+rollback by clearing Root Directory alone is no longer enough. To return to the
+legacy root build path, restore the deleted root `vercel.json` from history and
+then clear the Vercel Root Directory setting.
+
 ## Why it is safe
 
 Every `routes` entry in the current root `vercel.json` already has a native
