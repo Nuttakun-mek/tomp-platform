@@ -16,7 +16,7 @@
 --          the business insert rolls back
 --   2. Deploy the app change that removes the now-redundant app-side
 --      createTimelineEvent() calls for the covered events (see
---      docs/11-codex/959). During the gap the 20s de-dup guard below keeps
+--      docs/11-codex/960). During the gap the 20s de-dup guard below keeps
 --      app + trigger from double-logging.
 --   3. Apply on production, then deploy the app change.
 -- ---------------------------------------------------------------------------

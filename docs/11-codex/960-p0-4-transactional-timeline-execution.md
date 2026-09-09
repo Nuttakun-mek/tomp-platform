@@ -1,4 +1,4 @@
-# 959 — P0-4: atomic Timeline, execution note for the DB owner
+# 960 — P0-4: atomic Timeline, execution note for the DB owner
 
 Closes the last open **P0** from the 957 audit: a business write and its
 immutable audit event are separate, so the database can hold a change with no
