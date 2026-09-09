@@ -1,10 +1,10 @@
-import * as SecureStore from "expo-secure-store";
+import * as SQLite from "expo-sqlite";
 import type { AssignmentStatusUpdateInput, DriverCheckinInput, DriverIssueReportInput, DriverLocationUpdateInput } from "@tomp/types/schemas";
 import { submitLocation } from "./driver-api";
 import { getMobileDriverSession } from "./mobile-session-store";
 
-const OFFLINE_QUEUE_KEY = "tomp_driver_offline_queue";
-const MAX_QUEUE_SIZE = 500;
+const DATABASE_NAME = "tomp-driver-outbox.db";
+const MAX_QUEUE_SIZE = 2000;
 
 type OfflineAction =
   | { id: string; kind: "readiness"; payload: DriverCheckinInput; createdAt: string }
@@ -12,46 +12,82 @@ type OfflineAction =
   | { id: string; kind: "issue"; payload: DriverIssueReportInput; createdAt: string }
   | { id: string; kind: "location"; payload: DriverLocationUpdateInput; createdAt: string };
 
+interface OutboxRow {
+  id: string;
+  kind: OfflineAction["kind"];
+  payload: string;
+  created_at: string;
+  attempt_count: number;
+}
+
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
 function createId() {
   const randomPart = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
   return `${Date.now()}-${randomPart}`;
 }
 
-async function readQueue(): Promise<OfflineAction[]> {
-  const raw = await SecureStore.getItemAsync(OFFLINE_QUEUE_KEY);
-  if (!raw) return [];
+async function getDatabase() {
+  if (!dbPromise) {
+    dbPromise = SQLite.openDatabaseAsync(DATABASE_NAME).then(async (db) => {
+      await db.execAsync(`
+        create table if not exists driver_outbox (
+          id text primary key not null,
+          kind text not null,
+          payload text not null,
+          created_at text not null,
+          attempt_count integer not null default 0,
+          last_error text,
+          updated_at text not null
+        );
+        create index if not exists driver_outbox_created_at_idx on driver_outbox(created_at);
+      `);
+      return db;
+    });
+  }
+  return dbPromise;
+}
+
+function parseRow(row: OutboxRow): OfflineAction | null {
   try {
-    const parsed = JSON.parse(raw) as OfflineAction[];
-    return Array.isArray(parsed) ? parsed : [];
+    return {
+      id: row.id,
+      kind: row.kind,
+      payload: JSON.parse(row.payload) as OfflineAction["payload"],
+      createdAt: row.created_at
+    } as OfflineAction;
   } catch {
-    return [];
+    return null;
   }
 }
 
-async function writeQueue(actions: OfflineAction[]) {
-  await SecureStore.setItemAsync(OFFLINE_QUEUE_KEY, JSON.stringify(actions.slice(-MAX_QUEUE_SIZE)));
-}
-
 export async function getOfflineQueueCount() {
-  const queue = await readQueue();
-  return queue.length;
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ count: number }>("select count(*) as count from driver_outbox");
+  return Number(rows[0]?.count ?? 0);
 }
 
 export async function clearOfflineQueue() {
-  await SecureStore.deleteItemAsync(OFFLINE_QUEUE_KEY);
+  const db = await getDatabase();
+  await db.runAsync("delete from driver_outbox");
 }
 
 export async function enqueueOfflineAction(kind: OfflineAction["kind"], payload: OfflineAction["payload"]) {
-  const queue = await readQueue();
-  await writeQueue([
-    ...queue,
-    {
-      id: createId(),
-      kind,
-      payload,
-      createdAt: new Date().toISOString()
-    } as OfflineAction
-  ]);
+  const db = await getDatabase();
+  const createdAt = new Date().toISOString();
+  await db.runAsync(
+    "insert into driver_outbox (id, kind, payload, created_at, updated_at) values (?, ?, ?, ?, ?)",
+    [createId(), kind, JSON.stringify(payload), createdAt, createdAt]
+  );
+  await db.runAsync(
+    `delete from driver_outbox
+     where id in (
+       select id from driver_outbox
+       order by created_at asc
+       limit max((select count(*) from driver_outbox) - ?, 0)
+     )`,
+    [MAX_QUEUE_SIZE]
+  );
 }
 
 async function sendAction(action: OfflineAction) {
@@ -60,11 +96,17 @@ async function sendAction(action: OfflineAction) {
 }
 
 export async function flushOfflineQueue() {
-  const queue = await readQueue();
-  const remaining: OfflineAction[] = [];
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<OutboxRow>("select id, kind, payload, created_at, attempt_count from driver_outbox order by created_at asc limit 100");
   let sent = 0;
 
-  for (const action of queue) {
+  for (const row of rows) {
+    const action = parseRow(row);
+    if (!action) {
+      await db.runAsync("delete from driver_outbox where id = ?", [row.id]);
+      continue;
+    }
+
     const result = await sendAction(action).catch((error) => ({
       success: false,
       error: error instanceof Error ? error.message : "ส่งข้อมูลไม่สำเร็จ"
@@ -72,14 +114,18 @@ export async function flushOfflineQueue() {
 
     if (result.success) {
       sent += 1;
+      await db.runAsync("delete from driver_outbox where id = ?", [row.id]);
     } else {
-      remaining.push(action);
+      await db.runAsync("update driver_outbox set attempt_count = attempt_count + 1, last_error = ?, updated_at = ? where id = ?", [
+        result.error ?? "ส่งข้อมูลไม่สำเร็จ",
+        new Date().toISOString(),
+        row.id
+      ]);
     }
   }
 
-  await writeQueue(remaining);
   return {
     sent,
-    remaining: remaining.length
+    remaining: await getOfflineQueueCount()
   };
 }
