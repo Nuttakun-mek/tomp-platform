@@ -1,42 +1,53 @@
 import "server-only";
 
-import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
+import { cookies } from "next/headers";
+import { DRIVER_SESSION_COOKIE, DRIVER_SESSION_HEADER, verifyDriverSession } from "@/lib/driver-access/session";
 
-export interface DriverTokenContext {
-  token: string;
+export interface DriverSessionContext {
+  tokenId: string;
   projectId: string;
   assignmentId: string;
   driverId: string;
+  deviceHash: string;
 }
 
-// Resolves + verifies the driver access token for a write API route (mobile app).
-// The token is authoritative: callers cannot spoof projectId / assignmentId /
-// driverId in the request body.
-export async function resolveDriverTokenContext(
-  request: Request,
-  body: unknown
-): Promise<{ ok: true; context: DriverTokenContext } | { ok: false; status: number; error: string }> {
-  const fromHeader = request.headers.get("x-driver-token")?.trim();
-  const url = new URL(request.url);
-  const fromQuery = url.searchParams.get("token")?.trim();
-  const fromBody =
-    body && typeof body === "object" && typeof (body as { token?: unknown }).token === "string"
-      ? ((body as { token: string }).token.trim())
-      : "";
-  const token = fromHeader || fromQuery || fromBody;
+// Operational driver API routes authenticate with the scoped driver SESSION —
+// minted only after the visible device + PIN flow (see establishDriverSessionAction).
+// The raw QR token is no longer accepted here: possession of the QR URL alone
+// cannot read or write driver operations.
+export async function resolveDriverSession(
+  request: Request
+): Promise<{ ok: true; context: DriverSessionContext } | { ok: false; status: number; error: string }> {
+  const fromHeader = request.headers.get(DRIVER_SESSION_HEADER)?.trim();
+  const fromCookie = (await cookies()).get(DRIVER_SESSION_COOKIE)?.value;
 
-  if (!token) return { ok: false, status: 401, error: "ต้องระบุ token ของงาน" };
-
-  const access = await getDriverAssignmentByToken(token);
-  if (!access) return { ok: false, status: 403, error: "QR หมดอายุหรือถูกยกเลิก" };
+  const payload = verifyDriverSession(fromHeader || fromCookie);
+  if (!payload) {
+    return { ok: false, status: 401, error: "เซสชันคนขับหมดอายุ กรุณาเปิดงานจาก QR และยืนยันรหัสอีกครั้ง" };
+  }
 
   return {
     ok: true,
     context: {
-      token,
-      projectId: access.project.id,
-      assignmentId: access.assignment.id,
-      driverId: access.driver.id
+      tokenId: payload.tid,
+      projectId: payload.pid,
+      assignmentId: payload.aid,
+      driverId: payload.did,
+      deviceHash: payload.dev
     }
+  };
+}
+
+// Same, for server actions (no Request object) — reads the session cookie.
+export async function resolveDriverSessionFromCookies(): Promise<DriverSessionContext | null> {
+  const value = (await cookies()).get(DRIVER_SESSION_COOKIE)?.value;
+  const payload = verifyDriverSession(value);
+  if (!payload) return null;
+  return {
+    tokenId: payload.tid,
+    projectId: payload.pid,
+    assignmentId: payload.aid,
+    driverId: payload.did,
+    deviceHash: payload.dev
   };
 }

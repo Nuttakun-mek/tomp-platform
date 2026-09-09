@@ -143,7 +143,8 @@ export const assignmentStatusUpdateSchema = z.object({
 });
 
 export const driverLocationUpdateSchema = z.object({
-  token: z.string().trim().min(8).max(512),
+  // Optional and ignored — identity comes from the driver session, not the body.
+  token: z.string().trim().max(512).optional(),
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
   accuracy: z.coerce.number().min(0).max(10000).optional().nullable(),

@@ -2,7 +2,9 @@
 
 import { cookies } from "next/headers";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
+import { resolveDriverTokenIdentity } from "@/lib/data/driver-access";
 import { getPostgresClient } from "@/lib/db/postgres";
+import { DRIVER_SESSION_COOKIE, DRIVER_SESSION_MAX_AGE, mintDriverSession } from "@/lib/driver-access/session";
 import {
   DRIVER_DEVICE_COOKIE_PREFIX,
   DRIVER_PIN_COOKIE_PREFIX,
@@ -71,6 +73,47 @@ export async function verifyDriverPinAction(input: unknown): Promise<ActionResul
     .eq("id", row.id);
   await setPinCookie(String(row.id));
   return actionSuccess({ verified: true });
+}
+
+// Exchange a QR token (that has already cleared the visible device + PIN flow)
+// for a scoped driver session cookie. The operational /api/driver/* routes only
+// accept this session — never the raw token — so a leaked QR URL can't drive
+// the API. Called once when the task/preflight view mounts.
+export async function establishDriverSessionAction(input: unknown): Promise<ActionResult> {
+  const token = String((input as { token?: unknown })?.token ?? "").trim();
+  if (!token.startsWith("tomp_")) return actionFailure("ไม่พบลิงก์งาน");
+
+  const identity = await resolveDriverTokenIdentity(token);
+  if (!identity) return actionFailure("QR หมดอายุหรือถูกยกเลิก");
+
+  const store = await cookies();
+  const deviceId = store.get(DRIVER_DEVICE_COOKIE_PREFIX + "id")?.value ?? "";
+  const deviceHash = deviceId ? hashDriverDeviceId(deviceId) : "";
+
+  if (identity.deviceBoundTo && identity.deviceBoundTo !== deviceHash) {
+    return actionFailure(DEVICE_TAKEN);
+  }
+
+  if (identity.pinRequired) {
+    const pinOk = store.get(`${DRIVER_PIN_COOKIE_PREFIX}${identity.tokenId}`)?.value === "1";
+    if (!pinOk) return actionFailure("ต้องยืนยันรหัสก่อนเปิดงาน", { needsPin: ["1"] });
+  }
+
+  store.set(DRIVER_SESSION_COOKIE, mintDriverSession({
+    tid: identity.tokenId,
+    pid: identity.projectId,
+    aid: identity.assignmentId,
+    did: identity.driverId,
+    dev: deviceHash
+  }), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: DRIVER_SESSION_MAX_AGE
+  });
+
+  return actionSuccess({ established: true });
 }
 
 async function verifyDriverPinViaPostgres(token: string, pin: string): Promise<ActionResult> {

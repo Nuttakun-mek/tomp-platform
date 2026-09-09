@@ -1,26 +1,11 @@
 import { NextResponse } from "next/server";
 import { driverLocationUpdateSchema } from "@tomp/types/schemas";
-import { hashDriverAccessToken } from "@/lib/driver-access/token";
+import { resolveDriverSession, type DriverSessionContext } from "@/lib/api/driver-token";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 type LocationInput = typeof driverLocationUpdateSchema._type;
-
-// The embedded assignment comes back as an object (to-one) or, on some PostgREST
-// versions, a single-element array. `undefined` = the embed wasn't present.
-function extractVehicleId(embedded: unknown): string | null | undefined {
-  const row = Array.isArray(embedded) ? embedded[0] : embedded;
-  if (!row || typeof row !== "object") return undefined;
-  const value = (row as Record<string, unknown>).vehicle_id;
-  return typeof value === "string" ? value : null;
-}
-type TokenRow = {
-  project_id: string;
-  assignment_id: string;
-  driver_id: string | null;
-  expires_at: string | null;
-};
 
 async function updateLocationSession(input: {
   client: NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
@@ -65,24 +50,24 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return NextResponse.json(
-      {
-        success: false,
-        error: "ข้อมูลตำแหน่งไม่ถูกต้อง",
-        fieldErrors: parsed.error.flatten().fieldErrors
-      },
+      { success: false, error: "ข้อมูลตำแหน่งไม่ถูกต้อง", fieldErrors: parsed.error.flatten().fieldErrors },
       { status: 400 }
     );
   }
 
+  const auth = await resolveDriverSession(request);
+  if (!auth.ok) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+
   const { client, error } = getSupabaseWriteClient();
   if (!client) {
-    return writeDriverLocationViaPostgres(parsed.data, request, error || "ยังไม่ได้ตั้งค่า Supabase สำหรับรับตำแหน่ง");
+    return writeDriverLocationViaPostgres(auth.context, parsed.data, request, error || "ยังไม่ได้ตั้งค่า Supabase สำหรับรับตำแหน่ง");
   }
 
   try {
-    return await writeDriverLocationViaSupabase(client, parsed.data, request);
+    return await writeDriverLocationViaSupabase(client, auth.context, parsed.data, request);
   } catch (supabaseError) {
     return writeDriverLocationViaPostgres(
+      auth.context,
       parsed.data,
       request,
       supabaseError instanceof Error ? supabaseError.message : "เชื่อมต่อ Supabase ไม่สำเร็จ"
@@ -90,38 +75,22 @@ export async function POST(request: Request) {
   }
 }
 
-async function writeDriverLocationViaSupabase(client: NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>, input: LocationInput, request: Request) {
-  const tokenHash = hashDriverAccessToken(input.token);
-  // One round trip for the token and its assignment's vehicle (embedded).
-  const { data: tokenRow, error: tokenError } = await client
-    .from("driver_access_tokens")
-    .select("project_id, assignment_id, driver_id, status, expires_at, assignments(vehicle_id)")
-    .eq("token_hash", tokenHash)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (tokenError || !tokenRow) {
-    return writeDriverLocationViaPostgres(input, request, "QR หรือ token ไม่ถูกต้อง กรุณาขอ QR ใหม่จากศูนย์ควบคุม");
-  }
-
-  if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) {
-    return NextResponse.json({ success: false, error: "QR หมดอายุแล้ว กรุณาขอ QR ใหม่จากศูนย์ควบคุม" }, { status: 403 });
-  }
-
-  let vehicleId = extractVehicleId(tokenRow.assignments);
-  if (vehicleId === undefined) {
-    // Embed didn't resolve (older PostgREST relationship cache) — fetch directly.
-    const { data: assignment } = await client.from("assignments").select("vehicle_id").eq("id", tokenRow.assignment_id).maybeSingle();
-    vehicleId = typeof assignment?.vehicle_id === "string" ? assignment.vehicle_id : null;
-  }
+async function writeDriverLocationViaSupabase(
+  client: NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>,
+  ctx: DriverSessionContext,
+  input: LocationInput,
+  request: Request
+) {
+  const { data: assignment } = await client.from("assignments").select("vehicle_id").eq("id", ctx.assignmentId).maybeSingle();
+  const vehicleId = typeof assignment?.vehicle_id === "string" ? assignment.vehicle_id : null;
   const recordedAt = input.recordedAt || new Date().toISOString();
 
   const { data: inserted, error: insertError } = await client
     .from("gps_locations")
     .insert({
-      project_id: tokenRow.project_id,
-      assignment_id: tokenRow.assignment_id,
-      driver_id: tokenRow.driver_id,
+      project_id: ctx.projectId,
+      assignment_id: ctx.assignmentId,
+      driver_id: ctx.driverId,
       vehicle_id: vehicleId,
       latitude: input.latitude,
       longitude: input.longitude,
@@ -129,24 +98,20 @@ async function writeDriverLocationViaSupabase(client: NonNullable<ReturnType<typ
       recorded_at: recordedAt,
       source: "driver_web_app",
       sharing_event: input.trackingEvent,
-      metadata: {
-        ...input.metadata,
-        pilot: true,
-        userAgent: request.headers.get("user-agent")
-      }
+      metadata: { ...input.metadata, pilot: true, userAgent: request.headers.get("user-agent") }
     })
     .select("id, recorded_at")
     .single();
 
   if (insertError) {
-    return writeDriverLocationViaPostgres(input, request, insertError.message);
+    return writeDriverLocationViaPostgres(ctx, input, request, insertError.message);
   }
 
   await updateLocationSession({
     client,
-    projectId: String(tokenRow.project_id),
-    assignmentId: String(tokenRow.assignment_id),
-    driverId: typeof tokenRow.driver_id === "string" ? tokenRow.driver_id : null,
+    projectId: ctx.projectId,
+    assignmentId: ctx.assignmentId,
+    driverId: ctx.driverId,
     vehicleId,
     recordedAt,
     trackingEvent: input.trackingEvent
@@ -154,55 +119,28 @@ async function writeDriverLocationViaSupabase(client: NonNullable<ReturnType<typ
 
   if (input.trackingEvent === "sharing_started" || input.trackingEvent === "sharing_stopped") {
     await createTimelineEvent({
-      projectId: String(tokenRow.project_id),
+      projectId: ctx.projectId,
       objectType: "driver_location",
-      objectId: String(tokenRow.assignment_id || inserted.id),
+      objectId: ctx.assignmentId || inserted.id,
       eventType: input.trackingEvent === "sharing_started" ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED,
       source: "driver_qr",
       reason: input.trackingEvent === "sharing_started" ? "คนขับเริ่มแชร์ตำแหน่งจาก web app" : "คนขับหยุดแชร์ตำแหน่งจาก web app",
-      afterData: {
-        latitude: input.latitude,
-        longitude: input.longitude,
-        accuracy: input.accuracy ?? null,
-        recordedAt
-      },
+      afterData: { latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt },
       metadata: { pilot: true }
     });
   }
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      id: inserted.id,
-      recordedAt: inserted.recorded_at
-    }
-  });
+  return NextResponse.json({ success: true, data: { id: inserted.id, recordedAt: inserted.recorded_at } });
 }
 
-async function writeDriverLocationViaPostgres(input: LocationInput, request: Request, fallbackReason: string) {
+async function writeDriverLocationViaPostgres(ctx: DriverSessionContext, input: LocationInput, request: Request, fallbackReason: string) {
   const sql = getPostgresClient();
   if (!sql) {
     return NextResponse.json({ success: false, error: fallbackReason }, { status: 503 });
   }
 
-  const tokenHash = hashDriverAccessToken(input.token);
-  const tokenRows = await sql<TokenRow[]>`
-    select project_id, assignment_id, driver_id, expires_at
-    from driver_access_tokens
-    where token_hash = ${tokenHash}
-      and status = 'active'
-    limit 1
-  `;
-  const tokenRow = tokenRows[0];
-  if (!tokenRow) {
-    return NextResponse.json({ success: false, error: "QR หรือ token ไม่ถูกต้อง กรุณาขอ QR ใหม่จากศูนย์ควบคุม" }, { status: 403 });
-  }
-  if (tokenRow.expires_at && new Date(tokenRow.expires_at).getTime() <= Date.now()) {
-    return NextResponse.json({ success: false, error: "QR หมดอายุแล้ว กรุณาขอ QR ใหม่จากศูนย์ควบคุม" }, { status: 403 });
-  }
-
   const assignmentRows = await sql<Array<{ vehicle_id: string | null }>>`
-    select vehicle_id from assignments where id = ${tokenRow.assignment_id} limit 1
+    select vehicle_id from assignments where id = ${ctx.assignmentId} limit 1
   `;
   const vehicleId = assignmentRows[0]?.vehicle_id ?? null;
   const recordedAt = input.recordedAt || new Date().toISOString();
@@ -210,14 +148,14 @@ async function writeDriverLocationViaPostgres(input: LocationInput, request: Req
 
   const inserted = await sql<Array<{ id: string; recorded_at: string }>>`
     insert into gps_locations (project_id, assignment_id, driver_id, vehicle_id, latitude, longitude, accuracy, recorded_at, source, sharing_event, metadata)
-    values (${tokenRow.project_id}, ${tokenRow.assignment_id}, ${tokenRow.driver_id}, ${vehicleId}, ${input.latitude}, ${input.longitude}, ${input.accuracy ?? null}, ${recordedAt}, ${"driver_web_app"}, ${input.trackingEvent}, ${metadata}::jsonb)
+    values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.driverId}, ${vehicleId}, ${input.latitude}, ${input.longitude}, ${input.accuracy ?? null}, ${recordedAt}, ${"driver_web_app"}, ${input.trackingEvent}, ${metadata}::jsonb)
     returning id, recorded_at
   `;
 
   if (input.trackingEvent === "sharing_started") {
     await sql`
       insert into driver_location_sessions (project_id, assignment_id, driver_id, vehicle_id, started_at, consent_given_at, status, last_ping_at, metadata)
-      values (${tokenRow.project_id}, ${tokenRow.assignment_id}, ${tokenRow.driver_id}, ${vehicleId}, ${recordedAt}, ${recordedAt}, ${"healthy"}, ${recordedAt}, ${JSON.stringify({ source: "web_driver" })}::jsonb)
+      values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.driverId}, ${vehicleId}, ${recordedAt}, ${recordedAt}, ${"healthy"}, ${recordedAt}, ${JSON.stringify({ source: "web_driver" })}::jsonb)
     `;
   } else {
     await sql`
@@ -225,7 +163,7 @@ async function writeDriverLocationViaPostgres(input: LocationInput, request: Req
       set status = ${input.trackingEvent === "sharing_stopped" ? "offline" : "healthy"},
           last_ping_at = ${recordedAt},
           stopped_at = ${input.trackingEvent === "sharing_stopped" ? recordedAt : null}
-      where assignment_id = ${tokenRow.assignment_id}
+      where assignment_id = ${ctx.assignmentId}
         and stopped_at is null
     `;
   }
@@ -233,15 +171,9 @@ async function writeDriverLocationViaPostgres(input: LocationInput, request: Req
   if (input.trackingEvent === "sharing_started" || input.trackingEvent === "sharing_stopped") {
     await sql`
       insert into timeline_events (project_id, object_type, object_id, event_type, source, reason, after_data, metadata)
-      values (${tokenRow.project_id}, ${"driver_location"}, ${tokenRow.assignment_id}, ${input.trackingEvent === "sharing_started" ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED}, ${"driver_qr"}, ${input.trackingEvent === "sharing_started" ? "คนขับเริ่มแชร์ตำแหน่งจาก web app" : "คนขับหยุดแชร์ตำแหน่งจาก web app"}, ${JSON.stringify({ latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt })}::jsonb, ${JSON.stringify({ pilot: true, source: "postgres_direct" })}::jsonb)
+      values (${ctx.projectId}, ${"driver_location"}, ${ctx.assignmentId}, ${input.trackingEvent === "sharing_started" ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED}, ${"driver_qr"}, ${input.trackingEvent === "sharing_started" ? "คนขับเริ่มแชร์ตำแหน่งจาก web app" : "คนขับหยุดแชร์ตำแหน่งจาก web app"}, ${JSON.stringify({ latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt })}::jsonb, ${JSON.stringify({ pilot: true, source: "postgres_direct" })}::jsonb)
     `;
   }
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      id: inserted[0]?.id,
-      recordedAt: inserted[0]?.recorded_at || recordedAt
-    }
-  });
+  return NextResponse.json({ success: true, data: { id: inserted[0]?.id, recordedAt: inserted[0]?.recorded_at || recordedAt } });
 }

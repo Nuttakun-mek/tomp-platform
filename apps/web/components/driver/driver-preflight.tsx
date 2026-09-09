@@ -46,7 +46,6 @@ export function DriverPreflight({ driverAccess }: { driverAccess: DriverAccessAs
         return;
       }
       await recordVehicleEvidenceAction({
-        token: driverAccess.token,
         vehiclePath: photos.vehicle,
         platePath: photos.plate
       }).catch(() => undefined);
@@ -73,7 +72,7 @@ export function DriverPreflight({ driverAccess }: { driverAccess: DriverAccessAs
       </section>
 
       <section className="smart-card grid gap-3">
-        <DriverPhotoCheck token={driverAccess.token} onChange={setPhotos} />
+        <DriverPhotoCheck onChange={setPhotos} />
 
         <div className="grid gap-1.5">
           <p className="text-[13px] font-semibold text-ink">ยืนยันรายการ</p>

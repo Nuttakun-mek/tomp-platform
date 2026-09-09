@@ -111,7 +111,6 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token: driverAccess.token,
           latitude: ping.latitude,
           longitude: ping.longitude,
           accuracy: ping.accuracy,

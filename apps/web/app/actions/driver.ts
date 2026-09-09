@@ -7,21 +7,32 @@ import {
   vehicleCheckinSchema
 } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
-import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
+import { resolveDriverSessionFromCookies } from "@/lib/api/driver-token";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { uploadPlatePhoto, uploadVehiclePhoto } from "@/lib/storage/checkin-photos";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
+const SESSION_EXPIRED = "เซสชันคนขับหมดอายุ กรุณาเปิดงานจาก QR และยืนยันรหัสอีกครั้ง";
+
+// The scoped driver session is authoritative for project/assignment/driver —
+// callers cannot act on a job they did not open through the QR + PIN flow.
+async function driverScope(): Promise<{ projectId: string; assignmentId: string; driverId: string } | null> {
+  const session = await resolveDriverSessionFromCookies();
+  return session ? { projectId: session.projectId, assignmentId: session.assignmentId, driverId: session.driverId } : null;
+}
+
 export async function driverCheckinAction(input: unknown): Promise<ActionResult> {
   const parsed = driverCheckinSchema.safeParse(input);
   if (!parsed.success) return actionFailure("Driver check-in validation failed.", parsed.error.flatten().fieldErrors);
+  const scope = await driverScope();
+  if (!scope) return actionFailure(SESSION_EXPIRED);
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
 
   const { data, error: insertError } = await client.from("driver_checkins").insert({
-    project_id: parsed.data.projectId,
-    assignment_id: parsed.data.assignmentId,
-    driver_id: parsed.data.driverId,
+    project_id: scope.projectId,
+    assignment_id: scope.assignmentId,
+    driver_id: scope.driverId,
     status: parsed.data.status,
     confirmed_name: parsed.data.confirmedName,
     confirmed_phone: parsed.data.confirmedPhone,
@@ -37,14 +48,14 @@ export async function driverCheckinAction(input: unknown): Promise<ActionResult>
     await client
       .from("assignments")
       .update({ status: "active" })
-      .eq("id", parsed.data.assignmentId)
+      .eq("id", scope.assignmentId)
       .in("status", ["draft", "planned", "published"]);
   }
 
   const timelineResult = await createTimelineEvent({
-    projectId: parsed.data.projectId,
+    projectId: scope.projectId,
     objectType: "assignment",
-    objectId: parsed.data.assignmentId,
+    objectId: scope.assignmentId,
     eventType: TIMELINE_EVENTS.DRIVER_CHECKED_IN,
     source: "driver_qr",
     reason: "Driver activation check-in submitted.",
@@ -107,25 +118,25 @@ export async function vehiclePhotoUploadAction(formData: FormData): Promise<Acti
 }
 
 // Records the vehicle-evidence check-in (photo storage paths) for the driver's job.
-// Token-authed; paths are storage keys in the private driver-evidence bucket.
+// Session-authed; paths are storage keys in the private driver-evidence bucket.
 export async function recordVehicleEvidenceAction(input: unknown): Promise<ActionResult> {
-  const data = (input ?? {}) as { token?: string; vehiclePath?: string | null; platePath?: string | null };
-  const token = String(data.token || "");
-  if (!token) return actionFailure("ไม่พบลิงก์งาน");
-
-  const access = await getDriverAssignmentByToken(token);
-  if (!access) return actionFailure("QR หมดอายุหรือถูกยกเลิก");
+  const data = (input ?? {}) as { vehiclePath?: string | null; platePath?: string | null };
+  const scope = await driverScope();
+  if (!scope) return actionFailure(SESSION_EXPIRED);
 
   const { client, error } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "ระบบไม่พร้อมบันทึกข้อมูล");
 
+  const { data: vehicleRow } = await client.from("assignments").select("vehicle_id").eq("id", scope.assignmentId).maybeSingle();
+  const vehicleId = typeof vehicleRow?.vehicle_id === "string" ? vehicleRow.vehicle_id : null;
+
   const { data: row, error: insertError } = await client
     .from("vehicle_checkins")
     .insert({
-      project_id: access.project.id,
-      assignment_id: access.assignment.id,
-      vehicle_id: access.vehicle.id,
-      driver_id: access.driver.id,
+      project_id: scope.projectId,
+      assignment_id: scope.assignmentId,
+      vehicle_id: vehicleId,
+      driver_id: scope.driverId,
       status: "confirmed",
       photo_url: data.vehiclePath || null,
       plate_photo_url: data.platePath || null,
@@ -137,9 +148,9 @@ export async function recordVehicleEvidenceAction(input: unknown): Promise<Actio
   if (insertError) return actionFailure(`บันทึกหลักฐานตรวจรถไม่สำเร็จ: ${insertError.message}`);
 
   await createTimelineEvent({
-    projectId: access.project.id,
+    projectId: scope.projectId,
     objectType: "vehicle",
-    objectId: access.vehicle.id,
+    objectId: vehicleId || scope.assignmentId,
     eventType: TIMELINE_EVENTS.VEHICLE_CHECKED_IN,
     source: "driver_qr",
     reason: "คนขับส่งรูปรถและป้ายทะเบียนก่อนรับงาน",
@@ -152,13 +163,15 @@ export async function recordVehicleEvidenceAction(input: unknown): Promise<Actio
 export async function assignmentStatusUpdateAction(input: unknown): Promise<ActionResult> {
   const parsed = assignmentStatusUpdateSchema.safeParse(input);
   if (!parsed.success) return actionFailure("Assignment status update validation failed.", parsed.error.flatten().fieldErrors);
+  const scope = await driverScope();
+  if (!scope) return actionFailure(SESSION_EXPIRED);
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
 
   const { data, error: insertError } = await client.from("assignment_status_updates").insert({
-    project_id: parsed.data.projectId,
-    assignment_id: parsed.data.assignmentId,
-    driver_id: parsed.data.driverId || null,
+    project_id: scope.projectId,
+    assignment_id: scope.assignmentId,
+    driver_id: scope.driverId,
     status: parsed.data.status,
     source: parsed.data.source,
     metadata: parsed.data.metadata
@@ -173,13 +186,13 @@ export async function assignmentStatusUpdateAction(input: unknown): Promise<Acti
   await client
     .from("assignments")
     .update({ status: planStatus })
-    .eq("id", parsed.data.assignmentId)
+    .eq("id", scope.assignmentId)
     .in("status", ["draft", "planned", "published", "active"]);
 
   const timelineResult = await createTimelineEvent({
-    projectId: parsed.data.projectId,
+    projectId: scope.projectId,
     objectType: "assignment",
-    objectId: parsed.data.assignmentId,
+    objectId: scope.assignmentId,
     eventType: TIMELINE_EVENTS.ASSIGNMENT_STATUS_CHANGED,
     source: parsed.data.source,
     reason: `Driver status update: ${parsed.data.status}`,
@@ -191,13 +204,15 @@ export async function assignmentStatusUpdateAction(input: unknown): Promise<Acti
 export async function driverIssueReportAction(input: unknown): Promise<ActionResult> {
   const parsed = driverIssueReportSchema.safeParse(input);
   if (!parsed.success) return actionFailure("Driver issue report validation failed.", parsed.error.flatten().fieldErrors);
+  const scope = await driverScope();
+  if (!scope) return actionFailure(SESSION_EXPIRED);
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
 
   const { data, error: insertError } = await client.from("driver_issue_reports").insert({
-    project_id: parsed.data.projectId,
-    assignment_id: parsed.data.assignmentId,
-    driver_id: parsed.data.driverId || null,
+    project_id: scope.projectId,
+    assignment_id: scope.assignmentId,
+    driver_id: scope.driverId,
     issue_type: parsed.data.issueType,
     severity: parsed.data.severity,
     message: parsed.data.message || null,
@@ -206,9 +221,9 @@ export async function driverIssueReportAction(input: unknown): Promise<ActionRes
 
   if (insertError) return actionFailure(`Driver issue report failed: ${insertError.message}`);
   const timelineResult = await createTimelineEvent({
-    projectId: parsed.data.projectId,
+    projectId: scope.projectId,
     objectType: "assignment",
-    objectId: parsed.data.assignmentId,
+    objectId: scope.assignmentId,
     eventType: TIMELINE_EVENTS.DRIVER_ISSUE_REPORTED,
     source: "driver_qr",
     reason: parsed.data.message || "Driver reported an issue.",

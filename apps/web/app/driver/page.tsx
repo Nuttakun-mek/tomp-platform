@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { DriverPinGate } from "@/components/driver/driver-pin-gate";
 import { DriverPreflight } from "@/components/driver/driver-preflight";
+import { DriverSessionGate } from "@/components/driver/driver-session-gate";
 import { DriverTaskView } from "@/components/driver/driver-task-view";
 import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
 import { DRIVER_DEVICE_COOKIE_PREFIX, DRIVER_PIN_COOKIE_PREFIX, hashDriverDeviceId } from "@/lib/driver-access/token";
@@ -55,9 +56,10 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
 
   // Gate: identity confirmation + evidence photos happen before the driver sees
   // the job screen. `activated` is a driver_checkins row with status 'ready'.
-  if (!driverAccess.activated) {
-    return <DriverPreflight driverAccess={driverAccess} />;
-  }
-
-  return <DriverTaskView driverAccess={driverAccess} />;
+  // DriverSessionGate exchanges the QR token for the scoped API session first.
+  return (
+    <DriverSessionGate token={token}>
+      {driverAccess.activated ? <DriverTaskView driverAccess={driverAccess} /> : <DriverPreflight driverAccess={driverAccess} />}
+    </DriverSessionGate>
+  );
 }

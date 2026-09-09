@@ -5,6 +5,60 @@ import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
+export interface DriverTokenIdentity {
+  tokenId: string;
+  projectId: string;
+  assignmentId: string;
+  driverId: string;
+  pinRequired: boolean;
+  deviceBoundTo: string | null;
+}
+
+// One-query resolve of a QR token to the ids the driver session needs. Cheap
+// enough to call on every session establishment; does not build the full packet.
+export async function resolveDriverTokenIdentity(token: string): Promise<DriverTokenIdentity | null> {
+  if (!token.startsWith("tomp_")) return null;
+  const tokenHash = hashDriverAccessToken(token);
+
+  const { client } = getSupabaseWriteClient();
+  if (client) {
+    const { data } = await client
+      .from("driver_access_tokens")
+      .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata")
+      .eq("token_hash", tokenHash)
+      .eq("status", "active")
+      .maybeSingle();
+    if (data) return identityFromRow(data as Record<string, unknown>);
+  }
+
+  const sql = getPostgresClient();
+  if (!sql) return null;
+  const rows = await sql<Array<Record<string, unknown>>>`
+    select id, project_id, assignment_id, driver_id, expires_at, metadata
+    from driver_access_tokens where token_hash = ${tokenHash} and status = 'active' limit 1
+  `;
+  return rows[0] ? identityFromRow(rows[0]) : null;
+}
+
+function identityFromRow(row: Record<string, unknown>): DriverTokenIdentity | null {
+  const assignmentId = typeof row.assignment_id === "string" ? row.assignment_id : "";
+  const projectId = typeof row.project_id === "string" ? row.project_id : "";
+  const driverId = typeof row.driver_id === "string" ? row.driver_id : "";
+  if (!assignmentId || !projectId || !driverId) return null;
+  const expiresAt = row.expires_at ? new Date(String(row.expires_at)).getTime() : 0;
+  if (expiresAt && expiresAt <= Date.now()) return null;
+
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  return {
+    tokenId: String(row.id),
+    projectId,
+    assignmentId,
+    driverId,
+    pinRequired: typeof meta.pinHash === "string" && meta.pinHash.length > 0,
+    deviceBoundTo: typeof meta.deviceHash === "string" && meta.deviceHash ? meta.deviceHash : null
+  };
+}
+
 export interface DriverUpdates {
   assignmentStatus: string;
   latestStatus: { status: string; at: string } | null;
@@ -487,9 +541,28 @@ export async function getDriverUpdatesByToken(token: string): Promise<DriverUpda
   if (!tokenRow?.assignment_id || !tokenRow.driver_id || !tokenRow.project_id) return getDriverUpdatesByTokenViaPostgres(tokenHash);
   if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) return null;
 
-  const assignmentId = String(tokenRow.assignment_id);
-  const driverId = String(tokenRow.driver_id);
-  const projectId = String(tokenRow.project_id);
+  return getDriverUpdatesFor({
+    projectId: String(tokenRow.project_id),
+    assignmentId: String(tokenRow.assignment_id),
+    driverId: String(tokenRow.driver_id)
+  });
+}
+
+// Same lean payload, keyed by the ids a verified driver session already carries
+// (no token lookup). This is the path the /api/driver/updates route uses.
+export async function getDriverUpdatesFor({
+  projectId,
+  assignmentId,
+  driverId
+}: {
+  projectId: string;
+  assignmentId: string;
+  driverId: string;
+}): Promise<DriverUpdates | null> {
+  const { client } = getSupabaseWriteClient();
+  if (!client) {
+    return getDriverUpdatesForViaPostgres(projectId, assignmentId, driverId);
+  }
 
   const [{ data: assignmentRow }, notifications, messages, latestStatusRes, { data: dayRows }] = await Promise.all([
     client.from("assignments").select("status, start_time").eq("id", assignmentId).maybeSingle(),
@@ -538,9 +611,12 @@ async function getDriverUpdatesByTokenViaPostgres(tokenHash: string): Promise<Dr
   if (!tokenRow?.assignment_id || !tokenRow.driver_id || !tokenRow.project_id) return null;
   if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) return null;
 
-  const assignmentId = String(tokenRow.assignment_id);
-  const driverId = String(tokenRow.driver_id);
-  const projectId = String(tokenRow.project_id);
+  return getDriverUpdatesForViaPostgres(String(tokenRow.project_id), String(tokenRow.assignment_id), String(tokenRow.driver_id));
+}
+
+async function getDriverUpdatesForViaPostgres(projectId: string, assignmentId: string, driverId: string): Promise<DriverUpdates | null> {
+  const sql = getPostgresClient();
+  if (!sql) return null;
 
   const [assignmentRows, notifications, messages, latestStatusRows, dayRows] = await Promise.all([
     sql<Row[]>`select status, start_time from assignments where id = ${assignmentId} limit 1`,

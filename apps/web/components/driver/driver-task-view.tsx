@@ -105,7 +105,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
     async function poll() {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       try {
-        const res = await fetch(`/api/driver/updates?token=${encodeURIComponent(driverAccess.token)}`, {
+        const res = await fetch(`/api/driver/updates`, {
           cache: "no-store",
           headers: etag ? { "if-none-match": etag } : undefined
         });

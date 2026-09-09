@@ -37,13 +37,7 @@ async function compressImage(file: File): Promise<Blob> {
   return blob ?? file;
 }
 
-export function DriverPhotoCheck({
-  token,
-  onChange
-}: {
-  token: string;
-  onChange: (paths: { vehicle?: string; plate?: string }) => void;
-}) {
+export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: string; plate?: string }) => void }) {
   const [paths, setPaths] = useState<{ vehicle?: string; plate?: string }>({});
   const [previews, setPreviews] = useState<{ vehicle?: string; plate?: string }>({});
   const [busy, setBusy] = useState<Kind | null>(null);
@@ -61,7 +55,6 @@ export function DriverPhotoCheck({
     try {
       const blob = await compressImage(file);
       const form = new FormData();
-      form.set("token", token);
       form.set("kind", kind);
       form.set("file", new File([blob], `${kind}.jpg`, { type: "image/jpeg" }));
       const res = await fetch("/api/driver/evidence", { method: "POST", body: form });
