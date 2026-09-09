@@ -31,8 +31,10 @@ declare
   v_event_type  text := TG_ARGV[0];
   v_object_type text := TG_ARGV[1];
   v_id_col      text := coalesce(TG_ARGV[2], 'id');
+  -- the projects table's own project id is `id`, not `project_id`
+  v_pid_col     text := coalesce(TG_ARGV[3], 'project_id');
   v_row         jsonb := to_jsonb(NEW);
-  v_project_id  uuid := nullif(v_row ->> 'project_id', '')::uuid;
+  v_project_id  uuid := nullif(v_row ->> v_pid_col, '')::uuid;
   v_object_id   uuid := nullif(v_row ->> v_id_col, '')::uuid;
 begin
   if v_project_id is null then
@@ -52,7 +54,7 @@ begin
   end if;
 
   insert into public.timeline_events (project_id, object_type, object_id, event_type, source, after_data, metadata)
-  values (v_project_id, v_object_type, v_object_id, v_event_type, 'system_trigger', v_row, jsonb_build_object('trigger', TG_NAME));
+  values (v_project_id, v_object_type, v_object_id, v_event_type, 'system', v_row, jsonb_build_object('trigger', TG_NAME, 'writer', 'db_trigger'));
 
   return NEW;
 end;
@@ -64,7 +66,7 @@ revoke all on function public.tg_append_timeline() from public;
 drop trigger if exists trg_timeline_project_created on public.projects;
 create trigger trg_timeline_project_created
   after insert on public.projects
-  for each row execute function public.tg_append_timeline('PROJECT_CREATED', 'project', 'id');
+  for each row execute function public.tg_append_timeline('PROJECT_CREATED', 'project', 'id', 'id');
 
 drop trigger if exists trg_timeline_mission_created on public.missions;
 create trigger trg_timeline_mission_created
@@ -117,7 +119,7 @@ begin
         and created_at > now() - interval '20 seconds'
     ) then
       insert into public.timeline_events (project_id, object_type, object_id, event_type, source, before_data, after_data, metadata)
-      values (NEW.project_id, 'assignment', NEW.id, 'ASSIGNMENT_CANCELLED', 'system_trigger', to_jsonb(OLD), to_jsonb(NEW), jsonb_build_object('trigger', TG_NAME));
+      values (NEW.project_id, 'assignment', NEW.id, 'ASSIGNMENT_CANCELLED', 'system', to_jsonb(OLD), to_jsonb(NEW), jsonb_build_object('trigger', TG_NAME, 'writer', 'db_trigger'));
     end if;
   end if;
   return NEW;
