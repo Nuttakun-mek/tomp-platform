@@ -9,7 +9,7 @@ export function ProjectChangePanel({ projectId }: { projectId: string }) {
       <p className="mt-2 text-sm text-slate-600">หลังประกาศใช้แผน การเปลี่ยนแปลงต้องบันทึกเป็นคำขอและ Timeline</p>
       <div className="mt-4 grid gap-4">
         <ChangeRequestForm projectId={projectId} />
-        <ChangeRequestList />
+        <ChangeRequestList projectId={projectId} />
       </div>
     </section>
   );

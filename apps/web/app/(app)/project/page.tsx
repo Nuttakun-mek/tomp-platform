@@ -12,10 +12,10 @@ import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-ta
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getMissionsByProjectId } from "@/lib/data/missions";
+import { getOperationDaysByProjectId } from "@/lib/data/operation-days";
 import { getProjectById } from "@/lib/data/projects";
 import { getProjectMembers } from "@/lib/data/project-members";
 import { getViewerAccess } from "@/lib/auth/access";
-import { demoKernel } from "@/lib/demo/demo-kernel";
 import { checkProjectPublishReadiness } from "@/lib/domain/publish-readiness";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { roleLabelTh } from "@/lib/i18n/role-th";
@@ -67,9 +67,12 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
 }
 
 async function OverviewView({ projectId }: { projectId: string }) {
-  const [missions, assignments] = await Promise.all([getMissionsByProjectId(projectId), getAssignmentsByProjectId(projectId)]);
-  const operationDays = demoKernel.operationDays.filter((day) => day.projectId === projectId);
-  const project = await getProjectById(projectId);
+  const [missions, assignments, operationDays, project] = await Promise.all([
+    getMissionsByProjectId(projectId),
+    getAssignmentsByProjectId(projectId),
+    getOperationDaysByProjectId(projectId),
+    getProjectById(projectId)
+  ]);
   const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
 
   return (

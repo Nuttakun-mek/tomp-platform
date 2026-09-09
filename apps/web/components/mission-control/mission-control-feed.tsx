@@ -46,7 +46,9 @@ export function MissionControlFeedProvider({ projectId, initialLocations, initia
   const [connection, setConnection] = useState<MissionControlFeed["connection"]>("fallback");
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  // 0 until mounted — a Date.now() initializer differs between the SSR pass and
+  // hydration and warns. The first effect sets the real clock.
+  const [now, setNow] = useState(0);
 
   const liveRef = useRef(false);
 
@@ -90,6 +92,7 @@ export function MissionControlFeedProvider({ projectId, initialLocations, initia
 
   useEffect(() => {
     let disposed = false;
+    setNow(Date.now());
 
     const channel = subscribeToDriverLocations(projectId, () => {
       liveRef.current = true;
