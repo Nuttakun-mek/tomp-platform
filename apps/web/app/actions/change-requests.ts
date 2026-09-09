@@ -32,7 +32,7 @@ export async function createChangeRequestAction(input: unknown): Promise<ActionR
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
   const permission = await requirePermission(parsed.data.projectId, "change.create");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: change.create");
+  if (!permission.allowed) return actionFailure(permission.reason || "Missing permission: change.create");
 
   const { data, error: insertError } = await client
     .from("change_requests")
@@ -78,7 +78,7 @@ async function updateChangeStatus(projectId: string, changeRequestId: string, st
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
   const permission = await requirePermission(projectId, status === "applied" ? "change.apply" : "change.approve");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing change permission");
+  if (!permission.allowed) return actionFailure(permission.reason || "Missing change permission");
 
   const { data, error: updateError } = await client
     .from("change_requests")

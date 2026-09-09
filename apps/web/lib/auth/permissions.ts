@@ -20,9 +20,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "assignment.create",
     "assignment.update",
     "driver.read",
+    "driver.create",
     "vehicle.read",
+    "vehicle.create",
     "timeline.read",
-    "change.create"
+    "timeline.create",
+    "change.create",
+    "change.approve",
+    "change.apply"
   ],
   dispatcher: [
     "project.read",
@@ -31,10 +36,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "assignment.create",
     "assignment.update",
     "driver.read",
+    "driver.create",
     "vehicle.read",
-    "timeline.read"
+    "vehicle.create",
+    "timeline.read",
+    "timeline.create"
   ],
-  coordinator: ["project.read", "mission.read", "assignment.read", "timeline.read"],
+  coordinator: ["project.read", "mission.read", "assignment.read", "timeline.read", "timeline.create"],
   customer_viewer: ["project.read", "mission.read", "timeline.read", "change.create"],
   driver: []
 };

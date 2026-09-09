@@ -22,7 +22,7 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
   }
 
   const permission = await requirePermission(parsed.data.projectId, "assignment.create");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างงานที่จัดสรร");
   }
 
@@ -71,11 +71,11 @@ export async function cancelAssignmentAction(input: unknown): Promise<ActionResu
   const data = input as { projectId?: string; assignmentId?: string; reason?: string };
   if (!data.projectId || !data.assignmentId) return actionFailure("ไม่พบข้อมูลงานที่ต้องการถอน");
 
-  const { client, error, mode } = getSupabaseWriteClient();
+  const { client, error } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
 
   const permission = await requirePermission(data.projectId, "assignment.update");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์ถอนงานนี้");
   }
 
@@ -145,7 +145,7 @@ export async function setAssignmentOrderAction(input: unknown): Promise<ActionRe
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
 
   const permission = await requirePermission(parsed.data.projectId, "assignment.update");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์จัดลำดับงานในโครงการนี้");
   }
 

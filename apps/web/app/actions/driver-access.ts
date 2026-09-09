@@ -200,11 +200,11 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     return actionFailure("กรุณาเลือกโครงการและ Assignment");
   }
 
-  const { client, error, mode } = getSupabaseWriteClient();
+  const { client, error } = getSupabaseWriteClient();
   if (!client) return createDriverAccessTokenViaPostgres(data, error);
 
   const permission = await requirePermission(data.projectId, "assignment.update");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างลิงก์ QR สำหรับคนขับ");
   }
 
@@ -286,11 +286,11 @@ export async function revokeDriverAccessTokenAction(input: unknown): Promise<Act
   const data = input as { projectId?: string; tokenId?: string; reason?: string | null };
   if (!data.projectId || !data.tokenId) return actionFailure("กรุณาเลือกโครงการและลิงก์ QR");
 
-  const { client, error, mode } = getSupabaseWriteClient();
+  const { client, error } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
 
   const permission = await requirePermission(data.projectId, "assignment.update");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์ยกเลิกลิงก์ QR สำหรับคนขับ");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์ยกเลิกลิงก์ QR สำหรับคนขับ");
 
   const { data: row, error: updateError } = await client
     .from("driver_access_tokens")

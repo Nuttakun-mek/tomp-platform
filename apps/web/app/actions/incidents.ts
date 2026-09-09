@@ -15,7 +15,7 @@ export async function createIncidentAction(input: unknown): Promise<ActionResult
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่า Supabase สำหรับบันทึกเหตุผิดปกติ");
 
   const permission = await requirePermission(parsed.data.projectId, "timeline.create");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์บันทึกเหตุผิดปกติ");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์บันทึกเหตุผิดปกติ");
 
   const recommendation = buildRecoveryRecommendation({
     issueType: parsed.data.issueType,
@@ -68,7 +68,7 @@ export async function updateIncidentStatusAction(input: unknown): Promise<Action
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่า Supabase สำหรับอัปเดตเหตุผิดปกติ");
 
   const permission = await requirePermission(parsed.data.projectId, "timeline.create");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์อัปเดตเหตุผิดปกติ");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์อัปเดตเหตุผิดปกติ");
 
   const status = parsed.data.status === "closed" || parsed.data.status === "resolved" ? "closed" : parsed.data.status === "acknowledged" ? "acknowledged" : "open";
   const { data, error: updateError } = await client

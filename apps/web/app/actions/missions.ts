@@ -117,7 +117,7 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
   }
 
   const permission = await requirePermission(parsed.data.projectId, "mission.create");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างภารกิจ");
   }
   const editable = await assertPlanEditable(parsed.data.projectId);

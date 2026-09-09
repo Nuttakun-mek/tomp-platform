@@ -18,7 +18,7 @@ export async function publishProjectAction(input: unknown): Promise<ActionResult
     return actionFailure(error || "Supabase is not configured for writes.");
   }
   const permission = await requirePermission(parsed.data.projectId, "project.publish");
-  if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "Missing permission: project.publish");
+  if (!permission.allowed) return actionFailure(permission.reason || "Missing permission: project.publish");
 
   const { data, error: insertError } = await client
     .from("publish_snapshots")

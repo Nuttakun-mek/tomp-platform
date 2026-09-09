@@ -23,7 +23,7 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
   const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
   if (projectId) {
     const permission = await requirePermission(projectId, "driver.create");
-    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างข้อมูลคนขับ");
+    if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างข้อมูลคนขับ");
   }
 
   const { data, error: insertError } = await client
@@ -81,7 +81,7 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
   const projectId = typeof parsed.data.metadata.projectId === "string" ? parsed.data.metadata.projectId : parsed.data.organizationId;
   if (projectId) {
     const permission = await requirePermission(projectId, "vehicle.create");
-    if (!permission.allowed && mode !== "service_role") return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างข้อมูลรถ");
+    if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างข้อมูลรถ");
   }
 
   const { data, error: insertError } = await client

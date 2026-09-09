@@ -36,7 +36,7 @@ export async function createCallSignAction(input: unknown): Promise<ActionResult
   }
 
   const permission = await requirePermission(auto.data.projectId, "assignment.create");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้าง Call Sign ในโครงการนี้");
   }
 

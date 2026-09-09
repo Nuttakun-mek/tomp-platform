@@ -89,11 +89,11 @@ export async function archiveProjectAction(input: unknown): Promise<ActionResult
   const projectId = String(data.projectId || "");
   if (!projectId) return actionFailure("ไม่พบโครงการ");
 
-  const { client, error, mode } = getSupabaseWriteClient();
+  const { client, error } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
 
   const permission = await requirePermission(projectId, "project.update");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์จัดการโครงการนี้");
   }
 
@@ -118,11 +118,11 @@ export async function renameProjectAction(input: unknown): Promise<ActionResult>
   if (!projectId) return actionFailure("ไม่พบโครงการ");
   if (projectName.length < 2) return actionFailure("ชื่อโครงการสั้นเกินไป");
 
-  const { client, error, mode } = getSupabaseWriteClient();
+  const { client, error } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
 
   const permission = await requirePermission(projectId, "project.update");
-  if (!permission.allowed && mode !== "service_role") {
+  if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขโครงการนี้");
   }
 

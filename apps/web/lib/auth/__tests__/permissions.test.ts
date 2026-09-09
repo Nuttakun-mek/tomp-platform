@@ -12,6 +12,21 @@ describe("RBAC permissions", () => {
     expect(roleHasPermission("coordinator", "project.publish")).toBe(false);
   });
 
+  it("lets operators run the day-to-day project: resources, incidents, changes", () => {
+    for (const key of ["driver.create", "vehicle.create", "timeline.create", "change.approve", "change.apply"]) {
+      expect(roleHasPermission("project_manager", key)).toBe(true);
+    }
+    expect(roleHasPermission("dispatcher", "driver.create")).toBe(true);
+    expect(roleHasPermission("dispatcher", "vehicle.create")).toBe(true);
+    expect(roleHasPermission("coordinator", "timeline.create")).toBe(true);
+  });
+
+  it("keeps read-only roles read-only", () => {
+    expect(roleHasPermission("coordinator", "driver.create")).toBe(false);
+    expect(roleHasPermission("dispatcher", "change.approve")).toBe(false);
+    expect(roleHasPermission("customer_viewer", "assignment.create")).toBe(false);
+  });
+
   it("collapses legacy roles to no permissions", () => {
     expect(roleHasPermission("organization_admin", "project.read")).toBe(false);
     expect(roleHasPermission("planner", "mission.create")).toBe(false);

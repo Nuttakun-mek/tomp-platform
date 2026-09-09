@@ -19,17 +19,49 @@ export async function requirePermission(first: string, second?: string): Promise
     return allowed ? { allowed: true } : { allowed: false, reason: `No role includes ${permissionKey}.` };
   }
 
+  const profile = await getCurrentUserProfile();
+  if (profile.isDevelopmentFallback) return { allowed: true };
+
   const membership = await getProjectMembership(projectId);
+  if (membership && roleHasPermission(membership.roleKey, permissionKey)) {
+    return { allowed: true };
+  }
+
+  // A platform-level role (super_admin) acts on every project without a
+  // project_members row. This is the ONLY sanctioned way past the membership
+  // check — the service-role transport is not authorization.
+  const globalRoles = await getGlobalRoleKeys(profile.id);
+  if (globalRoles.some((roleKey) => roleHasPermission(roleKey, permissionKey))) {
+    return { allowed: true };
+  }
 
   if (!membership) {
     return { allowed: false, reason: "No project membership was found." };
   }
+  return { allowed: false, reason: `Role ${membership.roleKey} does not include ${permissionKey}.` };
+}
 
-  if (!roleHasPermission(membership.roleKey, permissionKey)) {
-    return { allowed: false, reason: `Role ${membership.roleKey} does not include ${permissionKey}.` };
+// Roles assigned to the profile with no project scope (user_role_assignments
+// where project_id is null) — platform roles like super_admin.
+export async function getGlobalRoleKeys(profileId: string): Promise<string[]> {
+  if (profileId.startsWith("development")) return ["super_admin"];
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return [];
+
+  const { data } = await supabase
+    .from("user_role_assignments")
+    .select("roles(role_key)")
+    .eq("profile_id", profileId)
+    .eq("status", "active")
+    .is("project_id", null);
+
+  const keys: string[] = [];
+  for (const row of data || []) {
+    const roles = row.roles as { role_key?: string } | { role_key?: string }[] | null;
+    const roleKey = Array.isArray(roles) ? roles[0]?.role_key : roles?.role_key;
+    if (roleKey) keys.push(roleKey);
   }
-
-  return { allowed: true };
+  return keys;
 }
 
 export async function hasPermission(profileId: string, permissionKey: string, projectId?: string): Promise<boolean> {
@@ -63,22 +95,7 @@ export async function getUserProjectMemberships(profileId: string): Promise<Arra
 
 export async function getUserRoles(profileId: string, projectId?: string): Promise<string[]> {
   if (profileId.startsWith("development")) return ["project_manager"];
-  const supabase = getSupabaseServerDataClient();
-  const globalRoles: string[] = [];
-  if (supabase) {
-    const { data } = await supabase
-      .from("user_role_assignments")
-      .select("roles(role_key)")
-      .eq("profile_id", profileId)
-      .eq("status", "active")
-      .is("project_id", null);
-
-    for (const row of data || []) {
-      const roles = row.roles as { role_key?: string } | { role_key?: string }[] | null;
-      const roleKey = Array.isArray(roles) ? roles[0]?.role_key : roles?.role_key;
-      if (roleKey) globalRoles.push(roleKey);
-    }
-  }
+  const globalRoles = await getGlobalRoleKeys(profileId);
   const memberships = await getUserProjectMemberships(profileId);
   const scoped = projectId ? memberships.filter((membership) => membership.projectId === projectId) : memberships;
   return [...new Set([...globalRoles, ...scoped.map((membership) => membership.roleKey)])];
