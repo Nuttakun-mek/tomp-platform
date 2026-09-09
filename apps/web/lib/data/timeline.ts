@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { TimelineEvent } from "@tomp/types/domain";
-import { withTimeout } from "@/lib/async/timeout";
+import { type DataResult, runListQuery } from "@/lib/data/data-result";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { demoOr } from "@/lib/data/demo-fallback";
@@ -8,17 +8,18 @@ import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapTimelineEvent } from "./mappers";
 
 // cache(): one render often needs this list from several components; keep it to one query per request.
-export const getTimelineEventsByProjectId = cache(async function getTimelineEventsByProjectId(projectId: string): Promise<TimelineEvent[]> {
+export const getTimelineEventsByProjectId = cache(async function getTimelineEventsByProjectId(
+  projectId: string
+): Promise<DataResult<TimelineEvent[]>> {
   const { client: supabase } = await resolveReadClient();
-  if (!supabase) return getTimelineEventsByProjectIdViaPostgres(projectId);
+  if (!supabase) return { ok: true, data: await getTimelineEventsByProjectIdViaPostgres(projectId) };
 
-  try {
-    const { data, error } = await withTimeout(supabase.from("timeline_events").select("*").eq("project_id", projectId).order("created_at", { ascending: false }), 2200, "timeline events");
-    if (error || !data) return getTimelineEventsByProjectIdViaPostgres(projectId);
-    return data.map(mapTimelineEvent);
-  } catch {
-    return getTimelineEventsByProjectIdViaPostgres(projectId);
-  }
+  return runListQuery({
+    fallback: [],
+    label: "timeline events",
+    query: () => supabase.from("timeline_events").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+    map: (rows) => rows.map(mapTimelineEvent)
+  });
 });
 async function getTimelineEventsByProjectIdViaPostgres(projectId: string): Promise<TimelineEvent[]> {
   const sql = getPostgresClient();

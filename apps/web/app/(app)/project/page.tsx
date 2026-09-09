@@ -10,7 +10,9 @@ import { ProjectReadinessSummary } from "@/components/projects/project-readiness
 import { ProjectRenameForm } from "@/components/projects/project-rename-form";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getOperationDaysByProjectId } from "@/lib/data/operation-days";
@@ -68,12 +70,21 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
 }
 
 async function OverviewView({ projectId }: { projectId: string }) {
-  const [missions, assignments, operationDays, project] = await Promise.all([
+  const [missionsResult, assignmentsResult, operationDaysResult, project] = await Promise.all([
     getMissionsByProjectId(projectId),
     getAssignmentsByProjectId(projectId),
     getOperationDaysByProjectId(projectId),
     getProjectById(projectId)
   ]);
+
+  const load = combineResults(missionsResult, assignmentsResult, operationDaysResult);
+  if (!load.ok) {
+    return <DataUnavailable description="โหลดข้อมูลภาพรวมโครงการไม่สำเร็จ" detail={load.error} />;
+  }
+
+  const missions = missionsResult.data;
+  const assignments = assignmentsResult.data;
+  const operationDays = operationDaysResult.data;
   const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
 
   return (

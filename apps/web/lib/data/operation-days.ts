@@ -1,6 +1,6 @@
 import { cache } from "react";
 import type { OperationDay, OperationDayStatus } from "@tomp/types/domain";
-import { withTimeout } from "@/lib/async/timeout";
+import { type DataResult, runListQuery } from "@/lib/data/data-result";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 type Row = Record<string, unknown>;
@@ -29,19 +29,16 @@ function mapOperationDay(row: Row): OperationDay {
 
 // Real operation days for a project. Publish readiness must never mix these with
 // demo data — a real project with no days should show that blocker honestly.
-export const getOperationDaysByProjectId = cache(async function getOperationDaysByProjectId(projectId: string): Promise<OperationDay[]> {
+export const getOperationDaysByProjectId = cache(async function getOperationDaysByProjectId(
+  projectId: string
+): Promise<DataResult<OperationDay[]>> {
   const { client } = await resolveReadClient();
-  if (!client) return [];
+  if (!client) return { ok: true, data: [] };
 
-  try {
-    const { data, error } = await withTimeout(
-      client.from("project_days").select("*").eq("project_id", projectId).order("day_number", { ascending: true }),
-      2200,
-      "operation days"
-    );
-    if (error || !Array.isArray(data)) return [];
-    return data.map(mapOperationDay);
-  } catch {
-    return [];
-  }
+  return runListQuery({
+    fallback: [],
+    label: "operation days",
+    query: () => client.from("project_days").select("*").eq("project_id", projectId).order("day_number", { ascending: true }),
+    map: (rows) => rows.map(mapOperationDay)
+  });
 });

@@ -1,23 +1,26 @@
 import { cache } from "react";
 import type { Mission } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
+import { type DataResult, runListQuery } from "@/lib/data/data-result";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { demoOr } from "@/lib/data/demo-fallback";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapMission } from "./mappers";
 
 // cache(): one render often needs this list from several components; keep it to one query per request.
-export const getMissionsByProjectId = cache(async function getMissionsByProjectId(projectId: string): Promise<Mission[]> {
+export const getMissionsByProjectId = cache(async function getMissionsByProjectId(
+  projectId: string
+): Promise<DataResult<Mission[]>> {
+  const demo = () => demoKernel.missions.filter((mission) => mission.projectId === projectId);
   const { client: supabase } = await resolveReadClient();
-  if (!supabase) return demoOr(demoKernel.missions.filter((mission) => mission.projectId === projectId), []);
+  if (!supabase) return { ok: true, data: demoOr(demo(), []) };
 
-  try {
-    const { data, error } = await withTimeout(supabase.from("missions").select("*").eq("project_id", projectId).order("planned_start_time"), 2200, "missions");
-    if (error || !data) return demoOr(demoKernel.missions.filter((mission) => mission.projectId === projectId), []);
-    return data.map(mapMission);
-  } catch {
-    return demoOr(demoKernel.missions.filter((mission) => mission.projectId === projectId), []);
-  }
+  return runListQuery({
+    fallback: [],
+    label: "missions",
+    query: () => supabase.from("missions").select("*").eq("project_id", projectId).order("planned_start_time"),
+    map: (rows) => rows.map(mapMission)
+  });
 });
 
 // One query for several projects — avoids the N+1 the vehicle-operations

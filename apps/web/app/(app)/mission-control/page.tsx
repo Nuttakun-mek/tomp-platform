@@ -10,7 +10,9 @@ import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exc
 import { VehicleMonitorPanel } from "@/components/mission-control/vehicle-monitor-panel";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { EmptyState } from "@/components/ui/empty-state";
+import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
@@ -55,7 +57,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     redirect("/projects");
   }
 
-  const [events, locations, assignments, vehicleProfiles, assignmentStatuses, callSigns, comms, drivers, vehicles, evidence] = await Promise.all([
+  const [eventsResult, locations, assignmentsResult, vehicleProfiles, assignmentStatuses, callSignsResult, comms, drivers, vehicles, evidence] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
     getLatestDriverLocationsByProjectId(activeProject.id),
     getAssignmentsByProjectId(activeProject.id),
@@ -68,6 +70,11 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     getVehicleEvidenceByProjectId(activeProject.id)
   ]);
 
+  const load = combineResults(eventsResult, assignmentsResult, callSignsResult);
+  const events = eventsResult.data;
+  const assignments = assignmentsResult.data;
+  const callSigns = callSignsResult.data;
+
   const locationAssignmentIds = new Set(locations.map((location) => location.assignmentId).filter(Boolean));
   const followUps = assignments.filter(
     (assignment) => !assignment.driverId || !assignment.vehicleId || !assignment.callSignId || !locationAssignmentIds.has(assignment.id)
@@ -77,6 +84,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
   return (
     <div className="grid gap-4">
       <ProjectWorkspaceTabs projectId={activeProject.id} active="control" />
+      {!load.ok ? <DataUnavailable description="โหลดข้อมูลศูนย์ควบคุมบางส่วนไม่สำเร็จ" detail={load.error} /> : null}
       <CommandCenterHeader project={activeProject} liveCount={locations.length} issueCount={followUps} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
 

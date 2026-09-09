@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { Assignment } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
+import { type DataResult, runListQuery } from "@/lib/data/data-result";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { demoOr } from "@/lib/data/demo-fallback";
@@ -8,17 +9,18 @@ import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapAssignment } from "./mappers";
 
 // cache(): one render often needs this list from several components; keep it to one query per request.
-export const getAssignmentsByProjectId = cache(async function getAssignmentsByProjectId(projectId: string): Promise<Assignment[]> {
+export const getAssignmentsByProjectId = cache(async function getAssignmentsByProjectId(
+  projectId: string
+): Promise<DataResult<Assignment[]>> {
   const { client: supabase } = await resolveReadClient();
-  if (!supabase) return getAssignmentsByProjectIdViaPostgres(projectId);
+  if (!supabase) return { ok: true, data: await getAssignmentsByProjectIdViaPostgres(projectId) };
 
-  try {
-    const { data, error } = await withTimeout(supabase.from("assignments").select("*").eq("project_id", projectId).order("start_time"), 2200, "assignments");
-    if (error || !data) return getAssignmentsByProjectIdViaPostgres(projectId);
-    return data.map(mapAssignment);
-  } catch {
-    return getAssignmentsByProjectIdViaPostgres(projectId);
-  }
+  return runListQuery({
+    fallback: [],
+    label: "assignments",
+    query: () => supabase.from("assignments").select("*").eq("project_id", projectId).order("start_time"),
+    map: (rows) => rows.map(mapAssignment)
+  });
 });
 // One query for several projects. The vehicle-operations aggregation used to
 // call getAssignmentsByProjectId once per project (N+1). Not cache()-wrapped:

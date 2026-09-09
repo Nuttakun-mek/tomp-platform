@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { createProjectAction } from "@/app/actions/projects";
 import { useToast } from "@/components/ui/toast";
@@ -25,6 +26,7 @@ export function CreateProjectForm() {
   const [projectCode, setProjectCode] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const router = useRouter();
   const toast = useToast();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isPending, startTransition] = useTransition();
@@ -68,7 +70,7 @@ export function CreateProjectForm() {
       const data = result.data as { project?: { id?: string } };
       toast.success(result.warning || "บันทึกโครงการสำเร็จ");
       if (data.project?.id) {
-        window.location.href = `/projects/${data.project.id}`;
+        router.push(`/projects/${data.project.id}`);
       }
     });
   }

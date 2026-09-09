@@ -1,14 +1,20 @@
 import { ChangeStatusBadge } from "@/components/change/change-status-badge";
+import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { getChangeRequestsByProjectId } from "@/lib/data/change-requests";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 
 export async function ChangeRequestList({ projectId }: { projectId: string }) {
-  const requests = await getChangeRequestsByProjectId(projectId);
+  const result = await getChangeRequestsByProjectId(projectId);
+  const requests = result.data;
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-ink">คำขอเปลี่ยนแปลง</h2>
-      {requests.length ? (
+      {!result.ok ? (
+        <div className="mt-4">
+          <DataUnavailable description="โหลดรายการคำขอเปลี่ยนแปลงไม่สำเร็จ" />
+        </div>
+      ) : requests.length ? (
         <div className="mt-4 grid gap-3">
           {requests.map((item) => (
             <article key={item.id} className="rounded-md border border-slate-200 p-3">

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { withTimeout } from "@/lib/async/timeout";
+import { type DataResult, runListQuery } from "@/lib/data/data-result";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 export interface ChangeRequestRow {
@@ -32,21 +32,19 @@ function mapChangeRequest(row: Row): ChangeRequestRow {
 }
 
 // Real change requests for a project. No demo fallback — an empty list is an
-// honest empty state; a failure surfaces as an empty list plus the caller's
-// error handling, never fabricated rows.
-export const getChangeRequestsByProjectId = cache(async function getChangeRequestsByProjectId(projectId: string): Promise<ChangeRequestRow[]> {
+// honest empty state; a failed read returns `ok: false` so the UI can offer a
+// retry instead of showing an empty list that looks like "no change requests".
+export const getChangeRequestsByProjectId = cache(async function getChangeRequestsByProjectId(
+  projectId: string
+): Promise<DataResult<ChangeRequestRow[]>> {
   const { client } = await resolveReadClient();
-  if (!client) return [];
+  if (!client) return { ok: true, data: [] };
 
-  try {
-    const { data, error } = await withTimeout(
+  return runListQuery({
+    fallback: [],
+    label: "change requests",
+    query: () =>
       client.from("change_requests").select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(50),
-      2200,
-      "change requests"
-    );
-    if (error || !Array.isArray(data)) return [];
-    return data.map(mapChangeRequest);
-  } catch {
-    return [];
-  }
+    map: (rows) => rows.map(mapChangeRequest)
+  });
 });

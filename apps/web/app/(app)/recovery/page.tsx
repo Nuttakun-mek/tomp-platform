@@ -9,7 +9,9 @@ import { demoKernel } from "@/lib/demo/demo-kernel";
 export default async function RecoveryPage() {
   const projects = await getProjects();
   const activeProjects = projects.length ? projects : demoKernel.projects;
-  const assignmentsByProject = await Promise.all(activeProjects.map((project) => getAssignmentsByProjectId(project.id)));
+  const assignmentsByProject = await Promise.all(
+    activeProjects.map(async (project) => (await getAssignmentsByProjectId(project.id)).data)
+  );
   const assignments = assignmentsByProject.flat();
 
   return (

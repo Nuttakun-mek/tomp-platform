@@ -33,7 +33,7 @@ export async function publishProjectAction(input: unknown): Promise<ActionResult
     return actionFailure("โครงการนี้ประกาศใช้แผนแล้ว การแก้ไขต้องผ่านคำขอเปลี่ยนแปลง");
   }
 
-  const [project, operationDays, missions, assignments, callSigns] = await Promise.all([
+  const [project, operationDaysResult, missionsResult, assignmentsResult, callSignsResult] = await Promise.all([
     getProjectById(parsed.data.projectId),
     getOperationDaysByProjectId(parsed.data.projectId),
     getMissionsByProjectId(parsed.data.projectId),
@@ -42,6 +42,16 @@ export async function publishProjectAction(input: unknown): Promise<ActionResult
   ]);
 
   if (!project) return actionFailure("ไม่พบโครงการ");
+
+  // Never publish off a partial read of the plan — a failed load could hide a
+  // blocker (no operation day, no assignment) and let an unready plan through.
+  if (!operationDaysResult.ok || !missionsResult.ok || !assignmentsResult.ok || !callSignsResult.ok) {
+    return actionFailure("โหลดข้อมูลแผนไม่ครบเพื่อตรวจความพร้อม กรุณาลองใหม่อีกครั้ง");
+  }
+  const operationDays = operationDaysResult.data;
+  const missions = missionsResult.data;
+  const assignments = assignmentsResult.data;
+  const callSigns = callSignsResult.data;
 
   const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
   if (!readiness.canPublish) {

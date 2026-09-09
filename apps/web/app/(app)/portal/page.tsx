@@ -8,7 +8,9 @@ import { getProjects } from "@/lib/data/projects";
 
 export default async function PortalPage() {
   const projects = await getProjects();
-  const missionsByProject = await Promise.all(projects.map((project) => getMissionsByProjectId(project.id)));
+  const missionsByProject = await Promise.all(
+    projects.map(async (project) => (await getMissionsByProjectId(project.id)).data)
+  );
   const primary = projects[0];
   const primaryMissions = missionsByProject[0] ?? [];
 

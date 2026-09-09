@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
 import { DispatchBoard } from "@/components/assignments/dispatch-board";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
+import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { EmptyState } from "@/components/ui/empty-state";
+import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";
@@ -41,13 +43,18 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
     redirect("/projects");
   }
   const projectId = activeProject.id;
-  const [assignments, missions, callSigns, drivers, vehicles] = await Promise.all([
+  const [assignmentsResult, missionsResult, callSignsResult, drivers, vehicles] = await Promise.all([
     getAssignmentsByProjectId(projectId),
     getMissionsByProjectId(projectId),
     getCallSignsByProjectId(projectId),
     getDrivers(),
     getVehicles()
   ]);
+
+  const load = combineResults(assignmentsResult, missionsResult, callSignsResult);
+  const assignments = assignmentsResult.data;
+  const missions = missionsResult.data;
+  const callSigns = callSignsResult.data;
 
   return (
     <div className="grid gap-4">
@@ -61,6 +68,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
           </div>
         </div>
       </section>
+      {!load.ok ? <DataUnavailable description="โหลดข้อมูลงานของโครงการนี้ไม่สำเร็จ" detail={load.error} /> : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">
         <CreateAssignmentForm
           projectId={projectId}
