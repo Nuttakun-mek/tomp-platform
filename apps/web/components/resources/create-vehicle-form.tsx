@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createVehicleAction } from "@/app/actions/resources";
-import { ActionFeedback } from "@/components/ui/action-feedback";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/toast";
 import { createVehicleSchema } from "@/lib/validation";
 
 function splitRequirements(value: FormDataEntryValue | null) {
@@ -16,12 +16,10 @@ function splitRequirements(value: FormDataEntryValue | null) {
 
 export function CreateVehicleForm() {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
-  const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
+  const toast = useToast();
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
-    setMessage(null);
     const parsed = createVehicleSchema.safeParse({
       plateNumber: formData.get("plateNumber"),
       vehicleType: formData.get("vehicleType"),
@@ -33,20 +31,17 @@ export function CreateVehicleForm() {
     });
 
     if (!parsed.success) {
-      setTone("warning");
-      setMessage("กรุณากรอกทะเบียนรถ ประเภทรถ และจำนวนที่นั่งให้ครบถ้วน");
+      toast.warning("กรุณากรอกทะเบียนรถ ประเภทรถ และจำนวนที่นั่งให้ครบถ้วน");
       return;
     }
 
     startTransition(async () => {
       const result = await createVehicleAction(parsed.data);
       if (!result.success) {
-        setTone("danger");
-        setMessage(result.error || "สร้างโปรไฟล์รถไม่สำเร็จ");
+        toast.error(result.error || "สร้างโปรไฟล์รถไม่สำเร็จ");
         return;
       }
-      setTone("success");
-      setMessage(result.warning || "บันทึกโปรไฟล์รถสำเร็จ");
+      toast.success(result.warning || "บันทึกโปรไฟล์รถสำเร็จ");
       router.refresh();
     });
   }
@@ -82,7 +77,6 @@ export function CreateVehicleForm() {
         หมายเหตุปฏิบัติการ
         <textarea className="field-input min-h-24" name="operationNote" placeholder="เช่น รถคันนี้ใช้สำหรับแขก VIP หรือกำหนดจุดจอดเฉพาะ" />
       </label>
-      <ActionFeedback message={message} tone={tone} />
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
         {isPending ? "กำลังบันทึก..." : "บันทึกโปรไฟล์รถ"}
       </button>

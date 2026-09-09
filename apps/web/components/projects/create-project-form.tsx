@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { RefreshCw } from "lucide-react";
 import { createProjectAction } from "@/app/actions/projects";
-import { ActionFeedback } from "@/components/ui/action-feedback";
+import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { createProjectSchema } from "@/lib/validation";
 
@@ -20,18 +20,12 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getFeedbackTone(message: string | null) {
-  if (!message) return "info" as const;
-  if (message.includes("สำเร็จ") || message.includes("บันทึก")) return "success" as const;
-  if (message.includes("กรุณา") || message.includes("ถูกใช้แล้ว")) return "warning" as const;
-  return "danger" as const;
-}
 
 export function CreateProjectForm() {
   const [projectCode, setProjectCode] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isPending, startTransition] = useTransition();
 
@@ -43,7 +37,6 @@ export function CreateProjectForm() {
   }, []);
 
   function handleSubmit(formData: FormData) {
-    setMessage(null);
     setFieldErrors({});
 
     const parsed = createProjectSchema.safeParse({
@@ -59,7 +52,7 @@ export function CreateProjectForm() {
 
     if (!parsed.success) {
       setFieldErrors(parsed.error.flatten().fieldErrors);
-      setMessage("กรุณากรอกข้อมูลโครงการให้ครบถ้วนก่อนบันทึก");
+      toast.warning("กรุณากรอกข้อมูลโครงการให้ครบถ้วนก่อนบันทึก");
       return;
     }
 
@@ -68,12 +61,12 @@ export function CreateProjectForm() {
 
       if (!result.success) {
         setFieldErrors(result.fieldErrors || {});
-        setMessage(result.error || "สร้างโครงการไม่สำเร็จ");
+        toast.error(result.error || "สร้างโครงการไม่สำเร็จ");
         return;
       }
 
       const data = result.data as { project?: { id?: string } };
-      setMessage(result.warning || "บันทึกโครงการสำเร็จ กำลังเปิดพื้นที่ทำงานของโครงการ");
+      toast.success(result.warning || "บันทึกโครงการสำเร็จ");
       if (data.project?.id) {
         window.location.href = `/projects/${data.project.id}`;
       }
@@ -145,8 +138,6 @@ export function CreateProjectForm() {
           <FieldError errors={fieldErrors.serviceLevel} />
         </label>
       </div>
-
-      <ActionFeedback message={message} tone={getFeedbackTone(message)} />
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
         {isPending ? "กำลังบันทึก..." : "บันทึกโครงการ"}
       </button>

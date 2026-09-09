@@ -4,20 +4,18 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { sendDriverNotificationAction } from "@/app/actions/driver-notifications";
-import { ActionFeedback } from "@/components/ui/action-feedback";
+import { useToast } from "@/components/ui/toast";
 
 export function VehicleMessageForm({ projectId, assignmentId, driverId }: { projectId: string; assignmentId: string; driverId?: string | null }) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
-  const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function send(formData: FormData) {
     const body = String(formData.get("body") || "").trim();
     if (!body) {
-      setTone("warning");
-      setMessage("กรุณาพิมพ์ข้อความก่อนส่ง");
+      toast.warning("กรุณาพิมพ์ข้อความก่อนส่ง");
       return;
     }
 
@@ -32,12 +30,11 @@ export function VehicleMessageForm({ projectId, assignmentId, driverId }: { proj
         actionLabel: "รับทราบ"
       });
       if (!result.success) {
-        setTone("danger");
-        setMessage(result.error || "ส่งข้อความไม่สำเร็จ");
+        toast.error(result.error || "ส่งข้อความไม่สำเร็จ");
         return;
       }
-      setTone("success");
-      setMessage("ส่งข้อความถึงคนขับแล้ว");
+      toast.success("ส่งข้อความถึงคนขับแล้ว");
+      setOpen(false);
       router.refresh();
     });
   }
@@ -60,7 +57,6 @@ export function VehicleMessageForm({ projectId, assignmentId, driverId }: { proj
           </button>
         </form>
       ) : null}
-      <ActionFeedback message={message} tone={tone} />
     </div>
   );
 }

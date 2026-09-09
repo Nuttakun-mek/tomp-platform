@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createDriverAction } from "@/app/actions/resources";
+import { useToast } from "@/components/ui/toast";
 import { createDriverSchema } from "@/lib/validation";
 
 export function CreateDriverForm() {
-  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+  const toast = useToast();
+  const [isPending, startTransition] = useTransition();
 
-  async function handleSubmit(formData: FormData) {
+  function handleSubmit(formData: FormData) {
     const parsed = createDriverSchema.safeParse({
       fullName: formData.get("fullName"),
       phone: formData.get("phone"),
@@ -17,12 +21,19 @@ export function CreateDriverForm() {
     });
 
     if (!parsed.success) {
-      setMessage("กรุณากรอกข้อมูลคนขับที่จำเป็นให้ครบถ้วน");
+      toast.warning("กรุณากรอกข้อมูลคนขับที่จำเป็นให้ครบถ้วน");
       return;
     }
 
-    const result = await createDriverAction(parsed.data);
-    setMessage(result.success ? result.warning || "บันทึกข้อมูลคนขับและเตรียม Timeline แล้ว" : result.error || "สร้างข้อมูลคนขับไม่สำเร็จ");
+    startTransition(async () => {
+      const result = await createDriverAction(parsed.data);
+      if (!result.success) {
+        toast.error(result.error || "สร้างข้อมูลคนขับไม่สำเร็จ");
+        return;
+      }
+      toast.success(result.warning || "บันทึกข้อมูลคนขับแล้ว");
+      router.refresh();
+    });
   }
 
   return (
@@ -31,8 +42,9 @@ export function CreateDriverForm() {
       <input className="rounded-md border border-slate-300 px-3 py-2" name="fullName" placeholder="ชื่อ-นามสกุล" />
       <input className="rounded-md border border-slate-300 px-3 py-2" name="phone" placeholder="เบอร์โทรศัพท์" />
       <input className="rounded-md border border-slate-300 px-3 py-2" name="licenseType" placeholder="ประเภทใบขับขี่" />
-      {message ? <p className="text-sm font-medium text-slate-700">{message}</p> : null}
-      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white" type="submit">บันทึกคนขับ</button>
+      <button className="w-fit rounded-md bg-operation px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300" disabled={isPending} type="submit">
+        {isPending ? "กำลังบันทึก..." : "บันทึกคนขับ"}
+      </button>
     </form>
   );
 }

@@ -5,6 +5,7 @@ import { UserMenu } from "@/components/auth/user-menu";
 import { BuildVersionBadge } from "@/components/layout/build-version-badge";
 import { EnvironmentBadge } from "@/components/layout/environment-badge";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
+import { ToastProvider } from "@/components/ui/toast";
 import { ProjectScopePill } from "@/components/workspace/project-scope-pill";
 import { getViewerAccess } from "@/lib/auth/access";
 import { NAV_SECTIONS, filterNav } from "@/lib/auth/nav-model";
@@ -69,7 +70,9 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
             </div>
           </header>
 
-          <WorkspaceShell>{children}</WorkspaceShell>
+          <ToastProvider>
+            <WorkspaceShell>{children}</WorkspaceShell>
+          </ToastProvider>
         </div>
       </div>
     </div>

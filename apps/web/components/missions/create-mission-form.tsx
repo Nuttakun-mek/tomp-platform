@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createMissionAction } from "@/app/actions/missions";
+import { useToast } from "@/components/ui/toast";
 import { createMissionSchema } from "@/lib/validation";
 
 export function CreateMissionForm({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
-    setMessage(null);
-
     const parsed = createMissionSchema.safeParse({
       projectId,
       missionCode: formData.get("missionCode"),
@@ -26,18 +25,17 @@ export function CreateMissionForm({ projectId }: { projectId: string }) {
     });
 
     if (!parsed.success) {
-      setMessage("กรุณากรอกข้อมูลภารกิจที่จำเป็นให้ครบถ้วน");
+      toast.warning("กรุณากรอกข้อมูลภารกิจที่จำเป็นให้ครบถ้วน");
       return;
     }
 
     startTransition(async () => {
       const result = await createMissionAction(parsed.data);
       if (!result.success) {
-        setMessage(result.error || "สร้างภารกิจไม่สำเร็จ");
+        toast.error(result.error || "สร้างภารกิจไม่สำเร็จ");
         return;
       }
-
-      setMessage(result.warning || "บันทึกภารกิจแล้ว");
+      toast.success(result.warning || "บันทึกภารกิจแล้ว");
       router.refresh();
     });
   }
@@ -86,7 +84,6 @@ export function CreateMissionForm({ projectId }: { projectId: string }) {
         <textarea className="field-input min-h-24" name="serviceCommitment" placeholder="เช่น ต้องถึงจุดรับก่อนเวลา 15 นาที และประสานงานกับผู้จัดงานก่อนปล่อยรถ" />
       </label>
 
-      {message ? <p className="rounded-2xl bg-slate-50 p-3 text-sm font-medium text-slate-700">{message}</p> : null}
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
         {isPending ? "กำลังบันทึก..." : "บันทึกภารกิจ"}
       </button>
