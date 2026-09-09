@@ -3,7 +3,7 @@ import * as TaskManager from "expo-task-manager";
 import { LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
 import { enqueueOfflineAction } from "./offline-queue";
-import { getSavedDriverToken } from "./token-store";
+import { getMobileDriverSession } from "./mobile-session-store";
 
 type LocationCallback = (location: Location.LocationObject) => void;
 
@@ -12,20 +12,23 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   const payload = data as { locations?: Location.LocationObject[] } | undefined;
   const latest = payload?.locations?.[0];
   if (!latest) return;
-  const token = await getSavedDriverToken();
-  if (!token) return;
-  await submitLocation({
-    token,
-    latitude: latest.coords.latitude,
-    longitude: latest.coords.longitude,
-    accuracy: latest.coords.accuracy,
-    recordedAt: new Date(latest.timestamp).toISOString(),
-    trackingEvent: "location_ping",
-    metadata: {
-      platform: "mobile_driver",
-      mode: "background"
-    }
-  }).catch(() => undefined);
+  const mobileSession = await getMobileDriverSession();
+  if (!mobileSession) return;
+
+  await submitLocation(
+    {
+      latitude: latest.coords.latitude,
+      longitude: latest.coords.longitude,
+      accuracy: latest.coords.accuracy,
+      recordedAt: new Date(latest.timestamp).toISOString(),
+      trackingEvent: "location_ping",
+      metadata: {
+        platform: "mobile_driver",
+        mode: "background"
+      }
+    },
+    mobileSession
+  ).catch(() => undefined);
 });
 
 export async function requestForegroundLocationPermission() {
@@ -43,7 +46,8 @@ export async function getCurrentLocation() {
 }
 
 async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]) {
-  const result = await submitLocation(input).catch((error) => ({
+  const mobileSession = await getMobileDriverSession();
+  const result = await submitLocation(input, mobileSession).catch((error) => ({
     success: false,
     error: error instanceof Error ? error.message : "ส่งตำแหน่งไม่สำเร็จ"
   }));
@@ -53,11 +57,10 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
   return result;
 }
 
-export async function startForegroundLocationSharing(token: string, onLocation: LocationCallback) {
+export async function startForegroundLocationSharing(onLocation: LocationCallback) {
   const firstLocation = await getCurrentLocation();
   onLocation(firstLocation);
   await submitOrQueueLocation({
-    token,
     latitude: firstLocation.coords.latitude,
     longitude: firstLocation.coords.longitude,
     accuracy: firstLocation.coords.accuracy,
@@ -78,7 +81,6 @@ export async function startForegroundLocationSharing(token: string, onLocation: 
     (location) => {
       onLocation(location);
       void submitOrQueueLocation({
-        token,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         accuracy: location.coords.accuracy,
@@ -94,6 +96,9 @@ export async function startForegroundLocationSharing(token: string, onLocation: 
 }
 
 export async function startBackgroundLocationSharing() {
+  const mobileSession = await getMobileDriverSession();
+  if (!mobileSession) return false;
+
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
   if (alreadyStarted) return true;
   await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
@@ -110,11 +115,10 @@ export async function startBackgroundLocationSharing() {
   return true;
 }
 
-export async function stopLocationSharing(token: string) {
+export async function stopLocationSharing() {
   const location = await getCurrentLocation().catch(() => null);
   if (location) {
     await submitOrQueueLocation({
-      token,
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
       accuracy: location.coords.accuracy,

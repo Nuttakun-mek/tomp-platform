@@ -1,15 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
-import type { LocationObject, LocationSubscription } from "expo-location";
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
+import type { ComponentType, RefAttributes } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  Linking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
+import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
 import * as ExpoLinking from "expo-linking";
-import { getNextDriverAction, mapDriverStatusToThai } from "@tomp/driver-core";
+import * as Network from "expo-network";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import { WebView, type WebViewProps } from "react-native-webview";
+import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
+import { buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
+import { buildDriverWebUrl, TOMP_API_BASE_URL, TOMP_DRIVER_APP_VERSION, TOMP_WEB_ORIGIN } from "./src/config";
 import { colors, radius } from "./src/theme";
-import type { DriverScreenState, MobileDriverAssignment } from "./src/types";
-import { fetchAssignmentByToken, submitIssue, submitReadiness, submitStatus } from "./src/services/driver-api";
-import { enqueueOfflineAction, flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-queue";
-import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
 import {
   requestBackgroundLocationPermission,
   requestForegroundLocationPermission,
@@ -17,256 +30,283 @@ import {
   startForegroundLocationSharing,
   stopLocationSharing
 } from "./src/services/location";
+import { getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
+import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
+import { parseDriverLink } from "./src/services/driver-link";
+import { decideWebViewNavigation } from "./src/services/webview-navigation";
 
-function extractToken(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("tomp_")) return trimmed;
-  try {
-    const url = new URL(trimmed);
-    const tokenParam = url.searchParams.get("token");
-    if (tokenParam) return tokenParam;
-    const parts = url.pathname.split("/").filter(Boolean);
-    return parts[parts.length - 1] ?? trimmed;
-  } catch {
-    return trimmed;
-  }
-}
+const DriverWebView = WebView as unknown as ComponentType<WebViewProps & RefAttributes<WebView>>;
 
-function formatLocation(location: LocationObject | null) {
-  if (!location) return "ยังไม่มีตำแหน่งล่าสุด";
-  return `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}`;
-}
+type ShellMode = "activation" | "web";
+type ShellStatus = "พร้อมเปิดงาน" | "กำลังเปิดงาน" | "กำลังใช้งาน" | "ต้องตรวจสอบ";
+
+const bridgeBootstrap = `
+  (function () {
+    window.TOMP_MOBILE_SHELL = {
+      namespace: "tomp.driver",
+      version: 1,
+      platform: "android",
+      appVersion: "${TOMP_DRIVER_APP_VERSION}",
+      canBackgroundLocation: true,
+      postMessage: function(message) {
+        window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(message));
+      }
+    };
+    window.dispatchEvent(new CustomEvent("tomp:mobile-shell-ready", { detail: window.TOMP_MOBILE_SHELL }));
+  })();
+  true;
+`;
 
 export default function App() {
-  const [screenState, setScreenState] = useState<DriverScreenState>("token");
+  const webViewRef = useRef<WebView>(null);
+  const [mode, setMode] = useState<ShellMode>("activation");
+  const [status, setStatus] = useState<ShellStatus>("พร้อมเปิดงาน");
   const [tokenInput, setTokenInput] = useState("");
-  const [assignment, setAssignment] = useState<MobileDriverAssignment | null>(null);
-  const [message, setMessage] = useState("");
-  const [location, setLocation] = useState<LocationObject | null>(null);
-  const [locationSharing, setLocationSharing] = useState(false);
-  const [backgroundEnabled, setBackgroundEnabled] = useState(false);
-  const [subscription, setSubscription] = useState<LocationSubscription | null>(null);
+  const [currentToken, setCurrentToken] = useState("");
+  const [webUrl, setWebUrl] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [qrLocked, setQrLocked] = useState(false);
-  const [offlineCount, setOfflineCount] = useState(0);
-  const [retryingQueue, setRetryingQueue] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [message, setMessage] = useState("สแกน QR หรือวาง URL งานที่ได้รับจากศูนย์ควบคุม");
+  const [sessionReady, setSessionReady] = useState(false);
+  const [networkLabel, setNetworkLabel] = useState("กำลังตรวจสอบสัญญาณ");
+  const [canGoBack, setCanGoBack] = useState(false);
 
-  const nextAction = useMemo(() => (assignment ? getNextDriverAction(assignment.packet.status) : "โหลดงานจาก QR ก่อน"), [assignment]);
+  const effectiveWebUrl = useMemo(() => webUrl || (currentToken ? buildDriverWebUrl(currentToken) : ""), [currentToken, webUrl]);
 
-  async function loadAssignment(rawToken: string) {
-    const token = extractToken(rawToken);
-    if (!token) {
-      setMessage("กรุณาใส่ token หรือเปิดลิงก์จาก QR");
-      return;
-    }
-    setScreenState("loading");
-    setMessage("กำลังโหลดงานจากศูนย์ควบคุม");
-    const result = await fetchAssignmentByToken(token);
-    if (!result.success || !result.data) {
-      setScreenState("error");
-      setMessage(result.error ?? "โหลดงานไม่สำเร็จ");
-      return;
-    }
-    await saveDriverToken(token);
-    setAssignment(result.data);
-    setTokenInput(token);
-    setMessage("โหลดงานสำเร็จ");
-    setScreenState("ready");
-    setScannerOpen(false);
-    setQrLocked(false);
-  }
+  const postStatusToWeb = useCallback((nativeStatus: Parameters<typeof buildNativeStatusMessage>[0], text: string, detail?: Record<string, unknown>) => {
+    const payload = buildNativeStatusMessage(nativeStatus, text, detail);
+    const serialized = JSON.stringify(payload).replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+    webViewRef.current?.injectJavaScript(`
+      window.dispatchEvent(new CustomEvent("tomp:native-status", { detail: ${serialized} }));
+      true;
+    `);
+  }, []);
 
-  async function openScanner() {
+  const openDriverLink = useCallback(
+    async (rawValue: string) => {
+      const parsed = parseDriverLink(rawValue);
+      if (!parsed) {
+        setStatus("ต้องตรวจสอบ");
+        setMessage("ไม่พบ token หรือ URL งาน กรุณาตรวจสอบ QR อีกครั้ง");
+        return;
+      }
+
+      await saveDriverToken(parsed.token);
+      setCurrentToken(parsed.token);
+      setTokenInput(parsed.token);
+      setWebUrl(parsed.webUrl);
+      setScannerOpen(false);
+      setQrLocked(false);
+      setMode("web");
+      setStatus("กำลังเปิดงาน");
+      setMessage(parsed.source === "raw-token" ? "กำลังเปิดงานจาก token" : "กำลังเปิดงานจาก QR");
+    },
+    []
+  );
+
+  const openScanner = useCallback(async () => {
     if (!cameraPermission?.granted) {
       const result = await requestCameraPermission();
       if (!result.granted) {
-        Alert.alert("ต้องอนุญาตกล้อง", "กรุณาอนุญาต Camera เพื่อสแกน QR งานจากศูนย์ควบคุม");
+        Alert.alert("ต้องอนุญาตกล้อง", "กรุณาอนุญาตให้ TOMP ใช้กล้องเพื่อสแกน QR งาน");
         return;
       }
     }
-    setMessage("");
     setQrLocked(false);
-    setScannerOpen(true);
-  }
+    setScannerOpen((value) => !value);
+  }, [cameraPermission?.granted, requestCameraPermission]);
 
-  function handleQrScanned(result: BarcodeScanningResult) {
-    if (qrLocked) return;
-    setQrLocked(true);
-    setMessage("พบ QR แล้ว กำลังโหลดงาน");
-    void loadAssignment(result.data);
-  }
+  const handleQrScanned = useCallback(
+    (result: BarcodeScanningResult) => {
+      if (qrLocked) return;
+      setQrLocked(true);
+      void openDriverLink(result.data);
+    },
+    [openDriverLink, qrLocked]
+  );
 
-  async function sendReadiness() {
-    if (!assignment) return;
-    const input = {
-      projectId: assignment.project.id,
-      assignmentId: assignment.assignment.id,
-      driverId: assignment.driver.id,
-      status: "ready",
-      confirmedName: true,
-      confirmedPhone: true,
-      confirmedVehicle: true,
-      gpsConsent: true,
-      metadata: { source: "mobile_driver" }
-    } as const;
-    const result = await submitReadiness(assignment.token, input);
-    if (!result.success) {
-      await enqueueOfflineAction("readiness", input);
-      await refreshOfflineCount();
-      setMessage("ยังส่งข้อมูลไม่ได้ ระบบเก็บไว้ส่งซ้ำเมื่อสัญญาณพร้อม");
+  const handleBridgeMessage = useCallback(
+    async (event: WebViewMessageEvent) => {
+      const parsed = parseBridgeMessage(event.nativeEvent.data);
+      if (!parsed) return;
+
+      if (parsed.type === "mobile-session.set") {
+        await saveMobileDriverSession(parsed.payload);
+        setSessionReady(true);
+        postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
+        return;
+      }
+
+      if (parsed.type === "open.url") {
+        const decision = decideWebViewNavigation(parsed.payload.url);
+        if (decision.action === "external") {
+          await Linking.openURL(decision.url);
+        } else if (decision.action === "block") {
+          postStatusToWeb("navigation_blocked", decision.reason, { url: parsed.payload.url });
+        }
+        return;
+      }
+
+      if (parsed.type === "gps.stop") {
+        await stopLocationSharing();
+        postStatusToWeb("gps_stopped", "หยุดแชร์ตำแหน่งจากแอปแล้ว");
+        return;
+      }
+
+      const session = await getMobileDriverSession();
+      if (!session) {
+        setSessionReady(false);
+        postStatusToWeb("session_missing", "ยังไม่มี mobile session หลังยืนยัน PIN จึงยังไม่เริ่ม GPS เบื้องหลัง");
+        return;
+      }
+
+      const foregroundGranted = await requestForegroundLocationPermission();
+      if (!foregroundGranted) {
+        postStatusToWeb("gps_error", "ไม่ได้รับสิทธิ์ตำแหน่งขณะเปิดแอป");
+        return;
+      }
+
+      postStatusToWeb("gps_starting", "กำลังเริ่มแชร์ตำแหน่งจากแอป");
+      await startForegroundLocationSharing((location) => {
+        postStatusToWeb("gps_sharing", "กำลังแชร์ตำแหน่งจากแอป", {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy,
+          recordedAt: new Date(location.timestamp).toISOString()
+        });
+      });
+
+      const backgroundGranted = await requestBackgroundLocationPermission().catch(() => false);
+      const backgroundStarted = backgroundGranted ? await startBackgroundLocationSharing().catch(() => false) : false;
+      postStatusToWeb(backgroundStarted ? "gps_sharing" : "gps_error", backgroundStarted ? "เปิด GPS เบื้องหลังแล้ว" : "ยังไม่ได้รับสิทธิ์ GPS เบื้องหลัง");
+    },
+    [postStatusToWeb]
+  );
+
+  const handleNavigation = useCallback((event: WebViewNavigation) => {
+    setCanGoBack(event.canGoBack);
+    if (event.loading) {
+      setStatus("กำลังเปิดงาน");
       return;
     }
-    setMessage("ส่งข้อมูลความพร้อมแล้ว");
-  }
+    setStatus("กำลังใช้งาน");
+    setMessage("เปิดหน้าคนขับผ่าน TOMP Web แล้ว");
+  }, []);
 
-  async function sendStatus(status: "ready" | "arrived_pickup" | "passenger_onboard" | "completed" | "blocked") {
-    if (!assignment) return;
-    const input = {
-      projectId: assignment.project.id,
-      assignmentId: assignment.assignment.id,
-      driverId: assignment.driver.id,
-      status,
-      source: "driver_qr",
-      metadata: { source: "mobile_driver" }
-    } as const;
-    const result = await submitStatus(assignment.token, input);
-    if (!result.success) {
-      await enqueueOfflineAction("status", input);
-      await refreshOfflineCount();
-      setMessage("ยังส่งสถานะไม่ได้ ระบบเก็บไว้ส่งซ้ำเมื่อสัญญาณพร้อม");
-      return;
-    }
-    setMessage(`ส่งสถานะ ${mapDriverStatusToThai(status)} แล้ว`);
-  }
+  const handleShouldStartLoad = useCallback((request: { url: string }) => {
+    const decision = decideWebViewNavigation(request.url);
+    if (decision.action === "allow") return true;
+    if (decision.action === "external") void Linking.openURL(decision.url);
+    if (decision.action === "block") postStatusToWeb("navigation_blocked", decision.reason, { url: request.url });
+    return false;
+  }, [postStatusToWeb]);
 
-  async function reportIssue() {
-    if (!assignment) return;
-    const input = {
-      projectId: assignment.project.id,
-      assignmentId: assignment.assignment.id,
-      driverId: assignment.driver.id,
-      issueType: "driver_needs_help",
-      severity: "urgent",
-      message: "คนขับกดแจ้งปัญหาจากแอปมือถือ",
-      metadata: { source: "mobile_driver" }
-    } as const;
-    const result = await submitIssue(assignment.token, input);
-    if (!result.success) {
-      await enqueueOfflineAction("issue", input);
-      await refreshOfflineCount();
-      setMessage("ยังแจ้งปัญหาไม่ได้ ระบบเก็บไว้ส่งซ้ำเมื่อสัญญาณพร้อม");
-      return;
-    }
-    setMessage("แจ้งปัญหาไปยังศูนย์ควบคุมแล้ว");
-  }
-
-  async function refreshOfflineCount() {
-    setOfflineCount(await getOfflineQueueCount());
-  }
-
-  async function retryOfflineQueue() {
-    setRetryingQueue(true);
-    const result = await flushOfflineQueue();
-    setRetryingQueue(false);
-    setOfflineCount(result.remaining);
-    setMessage(result.remaining ? `ส่งซ้ำสำเร็จ ${result.sent} รายการ ยังเหลือ ${result.remaining} รายการ` : `ส่งข้อมูลค้างสำเร็จ ${result.sent} รายการ`);
-  }
-
-  async function toggleLocationSharing() {
-    if (!assignment) return;
-    if (locationSharing) {
-      subscription?.remove();
-      setSubscription(null);
-      await stopLocationSharing(assignment.token);
-      setLocationSharing(false);
-      setBackgroundEnabled(false);
-      setMessage("หยุดแชร์ตำแหน่งแล้ว");
-      return;
-    }
-
-    const foregroundGranted = await requestForegroundLocationPermission();
-    if (!foregroundGranted) {
-      Alert.alert("ต้องอนุญาตตำแหน่ง", "กรุณาอนุญาต Location เพื่อแชร์ตำแหน่งระหว่างปฏิบัติงาน");
-      return;
-    }
-    const watcher = await startForegroundLocationSharing(assignment.token, setLocation);
-    setSubscription(watcher);
-    setLocationSharing(true);
-    setMessage("เริ่มแชร์ตำแหน่งแล้ว");
-
-    const backgroundGranted = await requestBackgroundLocationPermission().catch(() => false);
-    if (backgroundGranted) {
-      const started = await startBackgroundLocationSharing().catch(() => false);
-      setBackgroundEnabled(started);
-    }
-  }
-
-  async function resetToken() {
-    subscription?.remove();
-    if (assignment) await stopLocationSharing(assignment.token).catch(() => undefined);
+  const resetAssignment = useCallback(async () => {
+    await stopLocationSharing().catch(() => undefined);
     await clearDriverToken();
-    setAssignment(null);
-    setTokenInput("");
-    setLocation(null);
-    setLocationSharing(false);
-    setBackgroundEnabled(false);
-    setScreenState("token");
-    setMessage("ล้าง token แล้ว");
-  }
+    setCurrentToken("");
+    setWebUrl("");
+    setMode("activation");
+    setStatus("พร้อมเปิดงาน");
+    setMessage("ออกจากงานแล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
+  }, []);
 
   useEffect(() => {
     getSavedDriverToken().then((savedToken) => {
-      if (savedToken) void loadAssignment(savedToken);
+      if (savedToken) void openDriverLink(savedToken);
     });
-    void refreshOfflineCount();
+    getMobileDriverSession().then((session) => setSessionReady(Boolean(session)));
+    Network.getNetworkStateAsync().then((state) => {
+      setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
+    });
 
     const subscription = ExpoLinking.addEventListener("url", ({ url }) => {
-      void loadAssignment(url);
+      void openDriverLink(url);
     });
 
     ExpoLinking.getInitialURL().then((url) => {
-      if (url) void loadAssignment(url);
+      if (url) void openDriverLink(url);
     });
 
     return () => subscription.remove();
-  }, []);
+  }, [openDriverLink]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (mode === "web" && canGoBack) {
+        webViewRef.current?.goBack();
+        return true;
+      }
+      if (mode === "web") {
+        setMode("activation");
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [canGoBack, mode]);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" />
-      <ExpoStatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.kicker}>TOMP DRIVER APP</Text>
-          <Text style={styles.title}>งานของคุณวันนี้</Text>
-          <Text style={styles.subtitle}>แอปคนขับสำหรับรับงาน แชร์ GPS และส่งสถานะกลับศูนย์ควบคุม</Text>
+      <StatusBar barStyle="light-content" backgroundColor={colors.command} />
+      <ExpoStatusBar style="light" />
+      <View style={styles.shell}>
+        <View style={styles.topbar}>
+          <View style={styles.identity}>
+            <Text style={styles.product}>TOMP Driver</Text>
+            <Text style={styles.title}>{mode === "web" ? "หน้าคนขับ" : "เปิดงานด้วย QR"}</Text>
+          </View>
+          <View style={styles.statusGroup}>
+            <Text style={styles.statusPill}>{status}</Text>
+            <Text style={styles.network}>{networkLabel}</Text>
+          </View>
         </View>
 
-        {screenState === "loading" ? (
-          <View style={styles.panel}>
-            <ActivityIndicator color={colors.operation} />
-            <Text style={styles.panelText}>กำลังโหลดข้อมูลงาน</Text>
-          </View>
-        ) : null}
-
-        {offlineCount > 0 ? (
-          <View style={styles.offlinePanel}>
-            <View style={styles.offlineTextGroup}>
-              <Text style={styles.offlineTitle}>มีข้อมูลรอส่ง {offlineCount} รายการ</Text>
-              <Text style={styles.offlineText}>ระบบจะเก็บข้อมูลไว้ในเครื่องชั่วคราวเมื่อสัญญาณไม่พร้อม</Text>
+        {mode === "web" && effectiveWebUrl ? (
+          <View style={styles.webContainer}>
+            <View style={styles.webMeta}>
+              <Text style={styles.webMetaText}>Web: {TOMP_WEB_ORIGIN}</Text>
+              <Text style={[styles.webMetaText, sessionReady ? styles.okText : styles.warningText]}>
+                {sessionReady ? "mobile session พร้อม" : "รอ mobile session จาก Web"}
+              </Text>
             </View>
-            <Pressable style={styles.offlineButton} onPress={retryOfflineQueue} disabled={retryingQueue}>
-              <Text style={styles.offlineButtonText}>{retryingQueue ? "กำลังส่ง" : "ส่งซ้ำ"}</Text>
-            </Pressable>
+            <DriverWebView
+              ref={webViewRef}
+              source={{ uri: effectiveWebUrl }}
+              injectedJavaScriptBeforeContentLoaded={bridgeBootstrap}
+              onMessage={handleBridgeMessage}
+              onNavigationStateChange={handleNavigation}
+              onShouldStartLoadWithRequest={handleShouldStartLoad}
+              sharedCookiesEnabled
+              thirdPartyCookiesEnabled
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.loading}>
+                  <ActivityIndicator color={colors.operation} />
+                  <Text style={styles.loadingText}>กำลังเปิดหน้าคนขับ</Text>
+                </View>
+              )}
+            />
+            <View style={styles.bottomBar}>
+              <Pressable style={styles.secondaryButton} onPress={resetAssignment}>
+                <Text style={styles.secondaryButtonText}>ออกจากงาน</Text>
+              </Pressable>
+              <Pressable style={styles.primaryButton} onPress={() => webViewRef.current?.reload()}>
+                <Text style={styles.primaryButtonText}>รีเฟรช</Text>
+              </Pressable>
+            </View>
           </View>
-        ) : null}
+        ) : (
+          <View style={styles.activation}>
+            <View style={styles.heroCard}>
+              <Text style={styles.kicker}>สำหรับคนขับ</Text>
+              <Text style={styles.heroTitle}>สแกน QR เพื่อเปิดงาน</Text>
+              <Text style={styles.heroCopy}>แอปนี้ใช้สำหรับเปิดหน้าคนขับของ TOMP และเตรียม GPS เบื้องหลังสำหรับ Android</Text>
+            </View>
 
-        {!assignment ? (
-          <View style={styles.panel}>
-            <Text style={styles.sectionTitle}>เปิดงานจาก QR</Text>
-            <Text style={styles.panelText}>กดสแกน QR ที่ศูนย์ควบคุมสร้างให้ หรือวาง token เฉพาะกรณีทดสอบ</Text>
             {scannerOpen ? (
               <View style={styles.scannerBox}>
                 <CameraView
@@ -275,111 +315,98 @@ export default function App() {
                   style={styles.camera}
                 />
                 <View style={styles.scannerOverlay}>
-                  <Text style={styles.scannerText}>จัด QR ให้อยู่ในกรอบ</Text>
+                  <Text style={styles.scannerText}>วาง QR ให้อยู่ในกรอบ</Text>
                 </View>
               </View>
             ) : null}
-            <Pressable style={styles.routeButton} onPress={scannerOpen ? () => setScannerOpen(false) : openScanner}>
-              <Text style={styles.routeButtonText}>{scannerOpen ? "ปิดกล้อง" : "สแกน QR"}</Text>
-            </Pressable>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setTokenInput}
-              placeholder="วาง token หรือ URL จาก QR"
-              placeholderTextColor="#8795a5"
-              style={styles.input}
-              value={tokenInput}
-            />
-            <Pressable style={styles.primaryButton} onPress={() => loadAssignment(tokenInput)}>
-              <Text style={styles.primaryButtonText}>โหลดงาน</Text>
-            </Pressable>
+
+            <View style={styles.formCard}>
+              <Pressable style={styles.primaryButton} onPress={openScanner}>
+                <Text style={styles.primaryButtonText}>{scannerOpen ? "ปิดกล้อง" : "สแกน QR"}</Text>
+              </Pressable>
+              <Text style={styles.orText}>หรือวาง URL/token จากศูนย์ควบคุม</Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setTokenInput}
+                placeholder="เช่น https://.../driver/..."
+                placeholderTextColor="#7d8b99"
+                style={styles.input}
+                value={tokenInput}
+              />
+              <Pressable style={styles.secondaryButton} onPress={() => openDriverLink(tokenInput)}>
+                <Text style={styles.secondaryButtonText}>เปิดงาน</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.noteCard}>
+              <Text style={styles.noteTitle}>สถานะระบบ</Text>
+              <Text style={styles.noteText}>{message}</Text>
+              <Text style={styles.noteText}>API: {TOMP_API_BASE_URL}</Text>
+              <Text style={styles.noteText}>รุ่นแอป: {TOMP_DRIVER_APP_VERSION}</Text>
+              {Platform.OS === "android" ? <Text style={styles.noteText}>Android: รองรับ development build สำหรับ GPS เบื้องหลัง</Text> : null}
+            </View>
           </View>
-        ) : (
-          <>
-            <View style={styles.commandCard}>
-              <Text style={styles.commandKicker}>Call Sign</Text>
-              <Text style={styles.callSign}>{assignment.callSign.callSign}</Text>
-              <Text style={styles.commandText}>{assignment.project.projectName}</Text>
-              <Text style={styles.commandText}>{assignment.driver.fullName} · {assignment.vehicle.plateNumber}</Text>
-            </View>
-
-            <View style={styles.panel}>
-              <Text style={styles.sectionTitle}>งานถัดไปที่ต้องทำ</Text>
-              <Text style={styles.nextAction}>{nextAction}</Text>
-              <View style={styles.routeBox}>
-                <Text style={styles.routeLabel}>จุดรับ</Text>
-                <Text style={styles.routeValue}>{assignment.route.pickupLabel}</Text>
-                <Text style={styles.routeLabel}>จุดส่ง</Text>
-                <Text style={styles.routeValue}>{assignment.route.dropoffLabel}</Text>
-                <Text style={styles.routeLabel}>เวลาที่ต้องถึง</Text>
-                <Text style={styles.routeValue}>{assignment.route.commitmentTime}</Text>
-              </View>
-              <Pressable style={styles.routeButton} onPress={() => Linking.openURL(assignment.route.mapsUrl)}>
-                <Text style={styles.routeButtonText}>เปิด Google Maps</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.panel}>
-              <Text style={styles.sectionTitle}>ความพร้อมและสถานะ</Text>
-              <Pressable style={styles.primaryButton} onPress={sendReadiness}>
-                <Text style={styles.primaryButtonText}>ส่งข้อมูลความพร้อม</Text>
-              </Pressable>
-              <View style={styles.statusGrid}>
-                <StatusButton label="พร้อมเริ่มงาน" onPress={() => sendStatus("ready")} />
-                <StatusButton label="ถึงจุดรับแล้ว" onPress={() => sendStatus("arrived_pickup")} />
-                <StatusButton label="รับผู้โดยสารแล้ว" onPress={() => sendStatus("passenger_onboard")} />
-                <StatusButton label="เสร็จสิ้นงาน" onPress={() => sendStatus("completed")} />
-              </View>
-            </View>
-
-            <View style={styles.panel}>
-              <Text style={styles.sectionTitle}>แชร์ตำแหน่ง GPS</Text>
-              <Text style={styles.panelText}>ตำแหน่งนี้ผูกกับโครงการ Assignment Call Sign และคนขับจาก token ของงานนี้</Text>
-              <Text style={styles.locationText}>{formatLocation(location)}</Text>
-              <Pressable style={[styles.primaryButton, locationSharing ? styles.stopButton : null]} onPress={toggleLocationSharing}>
-                <Text style={styles.primaryButtonText}>{locationSharing ? "หยุดแชร์ตำแหน่ง" : "เริ่มแชร์ตำแหน่ง"}</Text>
-              </Pressable>
-              <Text style={styles.smallText}>{backgroundEnabled ? "เปิด background location แล้วตามที่ระบบมือถืออนุญาต" : "หากต้องการอัปเดตตอนสลับแอป ให้กดอนุญาตตำแหน่งเบื้องหลังเมื่อระบบถาม"}</Text>
-            </View>
-
-            <View style={styles.panel}>
-              <Text style={styles.sectionTitle}>ติดต่อและแจ้งปัญหา</Text>
-              <Pressable style={styles.warningButton} onPress={reportIssue}>
-                <Text style={styles.warningButtonText}>แจ้งปัญหาไปศูนย์ควบคุม</Text>
-              </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={resetToken}>
-                <Text style={styles.secondaryButtonText}>ออกจากงานนี้</Text>
-              </Pressable>
-            </View>
-          </>
         )}
-
-        {message ? <Text style={screenState === "error" ? styles.errorMessage : styles.message}>{message}</Text> : null}
-      </ScrollView>
+      </View>
     </SafeAreaView>
-  );
-}
-
-function StatusButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable style={styles.statusButton} onPress={onPress}>
-      <Text style={styles.statusButtonText}>{label}</Text>
-    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
+    backgroundColor: colors.command,
+    flex: 1
+  },
+  shell: {
+    backgroundColor: colors.canvas,
+    flex: 1
+  },
+  topbar: {
+    alignItems: "center",
+    backgroundColor: colors.command,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 14
+  },
+  identity: {
     flex: 1,
-    backgroundColor: colors.canvas
+    gap: 2
   },
-  container: {
-    gap: 16,
-    padding: 18,
-    paddingBottom: 40
+  product: {
+    color: "#8be2da",
+    fontSize: 12,
+    fontWeight: "800"
   },
-  header: {
+  title: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  statusGroup: {
+    alignItems: "flex-end",
+    gap: 5
+  },
+  statusPill: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: radius.pill,
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "800",
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  network: {
+    color: "#bdd1df",
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  activation: {
+    gap: 14,
+    padding: 16
+  },
+  heroCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radius.xl,
@@ -387,25 +414,24 @@ const styles = StyleSheet.create({
     padding: 20
   },
   kicker: {
-    color: colors.operation,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 2
+    color: colors.operationDeep,
+    fontSize: 12,
+    fontWeight: "900"
   },
-  title: {
+  heroTitle: {
     color: colors.ink,
     fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 36,
+    fontWeight: "900",
+    lineHeight: 34,
     marginTop: 8
   },
-  subtitle: {
+  heroCopy: {
     color: colors.muted,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 23,
     marginTop: 8
   },
-  panel: {
+  formCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radius.lg,
@@ -413,58 +439,42 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16
   },
-  offlinePanel: {
+  primaryButton: {
     alignItems: "center",
-    backgroundColor: "#fff7e8",
-    borderColor: "#ffd391",
-    borderRadius: radius.lg,
+    backgroundColor: colors.operation,
+    borderRadius: radius.md,
+    justifyContent: "center",
+    minHeight: 52,
+    paddingHorizontal: 18
+  },
+  primaryButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  secondaryButton: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: colors.line,
+    borderRadius: radius.md,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    padding: 14
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 16
   },
-  offlineTextGroup: {
-    flex: 1
-  },
-  offlineTitle: {
-    color: "#8a4b00",
+  secondaryButtonText: {
+    color: colors.ink,
     fontSize: 15,
     fontWeight: "900"
   },
-  offlineText: {
-    color: "#9a610f",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 2
-  },
-  offlineButton: {
-    alignItems: "center",
-    backgroundColor: "#8a4b00",
-    borderRadius: radius.md,
-    justifyContent: "center",
-    minHeight: 42,
-    minWidth: 86,
-    paddingHorizontal: 12
-  },
-  offlineButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  panelText: {
+  orText: {
     color: colors.muted,
-    fontSize: 14,
-    lineHeight: 22
-  },
-  sectionTitle: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: "800"
+    fontSize: 13,
+    textAlign: "center"
   },
   input: {
     backgroundColor: "#f8fbfd",
-    borderColor: "#cdd9e5",
+    borderColor: "#cbd7e3",
     borderRadius: radius.md,
     borderWidth: 1,
     color: colors.ink,
@@ -474,8 +484,8 @@ const styles = StyleSheet.create({
   },
   scannerBox: {
     backgroundColor: "#061421",
-    borderRadius: radius.lg,
-    height: 280,
+    borderRadius: radius.xl,
+    height: 320,
     overflow: "hidden",
     position: "relative"
   },
@@ -485,166 +495,90 @@ const styles = StyleSheet.create({
   },
   scannerOverlay: {
     alignItems: "center",
-    borderColor: "rgba(255,255,255,0.75)",
+    borderColor: "rgba(255,255,255,0.85)",
     borderRadius: radius.lg,
     borderWidth: 2,
-    bottom: 42,
+    bottom: 48,
     justifyContent: "center",
-    left: 36,
+    left: 42,
     position: "absolute",
-    right: 36,
-    top: 42
+    right: 42,
+    top: 48
   },
   scannerText: {
-    backgroundColor: "rgba(6,20,33,0.72)",
-    borderRadius: 999,
+    backgroundColor: "rgba(6,20,33,0.78)",
+    borderRadius: radius.pill,
     color: "#ffffff",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "900",
     paddingHorizontal: 14,
     paddingVertical: 8
   },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: colors.operation,
-    borderRadius: radius.md,
-    justifyContent: "center",
-    minHeight: 54,
-    paddingHorizontal: 18
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  commandCard: {
-    backgroundColor: colors.command,
-    borderRadius: radius.xl,
-    gap: 8,
-    padding: 22
-  },
-  commandKicker: {
-    color: "#9cf1e8",
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  callSign: {
-    color: "#ffffff",
-    fontSize: 42,
-    fontWeight: "900",
-    lineHeight: 50
-  },
-  commandText: {
-    color: "#d9e6f0",
-    fontSize: 14,
-    lineHeight: 22
-  },
-  nextAction: {
-    color: colors.operationDeep,
-    fontSize: 22,
-    fontWeight: "900"
-  },
-  routeBox: {
-    backgroundColor: "#f5f9fc",
-    borderRadius: radius.md,
-    gap: 4,
+  noteCard: {
+    backgroundColor: "#f6faf9",
+    borderColor: "#cce6e3",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 5,
     padding: 14
   },
-  routeLabel: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 6
-  },
-  routeValue: {
-    color: colors.ink,
-    fontSize: 16,
-    fontWeight: "700",
-    lineHeight: 24
-  },
-  routeButton: {
-    alignItems: "center",
-    backgroundColor: colors.route,
-    borderRadius: radius.md,
-    justifyContent: "center",
-    minHeight: 54
-  },
-  routeButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  statusGrid: {
-    gap: 10
-  },
-  statusButton: {
-    alignItems: "center",
-    backgroundColor: "#ecf6f4",
-    borderColor: "#b8ddd8",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 50
-  },
-  statusButtonText: {
+  noteTitle: {
     color: colors.operationDeep,
-    fontSize: 15,
-    fontWeight: "800"
+    fontSize: 14,
+    fontWeight: "900"
   },
-  locationText: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: "800"
-  },
-  smallText: {
+  noteText: {
     color: colors.muted,
     fontSize: 12,
     lineHeight: 18
   },
-  stopButton: {
-    backgroundColor: colors.danger
+  webContainer: {
+    backgroundColor: colors.surface,
+    flex: 1
   },
-  warningButton: {
+  webMeta: {
     alignItems: "center",
-    backgroundColor: "#fff3df",
-    borderColor: "#ffd391",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 52
+    backgroundColor: "#f6fafc",
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8
   },
-  warningButtonText: {
-    color: "#8a4b00",
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  secondaryButton: {
-    alignItems: "center",
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 48
-  },
-  secondaryButtonText: {
+  webMetaText: {
     color: colors.muted,
-    fontSize: 15,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  okText: {
+    color: colors.success
+  },
+  warningText: {
+    color: colors.warning
+  },
+  loading: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    bottom: 0,
+    gap: 10,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  loadingText: {
+    color: colors.muted,
+    fontSize: 14,
     fontWeight: "800"
   },
-  message: {
-    backgroundColor: "#e7f6f3",
-    borderRadius: radius.md,
-    color: colors.operationDeep,
-    fontSize: 14,
-    fontWeight: "700",
-    padding: 12
-  },
-  errorMessage: {
-    backgroundColor: "#ffe8e7",
-    borderRadius: radius.md,
-    color: colors.danger,
-    fontSize: 14,
-    fontWeight: "700",
-    padding: 12
+  bottomBar: {
+    backgroundColor: "#ffffff",
+    borderTopColor: colors.line,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10
   }
 });
