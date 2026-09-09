@@ -9,6 +9,11 @@ import { mapProject } from "@/lib/data/mappers";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createProjectTimelineEvent } from "@/lib/timeline";
 
+interface PgError {
+  code?: string;
+  message?: string;
+}
+
 export async function createProjectAction(input: unknown): Promise<ActionResult> {
   const parsed = createProjectSchema.safeParse(input);
   if (!parsed.success) {
@@ -33,55 +38,41 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
     return actionFailure("ยังไม่มีองค์กรตั้งต้นในระบบ กรุณาติดต่อผู้ดูแลแพลตฟอร์ม");
   }
 
-  const { data: existingProject, error: lookupError } = await client.from("projects").select("id").eq("project_code", parsed.data.projectCode).maybeSingle();
-  if (lookupError) {
-    return actionFailure(getDatabaseErrorMessage(lookupError, "ตรวจสอบรหัสโครงการไม่สำเร็จ"));
+  const profile = await getCurrentUserProfile();
+  const creatorProfileId =
+    profile.isDevelopmentFallback || !profile.authUserId || profile.id === "anonymous" ? null : profile.id;
+
+  // Atomic command (migration 0026): the project row, the creator's
+  // project_manager membership and the PROJECT_CREATED timeline event (0025
+  // trigger) all commit together or not at all.
+  const { data, error: rpcError } = await client.rpc("create_project_command", {
+    p_organization_id: organizationId,
+    p_owner_profile_id: parsed.data.ownerProfileId || null,
+    p_creator_profile_id: creatorProfileId,
+    p_project_code: parsed.data.projectCode,
+    p_project_name: parsed.data.projectName,
+    p_start_date: parsed.data.startDate,
+    p_end_date: parsed.data.endDate,
+    p_timezone: parsed.data.timezone,
+    p_visibility: parsed.data.visibilityLevel,
+    p_service_level: parsed.data.serviceLevel,
+    p_metadata: parsed.data.metadata
+  });
+
+  if (rpcError) {
+    const err = rpcError as PgError;
+    if (err.code === "23505" || /project_code_taken/.test(err.message || "")) {
+      return actionFailure("รหัสโครงการนี้ถูกใช้งานแล้ว กรุณากดสร้างรหัสใหม่หรือเปลี่ยนรหัสโครงการ", {
+        projectCode: ["รหัสโครงการนี้ถูกใช้งานแล้ว"]
+      });
+    }
+    return actionFailure(getDatabaseErrorMessage(rpcError, "บันทึกโครงการไม่สำเร็จ"));
   }
 
-  if (existingProject) {
-    return actionFailure("รหัสโครงการนี้ถูกใช้งานแล้ว กรุณากดสร้างรหัสใหม่หรือเปลี่ยนรหัสโครงการ", {
-      projectCode: ["รหัสโครงการนี้ถูกใช้งานแล้ว"]
-    });
-  }
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
+  const project = mapProject(row);
 
-  const { data, error: insertError } = await client
-    .from("projects")
-    .insert({
-      organization_id: organizationId,
-      owner_profile_id: parsed.data.ownerProfileId || null,
-      project_code: parsed.data.projectCode,
-      project_name: parsed.data.projectName,
-      start_date: parsed.data.startDate,
-      end_date: parsed.data.endDate,
-      timezone: parsed.data.timezone,
-      visibility_level: parsed.data.visibilityLevel,
-      service_level: parsed.data.serviceLevel,
-      metadata: parsed.data.metadata
-    })
-    .select()
-    .single();
-
-  if (insertError) {
-    return actionFailure(getDatabaseErrorMessage(insertError, "บันทึกโครงการไม่สำเร็จ"));
-  }
-
-  const project = mapProject(data);
-
-  // Creator becomes an active project_manager member + owner so RLS (0019) lets
-  // them see the project they just made.
-  const membershipWarning = await linkCreatorAsProjectManager(client, project.id, parsed.data.ownerProfileId || null);
-
-  const timelineResult = await createProjectTimelineEvent(project.id, project.id, data);
-
-  const warnings = [
-    membershipWarning,
-    timelineResult.success ? null : `บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
-  ].filter(Boolean);
-
-  return actionSuccess(
-    { mode, project, timelineEvent: timelineResult.data },
-    warnings.length ? `สร้างโครงการแล้ว แต่: ${warnings.join(" · ")}` : undefined
-  );
+  return actionSuccess({ mode, project });
 }
 
 export async function archiveProjectAction(input: unknown): Promise<ActionResult> {
@@ -153,32 +144,4 @@ async function resolveOrganizationId(client: WriteClient, requested: string | nu
 
   const { data: first } = await client.from("organizations").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle();
   return first?.id ? String(first.id) : null;
-}
-
-async function linkCreatorAsProjectManager(client: WriteClient, projectId: string, ownerProfileId: string | null): Promise<string | null> {
-  const profile = await getCurrentUserProfile();
-  if (profile.isDevelopmentFallback || !profile.authUserId || profile.id === "anonymous") {
-    // dev fallback / no session: nothing durable to link
-    if (ownerProfileId) await client.from("projects").update({ owner_profile_id: ownerProfileId }).eq("id", projectId);
-    return null;
-  }
-
-  const { data: role } = await client.from("roles").select("id").eq("role_key", "project_manager").maybeSingle();
-  const roleId = typeof role?.id === "string" ? role.id : null;
-  if (!roleId) return "ไม่พบบทบาทผู้จัดการโครงการ — ยังไม่ได้เพิ่มผู้สร้างเป็นสมาชิก";
-
-  const { error: memberError } = await client.from("project_members").insert({
-    project_id: projectId,
-    profile_id: profile.id,
-    role_id: roleId,
-    status: "active",
-    metadata: { source: "project_create" }
-  });
-  if (memberError && memberError.code !== "23505") {
-    return "เพิ่มผู้สร้างเป็นสมาชิกโครงการไม่สำเร็จ";
-  }
-
-  const owner = ownerProfileId || profile.id;
-  await client.from("projects").update({ owner_profile_id: owner }).eq("id", projectId);
-  return null;
 }

@@ -9,9 +9,8 @@ import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getOperationDaysByProjectId } from "@/lib/data/operation-days";
 import { getProjectById } from "@/lib/data/projects";
 import { checkProjectPublishReadiness } from "@/lib/domain/publish-readiness";
-import { createPublishLock, isProjectPublished } from "@/lib/domain/publish-locking";
+import { isProjectPublished } from "@/lib/domain/publish-locking";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
-import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 // Publish is a server-authoritative state transition, not a client-trusted
 // write. The server loads the real project aggregate, runs the canonical
@@ -60,49 +59,26 @@ export async function publishProjectAction(input: unknown): Promise<ActionResult
     warnings: readiness.warnings
   };
 
-  const { data: snapshotRow, error: insertError } = await client
-    .from("publish_snapshots")
-    .insert({
-      project_id: parsed.data.projectId,
-      object_type: "project",
-      object_id: parsed.data.projectId,
-      status: "published",
-      reason: parsed.data.reason,
-      snapshot_data: snapshot,
-      metadata: { ...parsed.data.metadata, authoritative: true }
-    })
-    .select()
-    .single();
-
-  if (insertError) return actionFailure(`บันทึก snapshot ไม่สำเร็จ: ${insertError.message}`);
-
-  const { error: statusError } = await client
-    .from("projects")
-    .update({ status: "published" })
-    .eq("id", parsed.data.projectId)
-    .in("status", ["draft", "planning"]);
-
-  const lockResult = await createPublishLock(parsed.data.projectId, snapshotRow.id, parsed.data.reason);
-
-  const timelineResult = await createTimelineEvent({
-    projectId: parsed.data.projectId,
-    objectType: "project",
-    objectId: parsed.data.projectId,
-    eventType: TIMELINE_EVENTS.PROJECT_PUBLISHED,
-    source: "operation_user",
-    reason: parsed.data.reason,
-    afterData: { snapshotId: snapshotRow.id, status: "published" }
+  // Atomic command (migration 0026): snapshot + projects.status + publish_locks
+  // + PROJECT_PUBLISHED (0025 trigger) commit together.
+  const { data, error: rpcError } = await client.rpc("publish_project_command", {
+    p_project_id: parsed.data.projectId,
+    p_reason: parsed.data.reason,
+    p_snapshot: snapshot,
+    p_metadata: parsed.data.metadata
   });
 
-  const warnings = [
-    statusError ? `เปลี่ยนสถานะโครงการไม่สำเร็จ: ${statusError.message}` : null,
-    lockResult.success ? null : `ล็อกแผนไม่สำเร็จ: ${lockResult.error}`,
-    timelineResult.success ? null : `บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`,
-    readiness.warnings.length ? `ประกาศแล้วแต่มีข้อควรระวัง: ${readiness.warnings.join(" · ")}` : null
-  ].filter(Boolean);
+  if (rpcError) {
+    if (/project_already_published/.test((rpcError as { message?: string }).message || "")) {
+      return actionFailure("โครงการนี้ประกาศใช้แผนแล้ว การแก้ไขต้องผ่านคำขอเปลี่ยนแปลง");
+    }
+    return actionFailure(`ประกาศใช้แผนไม่สำเร็จ: ${(rpcError as { message?: string }).message ?? ""}`);
+  }
+
+  const snapshotRow = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
 
   return actionSuccess(
-    { mode, publishSnapshot: snapshotRow, publishLock: lockResult, timelineEvent: timelineResult.data },
-    warnings.length ? warnings.join(" · ") : undefined
+    { mode, publishSnapshot: snapshotRow },
+    readiness.warnings.length ? `ประกาศแล้วแต่มีข้อควรระวัง: ${readiness.warnings.join(" · ")}` : undefined
   );
 }
