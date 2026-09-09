@@ -3,6 +3,7 @@ import type { Assignment } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
+import { demoOr } from "@/lib/data/demo-fallback";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapAssignment } from "./mappers";
 
@@ -52,24 +53,24 @@ export async function getAssignmentsByVehicleIds(vehicleIds: readonly string[]):
   if (!ids.length) return [];
 
   const { client: supabase } = await resolveReadClient();
-  if (!supabase) return demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId));
+  if (!supabase) return demoOr(demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId)), []);
 
   try {
     const { data, error } = await withTimeout(supabase.from("assignments").select("*").in("vehicle_id", ids).order("start_time"), 2200, "assignments (by vehicle)");
-    if (error || !data) return demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId));
+    if (error || !data) return demoOr(demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId)), []);
     return data.map(mapAssignment);
   } catch {
-    return demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId));
+    return demoOr(demoKernel.assignments.filter((assignment) => assignment.vehicleId != null && ids.includes(assignment.vehicleId)), []);
   }
 }
 
 async function getAssignmentsByProjectIdViaPostgres(projectId: string): Promise<Assignment[]> {
   const sql = getPostgresClient();
-  if (!sql) return demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
+  if (!sql) return demoOr(demoKernel.assignments.filter((assignment) => assignment.projectId === projectId), []);
   try {
     const data = await sql<Array<Record<string, unknown>>>`select * from assignments where project_id = ${projectId} order by start_time nulls last, created_at desc`;
-    return data.length ? data.map(mapAssignment) : demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
+    return data.length ? data.map(mapAssignment) : demoOr(demoKernel.assignments.filter((assignment) => assignment.projectId === projectId), []);
   } catch {
-    return demoKernel.assignments.filter((assignment) => assignment.projectId === projectId);
+    return demoOr(demoKernel.assignments.filter((assignment) => assignment.projectId === projectId), []);
   }
 }

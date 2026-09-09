@@ -3,6 +3,7 @@ import type { Project } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
+import { demoOr } from "@/lib/data/demo-fallback";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapProject } from "./mappers";
 
@@ -35,12 +36,12 @@ export async function getProjectById(projectId: string): Promise<Project | null>
 
 async function getProjectsViaPostgres(): Promise<Project[]> {
   const sql = getPostgresClient();
-  if (!sql) return demoKernel.projects;
+  if (!sql) return demoOr(demoKernel.projects, []);
   try {
     const data = await sql<Array<Record<string, unknown>>>`select * from projects order by start_date asc, created_at desc limit 100`;
-    return data.length ? data.map(mapProject) : demoKernel.projects;
+    return data.length ? data.map(mapProject) : demoOr(demoKernel.projects, []);
   } catch {
-    return demoKernel.projects;
+    return demoOr(demoKernel.projects, []);
   }
 }
 
@@ -49,12 +50,12 @@ async function getProjectByIdViaPostgres(projectId: string): Promise<Project | n
   // Only ever return a demo project when its id actually matches the request.
   // Falling back to demoKernel.projects[0] would render a different project's
   // data under the requested project's URL.
-  if (!sql) return demoKernel.projects.find((project) => project.id === projectId) ?? null;
+  if (!sql) return demoOr(demoKernel.projects.find((project) => project.id === projectId) ?? null, null);
   try {
     const data = await sql<Array<Record<string, unknown>>>`select * from projects where id = ${projectId} limit 1`;
     if (data[0]) return mapProject(data[0]);
-    return demoKernel.projects.find((project) => project.id === projectId) ?? null;
+    return demoOr(demoKernel.projects.find((project) => project.id === projectId) ?? null, null);
   } catch {
-    return demoKernel.projects.find((project) => project.id === projectId) ?? null;
+    return demoOr(demoKernel.projects.find((project) => project.id === projectId) ?? null, null);
   }
 }
