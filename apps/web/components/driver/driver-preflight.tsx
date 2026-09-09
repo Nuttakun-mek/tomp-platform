@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { driverCheckinAction, recordVehicleEvidenceAction } from "@/app/actions/driver";
 import { DriverPhotoCheck } from "@/components/driver/driver-photo-check";
@@ -14,6 +15,7 @@ const CONFIRMS = [
 ] as const;
 
 export function DriverPreflight({ driverAccess }: { driverAccess: DriverAccessAssignment }) {
+  const router = useRouter();
   const [checks, setChecks] = useState({ name: false, phone: false, vehicle: false, gps: false });
   const [photos, setPhotos] = useState<{ vehicle?: string; plate?: string }>({});
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function DriverPreflight({ driverAccess }: { driverAccess: DriverAccessAs
         vehiclePath: photos.vehicle,
         platePath: photos.plate
       }).catch(() => undefined);
-      window.location.reload();
+      router.refresh();
     });
   }
 

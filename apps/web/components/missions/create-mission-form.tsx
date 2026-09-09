@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createMissionAction } from "@/app/actions/missions";
 import { createMissionSchema } from "@/lib/validation";
 
 export function CreateMissionForm({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -35,8 +37,8 @@ export function CreateMissionForm({ projectId }: { projectId: string }) {
         return;
       }
 
-      setMessage(result.warning || "บันทึกภารกิจและเตรียม Timeline แล้ว");
-      window.location.reload();
+      setMessage(result.warning || "บันทึกภารกิจแล้ว");
+      router.refresh();
     });
   }
 

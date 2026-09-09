@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createVehicleAction } from "@/app/actions/resources";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -14,6 +15,7 @@ function splitRequirements(value: FormDataEntryValue | null) {
 }
 
 export function CreateVehicleForm() {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
   const [isPending, startTransition] = useTransition();
@@ -44,8 +46,8 @@ export function CreateVehicleForm() {
         return;
       }
       setTone("success");
-      setMessage(result.warning || "บันทึกโปรไฟล์รถสำเร็จ ระบบเตรียม Timeline แล้ว");
-      window.setTimeout(() => window.location.reload(), 900);
+      setMessage(result.warning || "บันทึกโปรไฟล์รถสำเร็จ");
+      router.refresh();
     });
   }
 

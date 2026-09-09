@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
 import { createCallSignAction } from "@/app/actions/call-signs";
@@ -30,6 +31,7 @@ interface CreateAssignmentFormProps {
 }
 
 export function CreateAssignmentForm({ projectId, projectCode, missions, callSigns, drivers, vehicles, existingAssignments = [] }: CreateAssignmentFormProps) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
   const [isPending, startTransition] = useTransition();
@@ -88,8 +90,8 @@ export function CreateAssignmentForm({ projectId, projectCode, missions, callSig
         return;
       }
       setTone("success");
-      setMessage(result.warning || "สร้างงานสำเร็จ ระบบบันทึก Timeline แล้ว กำลังโหลดข้อมูลใหม่");
-      window.setTimeout(() => window.location.reload(), 900);
+      setMessage(result.warning || "สร้างงานสำเร็จ");
+      router.refresh();
     });
   }
 

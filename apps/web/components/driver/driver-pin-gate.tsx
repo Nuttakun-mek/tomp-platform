@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { KeyRound } from "lucide-react";
 import { verifyDriverPinAction } from "@/app/actions/driver-pin";
 
 export function DriverPinGate({ token }: { token: string }) {
+  const router = useRouter();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -15,7 +17,7 @@ export function DriverPinGate({ token }: { token: string }) {
     startTransition(async () => {
       const result = await verifyDriverPinAction({ token, pin });
       if (result.success) {
-        window.location.reload();
+        router.refresh();
         return;
       }
       setError(result.error || "รหัสไม่ถูกต้อง");

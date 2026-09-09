@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { sendDriverNotificationAction } from "@/app/actions/driver-notifications";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 
 export function VehicleMessageForm({ projectId, assignmentId, driverId }: { projectId: string; assignmentId: string; driverId?: string | null }) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
   const [open, setOpen] = useState(false);
@@ -36,7 +38,7 @@ export function VehicleMessageForm({ projectId, assignmentId, driverId }: { proj
       }
       setTone("success");
       setMessage("ส่งข้อความถึงคนขับแล้ว");
-      window.setTimeout(() => window.location.reload(), 900);
+      router.refresh();
     });
   }
 

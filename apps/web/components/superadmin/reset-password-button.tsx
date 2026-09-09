@@ -6,6 +6,7 @@ import { resetUserPasswordAction } from "@/app/actions/superadmin-users";
 
 export function ResetPasswordButton({ profileId, hasLogin }: { profileId: string; hasLogin: boolean }) {
   const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   if (!hasLogin) {
@@ -13,7 +14,11 @@ export function ResetPasswordButton({ profileId, hasLogin }: { profileId: string
   }
 
   function handleClick() {
-    if (!window.confirm("ออกรหัสผ่านชั่วคราวใหม่ให้ผู้ใช้นี้? รหัสเดิมจะใช้ไม่ได้ทันที")) return;
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
     setResult(null);
     startTransition(async () => {
       const response = await resetUserPasswordAction(profileId);
@@ -30,11 +35,14 @@ export function ResetPasswordButton({ profileId, hasLogin }: { profileId: string
       <button
         type="button"
         onClick={handleClick}
+        onBlur={() => setConfirming(false)}
         disabled={isPending}
-        className="inline-flex items-center gap-1 rounded-command border border-border bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-soft transition hover:border-operation/40 disabled:opacity-50"
+        className={`inline-flex items-center gap-1 rounded-command border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
+          confirming ? "border-rose-500 bg-rose-500 text-white" : "border-border bg-white text-ink-soft hover:border-operation/40"
+        }`}
       >
         <KeyRound className="h-3 w-3" />
-        {isPending ? "กำลังออกรหัส..." : "ตั้งรหัสผ่านใหม่"}
+        {isPending ? "กำลังออกรหัส..." : confirming ? "กดยืนยัน (รหัสเดิมใช้ไม่ได้ทันที)" : "ตั้งรหัสผ่านใหม่"}
       </button>
       {result ? (
         <span className={`text-[11px] font-semibold ${result.tone === "ok" ? "text-operation" : "text-rose-600"}`}>{result.text}</span>
