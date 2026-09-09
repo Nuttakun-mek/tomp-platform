@@ -46,6 +46,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
   const [text, setText] = useState("");
   const [banner, setBanner] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [feedLimit, setFeedLimit] = useState(60);
 
   const callSignById = useMemo(() => new Map(callSigns.map((cs) => [cs.id, cs.callSign])), [callSigns]);
   const assignmentInfo = useMemo(() => {
@@ -59,7 +60,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
     return map;
   }, [assignments, callSignById]);
 
-  const feed = useMemo<FeedItem[]>(() => {
+  const { feed, olderCount } = useMemo(() => {
     const items: FeedItem[] = [
       ...inbound.map((item) => ({ direction: "in" as const, ...item })),
       ...outbound.map((item) => ({ direction: "out" as const, ...item }))
@@ -67,8 +68,8 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
     // oldest first, newest at the bottom — like a normal chat app
     items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
     const scoped = filter === "all" ? items : items.filter((item) => item.assignmentId === filter);
-    return scoped.slice(-60);
-  }, [inbound, outbound, filter]);
+    return { feed: scoped.slice(-feedLimit), olderCount: Math.max(0, scoped.length - feedLimit) };
+  }, [inbound, outbound, filter, feedLimit]);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -194,6 +195,15 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
 
           {feed.length ? (
             <div className="grid max-h-[420px] gap-2 overflow-y-auto pr-1">
+              {olderCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setFeedLimit((current) => current + 60)}
+                  className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-operation hover:text-operation"
+                >
+                  โหลดข้อความเก่ากว่านี้ (อีก {olderCount})
+                </button>
+              ) : null}
               {feed.map((item) => {
                 const label = assignmentInfo.get(item.assignmentId)?.label ?? `งาน ${item.assignmentId.slice(0, 8)}`;
                 if (item.direction === "in") {

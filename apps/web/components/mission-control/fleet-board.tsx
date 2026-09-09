@@ -10,6 +10,7 @@ import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useVisibleSlice } from "@/components/ui/use-visible-slice";
 import { useMissionControlFeed } from "./mission-control-feed";
 
 interface FleetBoardProps {
@@ -120,6 +121,9 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
   const liveCount = rows.filter((row) => row.freshness === "live").length;
   const needsAttention = rows.filter((row) => row.unread || row.freshness !== "live").length;
 
+  // Attention-ranked rows are already on top, so a cap never hides something urgent.
+  const { visible: visibleRows, hidden, hasMore, expanded: allShown, showAll, reset } = useVisibleSlice(rows, 15);
+
   return (
     <section className="enterprise-panel overflow-hidden">
       <div className="border-b border-slate-200 px-5 py-4">
@@ -145,7 +149,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
 
       {rows.length ? (
         <div className="grid gap-2 p-3 sm:p-4 lg:grid-cols-2 2xl:grid-cols-3">
-          {rows.map((row) => {
+          {visibleRows.map((row) => {
             const open = expanded === row.assignment.id;
             const phone = row.driver?.phone ?? "";
             return (
@@ -266,6 +270,15 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
               </article>
             );
           })}
+          {hasMore || allShown ? (
+            <button
+              type="button"
+              onClick={hasMore ? showAll : reset}
+              className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:border-operation hover:text-operation"
+            >
+              {hasMore ? `ดูทั้งหมด (อีก ${hidden})` : "ย่อรายการ"}
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="p-5 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้ โปรดสร้างงานที่หน้า “จัดงาน” ก่อน</div>

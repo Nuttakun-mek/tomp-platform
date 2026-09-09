@@ -1,8 +1,11 @@
+"use client";
+
 import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { AssignmentRiskBadge } from "./assignment-risk-badge";
 import { CallSignCard } from "./call-sign-card";
 import { DriverVehiclePairCard } from "./driver-vehicle-pair-card";
 import { CancelAssignmentButton } from "@/components/assignments/cancel-assignment-button";
+import { useVisibleSlice } from "@/components/ui/use-visible-slice";
 
 interface LaneProps {
   title: string;
@@ -19,6 +22,8 @@ function timeLabel(value?: string | null) {
 }
 
 export function AssignmentLane({ title, assignments, missions, callSigns, drivers, vehicles }: LaneProps) {
+  const { visible, hidden, hasMore, expanded, showMore, reset } = useVisibleSlice(assignments, 10);
+
   return (
     <section className="min-w-0 rounded-panel border border-border/80 bg-canvas/60 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -27,7 +32,7 @@ export function AssignmentLane({ title, assignments, missions, callSigns, driver
       </div>
       <div className="mt-4 grid gap-3">
         {assignments.length ? (
-          assignments.map((assignment) => {
+          visible.map((assignment) => {
             const mission = missions.find((item) => item.id === assignment.missionId);
             const callSign = callSigns.find((item) => item.id === assignment.callSignId);
             const driver = drivers.find((item) => item.id === assignment.driverId);
@@ -53,6 +58,15 @@ export function AssignmentLane({ title, assignments, missions, callSigns, driver
         ) : (
           <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">ยังไม่มีงานในกลุ่มนี้</p>
         )}
+        {hasMore || expanded ? (
+          <button
+            type="button"
+            onClick={hasMore ? showMore : reset}
+            className="rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:border-operation hover:text-operation"
+          >
+            {hasMore ? `ดูอีก ${hidden}` : "ย่อ"}
+          </button>
+        ) : null}
       </div>
     </section>
   );
