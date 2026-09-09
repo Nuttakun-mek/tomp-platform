@@ -31,6 +31,7 @@
     "db:production:reset:confirm": "node scripts/reset-production-data.mjs --production --yes",
     "auth:bootstrap-admin": "node scripts/bootstrap-production-admin.mjs",
     "db:local:sync": "node scripts/sync-supabase-migrations.mjs",
+    "db:check-mirror": "node scripts/sync-supabase-migrations.mjs --check",
     "db:local:start": "npm run db:local:sync && npx --prefix apps/web supabase start",
     "db:local:stop": "npx --prefix apps/web supabase stop",
     "db:local:reset": "npm run db:local:sync && npx --prefix apps/web supabase db reset",

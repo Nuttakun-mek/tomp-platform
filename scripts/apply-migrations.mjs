@@ -46,6 +46,22 @@ function getUrlArg() {
   return i >= 0 ? argv[i + 1] : undefined;
 }
 
+// --rename-applied <old.sql> <new.sql>: an already-applied migration file was
+// renamed in the repo (e.g. a timestamp prefix normalised to 00NN_). Point the
+// tracking row at the new name so it is not re-applied. No SQL is run.
+function getRenameArgs() {
+  const argv = process.argv.slice(2);
+  const i = argv.indexOf("--rename-applied");
+  if (i < 0) return null;
+  const [from, to] = [argv[i + 1], argv[i + 2]];
+  if (!from || !to || from.startsWith("--") || to.startsWith("--")) {
+    console.error("--rename-applied needs: <old-filename.sql> <new-filename.sql>");
+    process.exit(2);
+  }
+  return { from, to };
+}
+const RENAME = getRenameArgs();
+
 function parseEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {};
   const out = {};
@@ -200,6 +216,28 @@ async function main() {
           ).map((r) => [r.filename, r.checksum])
         )
       : new Map();
+
+    if (RENAME) {
+      if (!applied.has(RENAME.from)) {
+        console.log(`  rename skipped — no tracking row for ${RENAME.from} (already renamed?).`);
+      } else if (applied.has(RENAME.to)) {
+        console.error(`  ERROR: a tracking row for ${RENAME.to} already exists — resolve by hand.`);
+        exitCode = 1;
+      } else if (!migrations.some((m) => m.name === RENAME.to)) {
+        console.error(`  ERROR: ${RENAME.to} is not a file in ${MIGRATIONS_DIR}.`);
+        exitCode = 1;
+      } else if (DRY_RUN) {
+        console.log(`  DRY RUN: would rename tracking row ${RENAME.from} -> ${RENAME.to}`);
+      } else {
+        await sql.unsafe(
+          `update public.schema_migrations_tomp set filename = ${quote(RENAME.to)} where filename = ${quote(RENAME.from)};`
+        );
+        applied.set(RENAME.to, applied.get(RENAME.from));
+        applied.delete(RENAME.from);
+        console.log(`  RENAMED tracking row ${RENAME.from} -> ${RENAME.to}`);
+      }
+      console.log("");
+    }
 
     const pending = [];
     for (const file of migrations) {

@@ -44,6 +44,12 @@ jobs:
       - name: Public env safety
         run: npm run security:env
 
+      # supabase/migrations/ is a generated mirror of database/migrations/;
+      # a parallel-branch merge can leave it stale (duplicate prefixes break
+      # `supabase db reset`). Fail until someone re-runs db:local:sync.
+      - name: Supabase migration mirror in sync
+        run: npm run db:check-mirror
+
   database:
     runs-on: ubuntu-latest
     timeout-minutes: 15
