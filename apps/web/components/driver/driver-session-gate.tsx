@@ -76,8 +76,13 @@ async function establishMobileSessionIfNeeded() {
   const shell = (window as MobileShellWindow).TOMP_MOBILE_SHELL;
   if (!shell || shell.namespace !== "tomp.driver" || shell.version !== 1) return;
 
-  const response = await fetch("/api/driver/mobile-session/challenge", { method: "POST" });
-  const result = (await response.json().catch(() => null)) as { success?: boolean; data?: { code: string; expiresAt: string } } | null;
+  let result: { success?: boolean; data?: { code: string; expiresAt: string } } | null = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => window.setTimeout(resolve, 150));
+    const response = await fetch("/api/driver/mobile-session/challenge", { method: "POST" });
+    result = (await response.json().catch(() => null)) as { success?: boolean; data?: { code: string; expiresAt: string } } | null;
+    if (result?.success || response.status !== 401) break;
+  }
   if (!result?.success || !result.data) return;
 
   shell.postMessage({

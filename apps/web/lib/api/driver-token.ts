@@ -38,8 +38,8 @@ export async function resolveDriverSession(
   }
 
   if (fromHeader) {
-    const active = await markMobileSessionUsed(fromHeader);
-    if (!active) {
+    const mobileSessionStatus = await markMobileSessionUsed(fromHeader);
+    if (mobileSessionStatus === "inactive") {
       return { ok: false, status: 401, error: "mobile session หมดอายุหรือถูกยกเลิก กรุณาเปิดงานจาก QR และยืนยันรหัสอีกครั้ง" };
     }
   }

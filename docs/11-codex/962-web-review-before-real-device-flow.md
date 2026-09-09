@@ -43,7 +43,31 @@ endpoint (incl. `mobile-session/challenge` → 401, `mobile-session/exchange` �
 
 ---
 
-## NOT fixed — for the mobile agent
+## Follow-up applied on 2026-09-10
+
+The three mobile-session concerns below were fixed before real-device testing:
+
+| Where | Fix |
+|---|---|
+| `mobile-session.ts` `markMobileSessionUsed()` | Now returns `active` / `inactive` / `unknown`, throttles `last_used_at` touches to 120 seconds, and catches Postgres-path DB errors. A transient DB error no longer forces a 401 after the signed driver session has already been verified. Expired, revoked, or missing mobile sessions still return 401. |
+| `mobile-session.ts` `exchangeMobileSessionChallenge()` | The activation update now also requires `status = 'challenge_issued'` and returns `null` when a replay loses the race, preventing the same challenge from minting a second usable mobile session. |
+| `driver-session-gate.tsx` `establishMobileSessionIfNeeded()` | The mobile-shell challenge fetch now retries once after 150 ms when the first response is 401, covering the device timing window where the browser has not applied the driver-session cookie yet. |
+
+Production migration `0030_driver_mobile_sessions_grants.sql` was applied and a follow-up dry run reported `Nothing to apply. Database is up to date.`
+
+Verification:
+
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run test` passed: web 90/90 and driver-core 14/14.
+- `npm run test --prefix apps/mobile-driver` passed: 14/14.
+- `$env:NEXT_TELEMETRY_DISABLED='1'; npm.cmd run build` passed.
+
+---
+
+## Original mobile-agent watch items — fixed in follow-up
+
+These were the original watch items from the review. They are retained for audit context; see the 2026-09-10 follow-up above for the applied fixes.
 
 | Where | Issue | Suggested direction |
 |---|---|---|
@@ -67,14 +91,14 @@ endpoint (incl. `mobile-session/challenge` → 401, `mobile-session/exchange` �
 
 ## Pending — owner / infra (not code)
 
-1. `node scripts/apply-migrations.mjs --rename-applied 20260909100835_driver_mobile_sessions.sql 0029_driver_mobile_sessions.sql`
-   — repoint the prod tracking row (classifier-blocked here). Optional: the SQL
-   is idempotent, so if skipped the next `--yes` re-applies `0029` harmlessly.
-2. `node scripts/apply-migrations.mjs --yes` — apply `0030` (grants) to prod.
-   No-op on the privilege (already granted) but records the migration.
-3. `node scripts/apply-migrations.mjs --reconcile-checksums --yes` — clear the
-   `0011/0018/0019/0020` CHANGED flags (no real drift — doc 961).
-4. P1-4 `vercel.json` → project-root migration (doc 958). Independent of mobile.
+1. Done on 2026-09-10: `--rename-applied` repointed the prod tracking row to
+   `0029_driver_mobile_sessions.sql`.
+2. Done on 2026-09-10: `node scripts/apply-migrations.mjs --yes` applied
+   `0030_driver_mobile_sessions_grants.sql` to production.
+3. Done on 2026-09-10: `--reconcile-checksums --yes` cleared the
+   `0011/0018/0019/0020` CHANGED flags after drift verification.
+4. Still pending: P1-4 `vercel.json` → project-root migration (doc 958).
+   Independent of mobile.
 
 ---
 

@@ -7,6 +7,7 @@ import { DRIVER_SESSION_MAX_AGE, mintDriverSession } from "@/lib/driver-access/s
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
 const CHALLENGE_TTL_SECONDS = 60;
+const MOBILE_SESSION_TOUCH_THROTTLE_SECONDS = 120;
 
 function hashValue(value: string) {
   return createHash("sha256").update(`tomp-mobile-session:${value}`).digest("hex");
@@ -89,7 +90,7 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
       did: String(sessionRow.driver_id),
       dev: String(sessionRow.device_hash)
     });
-    const { error: updateError } = await client
+    const { data: updatedSessionRow, error: updateError } = await client
       .from("driver_mobile_sessions")
       .update({
         status: "active",
@@ -100,8 +101,12 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
         expires_at: expiresAt,
         updated_at: issuedAt
       })
-      .eq("id", sessionRow.id);
+      .eq("id", sessionRow.id)
+      .eq("status", "challenge_issued")
+      .select("id")
+      .maybeSingle();
     if (updateError) throw new Error(updateError.message);
+    if (!updatedSessionRow) return null;
     return { session, expiresAt };
   }
 
@@ -126,7 +131,7 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
     dev: sessionRow.device_hash
   });
 
-  await sql`
+  const updated = await sql<Array<{ id: string }>>`
     update driver_mobile_sessions
     set status = 'active',
         installation_id_hash = ${installationIdHash},
@@ -136,12 +141,23 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
         expires_at = ${expiresAt},
         updated_at = ${issuedAt}
     where id = ${sessionRow.id}
+      and status = 'challenge_issued'
+      and challenge_expires_at > ${issuedAt}
+    returning id
   `;
+  if (updated.length === 0) return null;
 
   return { session, expiresAt };
 }
 
-export async function markMobileSessionUsed(session: string) {
+function shouldTouchMobileSession(lastUsedAt: string | null | undefined, nowMs = Date.now()) {
+  if (!lastUsedAt) return true;
+  const lastUsedMs = Date.parse(lastUsedAt);
+  if (!Number.isFinite(lastUsedMs)) return true;
+  return nowMs - lastUsedMs >= MOBILE_SESSION_TOUCH_THROTTLE_SECONDS * 1000;
+}
+
+export async function markMobileSessionUsed(session: string): Promise<"active" | "inactive" | "unknown"> {
   const sessionHash = hashValue(session);
   const usedAt = nowIso();
 
@@ -149,28 +165,47 @@ export async function markMobileSessionUsed(session: string) {
   if (client) {
     const { data, error } = await client
       .from("driver_mobile_sessions")
-      .update({ last_used_at: usedAt, updated_at: usedAt })
+      .select("id, last_used_at")
       .eq("session_hash", sessionHash)
       .eq("status", "active")
       .gt("expires_at", usedAt)
       .is("revoked_at", null)
-      .select("id")
       .maybeSingle();
-    if (error) return false;
-    return Boolean(data);
+    if (error) return "unknown";
+    if (!data) return "inactive";
+    if (!shouldTouchMobileSession(data.last_used_at)) return "active";
+
+    const { error: touchError } = await client
+      .from("driver_mobile_sessions")
+      .update({ last_used_at: usedAt, updated_at: usedAt })
+      .eq("id", data.id);
+    return touchError ? "unknown" : "active";
   }
 
   const sql = getPostgresClient();
-  if (!sql) return false;
-  const rows = await sql<Array<{ id: string }>>`
-    update driver_mobile_sessions
-    set last_used_at = ${usedAt},
-        updated_at = ${usedAt}
-    where session_hash = ${sessionHash}
-      and status = 'active'
-      and expires_at > ${usedAt}
-      and revoked_at is null
-    returning id
-  `;
-  return rows.length > 0;
+  if (!sql) return "unknown";
+  try {
+    const rows = await sql<Array<{ id: string; last_used_at: string | null }>>`
+      select id, last_used_at
+      from driver_mobile_sessions
+      where session_hash = ${sessionHash}
+        and status = 'active'
+        and expires_at > ${usedAt}
+        and revoked_at is null
+      limit 1
+    `;
+    const row = rows[0];
+    if (!row) return "inactive";
+    if (!shouldTouchMobileSession(row.last_used_at)) return "active";
+
+    await sql`
+      update driver_mobile_sessions
+      set last_used_at = ${usedAt},
+          updated_at = ${usedAt}
+      where id = ${row.id}
+    `;
+    return "active";
+  } catch {
+    return "unknown";
+  }
 }
