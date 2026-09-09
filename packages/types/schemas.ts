@@ -53,6 +53,16 @@ export const createAssignmentSchema = z.object({
 
 export const updateAssignmentSchema = createAssignmentSchema.partial();
 
+// The centre sets the order a driver works through their jobs, and marks any as
+// urgent. Stored in each assignment's metadata (metadata.sequence /
+// metadata.urgent); the driver's QR page and the fleet board read it back.
+export const setAssignmentOrderSchema = z.object({
+  projectId: uuidSchema,
+  driverId: uuidSchema,
+  orderedAssignmentIds: z.array(uuidSchema).min(1).max(50),
+  urgentAssignmentIds: z.array(uuidSchema).max(50).default([])
+});
+
 export const createCallSignSchema = z.object({
   projectId: uuidSchema,
   callSign: z.string().trim().min(1).max(40),
@@ -338,6 +348,7 @@ export type VehicleCheckinInput = z.infer<typeof vehicleCheckinSchema>;
 export type DriverIssueReportInput = z.infer<typeof driverIssueReportSchema>;
 export type DriverCheckinInput = z.infer<typeof driverCheckinSchema>;
 export type AssignmentStatusUpdateInput = z.infer<typeof assignmentStatusUpdateSchema>;
+export type SetAssignmentOrderInput = z.infer<typeof setAssignmentOrderSchema>;
 export type DriverLocationUpdateInput = z.infer<typeof driverLocationUpdateSchema>;
 export type PublishProjectInput = z.infer<typeof publishProjectSchema>;
 export type CreateChangeRequestInput = z.infer<typeof createChangeRequestSchema>;

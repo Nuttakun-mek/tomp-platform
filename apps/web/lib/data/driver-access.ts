@@ -1,6 +1,7 @@
 import type { Assignment, CallSign, Driver, DriverAssignmentPacket, DriverNotification, Project, RouteChangeInstruction, Vehicle } from "@tomp/types/domain";
 import { hashDriverAccessToken } from "@/lib/driver-access/token";
 import { getDriverAssignmentPacketByAssignmentId, getDriverIssueMessagesByAssignmentId, getDriverNotificationsByAssignmentId, getRouteChangesByAssignmentId, type DriverIssueMessage } from "@/lib/data/driver-operations";
+import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
@@ -102,62 +103,39 @@ function sameOperationDay(value: string | null, anchor: string) {
   return date.getFullYear() === anchorDate.getFullYear() && date.getMonth() === anchorDate.getMonth() && date.getDate() === anchorDate.getDate();
 }
 
-function isUrgentRow(meta: Record<string, unknown>) {
-  return meta.urgent === true || meta.priority === "urgent" || meta.priority === "high";
-}
-
-// Ordering for the driver's "today" list: current job first, then anything the
-// centre marked urgent (inserted work), then the rest by planned start time.
-// Completed / cancelled sink to the bottom. An explicit metadata.sequence from
-// the centre wins within a tier. Without this the list was raw insert order, so
-// a job added mid-shift landed last and was easy to miss.
-function dayAssignmentTier(row: Row, isCurrent: boolean) {
-  const status = text(row, "status", "planned");
-  if (status === "completed") return 40;
-  if (status === "cancelled") return 50;
-  if (isCurrent) return 0;
-  if (isUrgentRow(metadata(row))) return 5;
-  return 10;
-}
-
 function buildDayAssignments(rows: Row[], currentAssignmentId: string, resolveCallSign: (callSignId: string) => string | undefined): DriverDayAssignment[] {
-  const decorated = rows.map((row) => {
-    const isCurrent = text(row, "id") === currentAssignmentId;
-    const meta = metadata(row);
+  const byId = new Map(rows.map((row) => [text(row, "id"), row]));
+
+  const ordered = orderDriverJobs(
+    rows.map((row) => {
+      const meta = metadata(row);
+      return {
+        id: text(row, "id"),
+        status: text(row, "status", "planned"),
+        startTime: nullableText(row, "start_time"),
+        createdAt: nullableText(row, "created_at"),
+        sequence: typeof meta.sequence === "number" ? meta.sequence : null,
+        urgent: isUrgentMeta(meta),
+        isCurrent: text(row, "id") === currentAssignmentId
+      };
+    })
+  );
+
+  return ordered.map((job) => {
+    const row = byId.get(job.id) as Row;
+    const route = assignmentRouteSummary(row);
     return {
-      row,
-      isCurrent,
-      tier: dayAssignmentTier(row, isCurrent),
-      explicitSequence: typeof meta.sequence === "number" ? meta.sequence : Number.POSITIVE_INFINITY,
-      startMs: nullableText(row, "start_time") ? new Date(String(row.start_time)).getTime() : Number.POSITIVE_INFINITY,
-      createdMs: nullableText(row, "created_at") ? new Date(String(row.created_at)).getTime() : 0,
-      urgent: isUrgentRow(meta)
-    };
-  });
-
-  decorated.sort((a, b) => {
-    if (a.tier !== b.tier) return a.tier - b.tier;
-    if (a.explicitSequence !== b.explicitSequence) return a.explicitSequence - b.explicitSequence;
-    if (a.startMs !== b.startMs) return a.startMs - b.startMs;
-    return a.createdMs - b.createdMs;
-  });
-
-  const nextIndex = decorated.findIndex((item) => !item.isCurrent && item.tier < 40);
-
-  return decorated.map((item, index) => {
-    const route = assignmentRouteSummary(item.row);
-    return {
-      assignmentId: text(item.row, "id"),
-      callSign: resolveCallSign(text(item.row, "call_sign_id")) || text(item.row, "id").slice(0, 8),
+      assignmentId: job.id,
+      callSign: resolveCallSign(text(row, "call_sign_id")) || job.id.slice(0, 8),
       pickup: route.pickup,
       dropoff: route.dropoff,
-      startTime: nullableText(item.row, "start_time"),
-      endTime: nullableText(item.row, "end_time"),
-      status: text(item.row, "status", "planned"),
-      isCurrent: item.isCurrent,
-      sequence: index + 1,
-      isNext: index === nextIndex,
-      urgent: item.urgent
+      startTime: job.startTime,
+      endTime: nullableText(row, "end_time"),
+      status: job.status,
+      isCurrent: job.isCurrent,
+      sequence: job.order,
+      isNext: job.isNext,
+      urgent: job.urgent
     };
   });
 }

@@ -1,6 +1,7 @@
 import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { DriverQrActionCard } from "./driver-qr-action-card";
 import { AssignmentLane } from "./assignment-lane";
+import { DriverJobOrderPanel } from "./driver-job-order-panel";
 
 interface DispatchBoardProps {
   projectId: string;
@@ -34,6 +35,7 @@ export function DispatchBoard({ projectId, assignments, missions, callSigns, dri
         </div>
       </div>
       <DriverQrActionCard assignments={assignments} projectId={projectId} />
+      <DriverJobOrderPanel projectId={projectId} assignments={assignments} callSigns={callSigns} drivers={drivers} />
       <div className="-mx-1 overflow-x-auto px-1 pb-2">
         <div className="grid grid-flow-col auto-cols-[minmax(272px,1fr)] gap-4">
           {laneDefinitions.map((lane) => (

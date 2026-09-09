@@ -6,6 +6,7 @@ import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tom
 import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
 import { metaString } from "@/lib/data/location-meta";
+import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
@@ -82,6 +83,35 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
     for (const list of map.values()) list.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
     return map;
   }, [inbound]);
+
+  // The "next job" per driver, using the same ordering the driver's QR page shows.
+  const nextAssignmentIds = useMemo(() => {
+    const byDriver = new Map<string, Assignment[]>();
+    for (const assignment of assignments) {
+      if (!assignment.driverId || ["cancelled", "archived", "completed"].includes(assignment.status)) continue;
+      const list = byDriver.get(assignment.driverId) ?? [];
+      list.push(assignment);
+      byDriver.set(assignment.driverId, list);
+    }
+    const next = new Set<string>();
+    for (const list of byDriver.values()) {
+      if (list.length < 2) continue;
+      const ordered = orderDriverJobs(
+        list.map((assignment) => ({
+          id: assignment.id,
+          status: assignment.status,
+          startTime: assignment.startTime ?? null,
+          createdAt: assignment.createdAt ?? null,
+          sequence: typeof assignment.metadata.sequence === "number" ? (assignment.metadata.sequence as number) : null,
+          urgent: isUrgentMeta(assignment.metadata),
+          isCurrent: assignment.status === "active"
+        }))
+      );
+      const nextJob = ordered.find((job) => job.isNext);
+      if (nextJob) next.add(nextJob.id);
+    }
+    return next;
+  }, [assignments]);
 
   const effectiveNow = now || Date.now();
   const rows = useMemo(() => {
@@ -168,6 +198,9 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="text-[15px] font-bold text-ink">{row.label}</span>
+                      {nextAssignmentIds.has(row.assignment.id) ? (
+                        <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
+                      ) : null}
                       {row.unread ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                           {row.hasIssue ? <TriangleAlert className="h-2.5 w-2.5" /> : <MessageSquare className="h-2.5 w-2.5" />}

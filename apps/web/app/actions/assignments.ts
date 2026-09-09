@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createAssignmentSchema } from "@tomp/types/schemas";
+import { createAssignmentSchema, setAssignmentOrderSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
@@ -129,5 +129,62 @@ export async function cancelAssignmentAction(input: unknown): Promise<ActionResu
   return actionSuccess(
     { assignment: mapAssignment(updated), timelineEvent: timelineResult.data },
     timelineResult.success ? undefined : `ถอนงานแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
+  );
+}
+
+// Save the order a driver works their jobs, and which are urgent. Written into
+// each assignment's metadata so the driver's QR page and the fleet board can
+// read it without a new column.
+export async function setAssignmentOrderAction(input: unknown): Promise<ActionResult> {
+  const parsed = setAssignmentOrderSchema.safeParse(input);
+  if (!parsed.success) {
+    return actionFailure("ข้อมูลลำดับงานไม่ถูกต้อง", parsed.error.flatten().fieldErrors);
+  }
+
+  const { client, error, mode } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(parsed.data.projectId, "assignment.update");
+  if (!permission.allowed && mode !== "service_role") {
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์จัดลำดับงานในโครงการนี้");
+  }
+
+  const ids = parsed.data.orderedAssignmentIds;
+  const urgent = new Set(parsed.data.urgentAssignmentIds);
+
+  // Only touch this driver's assignments in this project — guards against an id
+  // from another driver/project being slipped into the list.
+  const { data: rows, error: lookupError } = await client
+    .from("assignments")
+    .select("id, metadata")
+    .eq("project_id", parsed.data.projectId)
+    .eq("driver_id", parsed.data.driverId)
+    .in("id", ids);
+
+  if (lookupError) return actionFailure(getDatabaseErrorMessage(lookupError, "โหลดงานของคนขับไม่สำเร็จ"));
+
+  const metaById = new Map((rows ?? []).map((row) => [String(row.id), (row.metadata ?? {}) as Record<string, unknown>]));
+  const valid = ids.filter((id) => metaById.has(id));
+  if (!valid.length) return actionFailure("ไม่พบงานของคนขับคนนี้ในโครงการ");
+
+  const failures: string[] = [];
+  await Promise.all(
+    valid.map(async (id, index) => {
+      const nextMeta = { ...metaById.get(id), sequence: index + 1, urgent: urgent.has(id) };
+      const { error: updateError } = await client.from("assignments").update({ metadata: nextMeta }).eq("id", id);
+      if (updateError) failures.push(id);
+    })
+  );
+
+  if (failures.length === valid.length) return actionFailure("บันทึกลำดับงานไม่สำเร็จ");
+
+  revalidatePath("/assignments");
+  revalidatePath(`/projects/${parsed.data.projectId}`);
+  revalidatePath(`/projects/${parsed.data.projectId}/assignments`);
+  revalidatePath("/mission-control");
+
+  return actionSuccess(
+    { mode, ordered: valid.length },
+    failures.length ? `บันทึกลำดับแล้ว แต่บางงานไม่สำเร็จ ${failures.length} รายการ` : undefined
   );
 }

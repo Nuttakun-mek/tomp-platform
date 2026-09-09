@@ -92,7 +92,7 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
               เปิดตำแหน่งล่าสุดใน Google Maps
             </a>
           ) : null}
-          <Link className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-operation hover:text-operation" href="/assignments">
+          <Link className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-operation hover:text-operation" href="/projects">
             <Plus className="h-4 w-4" />
             เปิดงานใหม่ให้รถคันนี้
           </Link>

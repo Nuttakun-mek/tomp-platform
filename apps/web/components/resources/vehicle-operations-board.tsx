@@ -24,7 +24,7 @@ export function VehicleOperationsBoard({ profiles }: { profiles: VehicleOperatio
             ใช้หน้านี้เพื่อตรวจว่ารถคันใดกำลังทำงานอะไร เหลืองานกี่งาน งานไหนเสร็จแล้ว และมีสัญญาณ GPS ล่าสุดหรือไม่
           </p>
         </div>
-        <Link className="inline-flex items-center gap-2 rounded-2xl bg-operation px-4 py-3 text-sm font-semibold text-white" href="/assignments">
+        <Link className="inline-flex items-center gap-2 rounded-2xl bg-operation px-4 py-3 text-sm font-semibold text-white" href="/projects">
           <Plus className="h-4 w-4" />
           เปิดงานใหม่
         </Link>

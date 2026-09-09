@@ -9,6 +9,7 @@ export {
   driverIssueReportSchema,
   publishProjectSchema,
   assignmentStatusUpdateSchema,
+  setAssignmentOrderSchema,
   vehicleCheckinSchema,
   approveChangeRequestSchema,
   applyChangeRequestSchema,
