@@ -6,13 +6,12 @@ import type { Assignment, CallSign } from "@tomp/types/domain";
 import { sendDriverNotificationAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage, DriverOutboundMessage } from "@/lib/data/driver-comms";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
+import { useMissionControlFeed } from "./mission-control-feed";
 
 interface CommsConsoleProps {
   projectId: string;
   assignments: Assignment[];
   callSigns: CallSign[];
-  initialInbound: DriverInboundMessage[];
-  initialOutbound: DriverOutboundMessage[];
 }
 
 const QUICK_PHRASES = [
@@ -33,15 +32,20 @@ function severityClass(severity: string) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
-export function CommsConsole({ projectId, assignments, callSigns, initialInbound, initialOutbound }: CommsConsoleProps) {
-  const [inbound, setInbound] = useState(initialInbound);
-  const [outbound, setOutbound] = useState(initialOutbound);
+export function CommsConsole({ projectId, assignments, callSigns }: CommsConsoleProps) {
+  const { comms, now } = useMissionControlFeed();
+  const inbound = comms.inbound;
+  // Optimistic echoes of messages we just sent, dropped once the feed catches up.
+  const [optimisticOutbound, setOptimisticOutbound] = useState<DriverOutboundMessage[]>([]);
+  const outbound = useMemo(() => {
+    const seen = new Set(comms.outbound.map((message) => `${message.assignmentId}::${message.body}`));
+    return [...optimisticOutbound.filter((message) => !seen.has(`${message.assignmentId}::${message.body}`)), ...comms.outbound];
+  }, [comms.outbound, optimisticOutbound]);
   const [filter, setFilter] = useState<string>("all");
   const [target, setTarget] = useState<string>(assignments[0]?.id ?? "");
   const [text, setText] = useState("");
   const [banner, setBanner] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [now, setNow] = useState(() => Date.now());
 
   const callSignById = useMemo(() => new Map(callSigns.map((cs) => [cs.id, cs.callSign])), [callSigns]);
   const assignmentInfo = useMemo(() => {
@@ -54,29 +58,6 @@ export function CommsConsole({ projectId, assignments, callSigns, initialInbound
     }
     return map;
   }, [assignments, callSignById]);
-
-  useEffect(() => {
-    let alive = true;
-    async function poll() {
-      try {
-        const res = await fetch(`/api/mission-control/comms?projectId=${projectId}`, { cache: "no-store" });
-        const json = (await res.json()) as { success?: boolean; data?: { inbound?: DriverInboundMessage[]; outbound?: DriverOutboundMessage[] } };
-        if (alive && json.success && json.data) {
-          if (Array.isArray(json.data.inbound)) setInbound(json.data.inbound);
-          if (Array.isArray(json.data.outbound)) setOutbound(json.data.outbound);
-          setNow(Date.now());
-        }
-      } catch {
-        /* keep last known */
-      }
-    }
-    const timer = window.setInterval(poll, 15000);
-    void poll();
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-    };
-  }, [projectId]);
 
   const feed = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [
@@ -118,7 +99,7 @@ export function CommsConsole({ projectId, assignments, callSigns, initialInbound
       if (result.success) {
         setText("");
         setBanner({ tone: "ok", text: "ส่งข้อความถึงคนขับแล้ว" });
-        setOutbound((current) => [
+        setOptimisticOutbound((current) => [
           {
             id: `local-${Date.now()}`,
             assignmentId: target,
@@ -142,7 +123,7 @@ export function CommsConsole({ projectId, assignments, callSigns, initialInbound
       <div className="border-b border-slate-200 px-5 py-4">
         <p className="text-xs font-semibold tracking-[0.16em] text-operation">การสื่อสารกับคนขับ</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">ข้อความสองทาง ศูนย์ ↔ คนขับ</h2>
-        <p className="mt-1 text-xs text-slate-500">คนขับส่งมาจากหน้างาน (QR) · ศูนย์ตอบกลับได้ที่นี่ · รีเฟรชอัตโนมัติทุก 15 วินาที</p>
+        <p className="mt-1 text-xs text-slate-500">คนขับส่งมาจากหน้างาน (QR) · ศูนย์ตอบกลับได้ที่นี่ · รีเฟรชอัตโนมัติทุก 10 วินาที</p>
       </div>
 
       <div className="grid gap-4 p-4 sm:p-4 lg:grid-cols-[0.9fr_1.1fr]">

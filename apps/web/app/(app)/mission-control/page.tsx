@@ -3,6 +3,7 @@ import { CommandCenterHeader } from "@/components/mission-control/command-center
 import { CommsConsole } from "@/components/mission-control/comms-console";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
 import { LiveMapPanel } from "@/components/mission-control/live-map-panel";
+import { MissionControlFeedProvider } from "@/components/mission-control/mission-control-feed";
 import { OperationKpiStrip } from "@/components/mission-control/operation-kpi-strip";
 import { OperationTimelinePanel } from "@/components/mission-control/operation-timeline-panel";
 import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
@@ -79,29 +80,27 @@ export default async function MissionControlPage({ searchParams }: MissionContro
       <CommandCenterHeader project={activeProject} liveCount={locations.length} issueCount={followUps} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
 
-      <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">
-        <LiveMapPanel projectId={activeProject.id} locations={locations} />
-      </CollapsibleSection>
-
-      <FleetBoard
+      {/* One shared live feed for the map, the fleet board and the comms console —
+          one poll of /locations + /comms per cycle instead of three. */}
+      <MissionControlFeedProvider
         projectId={activeProject.id}
-        assignments={assignments}
-        callSigns={callSigns}
-        drivers={drivers}
-        vehicles={vehicles}
         initialLocations={locations}
-        initialStatuses={assignmentStatuses}
-        initialEvidence={evidence}
-        initialInbound={comms.inbound}
-      />
+        initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, evidence }}
+      >
+        <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">
+          <LiveMapPanel projectId={activeProject.id} locations={locations} />
+        </CollapsibleSection>
 
-      <CommsConsole
-        projectId={activeProject.id}
-        assignments={assignments}
-        callSigns={callSigns}
-        initialInbound={comms.inbound}
-        initialOutbound={comms.outbound}
-      />
+        <FleetBoard
+          projectId={activeProject.id}
+          assignments={assignments}
+          callSigns={callSigns}
+          drivers={drivers}
+          vehicles={vehicles}
+        />
+
+        <CommsConsole projectId={activeProject.id} assignments={assignments} callSigns={callSigns} />
+      </MissionControlFeedProvider>
 
       <CollapsibleSection title="รายละเอียดรถในโครงการ" storageKey="mc.vehicles" defaultOpen={false}>
         <VehicleMonitorPanel profiles={vehicleProfiles} />

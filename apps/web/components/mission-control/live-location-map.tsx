@@ -7,10 +7,19 @@ import { gpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
 import { LiveTrackingMap, toTrackedPoint } from "@/components/mission-control/live-tracking-map";
+import { useMissionControlFeedOptional } from "./mission-control-feed";
 
 interface LiveLocationMapProps {
   projectId: string;
   initialLocations: DriverLocation[];
+}
+
+interface MapData {
+  locations: DriverLocation[];
+  connection: "live" | "fallback" | "offline";
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  now: number;
 }
 
 function metadataText(location: DriverLocation, key: string, fallback: string) {
@@ -43,39 +52,37 @@ function initialClock(locations: DriverLocation[]) {
   return first ? new Date(first).getTime() : 0;
 }
 
-export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMapProps) {
+// Standalone poller — used only when the map is rendered outside the control
+// room's shared feed. Inside mission-control the provider owns polling.
+function useStandaloneLocations(projectId: string, initialLocations: DriverLocation[], enabled: boolean): MapData {
   const [locations, setLocations] = useState(initialLocations);
-  const [connection, setConnection] = useState<"live" | "fallback" | "offline">("fallback");
+  const [connection, setConnection] = useState<MapData["connection"]>("fallback");
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [now, setNow] = useState(() => initialClock(initialLocations));
-  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
     let mounted = true;
-    setHydrated(true);
     setNow(Date.now());
 
     async function refresh() {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       try {
         const response = await fetch(`/api/mission-control/locations?projectId=${projectId}`, { cache: "no-store" });
         const result = (await response.json()) as { success?: boolean; data?: DriverLocation[]; checkedAt?: string; error?: string };
-        if (mounted) {
-          if (result.success !== false && Array.isArray(result.data)) {
-            setLocations(result.data);
-          }
-          setLastCheckedAt(result.checkedAt ?? new Date().toISOString());
-          setLastError(result.success === false ? result.error || "โหลดตำแหน่งไม่สำเร็จ" : null);
-          setNow(Date.now());
-          setConnection((current) => (result.success === false ? "offline" : current === "live" ? "live" : "fallback"));
-        }
+        if (!mounted) return;
+        if (result.success !== false && Array.isArray(result.data)) setLocations(result.data);
+        setLastCheckedAt(result.checkedAt ?? new Date().toISOString());
+        setLastError(result.success === false ? result.error || "โหลดตำแหน่งไม่สำเร็จ" : null);
+        setNow(Date.now());
+        setConnection((current) => (result.success === false ? "offline" : current === "live" ? "live" : "fallback"));
       } catch {
-        if (mounted) {
-          setConnection("offline");
-          setLastCheckedAt(new Date().toISOString());
-          setLastError("เชื่อมต่อข้อมูลตำแหน่งไม่ได้");
-          setNow(Date.now());
-        }
+        if (!mounted) return;
+        setConnection("offline");
+        setLastCheckedAt(new Date().toISOString());
+        setLastError("เชื่อมต่อข้อมูลตำแหน่งไม่ได้");
+        setNow(Date.now());
       }
     }
 
@@ -83,10 +90,9 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
       setConnection("live");
       void refresh();
     });
-
     if (channel) setConnection("live");
+
     const refreshTimer = window.setInterval(refresh, 10000);
-    // freshness labels only need ~10s resolution; a 1s clock re-rendered the map every second
     const clockTimer = window.setInterval(() => setNow(Date.now()), 10000);
     void refresh();
 
@@ -96,7 +102,18 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
       window.clearInterval(clockTimer);
       unsubscribeMissionControl([channel]);
     };
-  }, [projectId]);
+  }, [projectId, enabled]);
+
+  return { locations, connection, lastCheckedAt, lastError, now };
+}
+
+export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMapProps) {
+  const feed = useMissionControlFeedOptional();
+  const standalone = useStandaloneLocations(projectId, feed ? [] : initialLocations, !feed);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+
+  const { locations, connection, lastCheckedAt, lastError, now } = feed ?? standalone;
 
   const effectiveNow = now || initialClock(locations) || 0;
   const liveCount = hydrated ? locations.filter((location) => getFreshness(location, effectiveNow) === "live").length : 0;

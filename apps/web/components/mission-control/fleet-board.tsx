@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Check, ChevronDown, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
 import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
-import type { AssignmentStatusUpdate } from "@/lib/data/assignment-status";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
-import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
 import { metaString } from "@/lib/data/location-meta";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useMissionControlFeed } from "./mission-control-feed";
 
 interface FleetBoardProps {
   projectId: string;
@@ -19,10 +18,6 @@ interface FleetBoardProps {
   callSigns: CallSign[];
   drivers: Driver[];
   vehicles: Vehicle[];
-  initialLocations: DriverLocation[];
-  initialStatuses: Record<string, AssignmentStatusUpdate>;
-  initialEvidence?: Record<string, VehicleEvidence>;
-  initialInbound?: DriverInboundMessage[];
 }
 
 // "none" = this assignment has never shared a location; the shared helper covers
@@ -52,29 +47,12 @@ function freshnessOf(location: DriverLocation | undefined, now: number): Freshne
   return gpsFreshness(location.recordedAt, location.sharingEvent, now);
 }
 
-export function FleetBoard({
-  projectId,
-  assignments,
-  callSigns,
-  drivers,
-  vehicles,
-  initialLocations,
-  initialStatuses,
-  initialEvidence = {},
-  initialInbound = []
-}: FleetBoardProps) {
-  const [locations, setLocations] = useState(initialLocations);
-  const [statuses, setStatuses] = useState(initialStatuses);
-  const [evidence, setEvidence] = useState(initialEvidence);
-  const [inbound, setInbound] = useState(initialInbound);
-  const [now, setNow] = useState(0);
+export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicles }: FleetBoardProps) {
+  const { locations, comms, now } = useMissionControlFeed();
+  const { statuses, evidence, inbound } = comms;
   const [expanded, setExpanded] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [, startResolve] = useTransition();
-
-  useEffect(() => {
-    setNow(Date.now());
-  }, []);
 
   function resolveMessage(id: string) {
     setResolvedIds((current) => new Set(current).add(id));
@@ -82,37 +60,6 @@ export function FleetBoard({
       await resolveDriverMessageAction({ id, projectId }).catch(() => undefined);
     });
   }
-
-  useEffect(() => {
-    let alive = true;
-    async function poll() {
-      try {
-        const [locRes, commsRes] = await Promise.all([
-          fetch(`/api/mission-control/locations?projectId=${projectId}`, { cache: "no-store" }).then((response) => response.json()),
-          fetch(`/api/mission-control/comms?projectId=${projectId}`, { cache: "no-store" }).then((response) => response.json())
-        ]);
-        if (!alive) return;
-        if (locRes?.success !== false && Array.isArray(locRes?.data)) setLocations(locRes.data as DriverLocation[]);
-        if (commsRes?.success && commsRes.data) {
-          if (commsRes.data.statuses) setStatuses((prev) => ({ ...prev, ...(commsRes.data.statuses as Record<string, AssignmentStatusUpdate>) }));
-          if (commsRes.data.evidence) setEvidence((prev) => ({ ...prev, ...(commsRes.data.evidence as Record<string, VehicleEvidence>) }));
-          if (Array.isArray(commsRes.data.inbound)) setInbound(commsRes.data.inbound as DriverInboundMessage[]);
-        }
-        setNow(Date.now());
-      } catch {
-        // Keep the last known operating picture.
-      }
-    }
-
-    const refreshTimer = window.setInterval(poll, 12000);
-    const clockTimer = window.setInterval(() => setNow(Date.now()), 15000);
-    void poll();
-    return () => {
-      alive = false;
-      window.clearInterval(refreshTimer);
-      window.clearInterval(clockTimer);
-    };
-  }, [projectId]);
 
   const callSignById = useMemo(() => new Map(callSigns.map((item) => [item.id, item.callSign])), [callSigns]);
   const driverById = useMemo(() => new Map(drivers.map((item) => [item.id, item])), [drivers]);
