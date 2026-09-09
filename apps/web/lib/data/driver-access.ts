@@ -42,6 +42,12 @@ export interface DriverDayAssignment {
   endTime?: string | null;
   status: string;
   isCurrent: boolean;
+  /** 1-based order the driver should work through the list. */
+  sequence: number;
+  /** The next job to start after the current one — the one to head to now. */
+  isNext: boolean;
+  /** Flagged urgent / inserted by the control centre — do this out of turn. */
+  urgent: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -94,6 +100,66 @@ function sameOperationDay(value: string | null, anchor: string) {
   const date = new Date(value);
   const anchorDate = new Date(anchor);
   return date.getFullYear() === anchorDate.getFullYear() && date.getMonth() === anchorDate.getMonth() && date.getDate() === anchorDate.getDate();
+}
+
+function isUrgentRow(meta: Record<string, unknown>) {
+  return meta.urgent === true || meta.priority === "urgent" || meta.priority === "high";
+}
+
+// Ordering for the driver's "today" list: current job first, then anything the
+// centre marked urgent (inserted work), then the rest by planned start time.
+// Completed / cancelled sink to the bottom. An explicit metadata.sequence from
+// the centre wins within a tier. Without this the list was raw insert order, so
+// a job added mid-shift landed last and was easy to miss.
+function dayAssignmentTier(row: Row, isCurrent: boolean) {
+  const status = text(row, "status", "planned");
+  if (status === "completed") return 40;
+  if (status === "cancelled") return 50;
+  if (isCurrent) return 0;
+  if (isUrgentRow(metadata(row))) return 5;
+  return 10;
+}
+
+function buildDayAssignments(rows: Row[], currentAssignmentId: string, resolveCallSign: (callSignId: string) => string | undefined): DriverDayAssignment[] {
+  const decorated = rows.map((row) => {
+    const isCurrent = text(row, "id") === currentAssignmentId;
+    const meta = metadata(row);
+    return {
+      row,
+      isCurrent,
+      tier: dayAssignmentTier(row, isCurrent),
+      explicitSequence: typeof meta.sequence === "number" ? meta.sequence : Number.POSITIVE_INFINITY,
+      startMs: nullableText(row, "start_time") ? new Date(String(row.start_time)).getTime() : Number.POSITIVE_INFINITY,
+      createdMs: nullableText(row, "created_at") ? new Date(String(row.created_at)).getTime() : 0,
+      urgent: isUrgentRow(meta)
+    };
+  });
+
+  decorated.sort((a, b) => {
+    if (a.tier !== b.tier) return a.tier - b.tier;
+    if (a.explicitSequence !== b.explicitSequence) return a.explicitSequence - b.explicitSequence;
+    if (a.startMs !== b.startMs) return a.startMs - b.startMs;
+    return a.createdMs - b.createdMs;
+  });
+
+  const nextIndex = decorated.findIndex((item) => !item.isCurrent && item.tier < 40);
+
+  return decorated.map((item, index) => {
+    const route = assignmentRouteSummary(item.row);
+    return {
+      assignmentId: text(item.row, "id"),
+      callSign: resolveCallSign(text(item.row, "call_sign_id")) || text(item.row, "id").slice(0, 8),
+      pickup: route.pickup,
+      dropoff: route.dropoff,
+      startTime: nullableText(item.row, "start_time"),
+      endTime: nullableText(item.row, "end_time"),
+      status: text(item.row, "status", "planned"),
+      isCurrent: item.isCurrent,
+      sequence: index + 1,
+      isNext: index === nextIndex,
+      urgent: item.urgent
+    };
+  });
 }
 
 export async function getDriverAssignmentByToken(token: string): Promise<DriverAccessAssignment | null> {
@@ -166,7 +232,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
 
   const { data: dayAssignmentRows } = await client
     .from("assignments")
-    .select("id, call_sign_id, start_time, end_time, status, metadata")
+    .select("id, call_sign_id, start_time, end_time, status, metadata, created_at")
     .eq("project_id", text(assignment, "project_id"))
     .eq("driver_id", text(driver, "id"))
     .neq("status", "cancelled")
@@ -178,19 +244,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     ? await client.from("call_signs").select("id, call_sign").in("id", dayCallSignIds)
     : { data: [] as Row[] };
   const dayCallSignById = new Map(((dayCallSignRows || []) as Row[]).map((row) => [text(row, "id"), text(row, "call_sign")]));
-  const dayAssignments = visibleDayRows.map((row) => {
-    const route = assignmentRouteSummary(row);
-    return {
-      assignmentId: text(row, "id"),
-      callSign: dayCallSignById.get(text(row, "call_sign_id")) || text(row, "id").slice(0, 8),
-      pickup: route.pickup,
-      dropoff: route.dropoff,
-      startTime: nullableText(row, "start_time"),
-      endTime: nullableText(row, "end_time"),
-      status: text(row, "status", "planned"),
-      isCurrent: text(row, "id") === text(assignment, "id")
-    };
-  });
+  const dayAssignments = buildDayAssignments(visibleDayRows, text(assignment, "id"), (id) => dayCallSignById.get(id));
 
   const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
 
@@ -303,7 +357,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   if (!project || !callSign || !driver || !vehicle) return null;
   const operationAnchor = nullableText(assignment, "start_time") || new Date().toISOString();
   const dayAssignmentRows = await sql<Row[]>`
-    select id, call_sign_id, start_time, end_time, status, metadata
+    select id, call_sign_id, start_time, end_time, status, metadata, created_at
     from assignments
     where project_id = ${String(tokenRow.project_id)}
       and driver_id = ${String(driver.id)}
@@ -316,19 +370,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     ? await sql<Row[]>`select id, call_sign from call_signs where id in ${sql(dayCallSignIds)}`
     : [];
   const dayCallSignById = new Map(dayCallSignRows.map((row) => [text(row, "id"), text(row, "call_sign")]));
-  const dayAssignments = visibleDayRows.map((row) => {
-    const route = assignmentRouteSummary(row);
-    return {
-      assignmentId: text(row, "id"),
-      callSign: dayCallSignById.get(text(row, "call_sign_id")) || text(row, "id").slice(0, 8),
-      pickup: route.pickup,
-      dropoff: route.dropoff,
-      startTime: nullableText(row, "start_time"),
-      endTime: nullableText(row, "end_time"),
-      status: text(row, "status", "planned"),
-      isCurrent: text(row, "id") === text(assignment, "id")
-    };
-  });
+  const dayAssignments = buildDayAssignments(visibleDayRows, text(assignment, "id"), (id) => dayCallSignById.get(id));
 
   await sql`
     update driver_access_tokens
@@ -478,7 +520,7 @@ export async function getDriverUpdatesByToken(token: string): Promise<DriverUpda
     client.from("assignment_status_updates").select("status, created_at").eq("assignment_id", assignmentId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     client
       .from("assignments")
-      .select("id, call_sign_id, start_time, end_time, status, metadata")
+      .select("id, call_sign_id, start_time, end_time, status, metadata, created_at")
       .eq("project_id", projectId)
       .eq("driver_id", driverId)
       .neq("status", "cancelled")
@@ -500,19 +542,7 @@ export async function getDriverUpdatesByToken(token: string): Promise<DriverUpda
     latestStatus: latestStatusRow ? { status: text(latestStatusRow, "status"), at: text(latestStatusRow, "created_at") } : null,
     notifications,
     messages,
-    dayAssignments: visibleDayRows.map((row) => {
-      const route = assignmentRouteSummary(row);
-      return {
-        assignmentId: text(row, "id"),
-        callSign: dayCallSignById.get(text(row, "call_sign_id")) || text(row, "id").slice(0, 8),
-        pickup: route.pickup,
-        dropoff: route.dropoff,
-        startTime: nullableText(row, "start_time"),
-        endTime: nullableText(row, "end_time"),
-        status: text(row, "status", "planned"),
-        isCurrent: text(row, "id") === assignmentId
-      };
-    })
+    dayAssignments: buildDayAssignments(visibleDayRows, assignmentId, (id) => dayCallSignById.get(id))
   };
 }
 
@@ -540,7 +570,7 @@ async function getDriverUpdatesByTokenViaPostgres(tokenHash: string): Promise<Dr
     getDriverIssueMessagesByAssignmentId(assignmentId),
     sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${assignmentId} order by created_at desc limit 1`,
     sql<Row[]>`
-      select id, call_sign_id, start_time, end_time, status, metadata
+      select id, call_sign_id, start_time, end_time, status, metadata, created_at
       from assignments
       where project_id = ${projectId} and driver_id = ${driverId} and status <> 'cancelled'
       order by start_time asc nulls last, created_at asc
@@ -558,19 +588,7 @@ async function getDriverUpdatesByTokenViaPostgres(tokenHash: string): Promise<Dr
     latestStatus: latestStatusRows[0] ? { status: text(latestStatusRows[0], "status"), at: text(latestStatusRows[0], "created_at") } : null,
     notifications,
     messages,
-    dayAssignments: visibleDayRows.map((row) => {
-      const route = assignmentRouteSummary(row);
-      return {
-        assignmentId: text(row, "id"),
-        callSign: dayCallSignById.get(text(row, "call_sign_id")) || text(row, "id").slice(0, 8),
-        pickup: route.pickup,
-        dropoff: route.dropoff,
-        startTime: nullableText(row, "start_time"),
-        endTime: nullableText(row, "end_time"),
-        status: text(row, "status", "planned"),
-        isCurrent: text(row, "id") === assignmentId
-      };
-    })
+    dayAssignments: buildDayAssignments(visibleDayRows, assignmentId, (id) => dayCallSignById.get(id))
   };
 }
 

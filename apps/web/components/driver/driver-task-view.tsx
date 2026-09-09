@@ -39,6 +39,13 @@ function stepFromStatus(status?: string | null) {
   return index >= 0 ? index + 1 : 0;
 }
 
+function jobTimeLabel(start?: string | null, end?: string | null) {
+  const fmt = (iso: string) => new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  if (start && end) return `${fmt(start)} – ${fmt(end)}`;
+  if (start) return `เริ่ม ${fmt(start)}`;
+  return "ยังไม่ระบุเวลา";
+}
+
 export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAssignment }) {
   const meta = driverAccess.assignment.metadata;
   const pickup = metaText(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ");
@@ -62,6 +69,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   const [issueOpen, setIssueOpen] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(true);
   const [nextStepsOpen, setNextStepsOpen] = useState(false);
+  const [openJobId, setOpenJobId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<DriverNotification[]>(driverAccess.notifications);
   const [messages, setMessages] = useState<DriverIssueMessage[]>(driverAccess.messages);
   const [dayAssignments, setDayAssignments] = useState(driverAccess.dayAssignments);
@@ -274,7 +282,9 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         </button>
       ) : null}
 
+      {/* Card: the job to do now — route, target time, and progress steps together. */}
       <section className="smart-card grid gap-2.5">
+        <p className="text-[13px] font-bold text-ink">งานปัจจุบัน</p>
         <div className="grid gap-2">
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-operation" />
@@ -294,16 +304,6 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         >
           <Navigation className="h-4 w-4" /> เปิด Google Maps
         </a>
-      </section>
-
-      <section className="smart-card grid gap-3">
-        <a
-          href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
-          className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
-        >
-          เปิดในแอป TOMP Driver เพื่อแชร์ GPS ต่อเนื่องเมื่อปิดจอ
-        </a>
-        <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} />
 
         {doneSteps.length ? (
           <div className="flex flex-wrap gap-1.5">
@@ -353,38 +353,83 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         )}
       </section>
 
+      {/* Card: location sharing — its own card so it can be hidden whole while sharing runs. */}
+      <section className="smart-card grid gap-3">
+        <a
+          href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
+          className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
+        >
+          เปิดในแอป TOMP Driver เพื่อแชร์ GPS ต่อเนื่องเมื่อปิดจอ
+        </a>
+        <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} />
+      </section>
+
       {dayAssignments.length > 1 ? (
         <section className="smart-card grid gap-2.5">
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-[13px] font-bold text-ink">งานวันนี้</p>
-              <p className="text-[12px] text-ink-faint">แสดงเฉพาะงานของคนขับในโครงการนี้</p>
+              <p className="text-[12px] text-ink-faint">เรียงตามลำดับที่ควรทำ · แตะเพื่อดูรายละเอียด</p>
             </div>
             <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">{dayAssignments.length} งาน</span>
           </div>
           <div className="grid gap-2">
-            {dayAssignments.map((item, index) => (
-              <article
-                key={item.assignmentId}
-                className={`rounded-card border px-3 py-2.5 ${
-                  item.isCurrent ? "border-operation/30 bg-operation-soft" : item.status === "completed" ? "border-emerald-200 bg-emerald-50" : "border-border bg-white"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-bold text-ink">
-                      {index + 1}. Call Sign {item.callSign}
-                    </p>
-                    <p className="mt-1 truncate text-[12px] text-ink-soft">
-                      {item.pickup} ไป {item.dropoff}
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                    {item.isCurrent ? "งานปัจจุบัน" : formatStatusTh(item.status)}
-                  </span>
-                </div>
-              </article>
-            ))}
+            {dayAssignments.map((item) => {
+              const open = openJobId === item.assignmentId;
+              const done = item.status === "completed" || item.status === "cancelled";
+              const jobMapsUrl = buildGoogleMapsDirectionsUrl(item.dropoff, item.pickup);
+              return (
+                <article
+                  key={item.assignmentId}
+                  className={`overflow-hidden rounded-card border ${
+                    item.isCurrent
+                      ? "border-operation/40 bg-operation-soft"
+                      : item.urgent
+                        ? "border-amber-300 bg-amber-50"
+                        : done
+                          ? "border-emerald-200 bg-emerald-50"
+                          : "border-border bg-white"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenJobId(open ? null : item.assignmentId)}
+                    aria-expanded={open}
+                    className="flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left"
+                  >
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
+                        <span>{item.sequence}. Call Sign {item.callSign}</span>
+                        {item.urgent ? <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">ด่วน</span> : null}
+                        {item.isNext ? <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">ทำต่อไป</span> : null}
+                      </p>
+                      <p className="mt-1 truncate text-[12px] text-ink-soft">{item.pickup} ไป {item.dropoff}</p>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
+                        {item.isCurrent ? "งานปัจจุบัน" : formatStatusTh(item.status)}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-ink-faint transition ${open ? "rotate-180" : ""}`} />
+                    </span>
+                  </button>
+                  {open ? (
+                    <div className="grid gap-1.5 border-t border-black/5 px-3 py-2.5 text-[12px] text-ink-soft">
+                      <p><span className="font-semibold text-ink">จุดรับ</span> / {item.pickup}</p>
+                      <p><span className="font-semibold text-ink">จุดส่ง</span> / {item.dropoff}</p>
+                      <p><span className="font-semibold text-ink">เวลา</span> / {jobTimeLabel(item.startTime, item.endTime)}</p>
+                      <a
+                        href={jobMapsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 flex min-h-10 items-center justify-center gap-2 rounded-command bg-route px-4 text-[13px] font-semibold text-white"
+                      >
+                        <Navigation className="h-3.5 w-3.5" /> เส้นทางงานนี้
+                      </a>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </section>
       ) : null}
