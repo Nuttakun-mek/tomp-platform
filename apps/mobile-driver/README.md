@@ -15,7 +15,7 @@
 
 - Mobile session exchange endpoint ยังต้องทำฝั่ง Web/API ก่อน native GPS จะส่งข้อมูลเบื้องหลังได้จริง
 - Push notification ยังไม่เปิดในรอบนี้
-- Offline queue ยังเป็น SecureStore queue ขนาด 500 รายการ ยังไม่ใช่ SQLite outbox เต็มรูปแบบ
+- Offline queue ใช้ SQLite outbox สำหรับ GPS และ retry ได้เป็นชุด
 - ต้องทดสอบบน Android เครื่องจริงก่อนออก APK ให้คนขับทดลอง
 
 ## พัฒนาโดยไม่รอ EAS Build
