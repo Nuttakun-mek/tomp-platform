@@ -10,6 +10,7 @@ interface LiveGpsResult {
   assignmentId: string;
   driverId?: string;
   accessUrl: string;
+  pin?: string;
   missionControlUrl: string;
   assignmentsUrl: string;
   packetId?: string;
@@ -96,9 +97,9 @@ export function LiveGpsTestPanel() {
   }
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-5">
       <div className="enterprise-panel overflow-hidden">
-        <div className="command-panel-dark grid gap-6 p-6 text-white sm:p-7 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,320px)]">
+        <div className="command-panel-dark grid gap-5 p-5 text-white sm:p-7 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,320px)]">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal-200">เส้นทางหลักสำหรับทดสอบระบบ</p>
             <h2 className="display-title mt-3 max-w-lg text-white">ทดสอบ QR คนขับและ GPS สดให้จบในหน้าเดียว</h2>
@@ -119,7 +120,7 @@ export function LiveGpsTestPanel() {
           </div>
         </div>
 
-        <div className="grid gap-5 p-5">
+        <div className="grid gap-4 p-4">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StepItem active={currentStep === 1} done={currentStep > 1} title="ตรวจระบบ" detail="ตรวจ Supabase และตารางสำคัญก่อนสร้างข้อมูล" />
             <StepItem active={currentStep === 2} done={currentStep > 2} title="สร้างชุดทดสอบ" detail="สร้างโครงการ ภารกิจ Assignment และ QR จริง" />
@@ -162,7 +163,7 @@ export function LiveGpsTestPanel() {
       </div>
 
       {result ? (
-        <section className="enterprise-panel grid gap-5 p-5 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
+        <section className="enterprise-panel grid gap-4 p-4 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
           <div className="flex h-60 w-full items-center justify-center rounded-panel border border-border bg-white p-4 shadow-sm sm:w-60">
             {qrDataUrl ? <Image alt="QR สำหรับคนขับ" className="h-full w-full" height={240} src={qrDataUrl} unoptimized width={240} /> : <span className="text-sm font-semibold text-operation">กำลังสร้าง QR...</span>}
           </div>
@@ -175,6 +176,12 @@ export function LiveGpsTestPanel() {
             <a className="break-all rounded-panel border border-route/30 bg-route-soft p-3 text-sm font-semibold text-route" href={result.accessUrl} target="_blank" rel="noreferrer">
               {result.accessUrl}
             </a>
+            {result.pin ? (
+              <div className="rounded-panel border-2 border-amber-400 bg-amber-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800">รหัสยืนยัน 6 หลัก · ต้องกรอกหลังเปิดลิงก์</p>
+                <p className="mt-0.5 text-3xl font-bold tracking-[0.3em] text-amber-900">{result.pin}</p>
+              </div>
+            ) : null}
             <div className="grid gap-2.5 sm:grid-cols-3">
               <a className="rounded-panel bg-route px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:opacity-90" href={result.accessUrl} target="_blank" rel="noreferrer">
                 เปิดหน้าคนขับ

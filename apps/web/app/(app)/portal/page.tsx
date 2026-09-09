@@ -28,7 +28,7 @@ export default async function PortalPage() {
             ))}
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] xl:items-start">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)] xl:items-start">
             <PortalMissionStatus missions={primaryMissions} />
             {primary ? <ChangeRequestForm projectId={primary.id} /> : null}
           </div>

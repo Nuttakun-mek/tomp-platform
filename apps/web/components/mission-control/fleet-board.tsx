@@ -323,7 +323,7 @@ export function FleetBoard({
           })}
         </div>
       ) : (
-        <div className="p-6 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้ โปรดสร้างงานที่หน้า “จัดงาน” ก่อน</div>
+        <div className="p-5 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้ โปรดสร้างงานที่หน้า “จัดงาน” ก่อน</div>
       )}
     </section>
   );

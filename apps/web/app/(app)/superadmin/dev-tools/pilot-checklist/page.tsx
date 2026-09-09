@@ -27,7 +27,7 @@ export default async function PilotChecklistPage() {
   return (
     <>
       <PilotScenarioBoard projectCode={activeProject.projectCode} />
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <PilotStepper steps={steps} />
         <aside className="grid content-start gap-4">
           <PilotRoleCard role="Operation Manager" responsibility="ดูภาพรวม ตัดสินใจเมื่อมีความเสี่ยง และยืนยันว่า flow พร้อมทดสอบ" />

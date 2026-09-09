@@ -145,7 +145,7 @@ export function CommsConsole({ projectId, assignments, callSigns, initialInbound
         <p className="mt-1 text-xs text-slate-500">คนขับส่งมาจากหน้างาน (QR) · ศูนย์ตอบกลับได้ที่นี่ · รีเฟรชอัตโนมัติทุก 15 วินาที</p>
       </div>
 
-      <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-4 p-4 sm:p-4 lg:grid-cols-[0.9fr_1.1fr]">
         {/* composer */}
         <div className="grid content-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <label className="text-xs font-semibold text-slate-600">ส่งถึง Call Sign</label>
@@ -247,7 +247,7 @@ export function CommsConsole({ projectId, assignments, callSigns, initialInbound
               <div ref={feedEndRef} />
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">
               <MessageSquare className="mx-auto h-5 w-5 text-slate-400" />
               <p className="mt-2">ยังไม่มีข้อความ เมื่อคนขับส่งข้อความจากหน้างาน หรือศูนย์ส่งข้อความออกไป จะแสดงที่นี่</p>
             </div>

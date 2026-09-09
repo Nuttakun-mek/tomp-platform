@@ -24,7 +24,7 @@ export default function DevToolsPage() {
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
           return (
-            <Link key={tool.href} className="smart-card p-5" href={tool.href}>
+            <Link key={tool.href} className="smart-card p-4" href={tool.href}>
               <span className="grid h-10 w-10 place-items-center rounded-panel bg-command text-white">
                 <Icon className="h-4 w-4" />
               </span>

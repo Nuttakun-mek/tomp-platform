@@ -48,11 +48,11 @@ export function CollapsibleSection({ title, children, defaultOpen = true, storag
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
         <span className="min-w-0">
           <span className="flex items-center gap-2">
-            <span className="text-base font-semibold text-ink">{title}</span>
+            <span className="text-[15px] font-semibold text-ink">{title}</span>
             {badge}
           </span>
           {description ? <span className="mt-0.5 block text-xs text-slate-500">{description}</span> : null}
@@ -62,7 +62,7 @@ export function CollapsibleSection({ title, children, defaultOpen = true, storag
           <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
         </span>
       </button>
-      {open ? <div className="border-t border-slate-200 p-4 sm:p-5">{children}</div> : null}
+      {open ? <div className="border-t border-slate-200 p-3.5">{children}</div> : null}
     </section>
   );
 }

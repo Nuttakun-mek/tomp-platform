@@ -5,8 +5,8 @@ import type { Project } from "@tomp/types/domain";
 export function CommandCenterHeader({ project, liveCount, issueCount }: { project: Project; liveCount: number; issueCount: number }) {
   return (
     <section className="overflow-hidden rounded-panel bg-slate-950 text-white shadow-command">
-      <div className="command-grid p-6 sm:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-6">
+      <div className="command-grid p-5 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="min-w-0">
             <p className="text-[11px] font-bold tracking-[0.2em] text-teal-200">ศูนย์ควบคุมปฏิบัติการ</p>
             <h1 className="mt-3 max-w-4xl text-[28px] font-semibold leading-tight sm:text-[36px]">{project.projectName}</h1>

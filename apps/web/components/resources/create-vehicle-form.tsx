@@ -21,12 +21,10 @@ export function CreateVehicleForm() {
   function handleSubmit(formData: FormData) {
     setMessage(null);
     const parsed = createVehicleSchema.safeParse({
-      organizationId: "10000000-0000-4000-8000-000000000001",
       plateNumber: formData.get("plateNumber"),
       vehicleType: formData.get("vehicleType"),
       capacity: formData.get("capacity"),
       metadata: {
-        projectId: "10000000-0000-4000-8000-000000000003",
         requirements: splitRequirements(formData.get("requirements")),
         operationNote: String(formData.get("operationNote") || "").trim()
       }
@@ -52,7 +50,7 @@ export function CreateVehicleForm() {
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid gap-4 p-5">
+    <form action={handleSubmit} className="enterprise-panel grid gap-4 p-4">
       <div>
         <h2 className="text-lg font-semibold text-ink">สร้างโปรไฟล์รถ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">เพิ่มรถสำหรับใช้งานจริง พร้อมกำหนดข้อปฏิบัติก่อนรับงานของรถคันนั้น</p>

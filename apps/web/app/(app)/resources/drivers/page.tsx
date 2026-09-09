@@ -9,7 +9,7 @@ export default async function DriversPage() {
 
   return (
     <>
-      <section className="enterprise-panel p-5">
+      <section className="enterprise-panel p-4">
         <p className="page-kicker">Drivers</p>
         <h1 className="mt-1 page-title">คนขับ</h1>
         <p className="mt-2 page-description">เตรียมข้อมูลคนขับสำหรับ QR การติดต่อ และการแชร์ GPS ระหว่างปฏิบัติงาน</p>
@@ -19,7 +19,7 @@ export default async function DriversPage() {
         <ResourceQualityCard title="พร้อมใช้งาน" value={`${drivers.length - missingPhone}`} detail="มีเบอร์โทรและสถานะใช้งานได้" />
         <ResourceQualityCard title="ขาดข้อมูล" value={`${missingPhone}`} detail="ควรเติมเบอร์โทรก่อนใช้งานจริง" />
       </div>
-      <div className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
+      <div className="grid gap-5 xl:grid-cols-[0.75fr_1.25fr]">
         <CreateDriverForm />
         <DriverReadinessTable drivers={drivers} />
       </div>

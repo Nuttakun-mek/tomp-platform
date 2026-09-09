@@ -4,7 +4,7 @@ import Link from "next/link";
 export function ProjectAssignmentBoard({ projectId, assignments }: { projectId: string; assignments: Assignment[] }) {
   const ready = assignments.filter((assignment) => assignment.driverId && assignment.vehicleId && assignment.callSignId).length;
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-soft">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="section-label">งานที่จัดสรร</p>

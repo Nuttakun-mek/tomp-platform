@@ -7,8 +7,8 @@ export function ResourceOverview({ drivers, vehicles }: { drivers: Driver[]; veh
   ).length;
 
   return (
-    <section className="command-panel-dark overflow-hidden p-6 text-white shadow-command sm:p-7">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] lg:items-center">
+    <section className="command-panel-dark overflow-hidden p-5 text-white shadow-command sm:p-7">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] lg:items-center">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal-200">ความพร้อมทรัพยากร</p>
           <h1 className="display-title mt-3 max-w-lg text-white">เตรียมคนขับและรถก่อนมอบงาน</h1>

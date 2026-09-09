@@ -70,7 +70,7 @@ export function VehicleFleetMap({ initialLocations }: { initialLocations: Driver
       {points.length ? (
         <LiveTrackingMap points={points} height={420} />
       ) : (
-        <div className="flex min-h-[240px] items-center justify-center p-6 text-center text-sm leading-6 text-slate-600">
+        <div className="flex min-h-[240px] items-center justify-center p-5 text-center text-sm leading-6 text-slate-600">
           ยังไม่มีตำแหน่ง GPS จากรถ — เมื่อคนขับเปิดงานและแชร์ GPS หมุดรถจะแสดงและขยับบนแผนที่นี้
         </div>
       )}

@@ -20,9 +20,17 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
     return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
   }
 
-  const permission = await requirePermission(parsed.data.organizationId, "project.create");
+  const permission = await requirePermission("project.create");
   if (!permission.allowed) {
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างโครงการ");
+  }
+
+  // Single-org product: the organisation is resolved here, never sent by the
+  // client. A hardcoded id in the form used to cause a foreign-key violation
+  // ("ข้อมูลที่เลือกไม่สัมพันธ์กัน") on every project creation.
+  const organizationId = await resolveOrganizationId(client, parsed.data.organizationId ?? null);
+  if (!organizationId) {
+    return actionFailure("ยังไม่มีองค์กรตั้งต้นในระบบ กรุณาติดต่อผู้ดูแลแพลตฟอร์ม");
   }
 
   const { data: existingProject, error: lookupError } = await client.from("projects").select("id").eq("project_code", parsed.data.projectCode).maybeSingle();
@@ -39,7 +47,7 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
   const { data, error: insertError } = await client
     .from("projects")
     .insert({
-      organization_id: parsed.data.organizationId,
+      organization_id: organizationId,
       owner_profile_id: parsed.data.ownerProfileId || null,
       project_code: parsed.data.projectCode,
       project_name: parsed.data.projectName,
@@ -130,6 +138,22 @@ export async function renameProjectAction(input: unknown): Promise<ActionResult>
 }
 
 type WriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
+
+async function resolveOrganizationId(client: WriteClient, requested: string | null): Promise<string | null> {
+  if (requested) {
+    const { data } = await client.from("organizations").select("id").eq("id", requested).maybeSingle();
+    if (data?.id) return String(data.id);
+  }
+
+  const profile = await getCurrentUserProfile();
+  if (profile.organizationId) {
+    const { data } = await client.from("organizations").select("id").eq("id", profile.organizationId).maybeSingle();
+    if (data?.id) return String(data.id);
+  }
+
+  const { data: first } = await client.from("organizations").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle();
+  return first?.id ? String(first.id) : null;
+}
 
 async function linkCreatorAsProjectManager(client: WriteClient, projectId: string, ownerProfileId: string | null): Promise<string | null> {
   const profile = await getCurrentUserProfile();

@@ -46,7 +46,7 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
     <div className="grid gap-4">
       <ProjectWorkspaceTabs projectId={project.id} active="overview" />
 
-      <section className="enterprise-panel p-5">
+      <section className="enterprise-panel p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold text-operation">{project.projectCode}</p>
@@ -73,13 +73,13 @@ async function OverviewView({ projectId }: { projectId: string }) {
   const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr]">
-      <div className="grid content-start gap-5">
+    <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
+      <div className="grid content-start gap-4">
         <ProjectReadinessSummary missions={missions.length} assignments={assignments.length} />
         <ProjectAssignmentBoard projectId={projectId} assignments={assignments} />
         <ProjectPublishPanel projectId={projectId} readiness={readiness} />
       </div>
-      <div className="grid content-start gap-5">
+      <div className="grid content-start gap-4">
         <CreateMissionForm projectId={projectId} />
         <ProjectMissionBoard missions={missions} />
         <ProjectChangePanel projectId={projectId} />
@@ -103,12 +103,12 @@ async function SettingsView({
 
   return (
     <div className="grid gap-4">
-      <section className="enterprise-panel grid gap-3 p-5">
+      <section className="enterprise-panel grid gap-3 p-4">
         <h2 className="text-lg font-semibold text-ink">ข้อมูลโครงการ</h2>
         {canManage ? <ProjectRenameForm projectId={projectId} currentName={projectName} /> : <p className="text-sm text-slate-600">ชื่อโครงการ: {projectName}</p>}
       </section>
 
-      <section className="enterprise-panel grid gap-3 p-5">
+      <section className="enterprise-panel grid gap-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-ink">สมาชิกโครงการ ({members.length})</h2>
           {canManage ? (
@@ -135,7 +135,7 @@ async function SettingsView({
       </section>
 
       {canManage ? (
-        <section className="enterprise-panel grid gap-3 p-5">
+        <section className="enterprise-panel grid gap-3 p-4">
           <h2 className="text-lg font-semibold text-ink">{archived ? "กู้คืนโครงการ" : "เก็บถาวรโครงการ"}</h2>
           <p className="text-sm text-slate-600">
             {archived

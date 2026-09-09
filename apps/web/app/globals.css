@@ -24,9 +24,9 @@
 
   /* radii */
   --r-sm: 12px;
-  --r-md: 16px;
-  --r-lg: 20px;
-  --r-xl: 26px;
+  --r-md: 14px;
+  --r-lg: 16px;
+  --r-xl: 20px;
 
   /* type scale — Thai-tuned (base 15px) */
   --fs-2xs: 0.6875rem; /* 11 */
@@ -140,23 +140,23 @@ button:disabled {
 
 /* ---- layout ---- */
 .app-page {
-  @apply mx-auto grid w-full max-w-[1400px] gap-5 px-4 py-5 sm:px-6 lg:px-7 lg:py-6;
+  @apply mx-auto grid w-full max-w-[1400px] gap-4 px-4 py-4 sm:px-5 lg:px-6 lg:py-5;
 }
 
 /* Balanced main + rail: the rail sticks, the main column flows to its own
    height — no forced equal-height columns leaving dead vertical space. */
 .page-grid {
-  @apply grid gap-5 lg:grid-cols-[minmax(0,1fr)_var(--rail,340px)] lg:items-start;
+  @apply grid gap-4 lg:grid-cols-[minmax(0,1fr)_var(--rail,340px)] lg:items-start;
 }
 
 .page-rail {
-  @apply grid gap-5 lg:sticky lg:top-6 lg:self-start;
+  @apply grid gap-4 lg:sticky lg:top-5 lg:self-start;
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
 
 .page-main {
-  @apply grid gap-5 content-start;
+  @apply grid gap-4 content-start;
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
@@ -182,13 +182,13 @@ button:disabled {
 
 .control-card {
   border-radius: var(--r-md);
-  @apply border border-border/80 bg-white p-4;
+  @apply border border-border/80 bg-white p-3.5;
   box-shadow: var(--shadow-sm);
 }
 
 .smart-card {
   border-radius: var(--r-md);
-  @apply border border-border/80 bg-white p-4 transition duration-200 hover:-translate-y-0.5;
+  @apply border border-border/80 bg-white p-3.5 transition duration-200 hover:-translate-y-0.5;
   box-shadow: var(--shadow-sm);
 }
 

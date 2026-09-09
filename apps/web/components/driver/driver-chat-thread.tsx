@@ -94,7 +94,7 @@ export function DriverChatThread({
             </div>
           ))
         ) : (
-          <p className="px-2 py-6 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ พิมพ์ด้านล่างเพื่อคุยกับศูนย์ควบคุม</p>
+          <p className="px-2 py-5 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ พิมพ์ด้านล่างเพื่อคุยกับศูนย์ควบคุม</p>
         )}
         <div ref={endRef} />
       </div>

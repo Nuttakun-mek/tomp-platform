@@ -17,7 +17,7 @@ export function PublishActionCard({ projectId, canPublish }: { projectId: string
   }
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-ink">ประกาศใช้แผน</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">การประกาศใช้แผนจะบันทึก baseline snapshot และการเปลี่ยนแปลงหลังจากนั้นต้องผ่านคำขอเปลี่ยนแปลงพร้อม Timeline</p>
       {message ? <p className="mt-3 text-sm font-medium text-slate-700">{message}</p> : null}

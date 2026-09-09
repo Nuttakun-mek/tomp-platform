@@ -2,7 +2,7 @@ import type { Driver } from "@tomp/types/domain";
 
 export function DriverReadinessTable({ drivers }: { drivers: Driver[] }) {
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-soft">
       <h2 className="text-lg font-semibold text-ink">ความพร้อมคนขับ</h2>
       <div className="mt-4 grid gap-2">
         {drivers.map((driver) => (

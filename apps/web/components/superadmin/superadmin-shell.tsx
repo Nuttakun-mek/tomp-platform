@@ -16,7 +16,7 @@ const TABS = [
 export function SuperadminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <div className="grid gap-5" data-area="superadmin">
+    <div className="grid gap-4" data-area="superadmin">
       <div className="flex items-center gap-3 rounded-panel border border-pilot/25 bg-pilot/10 px-4 py-2.5 text-sm font-semibold text-pilot">
         <ShieldAlert className="h-4 w-4 shrink-0" />
         พื้นที่ภายในสำหรับทีมแพลตฟอร์มเท่านั้น

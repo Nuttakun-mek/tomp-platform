@@ -13,14 +13,18 @@ describe("filterNav", () => {
     const hrefs = flat(dispatcher);
     expect(hrefs).toContain("/projects");
     expect(hrefs).not.toContain("/superadmin");
-    expect(hrefs).not.toContain("/superadmin/users");
+    expect(hrefs).not.toContain("/portal");
   });
 
   it("wildcard permission unlocks everything", () => {
     const superAdmin = filterNav(NAV_SECTIONS, { permissions: ["*"], roleKeys: ["super_admin"] });
     expect(flat(superAdmin)).toContain("/superadmin");
-    expect(flat(superAdmin)).toContain("/superadmin/users");
     expect(flat(superAdmin)).toContain("/projects");
+  });
+
+  it("keeps the customer portal to the customer persona, even for super admins", () => {
+    expect(flat(filterNav(NAV_SECTIONS, { permissions: ["*"], roleKeys: ["super_admin"] }))).not.toContain("/portal");
+    expect(flat(filterNav(NAV_SECTIONS, { permissions: ["project.read"], roleKeys: ["customer_viewer"] }))).toContain("/portal");
   });
 
   it("hides project-gated nav from a viewer with no permissions", () => {

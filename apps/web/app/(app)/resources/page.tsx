@@ -37,7 +37,7 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
 
 function ResourceLink({ href, title, detail, icon }: { href: string; title: string; detail: string; icon: ReactNode }) {
   return (
-    <Link className="smart-card group p-5" href={href}>
+    <Link className="smart-card group p-4" href={href}>
       <div className="flex items-start justify-between gap-4">
         <span className="grid h-11 w-11 place-items-center rounded-panel bg-command text-white">{icon}</span>
         <ArrowRight className="h-5 w-5 text-ink-faint transition group-hover:translate-x-1 group-hover:text-operation" />

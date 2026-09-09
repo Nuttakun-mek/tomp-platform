@@ -21,8 +21,8 @@ function statusClass(status: string) {
 
 export function EnterpriseReadinessPanel() {
   return (
-    <div className="grid gap-6">
-      <section className="enterprise-card p-5 lg:p-6">
+    <div className="grid gap-5">
+      <section className="enterprise-card p-4 lg:p-5">
         <p className="section-label">ความพร้อมระบบ</p>
         <h2 className="mt-1 text-2xl font-semibold text-ink">ภาพรวม 12 แกนก่อนใช้งานจริง</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">

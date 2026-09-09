@@ -22,8 +22,8 @@ const laneDefinitions = [
 
 export function DispatchBoard({ projectId, assignments, missions, callSigns, drivers, vehicles }: DispatchBoardProps) {
   return (
-    <section className="grid gap-6">
-      <div className="enterprise-panel-soft p-5">
+    <section className="grid gap-5">
+      <div className="enterprise-panel-soft p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="section-label">บอร์ดจัดสรรงาน</p>

@@ -6,7 +6,7 @@ import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { withTimeout } from "@/lib/async/timeout";
 import { checkPilotInfrastructureViaPostgres, createPilotScenarioViaPostgres } from "@/lib/db/pilot-scenario";
 import { PILOT_REQUIRED_TABLES } from "@/lib/db/pilot-tables";
-import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
+import { generateDriverAccessToken, generateDriverPin, getDefaultDriverTokenExpiry, hashDriverAccessToken, hashDriverPin } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
 import { getRequestBaseUrl } from "@/lib/request-origin";
@@ -140,6 +140,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
   const packet = buildWebDriverAssignmentPacket({ project, assignment, callSign, driver, vehicle, missionName });
   const expiresAt = getDefaultDriverTokenExpiry();
   const token = generateDriverAccessToken({ assignmentId: ids.assignment, driverId: ids.driver, expiresAt });
+  const smokePin = generateDriverPin();
 
   const steps: InsertStep[] = [
     {
@@ -308,7 +309,9 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
         token_hash: hashDriverAccessToken(token),
         status: "active",
         expires_at: expiresAt,
-        metadata: { smokeTest: true }
+        // Test tokens carry a PIN too, so the smoke flow exercises the same
+        // two-factor gate the real QR flow uses.
+        metadata: { smokeTest: true, tokenVersion: 2, pinHash: hashDriverPin(smokePin), pinAttempts: 0 }
       })
       .select("id")
       .single(),
@@ -396,6 +399,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     assignmentId: ids.assignment,
     driverId: ids.driver,
     accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
+    pin: smokePin,
     missionControlUrl: `/mission-control?projectId=${ids.project}`,
     assignmentsUrl: `/projects/${ids.project}/assignments`,
     packetId: packetResult.data?.id,

@@ -51,3 +51,17 @@ export function verifyDriverPin(pin: string, expectedHash: string): boolean {
   return timingSafeEqual(actual, expected);
 }
 
+
+// Device binding: one QR + PIN opens the job on exactly one device. The raw
+// device id lives in a cookie on that phone; only its hash is stored on the token
+// row, so the centre can tell "already claimed" without tracking the device.
+export const DRIVER_DEVICE_COOKIE_PREFIX = "ddev_";
+
+export function generateDriverDeviceId(): string {
+  return randomBytes(24).toString("base64url");
+}
+
+export function hashDriverDeviceId(deviceId: string): string {
+  const secret = process.env.DRIVER_ACCESS_TOKEN_SECRET ?? "development-driver-token-secret";
+  return createHash("sha256").update(`device:${secret}:${deviceId.trim()}`).digest("hex");
+}

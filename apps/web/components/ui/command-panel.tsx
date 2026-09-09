@@ -10,7 +10,7 @@ export function CommandPanel({ title, eyebrow, children, action }: { title: stri
         </div>
         {action}
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-4">{children}</div>
     </section>
   );
 }

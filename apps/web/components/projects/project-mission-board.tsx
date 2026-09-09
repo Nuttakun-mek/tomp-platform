@@ -3,7 +3,7 @@ import { MissionSummaryCard } from "@/components/missions/mission-summary-card";
 
 export function ProjectMissionBoard({ missions }: { missions: Mission[] }) {
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-5 shadow-soft">
+    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-soft">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-operation">ภารกิจ</p>

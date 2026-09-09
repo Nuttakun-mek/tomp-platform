@@ -16,7 +16,7 @@ export default async function VehiclesPage() {
 
   return (
     <>
-      <section className="enterprise-panel p-5">
+      <section className="enterprise-panel p-4">
         <p className="page-kicker">จัดการรถ</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -38,7 +38,7 @@ export default async function VehiclesPage() {
 
       <VehicleFleetMap initialLocations={locations} />
 
-      <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
+      <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr]">
         <CreateVehicleForm />
         <VehicleOperationsBoard profiles={profiles} />
       </div>

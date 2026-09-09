@@ -50,10 +50,10 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
   ]);
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <ProjectWorkspaceTabs projectId={projectId} active="dispatch" />
       <section className="enterprise-panel overflow-hidden">
-        <div className="enterprise-surface p-5 lg:p-6">
+        <div className="enterprise-surface p-4 lg:p-5">
           <div className="min-w-0">
             <p className="section-label">จัดงาน</p>
             <h1 className="page-title mt-2">{activeProject.projectName}</h1>
@@ -61,7 +61,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
           </div>
         </div>
       </section>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">
         <CreateAssignmentForm
           projectId={projectId}
           projectCode={activeProject.projectCode}

@@ -16,7 +16,7 @@ export function PortalMissionStatus({ missions }: { missions: Mission[] }) {
   }
 
   return (
-    <section className="enterprise-panel grid gap-3 p-5">
+    <section className="enterprise-panel grid gap-3 p-4">
       <p className="section-label">สถานะภารกิจ</p>
       <ul className="grid gap-2">
         {missions.map((mission) => (

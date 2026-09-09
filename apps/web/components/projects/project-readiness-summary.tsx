@@ -3,7 +3,7 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 export function ProjectReadinessSummary({ missions, assignments }: { missions: number; assignments: number }) {
   const score = missions ? Math.min(100, Math.round((assignments / missions) * 100)) : 0;
   return (
-    <section className="enterprise-panel p-5">
+    <section className="enterprise-panel p-4">
       <p className="text-xs font-semibold tracking-[0.16em] text-operation">ความพร้อม</p>
       <h2 className="mt-1 text-lg font-semibold text-ink">ความพร้อมโครงการ</h2>
       <p className="mt-4 metric-value">{score}%</p>

@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from "react";
 
 export function Card({ className = "", ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <section className={`rounded-md border border-slate-200 bg-white p-5 shadow-soft ${className}`} {...props} />;
+  return <section className={`rounded-md border border-slate-200 bg-white p-4 shadow-soft ${className}`} {...props} />;
 }
 
 export function CardHeader({ className = "", ...props }: HTMLAttributes<HTMLDivElement>) {

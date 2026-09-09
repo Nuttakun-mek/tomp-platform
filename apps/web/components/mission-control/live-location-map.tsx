@@ -109,16 +109,14 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
 
   return (
     <section className="enterprise-panel overflow-hidden">
-      <div className="border-b border-slate-200 bg-slate-950 px-5 py-4 text-white">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold tracking-[0.18em] text-blue-200">แผนที่ติดตามสถานะ</p>
-            <h2 className="mt-1 text-lg font-semibold md:text-xl">ตำแหน่งคนขับแบบเรียลไทม์</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-200">
-              ทุกหมุดผูกกับโครงการ Assignment, Call Sign, คนขับ และรถ สีของหมุดแสดงความสดของสัญญาณ GPS ล่าสุด
-            </p>
+      <div className="border-b border-slate-200 bg-slate-950 px-4 py-2.5 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full bg-white/10 px-2.5 py-1 font-semibold">ทั้งหมด {locations.length}</span>
+            <span className="rounded-full bg-emerald-400/90 px-2.5 py-1 font-semibold text-emerald-950">กำลังแชร์ {liveCount}</span>
+            <span className="rounded-full bg-amber-300/90 px-2.5 py-1 font-semibold text-amber-950">ต้องติดตาม {issueCount}</span>
           </div>
-          <div className="grid justify-items-start gap-2 sm:justify-items-end">
+          <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${connection === "live" ? "bg-emerald-400 text-emerald-950" : connection === "offline" ? "bg-rose-300 text-rose-950" : "bg-amber-300 text-amber-950"}`}>
               {connection === "live" ? "เชื่อมต่อสด" : connection === "offline" ? "ออฟไลน์" : "สำรองด้วยการดึงข้อมูล"}
             </span>
@@ -127,11 +125,11 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
         </div>
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
-        <div className="relative min-h-[380px] bg-slate-100">
+      <div className="grid gap-0">
+        <div className="relative min-h-[420px] bg-slate-100">
           {hydrated && locations.length ? (
             <LiveTrackingMap
-              height={480}
+              height={620}
               points={locations.map((location) => {
                 const identity = getLocationIdentity(location);
                 return toTrackedPoint(
@@ -144,7 +142,7 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
               })}
             />
           ) : (
-            <div className="flex h-full min-h-[380px] items-center justify-center p-6 text-center">
+            <div className="flex h-full min-h-[420px] items-center justify-center p-5 text-center">
               <div>
                 <p className="font-semibold text-ink">รอตำแหน่ง GPS จากคนขับ</p>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -155,43 +153,17 @@ export function LiveLocationMap({ projectId, initialLocations }: LiveLocationMap
           )}
         </div>
 
-        <div className="grid content-start gap-3 border-t border-slate-200 bg-white p-4 lg:border-l lg:border-t-0">
-          <div className="grid grid-cols-3 gap-2">
-            <MapMetric label="ทั้งหมด" value={locations.length} />
-            <MapMetric label="กำลังแชร์" value={liveCount} tone="success" />
-            <MapMetric label="ต้องติดตาม" value={issueCount} tone="warning" />
+        <div className="grid gap-2 border-t border-slate-200 bg-white px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+            <LegendDot color="bg-emerald-500" label="กำลังแชร์ (< 35 วิ)" />
+            <LegendDot color="bg-amber-500" label="สัญญาณช้า (> 35 วิ)" />
+            <LegendDot color="bg-rose-500" label="ขาดการอัปเดต (> 2 นาที)" />
+            <span className="text-slate-400">แตะหมุดเพื่อดูว่าเป็นคันไหน · รายละเอียดอยู่ที่การ์ด “ภาพรวมกองรถ”</span>
           </div>
-
-          <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            <LegendDot color="bg-emerald-500" label="กำลังแชร์: อัปเดตไม่เกิน 35 วินาที" />
-            <LegendDot color="bg-amber-500" label="สัญญาณช้า: เกิน 35 วินาที" />
-            <LegendDot color="bg-rose-500" label="ขาดการอัปเดต: เกิน 2 นาที" />
-          </div>
-
-          <p className="text-xs leading-5 text-slate-500">
-            แตะหมุดบนแผนที่เพื่อดูว่าเป็นคันไหน · รายละเอียดคนขับ/รถ สถานะ และข้อความ ดูได้ที่การ์ด “ภาพรวมกองรถ”
-          </p>
-
-          {lastError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">{lastError}</div> : null}
-
-          {!locations.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-              ยังไม่มีข้อมูลตำแหน่งสำหรับโครงการนี้ เมื่อคนขับเปิดแชร์ GPS หมุดจะแสดงที่นี่
-            </div>
-          ) : null}
+          {lastError ? <p className="rounded-card border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{lastError}</p> : null}
         </div>
       </div>
     </section>
-  );
-}
-
-function MapMetric({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "success" | "warning" }) {
-  const className = tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-950" : "border-slate-200 bg-slate-50 text-ink";
-  return (
-    <div className={`rounded-2xl border p-3 ${className}`}>
-      <p className="text-xs font-semibold opacity-75">{label}</p>
-      <p className="mt-1 text-2xl font-semibold leading-none">{value}</p>
-    </div>
   );
 }
 

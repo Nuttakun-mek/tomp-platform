@@ -58,8 +58,8 @@ export function LoginPanel() {
     "min-h-12 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-operation focus:ring-4 focus:ring-teal-100";
 
   return (
-    <section className="mx-auto grid min-h-screen w-full max-w-4xl content-center gap-6 px-4 py-10 lg:grid-cols-[1fr_minmax(0,380px)] lg:gap-10">
-      <div className="grid content-center gap-5">
+    <section className="mx-auto grid min-h-screen w-full max-w-4xl content-center gap-5 px-4 py-10 lg:grid-cols-[1fr_minmax(0,380px)] lg:gap-10">
+      <div className="grid content-center gap-4">
         <div className="grid gap-1.5">
           <p className="text-[12px] font-bold tracking-[0.28em] text-operation">TOMP</p>
           <h1 className="text-[26px] font-semibold leading-tight text-ink sm:text-[30px]">
@@ -75,7 +75,7 @@ export function LoginPanel() {
         <p className="text-[12px] text-slate-400">คนขับไม่ต้องเข้าจากหน้านี้ — เปิดงานจากลิงก์ QR ที่ศูนย์ควบคุมส่งให้</p>
       </div>
 
-      <div className="grid content-center rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="grid content-center rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-ink">เข้าสู่ระบบสำหรับเจ้าหน้าที่</h2>
 
         {mode === "password" ? (

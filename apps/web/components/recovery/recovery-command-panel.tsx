@@ -8,7 +8,7 @@ const recoveryScenarios = [
 
 export function RecoveryCommandPanel() {
   return (
-    <section className="enterprise-card p-5 lg:p-6">
+    <section className="enterprise-card p-4 lg:p-5">
       <p className="text-sm font-semibold text-operation">Recovery Playbook</p>
       <h2 className="mt-1 text-2xl font-semibold text-ink">แนวทางกู้คืนสถานการณ์</h2>
       <div className="mt-5 grid gap-3">

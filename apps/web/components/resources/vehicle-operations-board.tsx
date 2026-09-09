@@ -18,7 +18,7 @@ function gpsLabel(profile: VehicleOperationProfile) {
 
 export function VehicleOperationsBoard({ profiles }: { profiles: VehicleOperationProfile[] }) {
   return (
-    <section className="enterprise-panel grid gap-5 p-5">
+    <section className="enterprise-panel grid gap-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="page-kicker">Vehicle Operations</p>

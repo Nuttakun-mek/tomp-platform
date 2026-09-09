@@ -11,7 +11,7 @@ interface AccessDeniedProps {
 export function AccessDenied({ title = "บัญชีนี้ยังไม่ได้รับสิทธิ์", reason, requiredRole }: AccessDeniedProps) {
   return (
     <section className="mx-auto grid min-h-[60vh] w-full max-w-lg content-center gap-4 px-4">
-      <div className="enterprise-panel grid gap-4 p-6 text-center">
+      <div className="enterprise-panel grid gap-4 p-5 text-center">
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-panel bg-rose-50 text-rose-600">
           <ShieldX className="h-6 w-6" />
         </span>

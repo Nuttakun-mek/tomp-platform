@@ -18,7 +18,7 @@ export default async function RecoveryPage() {
         title="กู้คืนสถานการณ์"
         description="บันทึกเหตุผิดปกติ ประเมินความเสี่ยง และสร้างคำแนะนำการกู้คืนสำหรับงานขนส่ง โดยทุกเหตุการณ์ต้องอยู่ใน Timeline"
       />
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <IncidentForm projects={activeProjects} assignments={assignments.length ? assignments : demoKernel.assignments} />
         <RecoveryCommandPanel />
       </div>

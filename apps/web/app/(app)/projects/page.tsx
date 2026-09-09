@@ -30,7 +30,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const shown = showArchived ? archived : live;
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <section className="grid gap-2">
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-operation">พื้นที่ทำงาน</p>
         <div className="flex flex-wrap items-end justify-between gap-3">

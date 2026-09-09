@@ -11,13 +11,13 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
 
   if (!profile) {
     return (
-      <div className="grid gap-6">
-        <section className="enterprise-panel p-5">
+      <div className="grid gap-5">
+        <section className="enterprise-panel p-4">
           <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-operation" href="/resources/vehicles">
             <ArrowLeft className="h-4 w-4" />
             กลับไปศูนย์จัดการรถ
           </Link>
-          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600">
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
             <p className="text-base font-semibold text-ink">ไม่พบข้อมูลรถคันนี้</p>
             <p className="mt-1">
               รถคันนี้อาจถูกลบไปแล้ว หรือคุณยังไม่มีสิทธิ์เข้าถึงรถในโครงการที่ผูกกับรถคันนี้ ลองกลับไปที่รายการรถแล้วเลือกใหม่อีกครั้ง
@@ -33,8 +33,8 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
   const note = typeof metadata.operationNote === "string" ? metadata.operationNote : "";
 
   return (
-    <div className="grid gap-6">
-      <section className="enterprise-panel p-5">
+    <div className="grid gap-5">
+      <section className="enterprise-panel p-4">
         <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-operation" href="/resources/vehicles">
           <ArrowLeft className="h-4 w-4" />
           กลับไปศูนย์จัดการรถ
@@ -57,8 +57,8 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[0.68fr_1.32fr]">
-        <section className="enterprise-panel grid content-start gap-4 p-5">
+      <div className="grid gap-5 xl:grid-cols-[0.68fr_1.32fr]">
+        <section className="enterprise-panel grid content-start gap-4 p-4">
           <div>
             <p className="page-kicker">ข้อกำหนดก่อนรับงาน</p>
             <h2 className="mt-1 text-xl font-semibold text-ink">สิ่งที่คนขับต้องดำเนินการ</h2>
@@ -110,7 +110,7 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
 
 function TaskGroup({ title, tasks, allowCancel = false }: { title: string; tasks: NonNullable<Awaited<ReturnType<typeof getVehicleOperationProfileById>>>["currentTasks"]; allowCancel?: boolean }) {
   return (
-    <div className="enterprise-panel grid gap-3 p-5">
+    <div className="enterprise-panel grid gap-3 p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-ink">{title}</h2>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{tasks.length}</span>

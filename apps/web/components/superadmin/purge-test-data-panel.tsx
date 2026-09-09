@@ -29,7 +29,7 @@ export function PurgeTestDataPanel({ counts }: { counts: PurgeCounts }) {
   }
 
   return (
-    <section className="enterprise-panel grid gap-4 p-5">
+    <section className="enterprise-panel grid gap-4 p-4">
       <div>
         <h2 className="card-title">ข้อมูลทดสอบในระบบ</h2>
         <p className="section-description mt-1">ลบเฉพาะแถวที่เครื่องมือทดสอบสร้าง (ติดแท็ก smokeTest) — ไม่แตะข้อมูลจริง</p>

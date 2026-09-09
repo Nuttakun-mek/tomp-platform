@@ -137,7 +137,7 @@ export function DriverAccessGenerator({ assignments, projectId }: { assignments:
   const activeAccess = selectedAccess;
 
   return (
-    <section className="enterprise-panel p-5">
+    <section className="enterprise-panel p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-ink">สร้าง QR สำหรับคนขับ</h2>

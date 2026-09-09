@@ -21,7 +21,7 @@ export default async function SuperadminUsersPage() {
         title="ผู้ใช้และสิทธิ์"
         description="เพิ่มผู้ใช้ และกำหนดบทบาทในแต่ละโครงการ ผู้ใช้จะเข้าสู่ระบบด้วยอีเมลเดียวกันเพื่อเปิดใช้บัญชี"
       />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] xl:items-start">
         <InviteUserForm organizations={organizations} projects={projectOptions} />
         <UserList rows={rows} />
       </div>

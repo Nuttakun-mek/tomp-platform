@@ -9,14 +9,11 @@ export function CreateDriverForm() {
 
   async function handleSubmit(formData: FormData) {
     const parsed = createDriverSchema.safeParse({
-      organizationId: "10000000-0000-4000-8000-000000000001",
       fullName: formData.get("fullName"),
       phone: formData.get("phone"),
       licenseType: formData.get("licenseType") || null,
       languages: [],
-      metadata: {
-        projectId: "10000000-0000-4000-8000-000000000003"
-      }
+      metadata: {}
     });
 
     if (!parsed.success) {
@@ -29,7 +26,7 @@ export function CreateDriverForm() {
   }
 
   return (
-    <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={handleSubmit} className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-ink">เพิ่มคนขับ</h2>
       <input className="rounded-md border border-slate-300 px-3 py-2" name="fullName" placeholder="ชื่อ-นามสกุล" />
       <input className="rounded-md border border-slate-300 px-3 py-2" name="phone" placeholder="เบอร์โทรศัพท์" />

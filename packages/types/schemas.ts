@@ -5,7 +5,8 @@ const optionalUuidSchema = uuidSchema.optional().nullable();
 const metadataSchema = z.record(z.unknown()).default({});
 
 export const createProjectSchema = z.object({
-  organizationId: uuidSchema,
+  // Resolved server-side (single-org product) — the client must not supply it.
+  organizationId: optionalUuidSchema,
   ownerProfileId: optionalUuidSchema,
   projectCode: z.string().trim().min(2).max(40),
   projectName: z.string().trim().min(2).max(160),

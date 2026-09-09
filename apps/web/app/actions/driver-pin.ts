@@ -3,7 +3,14 @@
 import { cookies } from "next/headers";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getPostgresClient } from "@/lib/db/postgres";
-import { DRIVER_PIN_COOKIE_PREFIX, hashDriverAccessToken, verifyDriverPin } from "@/lib/driver-access/token";
+import {
+  DRIVER_DEVICE_COOKIE_PREFIX,
+  DRIVER_PIN_COOKIE_PREFIX,
+  generateDriverDeviceId,
+  hashDriverAccessToken,
+  hashDriverDeviceId,
+  verifyDriverPin
+} from "@/lib/driver-access/token";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
 const MAX_ATTEMPTS = 5;
@@ -32,9 +39,15 @@ export async function verifyDriverPinAction(input: unknown): Promise<ActionResul
   const meta = (row.metadata ?? {}) as Record<string, unknown>;
   const pinHash = typeof meta.pinHash === "string" ? meta.pinHash : "";
   const attempts = typeof meta.pinAttempts === "number" ? meta.pinAttempts : 0;
+  const boundDevice = typeof meta.deviceHash === "string" ? meta.deviceHash : "";
+  const deviceId = await resolveDeviceId();
+  const deviceHash = hashDriverDeviceId(deviceId);
+
+  if (boundDevice && boundDevice !== deviceHash) return actionFailure(DEVICE_TAKEN);
 
   // Tokens issued before the PIN feature have no pinHash — let them through.
   if (!pinHash) {
+    await client.from("driver_access_tokens").update({ metadata: { ...meta, deviceHash } }).eq("id", row.id);
     await setPinCookie(String(row.id));
     return actionSuccess({ verified: true });
   }
@@ -54,7 +67,7 @@ export async function verifyDriverPinAction(input: unknown): Promise<ActionResul
 
   await client
     .from("driver_access_tokens")
-    .update({ metadata: { ...meta, pinAttempts: 0 } })
+    .update({ metadata: { ...meta, pinAttempts: 0, deviceHash } })
     .eq("id", row.id);
   await setPinCookie(String(row.id));
   return actionSuccess({ verified: true });
@@ -79,8 +92,15 @@ async function verifyDriverPinViaPostgres(token: string, pin: string): Promise<A
   const meta = row.metadata ?? {};
   const pinHash = typeof meta.pinHash === "string" ? meta.pinHash : "";
   const attempts = typeof meta.pinAttempts === "number" ? meta.pinAttempts : 0;
+  const boundDevice = typeof meta.deviceHash === "string" ? meta.deviceHash : "";
+  const deviceId = await resolveDeviceId();
+  const deviceHash = hashDriverDeviceId(deviceId);
+
+  if (boundDevice && boundDevice !== deviceHash) return actionFailure(DEVICE_TAKEN);
 
   if (!pinHash) {
+    const boundMeta = JSON.stringify({ ...meta, deviceHash });
+    await sql`update driver_access_tokens set metadata = ${boundMeta}::jsonb where id = ${row.id}`;
     await setPinCookie(row.id);
     return actionSuccess({ verified: true });
   }
@@ -96,10 +116,29 @@ async function verifyDriverPinViaPostgres(token: string, pin: string): Promise<A
     return actionFailure(`รหัสไม่ถูกต้อง (เหลือ ${MAX_ATTEMPTS - attempts - 1} ครั้ง)`);
   }
 
-  const resetMeta = JSON.stringify({ ...meta, pinAttempts: 0 });
+  const resetMeta = JSON.stringify({ ...meta, pinAttempts: 0, deviceHash });
   await sql`update driver_access_tokens set metadata = ${resetMeta}::jsonb where id = ${row.id}`;
   await setPinCookie(row.id);
   return actionSuccess({ verified: true });
+}
+
+const DEVICE_TAKEN = "งานนี้ถูกเปิดใช้บนอุปกรณ์อื่นแล้ว หากต้องการย้ายเครื่อง กรุณาให้ศูนย์ควบคุมออก QR ใหม่";
+
+// Returns the caller's device id, creating one if this phone has never claimed a
+// job before. The raw id stays in an httpOnly cookie; only the hash is stored.
+async function resolveDeviceId(): Promise<string> {
+  const store = await cookies();
+  const existing = store.get(DRIVER_DEVICE_COOKIE_PREFIX + "id")?.value;
+  if (existing) return existing;
+  const fresh = generateDriverDeviceId();
+  store.set(DRIVER_DEVICE_COOKIE_PREFIX + "id", fresh, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 180
+  });
+  return fresh;
 }
 
 async function setPinCookie(tokenId: string) {

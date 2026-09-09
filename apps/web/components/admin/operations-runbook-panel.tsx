@@ -28,8 +28,8 @@ const runbookItems = [
 
 export function OperationsRunbookPanel() {
   return (
-    <div className="grid gap-6">
-      <section className="enterprise-card p-5 lg:p-6">
+    <div className="grid gap-5">
+      <section className="enterprise-card p-4 lg:p-5">
         <p className="text-sm font-semibold text-operation">Production Operations</p>
         <h2 className="mt-1 text-2xl font-semibold text-ink">Runbook ใช้งานและดูแลระบบ</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -38,13 +38,13 @@ export function OperationsRunbookPanel() {
       </section>
       <section className="grid gap-3 md:grid-cols-2">
         {runbookItems.map((item) => (
-          <a key={item.href} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-soft transition hover:-translate-y-0.5 hover:shadow-panel" href={item.href}>
+          <a key={item.href} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-soft transition hover:-translate-y-0.5 hover:shadow-panel" href={item.href}>
             <h3 className="text-lg font-semibold text-ink">{item.title}</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
           </a>
         ))}
       </section>
-      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
         <p className="font-semibold">ข้อควรจำ</p>
         <p className="mt-2 text-sm leading-6">
           Web GPS ใช้สำหรับทดสอบและปฏิบัติการแบบเปิดหน้า browser ค้างไว้ หากต้องการติดตามตอนปิดจอหรือสลับแอป ต้องใช้ Mobile Driver App ในระยะถัดไป

@@ -47,7 +47,6 @@ export function CreateProjectForm() {
     setFieldErrors({});
 
     const parsed = createProjectSchema.safeParse({
-      organizationId: "10000000-0000-4000-8000-000000000001",
       projectCode: formData.get("projectCode"),
       projectName: formData.get("projectName"),
       startDate: formData.get("startDate"),
@@ -82,7 +81,7 @@ export function CreateProjectForm() {
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid content-start gap-5 p-5">
+    <form action={handleSubmit} className="enterprise-panel grid content-start gap-4 p-4">
       <div className="border-b border-slate-100 pb-4">
         <h2 className="text-lg font-semibold text-ink">สร้างโครงการ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">

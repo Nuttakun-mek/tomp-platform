@@ -56,7 +56,7 @@ export function InviteUserForm({ organizations, projects }: { organizations: Opt
   }
 
   return (
-    <form action={submit} className="enterprise-panel grid content-start gap-4 p-5">
+    <form action={submit} className="enterprise-panel grid content-start gap-4 p-4">
       <div>
         <p className="section-label">เพิ่มผู้ใช้</p>
         <h2 className="section-title mt-1">สร้างบัญชีและกำหนดสิทธิ์</h2>

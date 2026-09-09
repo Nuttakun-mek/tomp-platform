@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <section className="enterprise-panel max-w-xl p-6 text-center">
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-5">
+      <section className="enterprise-panel max-w-xl p-5 text-center">
         <p className="text-sm font-semibold text-operation">ไม่พบหน้าที่ต้องการ</p>
         <h1 className="mt-2 text-2xl font-semibold text-ink">ลิงก์นี้ไม่พร้อมใช้งาน</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600">

@@ -24,7 +24,7 @@ export function DriverPinGate({ token }: { token: string }) {
   }
 
   return (
-    <div className="grid min-h-[70vh] content-center gap-5">
+    <div className="grid min-h-[70vh] content-center gap-4">
       <div className="grid gap-1 text-center">
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-operation-soft text-operation">
           <KeyRound className="h-6 w-6" />

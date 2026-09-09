@@ -56,7 +56,7 @@ export function IncidentForm({ projects, assignments }: { projects: Project[]; a
   }
 
   return (
-    <section className="enterprise-card p-5 lg:p-6">
+    <section className="enterprise-card p-4 lg:p-5">
       <div className="grid gap-1">
         <p className="text-sm font-semibold text-operation">เปิดเหตุผิดปกติ</p>
         <h2 className="text-2xl font-semibold text-ink">บันทึกสถานการณ์ที่ต้องกู้คืน</h2>

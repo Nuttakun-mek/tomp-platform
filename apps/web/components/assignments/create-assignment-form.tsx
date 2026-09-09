@@ -115,7 +115,7 @@ export function CreateAssignmentForm({ projectId, projectCode, missions, callSig
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid content-start gap-5 p-5">
+    <form action={handleSubmit} className="enterprise-panel grid content-start gap-4 p-4">
       <div className="border-b border-slate-100 pb-4">
         <h2 className="text-lg font-semibold text-ink">เปิดงานใหม่</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">

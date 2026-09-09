@@ -19,7 +19,7 @@ export function VehicleMonitorPanel({ profiles }: { profiles: VehicleOperationPr
   const pendingCount = profiles.reduce((sum, profile) => sum + profile.remainingTasks.length, 0);
 
   return (
-    <section className="enterprise-panel grid gap-4 p-5">
+    <section className="enterprise-panel grid gap-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="page-kicker">ติดตามรถ</p>
@@ -85,7 +85,7 @@ export function VehicleMonitorPanel({ profiles }: { profiles: VehicleOperationPr
           );
         })}
         {!profiles.length ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">ยังไม่มีรถที่ผูกกับโครงการนี้ กรุณาสร้างงานและเลือกรถก่อน</div>
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">ยังไม่มีรถที่ผูกกับโครงการนี้ กรุณาสร้างงานและเลือกรถก่อน</div>
         ) : null}
       </div>
     </section>

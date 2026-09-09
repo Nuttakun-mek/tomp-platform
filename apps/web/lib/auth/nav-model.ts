@@ -32,10 +32,10 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       {
         href: "/portal",
-        label: "พอร์ทัลผู้จัดงาน",
-        description: "ภาพรวมและคำขอเปลี่ยนแปลง",
+        label: "มุมมองลูกค้า",
+        description: "หน้าที่ลูกค้า/ผู้จัดงานเห็น",
         icon: "PanelsTopLeft",
-        help: "ดูสถานะโครงการที่ได้รับอนุญาต และส่งคำขอเปลี่ยนแปลง",
+        help: "หน้าอ่านอย่างเดียวสำหรับลูกค้าหรือผู้จัดงาน — เห็นสถานะภารกิจของโครงการที่ตนเกี่ยวข้อง และส่งคำขอเปลี่ยนแปลงเข้ามา แก้ไขแผนเองไม่ได้",
         anyRole: ["customer_viewer"]
       }
     ]
@@ -44,19 +44,11 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "ระบบ",
     items: [
       {
-        href: "/superadmin/users",
-        label: "ผู้ใช้และสิทธิ์",
-        description: "จัดการสมาชิกและบทบาท",
-        icon: "Users",
-        help: "เพิ่มผู้ใช้ และกำหนดบทบาทในแต่ละโครงการ",
-        anyPermission: ["admin.manage_users"]
-      },
-      {
         href: "/superadmin",
         label: "เครื่องมือระบบ",
-        description: "เครื่องมือแพลตฟอร์ม",
+        description: "ผู้ใช้ สิทธิ์ และเครื่องมือแพลตฟอร์ม",
         icon: "ShieldAlert",
-        help: "จัดการผู้ใช้ บทบาท และเครื่องมือพัฒนา — เฉพาะทีมแพลตฟอร์ม",
+        help: "จัดการผู้ใช้และบทบาท ตรวจสอบระบบ และเครื่องมือพัฒนา — เฉพาะทีมแพลตฟอร์ม",
         anyPermission: ["superadmin.access"],
         anyRole: ["super_admin"]
       }
@@ -66,9 +58,11 @@ export const NAV_SECTIONS: NavSection[] = [
 
 function itemVisible(item: NavItem, ctx: { permissions: string[]; roleKeys: string[] }): boolean {
   if (!item.anyPermission && !item.anyRole) return true; // เมนูสาธารณะ (เช่น ภาพรวม)
-  if (ctx.permissions.includes("*")) return true;
-  if (item.anyPermission?.some((p) => ctx.permissions.includes(p))) return true;
   if (item.anyRole?.some((r) => ctx.roleKeys.includes(r))) return true;
+  if (item.anyPermission?.some((p) => ctx.permissions.includes(p))) return true;
+  // "*" แทนทุก "สิทธิ์" ไม่ใช่ทุก "บทบาท" — เมนูที่ผูกกับบทบาทล้วน (มุมมองลูกค้า)
+  // เป็นหน้าเฉพาะ persona ไม่ใช่ความสามารถ จึงไม่โผล่ให้แอดมินสับสน
+  if (item.anyPermission && ctx.permissions.includes("*")) return true;
   return false;
 }
 

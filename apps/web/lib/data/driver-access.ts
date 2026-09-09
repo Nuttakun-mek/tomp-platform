@@ -8,6 +8,8 @@ export interface DriverAccessAssignment {
   token: string;
   tokenId: string;
   pinRequired: boolean;
+  /** sha256 of the device that claimed this token, or null if unclaimed. */
+  deviceBoundTo: string | null;
   project: Project;
   assignment: Assignment;
   callSign: CallSign;
@@ -188,6 +190,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     token,
     tokenId: String(tokenRow.id),
     pinRequired: typeof tokenMeta.pinHash === "string" && tokenMeta.pinHash.length > 0,
+    deviceBoundTo: typeof tokenMeta.deviceHash === "string" && tokenMeta.deviceHash ? tokenMeta.deviceHash : null,
     tokenValidated: true,
     packet,
     notifications,
@@ -340,6 +343,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   return {
     tokenId: String(tokenRow.id),
     pinRequired: typeof pgTokenMeta.pinHash === "string" && pgTokenMeta.pinHash.length > 0,
+    deviceBoundTo: typeof pgTokenMeta.deviceHash === "string" && pgTokenMeta.deviceHash ? pgTokenMeta.deviceHash : null,
     token,
     tokenValidated: true,
     packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,

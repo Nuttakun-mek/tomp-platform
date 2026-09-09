@@ -44,6 +44,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   const [message, setMessage] = useState("ยังไม่ได้แชร์ตำแหน่ง");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
   const [mapOpen, setMapOpen] = useState(true);
+  const [cardOpen, setCardOpen] = useState(true);
   const [canResume, setCanResume] = useState(false);
   const watchIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
@@ -260,6 +261,9 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       : null
   );
 
+  const statusLabel =
+    state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "stale" ? "ขาดช่วง" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์";
+
   const mapPoint: TrackedPoint | null = lastLocation
     ? {
         id: driverAccess.assignment.id,
@@ -274,19 +278,30 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
     : null;
 
   return (
-    <section className="grid gap-3 rounded-card border border-border bg-white p-3.5">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[13px] font-bold text-ink">แชร์ตำแหน่ง GPS</p>
-          <p className="text-[12px] leading-5 text-ink-faint">{message}</p>
-        </div>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-          state === "sharing" ? "bg-emerald-100 text-emerald-800" : state === "stale" ? "bg-amber-100 text-amber-800" : state === "error" ? "bg-rose-100 text-rose-700" : "bg-canvas text-ink-soft"
-        }`}>
-          {state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "stale" ? "ขาดช่วง" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์"}
+    <section className="rounded-card border border-border bg-white">
+      {/* Whole card collapses — sharing keeps running while it is closed. */}
+      <button
+        type="button"
+        onClick={() => setCardOpen((value) => !value)}
+        aria-expanded={cardOpen}
+        className="flex w-full items-start justify-between gap-2 p-3.5 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block text-[13px] font-bold text-ink">แชร์ตำแหน่ง GPS</span>
+          <span className="block text-[12px] leading-5 text-ink-faint">{cardOpen ? message : statusLabel}</span>
         </span>
-      </div>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+            state === "sharing" ? "bg-emerald-100 text-emerald-800" : state === "stale" ? "bg-amber-100 text-amber-800" : state === "error" ? "bg-rose-100 text-rose-700" : "bg-canvas text-ink-soft"
+          }`}>
+            {statusLabel}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-ink-faint transition ${cardOpen ? "rotate-180" : ""}`} />
+        </span>
+      </button>
 
+      {cardOpen ? (
+      <div className="grid gap-3 border-t border-border p-3.5">
       {lastLocation ? (
         <p className="text-[12px] text-ink-soft">
           ล่าสุด {formatTime(lastLocation.sentAt)} / ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} ม. / {health.message}
@@ -341,6 +356,8 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
             เปิดตำแหน่งของฉันใน Google Maps
           </a>
         </div>
+      ) : null}
+      </div>
       ) : null}
     </section>
   );

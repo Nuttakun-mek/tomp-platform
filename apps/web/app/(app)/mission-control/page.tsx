@@ -74,10 +74,14 @@ export default async function MissionControlPage({ searchParams }: MissionContro
   const readiness = assignments.length ? Math.min(100, Math.round((locations.length / assignments.length) * 100)) : locations.length ? 100 : 0;
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <ProjectWorkspaceTabs projectId={activeProject.id} active="control" />
       <CommandCenterHeader project={activeProject} liveCount={locations.length} issueCount={followUps} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
+
+      <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">
+        <LiveMapPanel projectId={activeProject.id} locations={locations} />
+      </CollapsibleSection>
 
       <FleetBoard
         projectId={activeProject.id}
@@ -90,10 +94,6 @@ export default async function MissionControlPage({ searchParams }: MissionContro
         initialEvidence={evidence}
         initialInbound={comms.inbound}
       />
-
-      <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">
-        <LiveMapPanel projectId={activeProject.id} locations={locations} />
-      </CollapsibleSection>
 
       <CommsConsole
         projectId={activeProject.id}
