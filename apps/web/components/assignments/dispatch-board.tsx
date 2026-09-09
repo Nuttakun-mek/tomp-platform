@@ -36,19 +36,25 @@ export function DispatchBoard({ projectId, assignments, missions, callSigns, dri
       </div>
       <DriverQrActionCard assignments={assignments} projectId={projectId} />
       <DriverJobOrderPanel projectId={projectId} assignments={assignments} callSigns={callSigns} drivers={drivers} />
-      <div className="-mx-1 overflow-x-auto px-1 pb-2">
-        <div className="grid grid-flow-col auto-cols-[minmax(272px,1fr)] gap-4">
-          {laneDefinitions.map((lane) => (
-            <AssignmentLane
-              key={lane.title}
-              title={lane.title}
-              assignments={assignments.filter(lane.match)}
-              missions={missions}
-              callSigns={callSigns}
-              drivers={drivers}
-              vehicles={vehicles}
-            />
-          ))}
+      {/* Stacked list below lg (a Kanban row does not fit a 390px phone),
+          horizontal lane board on wide screens. */}
+      <div className="-mx-1 px-1 pb-2 lg:overflow-x-auto">
+        <div className="grid gap-4 lg:grid-flow-col lg:auto-cols-[minmax(272px,1fr)]">
+          {laneDefinitions.map((lane) => {
+            const laneAssignments = assignments.filter(lane.match);
+            if (!laneAssignments.length && lane.title !== "ต้องติดตาม") return null;
+            return (
+              <AssignmentLane
+                key={lane.title}
+                title={lane.title}
+                assignments={laneAssignments}
+                missions={missions}
+                callSigns={callSigns}
+                drivers={drivers}
+                vehicles={vehicles}
+              />
+            );
+          })}
         </div>
       </div>
     </section>

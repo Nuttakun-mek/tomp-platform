@@ -87,7 +87,12 @@ export default async function MissionControlPage({ searchParams }: MissionContro
         initialLocations={locations}
         initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, evidence }}
       >
-        <CollapsibleSection title="แผนที่ติดตามตำแหน่ง" storageKey="mc.map" description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ">
+        <CollapsibleSection
+          title="แผนที่ติดตามตำแหน่ง"
+          storageKey="mc.map"
+          description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ"
+          defaultOpen={locations.length > 0}
+        >
           <LiveLocationMap projectId={activeProject.id} initialLocations={locations} />
         </CollapsibleSection>
 

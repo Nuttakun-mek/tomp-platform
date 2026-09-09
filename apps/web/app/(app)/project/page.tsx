@@ -9,6 +9,7 @@ import { ProjectPublishPanel } from "@/components/projects/project-publish-panel
 import { ProjectReadinessSummary } from "@/components/projects/project-readiness-summary";
 import { ProjectRenameForm } from "@/components/projects/project-rename-form";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getMissionsByProjectId } from "@/lib/data/missions";
@@ -76,17 +77,27 @@ async function OverviewView({ projectId }: { projectId: string }) {
   const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
-      <div className="grid content-start gap-4">
-        <ProjectReadinessSummary missions={missions.length} assignments={assignments.length} />
-        <ProjectAssignmentBoard projectId={projectId} assignments={assignments} />
-        <ProjectPublishPanel projectId={projectId} readiness={readiness} />
+    <div className="grid gap-4">
+      {/* Summary-first: readiness + what's on the plan, then create/change
+          flows folded away until needed. */}
+      <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr] xl:items-start">
+        <div className="grid content-start gap-4">
+          <ProjectReadinessSummary missions={missions.length} assignments={assignments.length} />
+          <ProjectPublishPanel projectId={projectId} readiness={readiness} />
+        </div>
+        <div className="grid content-start gap-4">
+          <ProjectAssignmentBoard projectId={projectId} assignments={assignments} />
+          <ProjectMissionBoard missions={missions} />
+        </div>
       </div>
-      <div className="grid content-start gap-4">
+
+      <CollapsibleSection title="เพิ่มภารกิจ" storageKey={`proj.${projectId}.newmission`} defaultOpen={missions.length === 0}>
         <CreateMissionForm projectId={projectId} />
-        <ProjectMissionBoard missions={missions} />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="คำขอเปลี่ยนแปลง" storageKey={`proj.${projectId}.change`} defaultOpen={false}>
         <ProjectChangePanel projectId={projectId} />
-      </div>
+      </CollapsibleSection>
     </div>
   );
 }
