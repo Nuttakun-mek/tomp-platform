@@ -1,6 +1,7 @@
-import type { AssignmentStatusUpdateInput, DriverCheckinInput, DriverIssueReportInput, DriverLocationUpdateInput } from "@tomp/types/schemas";
+import type { DriverLocationUpdateInput } from "@tomp/types/schemas";
 import { TOMP_API_BASE_URL } from "../config";
 import type { MobileDriverAssignment } from "../types";
+import type { MobileDriverSession } from "./mobile-session-store";
 
 interface ApiResult<T> {
   success: boolean;
@@ -26,20 +27,17 @@ export async function fetchAssignmentByToken(token: string) {
   return requestJson<MobileDriverAssignment>(`/api/driver/assignment?token=${encodeURIComponent(token)}`);
 }
 
-// The write routes verify the driver token (x-driver-token) and derive
-// projectId/assignmentId/driverId from it — the body ids are ignored.
-export async function submitReadiness(token: string, input: DriverCheckinInput) {
-  return requestJson<unknown>("/api/driver/readiness", { method: "POST", headers: { "x-driver-token": token }, body: JSON.stringify(input) });
-}
+export async function submitLocation(input: DriverLocationUpdateInput, mobileSession?: MobileDriverSession | null) {
+  if (!mobileSession?.session) {
+    return {
+      success: false,
+      error: "ยังไม่มี mobile session สำหรับส่งตำแหน่งเบื้องหลัง"
+    };
+  }
 
-export async function submitStatus(token: string, input: AssignmentStatusUpdateInput) {
-  return requestJson<unknown>("/api/driver/status", { method: "POST", headers: { "x-driver-token": token }, body: JSON.stringify(input) });
-}
-
-export async function submitIssue(token: string, input: DriverIssueReportInput) {
-  return requestJson<unknown>("/api/driver/issue", { method: "POST", headers: { "x-driver-token": token }, body: JSON.stringify(input) });
-}
-
-export async function submitLocation(input: DriverLocationUpdateInput) {
-  return requestJson<{ id: string; recordedAt: string }>("/api/driver/location", { method: "POST", body: JSON.stringify(input) });
+  return requestJson<{ id: string; recordedAt: string }>("/api/driver/location", {
+    method: "POST",
+    headers: { "x-driver-session": mobileSession.session },
+    body: JSON.stringify(input)
+  });
 }

@@ -1,10 +1,10 @@
 import * as SecureStore from "expo-secure-store";
 import type { AssignmentStatusUpdateInput, DriverCheckinInput, DriverIssueReportInput, DriverLocationUpdateInput } from "@tomp/types/schemas";
-import { submitIssue, submitLocation, submitReadiness, submitStatus } from "./driver-api";
-import { getSavedDriverToken } from "./token-store";
+import { submitLocation } from "./driver-api";
+import { getMobileDriverSession } from "./mobile-session-store";
 
 const OFFLINE_QUEUE_KEY = "tomp_driver_offline_queue";
-const MAX_QUEUE_SIZE = 20;
+const MAX_QUEUE_SIZE = 500;
 
 type OfflineAction =
   | { id: string; kind: "readiness"; payload: DriverCheckinInput; createdAt: string }
@@ -13,7 +13,8 @@ type OfflineAction =
   | { id: string; kind: "location"; payload: DriverLocationUpdateInput; createdAt: string };
 
 function createId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const randomPart = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
+  return `${Date.now()}-${randomPart}`;
 }
 
 async function readQueue(): Promise<OfflineAction[]> {
@@ -54,12 +55,8 @@ export async function enqueueOfflineAction(kind: OfflineAction["kind"], payload:
 }
 
 async function sendAction(action: OfflineAction) {
-  if (action.kind === "location") return submitLocation(action.payload);
-  const token = await getSavedDriverToken();
-  if (!token) return { success: false, error: "ไม่พบ token ของงาน" };
-  if (action.kind === "readiness") return submitReadiness(token, action.payload);
-  if (action.kind === "status") return submitStatus(token, action.payload);
-  return submitIssue(token, action.payload);
+  if (action.kind === "location") return submitLocation(action.payload, await getMobileDriverSession());
+  return { success: false, error: "รายการนี้ต้องส่งผ่าน Driver Web session ไม่ใช่ raw QR token" };
 }
 
 export async function flushOfflineQueue() {

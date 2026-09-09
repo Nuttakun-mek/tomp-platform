@@ -16,5 +16,6 @@ export const colors = {
 export const radius = {
   md: 14,
   lg: 18,
-  xl: 24
+  xl: 24,
+  pill: 999
 };
