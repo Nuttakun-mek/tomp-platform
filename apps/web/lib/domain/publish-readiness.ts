@@ -17,18 +17,18 @@ export interface PublishReadinessResult {
 export function getBlockingPublishIssues(input: PublishReadinessInput): string[] {
   const blockers: string[] = [];
 
-  if (!input.project) blockers.push("Project is missing.");
-  if (input.operationDays.length === 0) blockers.push("At least one operation day is required.");
-  if (input.missions.length === 0) blockers.push("At least one mission is required.");
+  if (!input.project) blockers.push("ไม่พบข้อมูลโครงการ");
+  if (input.operationDays.length === 0) blockers.push("ต้องมีวันปฏิบัติการอย่างน้อย 1 วัน");
+  if (input.missions.length === 0) blockers.push("ต้องมีภารกิจอย่างน้อย 1 รายการ");
 
   input.missions.forEach((mission) => {
     if (!mission.plannedStartTime && !mission.serviceCommitment) {
-      blockers.push(`Mission ${mission.missionCode} needs a planned time or service commitment.`);
+      blockers.push(`ภารกิจ ${mission.missionCode} ต้องระบุเวลาเริ่มหรือข้อผูกพันด้านบริการ`);
     }
   });
 
   input.assignments.forEach((assignment) => {
-    if (!assignment.callSignId) blockers.push(`Assignment ${assignment.id} needs a call sign.`);
+    if (!assignment.callSignId) blockers.push(`งาน ${assignment.id.slice(0, 8)} ยังไม่ได้กำหนด Call Sign`);
   });
 
   return blockers;

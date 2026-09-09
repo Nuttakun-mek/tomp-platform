@@ -21,7 +21,7 @@ describe("publish readiness", () => {
     });
 
     expect(readiness.canPublish).toBe(false);
-    expect(readiness.blockers).toContain("At least one mission is required.");
+    expect(readiness.blockers).toContain("ต้องมีภารกิจอย่างน้อย 1 รายการ");
   });
 });
 
