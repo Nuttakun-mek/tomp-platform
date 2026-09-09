@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildInfo } from "@/lib/build-info";
 import { readCleanEnv } from "@/lib/env";
+import { scopedReadsFlagOn } from "@/lib/supabase/scoped-decision";
 
 function hasServerSupabaseConfig() {
   return Boolean(
@@ -59,6 +60,9 @@ export function GET() {
       checks: {
         serverSupabaseConfig: hasServerSupabaseConfig(),
         publicSecretSafe: !unsafePublicSecret,
+        // Safe boolean only — never the raw env value. false means reads fall
+        // back to service-role transport and RLS is not exercised.
+        scopedReadsEnabled: scopedReadsFlagOn(),
         webGpsMode: "foreground-browser",
         timelineImmutableUi: true
       }
