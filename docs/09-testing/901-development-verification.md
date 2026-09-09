@@ -2,15 +2,15 @@
 
 ## Latest Command Results
 
-Run date: 2026-09-07.
+Run date: 2026-09-09.
 
 | Command | Result |
 | --- | --- |
 | `npm.cmd install` | Passed |
 | `npm.cmd run typecheck` | Passed |
 | `npm.cmd run lint` | Passed |
-| `npm.cmd run test` | Passed: 12 test files, 30 tests |
-| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed; 31 app routes generated |
+| `npm.cmd run test` | Passed: 20 test files, 68 tests |
+| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed; 43 app routes generated |
 | `npm.cmd run security:env` | Passed; no `NEXT_PUBLIC_*` service/secret key found in source |
 
 ## Current Verification Scope
@@ -31,7 +31,7 @@ This verification covers the Thai-first UI/UX reset UX-31 to UX-42:
 
 - TypeScript compiled for `apps/web`.
 - ESLint completed with no errors.
-- Vitest completed with 12 passing files and 30 passing tests.
+- Vitest completed with 20 passing files and 68 passing tests.
 - Next.js production build completed.
 - The UI reset did not add new backend business scope.
 - Local production-like smoke checks passed for `/`, `/projects`, `/assignments`, `/driver`, `/live-test`, `/mission-control`, `/api/health`, `/api/admin/pilot-infrastructure`, and `/api/mission-control/locations`.
@@ -63,3 +63,18 @@ This verification covers the Thai-first UI/UX reset UX-31 to UX-42:
 - Fresh Supabase reset using all migrations and seed files.
 - Real multi-user auth and project-scoped RBAC.
 - Real mobile browser GPS under long-running field conditions.
+
+## 2026-09-09 Flow Fix Notes
+
+- Assignment creation no longer blocks on an empty Call Sign list; dispatchers can create a Call Sign inside the assignment form.
+- Driver QR/PIN verification now has a Postgres fallback when REST writes are unavailable but direct database access is configured.
+- Driver task progress reads the latest saved status after refresh.
+- Driver GPS status is no longer optimistic; the UI marks GPS live only after a real ping is accepted.
+- Failed driver status, message, and issue submissions are stored in a browser outbox and retried.
+- Target pilot load of about 50 vehicles and 250 tasks per day is within the expected Supabase/Postgres and Vercel capacity when queries remain project-scoped and indexed.
+- Production-grade background GPS still requires the future iOS/Android driver app. The web page is foreground-first.
+- QR/PIN creation now has Postgres fallback when REST writes are unavailable but direct database access is configured.
+- The driver task page now shows same-day assignments for the same driver and project.
+- The QR panel can generate QR/PIN for all ready assignments in one operation.
+- Mission Control fleet cards were rebuilt for compact scanning, GPS freshness, unread message badges, and expandable vehicle detail.
+- New user-facing copy in replaced files uses formal Thai. A full copy audit is still required for older files with legacy encoding.

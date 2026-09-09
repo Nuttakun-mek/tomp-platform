@@ -1,13 +1,18 @@
 "use client";
 
 import { buildLocationPingPayload, evaluateLocationHealth } from "@tomp/driver-core";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, MapPin } from "lucide-react";
-import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 import { LiveTrackingMap, type TrackedPoint } from "@/components/mission-control/live-tracking-map";
+import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 
-type ShareState = "idle" | "requesting" | "sharing" | "error";
+type ShareState = "idle" | "requesting" | "sharing" | "stale" | "error";
 type TrackingEvent = "sharing_started" | "location_ping" | "sharing_stopped";
+type LocationSignal = "off" | "live" | "stale";
+
+interface WakeLockSentinelLike {
+  release: () => Promise<void>;
+}
 
 interface LastLocation {
   latitude: number;
@@ -17,18 +22,74 @@ interface LastLocation {
   sentAt: string;
 }
 
+interface DriverLocationShareProps {
+  driverAccess: DriverAccessAssignment;
+  onStatusChange?: (status: LocationSignal) => void;
+}
+
 function buildGoogleMapsUrl(location: LastLocation) {
   return `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
 }
 
-export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAccessAssignment }) {
+function consentKey(token: string) {
+  return `tomp:gps-consent:${token}`;
+}
+
+function formatTime(iso: string) {
+  return new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(iso));
+}
+
+export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLocationShareProps) {
   const [state, setState] = useState<ShareState>("idle");
   const [message, setMessage] = useState("ยังไม่ได้แชร์ตำแหน่ง");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
   const [mapOpen, setMapOpen] = useState(true);
+  const [canResume, setCanResume] = useState(false);
   const watchIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
   const lastLocationRef = useRef<LastLocation | null>(null);
+  const staleTimerRef = useRef<number | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null);
+
+  const setSignal = useCallback(
+    (signal: LocationSignal) => {
+      onStatusChange?.(signal);
+      if (signal === "stale" && watchIdRef.current != null) setState("stale");
+    },
+    [onStatusChange]
+  );
+
+  const requestWakeLock = useCallback(async () => {
+    const nav = navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinelLike> } };
+    if (!nav.wakeLock || wakeLockRef.current) return;
+    try {
+      wakeLockRef.current = await nav.wakeLock.request("screen");
+    } catch {
+      wakeLockRef.current = null;
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    const lock = wakeLockRef.current;
+    wakeLockRef.current = null;
+    if (lock) await lock.release().catch(() => undefined);
+  }, []);
+
+  const markFresh = useCallback(
+    (location: LastLocation) => {
+      lastLocationRef.current = location;
+      setLastLocation(location);
+      setState("sharing");
+      setMessage("ส่งตำแหน่งล่าสุดให้ศูนย์ควบคุมแล้ว");
+      setSignal("live");
+      if (staleTimerRef.current != null) window.clearTimeout(staleTimerRef.current);
+      staleTimerRef.current = window.setTimeout(() => {
+        setMessage("ยังเปิดแชร์ GPS อยู่ แต่ไม่มีพิกัดใหม่เกิน 45 วินาที");
+        setSignal("stale");
+      }, 45000);
+    },
+    [setSignal]
+  );
 
   const postLocation = useCallback(
     async (location: LastLocation, trackingEvent: TrackingEvent) => {
@@ -69,70 +130,119 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
         })
       });
       const result = (await response.json()) as { success?: boolean; error?: string };
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "ส่งตำแหน่งไม่สำเร็จ");
-      }
+      if (!response.ok || !result.success) throw new Error(result.error || "ส่งตำแหน่งไม่สำเร็จ");
     },
     [driverAccess]
   );
 
   const sendPosition = useCallback(
     async (position: GeolocationPosition, trackingEvent: TrackingEvent) => {
-      const location = {
+      const location: LastLocation = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy ?? null,
         recordedAt: new Date(position.timestamp).toISOString(),
-        sentAt: new Date().toLocaleTimeString("th-TH")
+        sentAt: new Date().toISOString()
       };
       await postLocation(location, trackingEvent);
-      lastLocationRef.current = location;
-      setLastLocation(location);
-      setMessage("ส่งตำแหน่งล่าสุดให้ศูนย์ควบคุมแล้ว");
+      markFresh(location);
     },
-    [postLocation]
+    [markFresh, postLocation]
   );
 
-  function startSharing() {
+  const startSharing = useCallback(async () => {
+    if (watchIdRef.current != null) return;
     if (!("geolocation" in navigator)) {
       setState("error");
+      setSignal("off");
       setMessage("อุปกรณ์นี้ไม่รองรับการแชร์ตำแหน่ง");
       return;
     }
+
+    window.localStorage.setItem(consentKey(driverAccess.token), "1");
+    setCanResume(true);
     setState("requesting");
     setMessage("กำลังขอสิทธิ์เข้าถึงตำแหน่ง กรุณากดอนุญาต");
+    await requestWakeLock();
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       async (position) => {
         try {
           const event = startedRef.current ? "location_ping" : "sharing_started";
           startedRef.current = true;
           await sendPosition(position, event);
-          setState("sharing");
         } catch (error) {
           setState("error");
+          setSignal("stale");
           setMessage(error instanceof Error ? error.message : "ส่งตำแหน่งไม่สำเร็จ");
         }
       },
       (error) => {
+        if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+        startedRef.current = false;
         setState("error");
+        setSignal("off");
         setMessage(error.message || "ไม่ได้รับสิทธิ์เข้าถึงตำแหน่ง");
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );
-  }
+  }, [driverAccess.token, requestWakeLock, sendPosition, setSignal]);
 
-  async function stopSharing() {
+  const stopSharing = useCallback(async () => {
     if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
     watchIdRef.current = null;
     startedRef.current = false;
+    window.localStorage.removeItem(consentKey(driverAccess.token));
+    setCanResume(false);
+    if (staleTimerRef.current != null) window.clearTimeout(staleTimerRef.current);
+    staleTimerRef.current = null;
     if (lastLocationRef.current) {
       await postLocation(lastLocationRef.current, "sharing_stopped").catch(() => undefined);
     }
+    await releaseWakeLock();
     setState("idle");
+    setSignal("off");
     setMessage("หยุดแชร์ตำแหน่งแล้ว");
-  }
+  }, [driverAccess.token, postLocation, releaseWakeLock, setSignal]);
 
-  const isSharing = state === "sharing" || state === "requesting";
+  useEffect(() => {
+    const storedConsent = window.localStorage.getItem(consentKey(driverAccess.token)) === "1";
+    setCanResume(storedConsent);
+    if (!storedConsent) return undefined;
+
+    const maybeResume = async () => {
+      const permissions = navigator.permissions;
+      if (!permissions) return;
+      const status = await permissions.query({ name: "geolocation" as PermissionName }).catch(() => null);
+      if (status?.state === "granted") void startSharing();
+    };
+
+    void maybeResume();
+    return undefined;
+  }, [driverAccess.token, startSharing]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && window.localStorage.getItem(consentKey(driverAccess.token)) === "1") {
+        void requestWakeLock();
+        if (watchIdRef.current == null) void startSharing();
+      }
+    };
+    const handleOnline = () => {
+      if (window.localStorage.getItem(consentKey(driverAccess.token)) === "1" && watchIdRef.current == null) void startSharing();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
+      if (staleTimerRef.current != null) window.clearTimeout(staleTimerRef.current);
+      void releaseWakeLock();
+    };
+  }, [driverAccess.token, releaseWakeLock, requestWakeLock, startSharing]);
+
+  const isSharing = state === "sharing" || state === "requesting" || state === "stale";
   const health = evaluateLocationHealth(
     lastLocation
       ? {
@@ -158,37 +268,43 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
         freshness: state === "sharing" ? "live" : "slow",
         title: `Call Sign ${driverAccess.callSign.callSign}`,
         subtitle: driverAccess.vehicle.plateNumber || "รถของฉัน",
-        ageLabel: `ส่งเมื่อ ${lastLocation.sentAt}`,
+        ageLabel: `ส่งเมื่อ ${formatTime(lastLocation.sentAt)}`,
         accuracy: lastLocation.accuracy
       }
     : null;
 
   return (
     <section className="grid gap-3 rounded-card border border-border bg-white p-3.5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[13px] font-bold text-ink">แชร์ตำแหน่ง GPS</p>
-          <p className="text-[12px] text-ink-faint">{message}</p>
+          <p className="text-[12px] leading-5 text-ink-faint">{message}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${state === "sharing" ? "bg-emerald-100 text-emerald-800" : state === "error" ? "bg-rose-100 text-rose-700" : "bg-canvas text-ink-soft"}`}>
-          {state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์"}
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+          state === "sharing" ? "bg-emerald-100 text-emerald-800" : state === "stale" ? "bg-amber-100 text-amber-800" : state === "error" ? "bg-rose-100 text-rose-700" : "bg-canvas text-ink-soft"
+        }`}>
+          {state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "stale" ? "ขาดช่วง" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์"}
         </span>
       </div>
 
       {lastLocation ? (
         <p className="text-[12px] text-ink-soft">
-          ล่าสุด {lastLocation.sentAt} · ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} ม. · {health.message}
+          ล่าสุด {formatTime(lastLocation.sentAt)} / ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} ม. / {health.message}
         </p>
       ) : null}
+
+      <div className="rounded-card bg-blue-50 px-3 py-2 text-[12px] leading-5 text-blue-800">
+        Web app ส่ง GPS ได้เมื่อหน้านี้ยังทำงานอยู่ หากต้องการต่อเนื่องตอนปิดจอหรือสลับแอป ควรใช้แอป TOMP Driver ในขั้นถัดไป
+      </div>
 
       <div className="grid gap-2">
         <button
           type="button"
-          disabled={isSharing}
-          onClick={startSharing}
+          disabled={state === "requesting"}
+          onClick={() => void startSharing()}
           className="min-h-13 rounded-command bg-route px-4 text-[15px] font-bold text-white disabled:opacity-50"
         >
-          {isSharing ? "กำลังแชร์ตำแหน่ง…" : "เริ่มแชร์ตำแหน่ง"}
+          {isSharing ? "แชร์ตำแหน่งต่อ" : canResume ? "แชร์ตำแหน่งต่อ" : "เริ่มแชร์ตำแหน่ง"}
         </button>
         {isSharing ? (
           <button
@@ -201,11 +317,11 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
         ) : null}
       </div>
 
-      {mapPoint ? (
+      {mapPoint && lastLocation ? (
         <div className="grid gap-1.5">
           <button
             type="button"
-            onClick={() => setMapOpen((v) => !v)}
+            onClick={() => setMapOpen((value) => !value)}
             className="flex items-center justify-between rounded-card border border-border bg-canvas px-3 py-2 text-[12px] font-semibold text-ink-soft"
           >
             <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> ตำแหน่งของฉันบนแผนที่</span>
@@ -217,7 +333,7 @@ export function DriverLocationShare({ driverAccess }: { driverAccess: DriverAcce
             </div>
           ) : null}
           <a
-            href={buildGoogleMapsUrl(lastLocation!)}
+            href={buildGoogleMapsUrl(lastLocation)}
             target="_blank"
             rel="noreferrer"
             className="text-center text-[12px] font-semibold text-route underline"

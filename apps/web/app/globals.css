@@ -325,3 +325,23 @@ button:disabled {
     --fs-3xl: 1.75rem; /* 28 */
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .qr-print-sheet,
+  .qr-print-sheet * {
+    visibility: visible;
+  }
+
+  .qr-print-sheet {
+    display: block !important;
+    left: 0;
+    padding: 24px;
+    position: absolute;
+    top: 0;
+    width: 100%;
+  }
+}

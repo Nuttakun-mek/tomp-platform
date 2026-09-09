@@ -64,6 +64,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">
         <CreateAssignmentForm
           projectId={projectId}
+          projectCode={activeProject.projectCode}
           missions={missions}
           callSigns={callSigns}
           drivers={drivers}

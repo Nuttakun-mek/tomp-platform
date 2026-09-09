@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
+import { createCallSignAction } from "@/app/actions/call-signs";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -20,6 +21,7 @@ export interface ExistingAssignmentWindow {
 
 interface CreateAssignmentFormProps {
   projectId: string;
+  projectCode?: string;
   missions: Mission[];
   callSigns: CallSign[];
   drivers: Driver[];
@@ -27,15 +29,18 @@ interface CreateAssignmentFormProps {
   existingAssignments?: ExistingAssignmentWindow[];
 }
 
-export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, vehicles, existingAssignments = [] }: CreateAssignmentFormProps) {
+export function CreateAssignmentForm({ projectId, projectCode, missions, callSigns, drivers, vehicles, existingAssignments = [] }: CreateAssignmentFormProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
   const [isPending, startTransition] = useTransition();
+  const [isCallSignPending, startCallSignTransition] = useTransition();
+  const [availableCallSigns, setAvailableCallSigns] = useState(callSigns);
+  const [selectedCallSignId, setSelectedCallSignId] = useState(callSigns[0]?.id || "");
   const [driverId, setDriverId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const canCreate = missions.length > 0 && callSigns.length > 0 && drivers.length > 0 && vehicles.length > 0;
+  const canCreate = missions.length > 0 && availableCallSigns.length > 0 && drivers.length > 0 && vehicles.length > 0;
 
   const conflicts = useMemo(() => {
     if (!startTime || !endTime || (!driverId && !vehicleId)) return [];
@@ -56,7 +61,7 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
     const parsed = createAssignmentSchema.safeParse({
       projectId,
       missionId: formData.get("missionId"),
-      callSignId: formData.get("callSignId"),
+      callSignId: selectedCallSignId || formData.get("callSignId"),
       driverId: formData.get("driverId"),
       vehicleId: formData.get("vehicleId"),
       startTime: formData.get("startTime") || null,
@@ -88,6 +93,27 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
     });
   }
 
+  function handleCreateCallSign() {
+    setMessage(null);
+    startCallSignTransition(async () => {
+      const result = await createCallSignAction({ projectId, projectCode });
+      if (!result.success) {
+        setTone("danger");
+        setMessage(result.error || "สร้าง Call Sign ไม่สำเร็จ");
+        return;
+      }
+
+      const callSign = (result.data as { callSign?: CallSign } | undefined)?.callSign;
+      if (callSign) {
+        setAvailableCallSigns((items) => [...items, callSign]);
+        setSelectedCallSignId(callSign.id);
+      }
+
+      setTone("success");
+      setMessage(result.warning || `สร้าง Call Sign ${callSign?.callSign || ""} สำเร็จ`);
+    });
+  }
+
   return (
     <form action={handleSubmit} className="enterprise-panel grid content-start gap-5 p-5">
       <div className="border-b border-slate-100 pb-4">
@@ -116,14 +142,30 @@ export function CreateAssignmentForm({ projectId, missions, callSigns, drivers, 
               <span className="grid h-5 w-5 place-items-center rounded-full border border-slate-300 text-[11px] text-slate-500">?</span>
             </Tooltip>
           </span>
-          <select className="field-input" name="callSignId" required>
-            <option value="">เลือก Call Sign</option>
-            {callSigns.map((callSign) => (
-              <option key={callSign.id} value={callSign.id}>
-                {callSign.callSign}
-              </option>
-            ))}
-          </select>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <select
+              className="field-input"
+              name="callSignId"
+              value={selectedCallSignId}
+              onChange={(event) => setSelectedCallSignId(event.target.value)}
+              required
+            >
+              <option value="">เลือก Call Sign</option>
+              {availableCallSigns.map((callSign) => (
+                <option key={callSign.id} value={callSign.id}>
+                  {callSign.callSign}
+                </option>
+              ))}
+            </select>
+            <button
+              className="rounded-2xl border border-operation/30 px-4 py-2.5 text-sm font-semibold text-operation transition hover:bg-operation/10 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isCallSignPending}
+              type="button"
+              onClick={handleCreateCallSign}
+            >
+              {isCallSignPending ? "กำลังสร้าง..." : "สร้าง Call Sign"}
+            </button>
+          </div>
         </label>
         <label className="field-label">
           เลือกคนขับ

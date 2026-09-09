@@ -3,6 +3,7 @@
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
+import { getPostgresClient } from "@/lib/db/postgres";
 import { generateDriverAccessToken, generateDriverPin, getDefaultDriverTokenExpiry, hashDriverAccessToken, hashDriverPin } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { getRequestBaseUrl } from "@/lib/request-origin";
@@ -112,6 +113,87 @@ async function createAssignmentPacket(client: NonNullable<ReturnType<typeof getS
   return { packet, packetRecord: packetRow };
 }
 
+async function createDriverAccessTokenViaPostgres(
+  data: { projectId?: string; assignmentId?: string; driverId?: string | null; expiresAt?: string | null },
+  fallbackReason?: string
+): Promise<ActionResult> {
+  const sql = getPostgresClient();
+  if (!sql) return actionFailure(fallbackReason || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูลจริง");
+
+  const permission = await requirePermission(String(data.projectId), "assignment.update");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างลิงก์ QR สำหรับคนขับ");
+
+  const assignmentRows = await sql<Row[]>`
+    select id, project_id, mission_id, call_sign_id, driver_id, vehicle_id, current_version, metadata, status, start_time, end_time
+    from assignments
+    where id = ${String(data.assignmentId)}
+      and project_id = ${String(data.projectId)}
+    limit 1
+  `;
+  const assignment = assignmentRows[0];
+  if (!assignment) return actionFailure("ไม่พบ Assignment นี้ในโครงการ โปรดเลือกงานใหม่");
+
+  const missing: string[] = [];
+  if (!assignment.call_sign_id) missing.push("Call Sign");
+  if (!assignment.driver_id && !data.driverId) missing.push("คนขับ");
+  if (!assignment.vehicle_id) missing.push("รถ");
+  if (missing.length) {
+    return actionFailure(`ยังสร้าง QR ไม่ได้ เนื่องจาก Assignment นี้ยังขาด ${missing.join(", ")} โปรดจัดสรรข้อมูลให้ครบก่อน`);
+  }
+
+  const [projectRows, callSignRows, driverRows, vehicleRows, missionRows] = await Promise.all([
+    sql<Row[]>`select * from projects where id = ${String(data.projectId)} limit 1`,
+    sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
+    sql<Row[]>`select * from drivers where id = ${String(data.driverId || assignment.driver_id)} limit 1`,
+    sql<Row[]>`select * from vehicles where id = ${String(assignment.vehicle_id)} limit 1`,
+    assignment.mission_id ? sql<Row[]>`select * from missions where id = ${String(assignment.mission_id)} limit 1` : Promise.resolve([])
+  ]);
+
+  const project = projectRows[0];
+  const callSign = callSignRows[0];
+  const driver = driverRows[0];
+  const vehicle = vehicleRows[0];
+  if (!project || !callSign || !driver || !vehicle) {
+    return actionFailure("สร้าง QR ไม่ได้ เนื่องจากข้อมูลโครงการ Call Sign คนขับ หรือรถไม่ครบ");
+  }
+
+  const token = generateDriverAccessToken({
+    assignmentId: String(data.assignmentId),
+    driverId: String(data.driverId || assignment.driver_id),
+    expiresAt: data.expiresAt
+  });
+  const expiresAt = data.expiresAt || getDefaultDriverTokenExpiry();
+  const pin = generateDriverPin();
+  const tokenMeta = JSON.stringify({ tokenVersion: 2, pinHash: hashDriverPin(pin), pinAttempts: 0, source: "postgres_fallback" });
+
+  const tokenRows = await sql<Row[]>`
+    insert into driver_access_tokens (project_id, assignment_id, driver_id, token_hash, status, expires_at, metadata)
+    values (${String(data.projectId)}, ${String(data.assignmentId)}, ${String(data.driverId || assignment.driver_id)}, ${hashDriverAccessToken(token)}, 'active', ${expiresAt}, ${tokenMeta}::jsonb)
+    returning id, expires_at, status
+  `;
+  const tokenRow = tokenRows[0];
+
+  const packet = buildPacketPayload({ project, assignment, callSign, driver, vehicle, mission: missionRows[0] || null });
+  const packetRows = await sql<Row[]>`
+    insert into driver_assignment_packets (project_id, assignment_id, driver_id, packet_version, payload, published_at, metadata)
+    values (${String(data.projectId)}, ${String(data.assignmentId)}, ${String(data.driverId || assignment.driver_id)}, ${Number(packet.packetVersion) || 1}, ${JSON.stringify(packet)}::jsonb, ${packet.publishedAt}, ${JSON.stringify({ source: "createDriverAccessTokenAction", mode: "postgres_fallback" })}::jsonb)
+    returning id, packet_version, published_at
+  `;
+
+  await sql`
+    insert into timeline_events (project_id, object_type, object_id, event_type, source, reason, after_data, metadata)
+    values (${String(data.projectId)}, 'assignment', ${String(data.assignmentId)}, ${TIMELINE_EVENTS.DRIVER_ACCESS_TOKEN_CREATED}, 'operation_user', 'สร้าง QR token และ assignment packet สำหรับคนขับ', ${JSON.stringify({ tokenId: tokenRow.id, expiresAt, packetRecord: packetRows[0] || null })}::jsonb, ${JSON.stringify({ mode: "postgres_fallback" })}::jsonb)
+  `.catch(() => undefined);
+
+  return actionSuccess({
+    token,
+    pin,
+    accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
+    tokenRecord: { id: tokenRow.id, expires_at: tokenRow.expires_at, status: tokenRow.status },
+    packetRecord: packetRows[0] || null
+  });
+}
+
 export async function createDriverAccessTokenAction(input: unknown): Promise<ActionResult> {
   const data = input as { projectId?: string; assignmentId?: string; driverId?: string | null; expiresAt?: string | null };
   if (!data.projectId || !data.assignmentId) {
@@ -119,7 +201,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
   }
 
   const { client, error, mode } = getSupabaseWriteClient();
-  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+  if (!client) return createDriverAccessTokenViaPostgres(data, error);
 
   const permission = await requirePermission(data.projectId, "assignment.update");
   if (!permission.allowed && mode !== "service_role") {

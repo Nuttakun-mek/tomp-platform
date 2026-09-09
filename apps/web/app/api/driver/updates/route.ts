@@ -17,6 +17,8 @@ export async function GET(request: Request) {
     checkedAt: new Date().toISOString(),
     data: {
       assignmentStatus: driverAccess.assignment.status,
+      latestStatus: driverAccess.latestStatus,
+      dayAssignments: driverAccess.dayAssignments,
       notifications: driverAccess.notifications,
       routeChanges: driverAccess.routeChanges,
       messages: driverAccess.messages
