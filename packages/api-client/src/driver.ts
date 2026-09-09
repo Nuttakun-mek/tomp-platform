@@ -30,12 +30,6 @@ async function requestJson<T>(config: DriverApiConfig, path: string, init?: Requ
   return payload;
 }
 
-export async function fetchDriverAssignmentByToken(token: string, config?: DriverApiConfig): Promise<DriverAssignmentPacket> {
-  void token;
-  void config;
-  throw new Error("fetchDriverAssignmentByToken is deprecated. Establish a driver session first and call fetchDriverAssignmentBySession().");
-}
-
 export async function fetchDriverAssignmentBySession(config?: DriverApiConfig): Promise<DriverAssignmentPacket> {
   if (!config?.baseUrl) {
     throw new Error("Driver API baseUrl is required.");

@@ -7,7 +7,6 @@ This contract prepares a stable boundary for Web Driver and a future Mobile Driv
 ## Driver
 
 - `fetchDriverAssignmentBySession(config)` - requires an `x-driver-session` value minted after QR/PIN/device checks.
-- `fetchDriverAssignmentByToken(token)` - deprecated compatibility wrapper; must not call the assignment API with a query token.
 - `submitDriverReadiness(input)`
 - `submitDriverStatusUpdate(input)`
 - `submitDriverIssueReport(input)`

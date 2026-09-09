@@ -3,15 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { buildBridgeMessage, getMobileShell } from "@tomp/driver-core";
 import { establishDriverSessionAction } from "@/app/actions/driver-pin";
-
-type MobileShellWindow = Window & {
-  TOMP_MOBILE_SHELL?: {
-    namespace: "tomp.driver";
-    version: 1;
-    postMessage: (message: unknown) => void;
-  };
-};
 
 // The page's server checks (token, device, PIN cookie) decide whether the driver
 // views render. This then exchanges the QR token for the scoped session cookie
@@ -73,8 +66,8 @@ export function DriverSessionGate({ token, children }: { token: string; children
 }
 
 async function establishMobileSessionIfNeeded() {
-  const shell = (window as MobileShellWindow).TOMP_MOBILE_SHELL;
-  if (!shell || shell.namespace !== "tomp.driver" || shell.version !== 1) return;
+  const shell = getMobileShell(window);
+  if (!shell) return;
 
   let result: { success?: boolean; data?: { code: string; expiresAt: string } } | null = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -85,10 +78,5 @@ async function establishMobileSessionIfNeeded() {
   }
   if (!result?.success || !result.data) return;
 
-  shell.postMessage({
-    namespace: "tomp.driver",
-    version: 1,
-    type: "mobile-session.challenge",
-    payload: result.data
-  });
+  shell.postMessage(buildBridgeMessage("mobile-session.challenge", result.data));
 }

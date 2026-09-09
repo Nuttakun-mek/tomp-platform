@@ -1,6 +1,13 @@
 "use client";
 
-import { buildLocationPingPayload, evaluateLocationHealth } from "@tomp/driver-core";
+import {
+  buildBridgeMessage,
+  buildLocationPingPayload,
+  evaluateLocationHealth,
+  getMobileShell,
+  NATIVE_STATUS_EVENT,
+  parseNativeStatusDetail
+} from "@tomp/driver-core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, MapPin } from "lucide-react";
 import { LiveTrackingMap, type TrackedPoint } from "@/components/mission-control/live-tracking-map";
@@ -12,19 +19,6 @@ type LocationSignal = "off" | "live" | "stale";
 
 interface WakeLockSentinelLike {
   release: () => Promise<void>;
-}
-
-interface TompMobileShell {
-  namespace: "tomp.driver";
-  version: 1;
-  canBackgroundLocation?: boolean;
-  postMessage: (message: unknown) => void;
-}
-
-declare global {
-  interface Window {
-    TOMP_MOBILE_SHELL?: TompMobileShell;
-  }
 }
 
 interface LastLocation {
@@ -46,11 +40,6 @@ function buildGoogleMapsUrl(location: LastLocation) {
 
 function consentKey(token: string) {
   return `tomp:gps-consent:${token}`;
-}
-
-function getMobileShell() {
-  const shell = window.TOMP_MOBILE_SHELL;
-  return shell?.namespace === "tomp.driver" && shell.version === 1 ? shell : null;
 }
 
 function formatTime(iso: string) {
@@ -170,18 +159,13 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
 
   const startSharing = useCallback(async () => {
     if (watchIdRef.current != null) return;
-    const shell = getMobileShell();
+    const shell = getMobileShell(window);
     if (shell?.canBackgroundLocation) {
       window.localStorage.setItem(consentKey(driverAccess.token), "1");
       setCanResume(true);
       setState("requesting");
       setMessage("กำลังขอให้แอป TOMP Driver เริ่มแชร์ตำแหน่ง");
-      shell.postMessage({
-        namespace: "tomp.driver",
-        version: 1,
-        type: "gps.start",
-        payload: { reason: "driver_requested" }
-      });
+      shell.postMessage(buildBridgeMessage("gps.start", { reason: "driver_requested" }));
       return;
     }
 
@@ -223,14 +207,9 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   }, [driverAccess.token, requestWakeLock, sendPosition, setSignal]);
 
   const stopSharing = useCallback(async () => {
-    const shell = getMobileShell();
+    const shell = getMobileShell(window);
     if (shell?.canBackgroundLocation) {
-      shell.postMessage({
-        namespace: "tomp.driver",
-        version: 1,
-        type: "gps.stop",
-        payload: { reason: "driver_requested" }
-      });
+      shell.postMessage(buildBridgeMessage("gps.stop", { reason: "driver_requested" }));
       window.localStorage.removeItem(consentKey(driverAccess.token));
       setCanResume(false);
       setState("idle");
@@ -257,24 +236,14 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
 
   useEffect(() => {
     const handleNativeStatus = (event: Event) => {
-      const detail = (event as CustomEvent).detail as {
-        payload?: {
-          status?: string;
-          message?: string;
-          detail?: {
-            latitude?: number;
-            longitude?: number;
-            accuracy?: number | null;
-            recordedAt?: string;
-          };
-        };
-      };
-      const payload = detail?.payload;
-      if (!payload?.status) return;
+      const payload = parseNativeStatusDetail((event as CustomEvent).detail);
+      if (!payload) return;
 
       if (payload.message) setMessage(payload.message);
       if (payload.status === "gps_sharing") {
-        const locationDetail = payload.detail;
+        const locationDetail = payload.detail as
+          | { latitude?: number; longitude?: number; accuracy?: number | null; recordedAt?: string }
+          | undefined;
         if (typeof locationDetail?.latitude === "number" && typeof locationDetail.longitude === "number") {
           markFresh({
             latitude: locationDetail.latitude,
@@ -298,8 +267,8 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       }
     };
 
-    window.addEventListener("tomp:native-status", handleNativeStatus);
-    return () => window.removeEventListener("tomp:native-status", handleNativeStatus);
+    window.addEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+    return () => window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
   }, [markFresh, setSignal]);
 
   useEffect(() => {
