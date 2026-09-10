@@ -86,6 +86,8 @@ export function mapCallSign(row: Row): CallSign {
     projectId: text(row, "project_id"),
     callSign: text(row, "call_sign"),
     groupName: nullableText(row, "group_name"),
+    driverId: nullableText(row, "driver_id"),
+    vehicleId: nullableText(row, "vehicle_id"),
     status: text(row, "status", "active") as CallSign["status"],
     createdAt: text(row, "created_at"),
     updatedAt: text(row, "updated_at"),

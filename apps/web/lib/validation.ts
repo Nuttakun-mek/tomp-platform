@@ -1,6 +1,7 @@
 export {
   createAssignmentSchema,
   createChangeRequestSchema,
+  createCallSignSchema,
   createDriverSchema,
   createMissionSchema,
   createProjectSchema,
@@ -10,6 +11,7 @@ export {
   publishProjectSchema,
   assignmentStatusUpdateSchema,
   setAssignmentOrderSchema,
+  updateCallSignCrewSchema,
   vehicleCheckinSchema,
   approveChangeRequestSchema,
   applyChangeRequestSchema,

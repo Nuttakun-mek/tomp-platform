@@ -63,13 +63,18 @@ try {
     insert into vehicles ${sql(Array.from({ length: VEHICLES }, (_, i) => ({ plate_number: `LOAD-${i}`, vehicle_type: "van", capacity: 10, status: "available" })))}
     returning id`;
   const callSigns = await sql`
-    insert into call_signs ${sql(Array.from({ length: ASSIGNMENTS }, (_, i) => ({ project_id: project.id, call_sign: `A-${i}` })))}
+    insert into call_signs ${sql(Array.from({ length: VEHICLES }, (_, i) => ({
+      project_id: project.id,
+      call_sign: `A-${i}`,
+      driver_id: drivers[i % DRIVERS].id,
+      vehicle_id: vehicles[i].id
+    })))}
     returning id`;
 
   const assignmentRows = Array.from({ length: ASSIGNMENTS }, (_, i) => ({
     project_id: project.id,
     mission_id: mission.id,
-    call_sign_id: callSigns[i].id,
+    call_sign_id: callSigns[i % VEHICLES].id,
     driver_id: drivers[i % DRIVERS].id,
     vehicle_id: vehicles[i % VEHICLES].id,
     status: i < 200 ? "active" : "planned",

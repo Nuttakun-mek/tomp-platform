@@ -192,6 +192,13 @@ insert into public.drivers (
   '{"seed": true}'::jsonb
 ) on conflict (id) do nothing;
 
+update public.call_signs
+set
+  driver_id = '10000000-0000-4000-8000-000000000009',
+  vehicle_id = '10000000-0000-4000-8000-000000000008',
+  metadata = metadata || '{"seedCrewedUnit": true}'::jsonb
+where id = '10000000-0000-4000-8000-000000000007';
+
 insert into public.assignments (
   id,
   project_id,

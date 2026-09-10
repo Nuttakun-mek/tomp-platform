@@ -24,21 +24,23 @@ interface JobRow {
 }
 
 export function DriverJobOrderPanel({ projectId, assignments, callSigns, drivers }: DriverJobOrderPanelProps) {
-  const callSignById = useMemo(() => new Map(callSigns.map((cs) => [cs.id, cs.callSign])), [callSigns]);
-  const driverById = useMemo(() => new Map(drivers.map((d) => [d.id, d])), [drivers]);
+  const callSignById = useMemo(() => new Map(callSigns.map((cs) => [cs.id, cs])), [callSigns]);
+  const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
 
   const groups = useMemo(() => {
-    const byDriver = new Map<string, Assignment[]>();
+    const byCallSign = new Map<string, Assignment[]>();
     for (const assignment of assignments) {
-      if (!assignment.driverId || !ACTIVE.has(assignment.status)) continue;
-      const list = byDriver.get(assignment.driverId) ?? [];
+      if (!assignment.callSignId || !ACTIVE.has(assignment.status)) continue;
+      const list = byCallSign.get(assignment.callSignId) ?? [];
       list.push(assignment);
-      byDriver.set(assignment.driverId, list);
+      byCallSign.set(assignment.callSignId, list);
     }
 
-    return [...byDriver.entries()]
+    return [...byCallSign.entries()]
       .filter(([, list]) => list.length >= 2)
-      .map(([driverId, list]) => {
+      .map(([callSignId, list]) => {
+        const callSign = callSignById.get(callSignId);
+        const driver = callSign?.driverId ? driverById.get(callSign.driverId) : undefined;
         const ordered = orderDriverJobs(
           list.map((assignment) => ({
             id: assignment.id,
@@ -50,12 +52,13 @@ export function DriverJobOrderPanel({ projectId, assignments, callSigns, drivers
             isCurrent: assignment.status === "active"
           }))
         );
+
         return {
-          driverId,
-          driverName: driverById.get(driverId)?.fullName ?? "ไม่ทราบชื่อคนขับ",
+          callSignId,
+          title: `${callSign?.callSign ?? "Call Sign"}${driver ? ` / ${driver.fullName}` : ""}`,
           rows: ordered.map<JobRow>((job) => ({
             id: job.id,
-            label: callSignById.get(list.find((a) => a.id === job.id)?.callSignId ?? "") ?? `งาน ${job.id.slice(0, 8)}`,
+            label: `งาน ${job.id.slice(0, 8)}`,
             startTime: job.startTime,
             urgent: job.urgent
           }))
@@ -65,11 +68,17 @@ export function DriverJobOrderPanel({ projectId, assignments, callSigns, drivers
 
   const conflicts = useMemo(() => {
     const set = new Set<string>();
-    for (const c of findDriverTimeConflicts(
-      assignments.map((a) => ({ id: a.id, driverId: a.driverId ?? null, startTime: a.startTime ?? null, endTime: a.endTime ?? null, status: a.status }))
+    for (const conflict of findDriverTimeConflicts(
+      assignments.map((assignment) => ({
+        id: assignment.id,
+        driverId: assignment.driverId ?? null,
+        startTime: assignment.startTime ?? null,
+        endTime: assignment.endTime ?? null,
+        status: assignment.status
+      }))
     )) {
-      set.add(c.a);
-      set.add(c.b);
+      set.add(conflict.a);
+      set.add(conflict.b);
     }
     return set;
   }, [assignments]);
@@ -79,20 +88,20 @@ export function DriverJobOrderPanel({ projectId, assignments, callSigns, drivers
   return (
     <section className="enterprise-panel-soft grid gap-4 p-4">
       <div>
-        <p className="section-label">ลำดับงานต่อคนขับ</p>
-        <h2 className="section-title mt-1">คนขับที่มีหลายงานในวันนี้</h2>
+        <p className="section-label">ลำดับงานต่อ Call Sign</p>
+        <h2 className="section-title mt-1">Call Sign ที่มีหลายงานในวันเดียวกัน</h2>
         <p className="section-description mt-1">
-          จัดลำดับว่าคนขับควรทำงานไหนก่อน–หลัง และทำเครื่องหมาย “ด่วน” ให้งานแทรก คนขับจะเห็นลำดับนี้บน QR ทันที
+          จัดลำดับงานบน slot ปฏิบัติการเดียวกัน เพื่อให้รถและคนขับเห็นงานก่อนหลังชัดเจน แม้มีการเปลี่ยนคนขับภายหลัง งานยังอยู่กับ Call Sign เดิม
         </p>
       </div>
 
       <div className="grid gap-3">
         {groups.map((group) => (
-          <DriverGroup
-            key={group.driverId}
+          <CallSignJobGroup
+            key={group.callSignId}
             projectId={projectId}
-            driverId={group.driverId}
-            driverName={group.driverName}
+            callSignId={group.callSignId}
+            title={group.title}
             initialRows={group.rows}
             conflictIds={conflicts}
           />
@@ -102,16 +111,16 @@ export function DriverJobOrderPanel({ projectId, assignments, callSigns, drivers
   );
 }
 
-function DriverGroup({
+function CallSignJobGroup({
   projectId,
-  driverId,
-  driverName,
+  callSignId,
+  title,
   initialRows,
   conflictIds
 }: {
   projectId: string;
-  driverId: string;
-  driverName: string;
+  callSignId: string;
+  title: string;
   initialRows: JobRow[];
   conflictIds: Set<string>;
 }) {
@@ -119,7 +128,7 @@ function DriverGroup({
   const [saved, setSaved] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const dirty = rows.map((r) => `${r.id}:${r.urgent}`).join("|") !== initialRows.map((r) => `${r.id}:${r.urgent}`).join("|");
+  const dirty = rows.map((row) => `${row.id}:${row.urgent}`).join("|") !== initialRows.map((row) => `${row.id}:${row.urgent}`).join("|");
 
   function move(index: number, delta: number) {
     const target = index + delta;
@@ -140,18 +149,18 @@ function DriverGroup({
     startTransition(async () => {
       const result = await setAssignmentOrderAction({
         projectId,
-        driverId,
-        orderedAssignmentIds: rows.map((r) => r.id),
-        urgentAssignmentIds: rows.filter((r) => r.urgent).map((r) => r.id)
+        callSignId,
+        orderedAssignmentIds: rows.map((row) => row.id),
+        urgentAssignmentIds: rows.filter((row) => row.urgent).map((row) => row.id)
       });
-      setSaved(result.success ? "บันทึกลำดับแล้ว คนขับจะเห็นทันที" : result.error || "บันทึกไม่สำเร็จ");
+      setSaved(result.success ? "บันทึกลำดับแล้ว คนขับจะเห็นตามลำดับนี้" : result.error || "บันทึกไม่สำเร็จ");
     });
   }
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] font-bold text-ink">{driverName}</p>
+        <p className="text-[13px] font-bold text-ink">{title}</p>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{rows.length} งาน</span>
       </div>
 
@@ -210,7 +219,7 @@ function DriverGroup({
           disabled={!dirty || isPending}
           className="rounded-xl bg-operation px-4 py-2 text-[13px] font-semibold text-white disabled:bg-slate-300"
         >
-          {isPending ? "กำลังบันทึก…" : "บันทึกลำดับ"}
+          {isPending ? "กำลังบันทึก..." : "บันทึกลำดับ"}
         </button>
         {saved ? <span className="text-[12px] font-semibold text-slate-600">{saved}</span> : null}
       </div>

@@ -109,6 +109,13 @@ async function seedIn(sql) {
     values (${orgId}, ${`ทส-${suffix}`}, 'sedan', 4, 'available', ${SMOKE})
     returning id, plate_number`;
 
+  await sql`
+    update call_signs
+    set driver_id = ${driver.id},
+        vehicle_id = ${vehicle.id},
+        metadata = metadata || ${sql.json({ smokeTest: true, crewedUnit: true })}::jsonb
+    where id = ${callSign.id}`;
+
   const [assignment] = await sql`
     insert into assignments (project_id, mission_id, call_sign_id, vehicle_id, driver_id, status, start_time, end_time, metadata)
     values (${project.id}, ${mission.id}, ${callSign.id}, ${vehicle.id}, ${driver.id}, 'published', now(), now() + interval '4 hours',

@@ -6,6 +6,7 @@ import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/a
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
 import { mapAssignment } from "@/lib/data/mappers";
+import { assertAssignmentCrewMatchesCallSign } from "@/lib/domain/call-sign-rules";
 import { assertPlanEditable } from "@/lib/domain/publish-locking";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createAssignmentTimelineEvent, createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
@@ -31,20 +32,48 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
     return actionFailure(editable.reason || "โครงการนี้ประกาศใช้แผนแล้ว กรุณาส่งคำขอเปลี่ยนแปลง");
   }
 
+  const { data: callSign, error: callSignError } = await client
+    .from("call_signs")
+    .select("id, project_id, driver_id, vehicle_id, call_sign")
+    .eq("id", parsed.data.callSignId)
+    .eq("project_id", parsed.data.projectId)
+    .maybeSingle();
+
+  if (callSignError) {
+    return actionFailure(getDatabaseErrorMessage(callSignError, "อ่านข้อมูล Call Sign ไม่สำเร็จ"));
+  }
+  if (!callSign) {
+    return actionFailure("ไม่พบ Call Sign ในโครงการนี้");
+  }
+
+  const inheritedDriverId = typeof callSign.driver_id === "string" ? callSign.driver_id : null;
+  const inheritedVehicleId = typeof callSign.vehicle_id === "string" ? callSign.vehicle_id : null;
+  const crewCheck = assertAssignmentCrewMatchesCallSign(
+    { driverId: inheritedDriverId, vehicleId: inheritedVehicleId },
+    { driverId: parsed.data.driverId || null, vehicleId: parsed.data.vehicleId || null }
+  );
+  if (!crewCheck.ok) {
+    return actionFailure(crewCheck.reason);
+  }
+
   const { data, error: insertError } = await client
     .from("assignments")
     .insert({
       project_id: parsed.data.projectId,
       mission_id: parsed.data.missionId,
       call_sign_id: parsed.data.callSignId,
-      vehicle_id: parsed.data.vehicleId || null,
-      driver_id: parsed.data.driverId || null,
+      vehicle_id: inheritedVehicleId,
+      driver_id: inheritedDriverId,
       // a freshly dispatched job is "planned", not a hidden "draft"
       status: "planned",
       start_time: parsed.data.startTime || null,
       end_time: parsed.data.endTime || null,
       commitment_id: parsed.data.commitmentId || null,
-      metadata: parsed.data.metadata
+      metadata: {
+        ...parsed.data.metadata,
+        crewSnapshotSource: "call_sign",
+        inheritedCallSign: typeof callSign.call_sign === "string" ? callSign.call_sign : null
+      }
     })
     .select()
     .single();
@@ -154,12 +183,15 @@ export async function setAssignmentOrderAction(input: unknown): Promise<ActionRe
 
   // Only touch this driver's assignments in this project — guards against an id
   // from another driver/project being slipped into the list.
-  const { data: rows, error: lookupError } = await client
+  let orderScopeQuery = client
     .from("assignments")
     .select("id, metadata")
     .eq("project_id", parsed.data.projectId)
-    .eq("driver_id", parsed.data.driverId)
     .in("id", ids);
+  orderScopeQuery = parsed.data.callSignId
+    ? orderScopeQuery.eq("call_sign_id", parsed.data.callSignId)
+    : orderScopeQuery.eq("driver_id", parsed.data.driverId || "");
+  const { data: rows, error: lookupError } = await orderScopeQuery;
 
   if (lookupError) return actionFailure(getDatabaseErrorMessage(lookupError, "โหลดงานของคนขับไม่สำเร็จ"));
 

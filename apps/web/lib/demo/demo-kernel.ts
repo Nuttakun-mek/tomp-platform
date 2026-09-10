@@ -74,6 +74,8 @@ export const demoCallSign: CallSign = {
   projectId: demoProject.id,
   callSign: "A-01",
   groupName: "รับผู้โดยสาร",
+  driverId: "10000000-0000-4000-8000-000000000009",
+  vehicleId: "10000000-0000-4000-8000-000000000008",
   status: "active",
   createdAt,
   updatedAt: createdAt,

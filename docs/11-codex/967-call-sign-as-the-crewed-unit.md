@@ -5,7 +5,12 @@ A restructure proposed by the owner on 2026-09-10: a QR should belong to a
 ten QR codes, and the day's work is planned onto each of them.
 
 This document records the analysis, the decisions taken, and the order to build
-in. Nothing here is built yet.
+in.
+
+Update on 2026-09-10: phase 1 has started. `call_signs` now carries the current
+`driver_id` and `vehicle_id`, assignment creation inherits that crew server-side,
+and an audit table records crew changes. QR/token scope is intentionally still
+assignment-based until phase 2.
 
 ---
 

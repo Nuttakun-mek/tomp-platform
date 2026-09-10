@@ -33,7 +33,7 @@ if (/prod|staging/i.test(url)) {
 
 const REQUIRED_TABLES = [
   "organizations", "profiles", "projects", "project_days", "sessions", "missions",
-  "call_signs", "assignments", "timeline_events", "roles", "permissions",
+  "call_signs", "call_sign_crew_events", "assignments", "timeline_events", "roles", "permissions",
   "role_permissions", "project_members", "user_role_assignments",
   "publish_snapshots", "publish_locks", "change_requests",
   "driver_access_tokens", "driver_checkins", "driver_issue_reports",

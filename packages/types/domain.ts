@@ -104,6 +104,8 @@ export interface CallSign extends BaseRecord {
   projectId: Id;
   callSign: string;
   groupName?: string | null;
+  driverId?: Id | null;
+  vehicleId?: Id | null;
   status: "active" | "inactive" | "archived";
 }
 

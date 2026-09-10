@@ -278,6 +278,19 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     {
       label: "สร้าง Assignment",
       run: () =>
+        client
+          .from("call_signs")
+          .update({
+            driver_id: ids.driver,
+            vehicle_id: ids.vehicle,
+            metadata: { smokeTest: true, crewedUnit: true }
+          })
+          .eq("id", ids.callSign)
+          .eq("project_id", ids.project)
+    },
+    {
+      label: "สร้าง Assignment",
+      run: () =>
         client.from("assignments").insert({
           id: ids.assignment,
           project_id: ids.project,

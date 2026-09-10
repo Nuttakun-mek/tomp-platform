@@ -58,15 +58,30 @@ export const updateAssignmentSchema = createAssignmentSchema.partial();
 // metadata.urgent); the driver's QR page and the fleet board read it back.
 export const setAssignmentOrderSchema = z.object({
   projectId: uuidSchema,
-  driverId: uuidSchema,
+  driverId: optionalUuidSchema,
+  callSignId: optionalUuidSchema,
   orderedAssignmentIds: z.array(uuidSchema).min(1).max(50),
   urgentAssignmentIds: z.array(uuidSchema).max(50).default([])
+}).refine((value) => Boolean(value.driverId || value.callSignId), {
+  message: "driverId or callSignId is required",
+  path: ["callSignId"]
 });
 
 export const createCallSignSchema = z.object({
   projectId: uuidSchema,
   callSign: z.string().trim().min(1).max(40),
   groupName: z.string().trim().optional().nullable(),
+  driverId: optionalUuidSchema,
+  vehicleId: optionalUuidSchema,
+  metadata: metadataSchema
+});
+
+export const updateCallSignCrewSchema = z.object({
+  projectId: uuidSchema,
+  callSignId: uuidSchema,
+  driverId: optionalUuidSchema,
+  vehicleId: optionalUuidSchema,
+  reason: z.string().trim().max(500).optional().nullable(),
   metadata: metadataSchema
 });
 
@@ -342,6 +357,7 @@ export type UpdateMissionInput = z.infer<typeof updateMissionSchema>;
 export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;
 export type UpdateAssignmentInput = z.infer<typeof updateAssignmentSchema>;
 export type CreateCallSignInput = z.infer<typeof createCallSignSchema>;
+export type UpdateCallSignCrewInput = z.infer<typeof updateCallSignCrewSchema>;
 export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
 export type CreateDriverInput = z.infer<typeof createDriverSchema>;
 export type DriverActivationInput = z.infer<typeof driverActivationSchema>;
