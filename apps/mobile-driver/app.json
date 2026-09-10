@@ -27,7 +27,10 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "CAMERA"
+        "CAMERA",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "POST_NOTIFICATIONS"
       ]
     },
     "plugins": [
@@ -42,7 +45,14 @@
         }
       ],
       "expo-secure-store",
-      "expo-camera"
+      "expo-camera",
+      [
+        "expo-notifications",
+        {
+          "color": "#007a73",
+          "defaultChannel": "driver-alerts"
+        }
+      ]
     ],
     "extra": {
       "tompApiBaseUrl": "https://tomp-platform.vercel.app",

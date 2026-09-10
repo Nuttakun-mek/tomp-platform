@@ -3,6 +3,7 @@
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
+import { sendDriverPush } from "@/lib/driver-access/push";
 import { createTimelineEvent } from "@/lib/timeline";
 
 async function recordAcknowledgement(input: {
@@ -158,6 +159,16 @@ export async function sendDriverNotificationAction(input: {
 
   if (insertError) return actionFailure(getDatabaseErrorMessage(insertError, "ส่งข้อความถึงคนขับไม่สำเร็จ"));
 
+  // Reach the driver even with the app backgrounded. Best effort: the row is
+  // already saved and the app also polls, so a failed push costs only the
+  // banner, never the message.
+  const push = await sendDriverPush(input.assignmentId, {
+    title: input.title.trim(),
+    body: input.body.trim(),
+    priority: input.priority,
+    data: { projectId: input.projectId, type: "control_message" }
+  }).catch(() => ({ sent: 0 }));
+
   const timelineResult = await createTimelineEvent({
     projectId: input.projectId,
     objectType: "assignment",
@@ -166,8 +177,8 @@ export async function sendDriverNotificationAction(input: {
     source: "operation_user",
     reason: `ส่งข้อความถึงคนขับ: ${input.title.trim()}`,
     afterData: data,
-    metadata: { notificationType: "control_message" }
+    metadata: { notificationType: "control_message", pushSent: push.sent }
   });
 
-  return actionSuccess({ notification: data, timelineEvent: timelineResult.data }, timelineResult.success ? undefined : `ส่งข้อความแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`);
+  return actionSuccess({ notification: data, timelineEvent: timelineResult.data, pushSent: push.sent }, timelineResult.success ? undefined : `ส่งข้อความแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`);
 }

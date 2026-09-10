@@ -23,16 +23,20 @@ import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
-import { buildDriverWebUrl, TOMP_API_BASE_URL, TOMP_DRIVER_APP_VERSION, TOMP_WEB_ORIGIN } from "./src/config";
+import { buildDriverWebUrl, EAS_PROJECT_ID, TOMP_API_BASE_URL, TOMP_DRIVER_APP_VERSION, TOMP_WEB_ORIGIN } from "./src/config";
 import { colors, radius } from "./src/theme";
 import {
+  hasBackgroundLocationPermission,
+  isForegroundSharing,
   requestBackgroundLocationPermission,
   requestForegroundLocationPermission,
   startBackgroundLocationSharing,
   startForegroundLocationSharing,
-  stopLocationSharing
+  stopLocationSharing,
+  stopStaleBackgroundLocationTask
 } from "./src/services/location";
 import { exchangeMobileSessionChallenge } from "./src/services/mobile-session-api";
+import { addNotificationTapListener, registerForPushNotifications, syncPushToken } from "./src/services/push";
 import { getInstallationId, getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
 import { flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-queue";
 import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
@@ -107,6 +111,14 @@ export default function App() {
     }
   }, []);
 
+  // Best effort: a driver without notification permission still works, they just
+  // do not get alerted while the app is in the background.
+  const registerPush = useCallback(async (session: { session: string; expiresAt: string }) => {
+    const token = await registerForPushNotifications(EAS_PROJECT_ID);
+    if (!token) return;
+    await syncPushToken(token, session);
+  }, []);
+
   const openDriverLink = useCallback(
     async (rawValue: string) => {
       const parsed = parseDriverLink(rawValue);
@@ -159,6 +171,7 @@ export default function App() {
         await saveMobileDriverSession(parsed.payload);
         setSessionReady(true);
         void flushOutbox();
+        void registerPush(parsed.payload);
         postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
         return;
       }
@@ -177,6 +190,7 @@ export default function App() {
         await saveMobileDriverSession(result.data);
         setSessionReady(true);
         void flushOutbox();
+        void registerPush(result.data);
         postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
         return;
       }
@@ -204,6 +218,13 @@ export default function App() {
         return;
       }
 
+      // A repeat gps.start (the web "share again" button) must not stack a
+      // second watcher on top of the running one.
+      if (isForegroundSharing()) {
+        postStatusToWeb("gps_sharing", "กำลังแชร์ตำแหน่งจากแอปอยู่แล้ว");
+        return;
+      }
+
       const foregroundGranted = await requestForegroundLocationPermission();
       if (!foregroundGranted) {
         postStatusToWeb("gps_error", "ไม่ได้รับสิทธิ์ตำแหน่งขณะเปิดแอป");
@@ -220,9 +241,20 @@ export default function App() {
         });
       });
 
-      const backgroundGranted = await requestBackgroundLocationPermission().catch(() => false);
-      const backgroundStarted = backgroundGranted ? await startBackgroundLocationSharing().catch(() => false) : false;
-      postStatusToWeb(backgroundStarted ? "gps_sharing" : "gps_error", backgroundStarted ? "เปิด GPS เบื้องหลังแล้ว" : "ยังไม่ได้รับสิทธิ์ GPS เบื้องหลัง");
+      // Foreground sharing is already running and is enough to keep the centre
+      // updated while the app is open. Background is a bonus: ask once, then
+      // only start the service when the OS actually reports the grant —
+      // starting it without one is a native crash, not a rejected promise.
+      if (!(await hasBackgroundLocationPermission())) {
+        await requestBackgroundLocationPermission();
+      }
+      const backgroundStarted = await startBackgroundLocationSharing();
+      postStatusToWeb(
+        "gps_sharing",
+        backgroundStarted
+          ? "เปิด GPS เบื้องหลังแล้ว"
+          : "แชร์ตำแหน่งขณะเปิดแอปแล้ว — เปิด GPS เบื้องหลังได้โดยตั้งค่าตำแหน่งเป็น อนุญาตตลอดเวลา"
+      );
     },
     [flushOutbox, postStatusToWeb]
   );
@@ -256,6 +288,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // A background location task survives a crash and is restored on launch. If
+    // it no longer has a session or the permission behind it, clear it before
+    // anything else — otherwise it takes the app down on every start and the
+    // driver only ever sees a white screen.
+    void stopStaleBackgroundLocationTask();
+
     getSavedDriverToken().then((savedToken) => {
       if (savedToken) void openDriverLink(savedToken);
     });
@@ -263,6 +301,13 @@ export default function App() {
     void flushOutbox();
     Network.getNetworkStateAsync().then((state) => {
       setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
+    });
+
+    // Tapping a dispatch notification should land on the job, not just open the
+    // shell — the driver is being told to look at something.
+    const tapSubscription = addNotificationTapListener(() => {
+      setMode("web");
+      webViewRef.current?.reload();
     });
 
     const subscription = ExpoLinking.addEventListener("url", ({ url }) => {

@@ -1,34 +1,51 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
-import { LOCATION_TASK_NAME } from "../config";
+import { BACKGROUND_GPS_ENABLED, LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
 import { enqueueOfflineAction } from "./offline-queue";
 import { getMobileDriverSession, type MobileDriverSession } from "./mobile-session-store";
 
 type LocationCallback = (location: Location.LocationObject) => void;
 
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  if (error) return;
-  const payload = data as { locations?: Location.LocationObject[] } | undefined;
-  const latest = payload?.locations?.[0];
-  if (!latest) return;
-  const mobileSession = await getMobileDriverSession();
-  if (!mobileSession) return;
+// The foreground watcher is owned here, not by the caller. It used to be
+// returned and dropped on the floor, and stopLocationSharing() only stopped the
+// background task — so every "share again" tap added another watchPositionAsync
+// that could never be removed. They stacked up until the app died natively.
+let foregroundWatch: Location.LocationSubscription | null = null;
 
-  await submitOrQueueLocation(
-    {
-      latitude: latest.coords.latitude,
-      longitude: latest.coords.longitude,
-      accuracy: latest.coords.accuracy,
-      recordedAt: new Date(latest.timestamp).toISOString(),
-      trackingEvent: "location_ping",
-      metadata: {
-        platform: "mobile_driver",
-        mode: "background"
-      }
-    },
-    mobileSession
-  ).catch(() => undefined);
+export function isForegroundSharing() {
+  return foregroundWatch !== null;
+}
+
+// Runs in a headless JS context that Android restores after a reboot or a
+// process kill. Anything that escapes here takes the whole app down on start,
+// so the entire body is guarded — SecureStore and SQLite both live in here.
+TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+  try {
+    if (error) return;
+    const payload = data as { locations?: Location.LocationObject[] } | undefined;
+    const latest = payload?.locations?.[0];
+    if (!latest) return;
+    const mobileSession = await getMobileDriverSession();
+    if (!mobileSession) return;
+
+    await submitOrQueueLocation(
+      {
+        latitude: latest.coords.latitude,
+        longitude: latest.coords.longitude,
+        accuracy: latest.coords.accuracy,
+        recordedAt: new Date(latest.timestamp).toISOString(),
+        trackingEvent: "location_ping",
+        metadata: {
+          platform: "mobile_driver",
+          mode: "background"
+        }
+      },
+      mobileSession
+    );
+  } catch {
+    // A dropped background ping must never crash the app.
+  }
 });
 
 export async function requestForegroundLocationPermission() {
@@ -37,12 +54,54 @@ export async function requestForegroundLocationPermission() {
 }
 
 export async function requestBackgroundLocationPermission() {
-  const { status } = await Location.requestBackgroundPermissionsAsync();
-  return status === "granted";
+  try {
+    const { status } = await Location.requestBackgroundPermissionsAsync();
+    return status === "granted";
+  } catch {
+    return false;
+  }
 }
 
-export async function getCurrentLocation() {
-  return Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+// Read what the OS actually grants right now. On Android 11+ the background
+// request cannot show a dialog — the driver has to pick "Allow all the time" in
+// Settings — so the result of requesting is not proof that we may start a
+// location foreground service.
+export async function hasBackgroundLocationPermission() {
+  try {
+    const { status } = await Location.getBackgroundPermissionsAsync();
+    return status === "granted";
+  } catch {
+    return false;
+  }
+}
+
+// A registered background task is restored on every app start. If it was left
+// behind by a crash — or the driver has since revoked the permission — starting
+// it again takes the app down before it renders, so clear it out.
+export async function stopStaleBackgroundLocationTask() {
+  try {
+    const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (!started) return;
+    const [session, allowed] = await Promise.all([getMobileDriverSession(), hasBackgroundLocationPermission()]);
+    if (!session || !allowed) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+  } catch {
+    // never let cleanup break startup
+  }
+}
+
+const FIRST_FIX_TIMEOUT_MS = 8000;
+
+// getCurrentPositionAsync has no timeout of its own. Indoors it can sit waiting
+// for a high-accuracy fix long enough that Android calls the app unresponsive
+// and kills it, which is what "tap share, app freezes, app closes" was. Race it,
+// fall back to the last known position, and let the caller carry on without a
+// first fix — the watcher delivers positions anyway.
+export async function getCurrentLocation(): Promise<Location.LocationObject | null> {
+  const fix = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null);
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), FIRST_FIX_TIMEOUT_MS));
+  const raced = await Promise.race([fix, timeout]);
+  if (raced) return raced;
+  return Location.getLastKnownPositionAsync().catch(() => null);
 }
 
 async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0], mobileSession?: MobileDriverSession | null) {
@@ -58,21 +117,27 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
 }
 
 export async function startForegroundLocationSharing(onLocation: LocationCallback) {
-  const firstLocation = await getCurrentLocation();
-  onLocation(firstLocation);
-  await submitOrQueueLocation({
-    latitude: firstLocation.coords.latitude,
-    longitude: firstLocation.coords.longitude,
-    accuracy: firstLocation.coords.accuracy,
-    recordedAt: new Date(firstLocation.timestamp).toISOString(),
-    trackingEvent: "sharing_started",
-    metadata: {
-      platform: "mobile_driver",
-      mode: "foreground"
-    }
-  });
+  // Idempotent: a second request while already watching is a no-op.
+  if (foregroundWatch) return foregroundWatch;
 
-  return Location.watchPositionAsync(
+  // Never block starting the watcher on a first fix.
+  const firstLocation = await getCurrentLocation();
+  if (firstLocation) {
+    onLocation(firstLocation);
+    void submitOrQueueLocation({
+      latitude: firstLocation.coords.latitude,
+      longitude: firstLocation.coords.longitude,
+      accuracy: firstLocation.coords.accuracy,
+      recordedAt: new Date(firstLocation.timestamp).toISOString(),
+      trackingEvent: "sharing_started",
+      metadata: {
+        platform: "mobile_driver",
+        mode: "foreground"
+      }
+    });
+  }
+
+  foregroundWatch = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.High,
       distanceInterval: 15,
@@ -93,29 +158,50 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
       });
     }
   );
+  return foregroundWatch;
 }
 
 export async function startBackgroundLocationSharing() {
+  if (!BACKGROUND_GPS_ENABLED) return false;
+
   const mobileSession = await getMobileDriverSession();
   if (!mobileSession) return false;
 
-  const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
-  if (alreadyStarted) return true;
-  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-    accuracy: Location.Accuracy.Balanced,
-    distanceInterval: 25,
-    timeInterval: 30000,
-    pausesUpdatesAutomatically: false,
-    foregroundService: {
-      notificationTitle: "TOMP กำลังแชร์ตำแหน่ง",
-      notificationBody: "ศูนย์ควบคุมกำลังติดตามตำแหน่งระหว่างปฏิบัติงาน",
-      notificationColor: "#007a73"
-    }
-  });
-  return true;
+  // Android throws (natively — a JS catch cannot save the app) when a
+  // location-typed foreground service starts without background permission
+  // actually granted. Check the live grant, never the request result.
+  if (!(await hasBackgroundLocationPermission())) return false;
+
+  try {
+    const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (alreadyStarted) return true;
+    await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+      accuracy: Location.Accuracy.Balanced,
+      distanceInterval: 25,
+      timeInterval: 30000,
+      foregroundService: {
+        notificationTitle: "TOMP กำลังแชร์ตำแหน่ง",
+        notificationBody: "ศูนย์ควบคุมกำลังติดตามตำแหน่งระหว่างปฏิบัติงาน",
+        notificationColor: "#007a73"
+      }
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function stopLocationSharing() {
+  // Remove the watcher first so no further pings fire while we are stopping.
+  if (foregroundWatch) {
+    try {
+      foregroundWatch.remove();
+    } catch {
+      // already gone
+    }
+    foregroundWatch = null;
+  }
+
   const location = await getCurrentLocation().catch(() => null);
   if (location) {
     await submitOrQueueLocation({
@@ -130,5 +216,5 @@ export async function stopLocationSharing() {
     }).catch(() => undefined);
   }
   const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
-  if (started) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+  if (started) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => undefined);
 }

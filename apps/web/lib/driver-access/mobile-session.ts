@@ -209,3 +209,57 @@ export async function markMobileSessionUsed(session: string): Promise<"active" |
     return "unknown";
   }
 }
+
+/**
+ * Store the device's Expo push token on the active mobile session. Kept in
+ * metadata rather than a new column so this needs no migration; dispatch reads
+ * it back by assignment when it has something to tell the driver.
+ */
+export async function saveMobileSessionPushToken(
+  ctx: DriverSessionContext,
+  pushToken: string,
+  platform: string
+): Promise<boolean> {
+  const updatedAt = nowIso();
+  const { client } = getSupabaseWriteClient();
+  if (client) {
+    const { data, error } = await client
+      .from("driver_mobile_sessions")
+      .select("id, metadata")
+      .eq("token_id", ctx.tokenId)
+      .eq("assignment_id", ctx.assignmentId)
+      .eq("status", "active")
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return false;
+
+    const metadata = { ...((data.metadata as Record<string, unknown>) ?? {}), pushToken, pushPlatform: platform, pushTokenAt: updatedAt };
+    const { error: updateError } = await client
+      .from("driver_mobile_sessions")
+      .update({ metadata, updated_at: updatedAt })
+      .eq("id", data.id);
+    return !updateError;
+  }
+
+  const sql = getPostgresClient();
+  if (!sql) return false;
+  try {
+    const rows = await sql<Array<{ id: string }>>`
+      update driver_mobile_sessions
+      set metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({ pushToken, pushPlatform: platform, pushTokenAt: updatedAt })}::jsonb,
+          updated_at = ${updatedAt}
+      where id = (
+        select id from driver_mobile_sessions
+        where token_id = ${ctx.tokenId} and assignment_id = ${ctx.assignmentId}
+          and status = 'active' and revoked_at is null
+        order by created_at desc limit 1
+      )
+      returning id
+    `;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
