@@ -345,3 +345,40 @@ button:disabled {
     width: 100%;
   }
 }
+
+/* Printing a credential sheet should produce the sheet, not the application
+   around it. The operator reaches for Print to get a PDF they can hand over.
+
+   Hiding by `visibility` rather than `display` on purpose: the sheet sits deep
+   in the tree, so anything that hides its ancestors hides it too. Visibility is
+   inherited but can be turned back on for a subtree, which is exactly what is
+   needed here. */
+@media print {
+  body:has([data-credential-sheet]) {
+    visibility: hidden;
+    background: #ffffff;
+  }
+
+  body:has([data-credential-sheet]) [data-credential-sheet],
+  body:has([data-credential-sheet]) [data-credential-sheet] * {
+    visibility: visible;
+  }
+
+  body:has([data-credential-sheet]) [data-credential-sheet] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    border: 0;
+    background: #ffffff;
+  }
+
+  [data-credential-sheet] .print\:hidden {
+    display: none !important;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}

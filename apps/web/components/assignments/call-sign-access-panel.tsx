@@ -7,6 +7,8 @@ import type { Assignment, CallSign, Driver, Vehicle } from "@tomp/types/domain";
 import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
 import { createObserverAccessTokenAction } from "@/app/actions/observer-access";
 import { ActionFeedback } from "@/components/ui/action-feedback";
+import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
+import { formatStatusTh } from "@/lib/i18n/status-th";
 import { CallSignCrewForm } from "./call-sign-crew-form";
 
 // Access is issued per crewed unit, not per job: one Call Sign is one driver in
@@ -14,13 +16,20 @@ import { CallSignCrewForm } from "./call-sign-crew-form";
 // filled Mission Control with duplicate cards and stranded job history on old
 // tokens — see docs/11-codex/967.
 
+interface UnitJob {
+  id: string;
+  status: string;
+  clock: string;
+  route: string;
+}
+
 interface Unit {
   callSign: CallSign;
   driver?: Driver;
   vehicle?: Vehicle;
   /** A job on this unit, needed because the token still records one for compatibility. */
   anchorAssignmentId: string | null;
-  jobCount: number;
+  jobs: UnitJob[];
 }
 
 interface Issued {
@@ -33,6 +42,16 @@ interface Issued {
 async function renderQr(url: string, width = 240) {
   const QRCode = await import("qrcode");
   return QRCode.toDataURL(url, { margin: 2, width, errorCorrectionLevel: "M" });
+}
+
+
+/** "09:30 – 12:00", or a dash when the job has no times yet. */
+function clockRange(start?: string | null, end?: string | null) {
+  const time = (value?: string | null) => (value ? String(value).slice(11, 16) : "");
+  const from = time(start);
+  const to = time(end);
+  if (from && to) return `${from} – ${to}`;
+  return from || to || "ยังไม่ระบุเวลา";
 }
 
 export function CallSignAccessPanel({
@@ -71,32 +90,51 @@ export function CallSignAccessPanel({
         // Prefer the job actually running; otherwise any job will do — the token
         // only needs one to point at.
         const anchor = jobs.find((a) => a.status === "active") ?? jobs[0];
+        // Same running order the driver's own screen uses, so the control room
+        // and the driver never disagree about what comes next.
+        const ordered = orderDriverJobs(
+          jobs.map((a) => ({
+            id: a.id,
+            status: a.status,
+            startTime: a.startTime ?? null,
+            createdAt: a.createdAt ?? null,
+            sequence: typeof a.metadata.sequence === "number" ? (a.metadata.sequence as number) : null,
+            urgent: isUrgentMeta(a.metadata),
+            isCurrent: a.status === "active"
+          }))
+        );
+        const byId = new Map(jobs.map((a) => [a.id, a]));
         return {
           callSign: cs,
           driver: cs.driverId ? driverById.get(cs.driverId) : undefined,
           vehicle: cs.vehicleId ? vehicleById.get(cs.vehicleId) : undefined,
           anchorAssignmentId: anchor?.id ?? null,
-          jobCount: jobs.length
+          jobs: ordered.map((job) => {
+            const row = byId.get(job.id);
+            const meta = (row?.metadata ?? {}) as Record<string, unknown>;
+            const pickup = typeof meta.pickupLocation === "string" ? meta.pickupLocation : "ยังไม่ระบุจุดรับ";
+            const dropoff = typeof meta.dropoffLocation === "string" ? meta.dropoffLocation : "ยังไม่ระบุจุดส่ง";
+            return {
+              id: job.id,
+              status: job.status,
+              clock: clockRange(row?.startTime, row?.endTime),
+              route: `${pickup} → ${dropoff}`
+            };
+          })
         };
       })
       .sort((a, b) => a.callSign.callSign.localeCompare(b.callSign.callSign, "th"));
   }, [assignments, callSigns, drivers, vehicles]);
 
-  const ready = units.filter((u) => u.driver && u.vehicle && u.anchorAssignmentId);
+  const ready = units.filter((u) => u.driver && u.vehicle);
 
   function issue(unit: Unit, replaceExisting: boolean) {
     setMessage(null);
     setIssued(null);
-    if (!unit.anchorAssignmentId) {
-      setTone("warning");
-      setMessage("Call Sign นี้ยังไม่มีงาน กรุณาเพิ่มงานให้คันนี้ก่อนออก QR");
-      return;
-    }
-
     startTransition(async () => {
       const result = await createDriverAccessTokenAction({
         projectId,
-        assignmentId: unit.anchorAssignmentId,
+        callSignId: unit.callSign.id,
         driverId: unit.callSign.driverId || null,
         replaceExisting
       });
@@ -203,13 +241,13 @@ export function CallSignAccessPanel({
                   <p className="mt-0.5 truncate text-[12px] text-ink-soft">
                     {unit.driver?.fullName ?? "ยังไม่ผูกคนขับ"} / {unit.vehicle?.plateNumber ?? "ยังไม่ผูกรถ"}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-ink-faint">{unit.jobCount} งานในโครงการนี้</p>
+                  <p className="mt-0.5 text-[11px] text-ink-faint">{unit.jobs.length} งานในโครงการนี้</p>
                 </div>
 
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                   <button
                     type="button"
-                    disabled={isPending || !crewed || !unit.anchorAssignmentId}
+                    disabled={isPending || !crewed}
                     onClick={() => issue(unit, needsConfirm)}
                     className={`flex min-h-9 items-center gap-1.5 rounded-command px-3 text-[12px] font-semibold text-white disabled:opacity-40 ${
                       needsConfirm ? "bg-amber-600" : "bg-route"
@@ -237,9 +275,26 @@ export function CallSignAccessPanel({
                 </p>
               ) : null}
 
-              {crewed && !unit.anchorAssignmentId ? (
+              {/* Item 5: work shows up under the unit it was given to, right
+                  after it is added, instead of only as a number. */}
+              {unit.jobs.length ? (
+                <ol className="mt-2 grid gap-1 border-t border-black/5 pt-2">
+                  {unit.jobs.map((job, index) => (
+                    <li key={job.id} className="flex flex-wrap items-center gap-2 text-[12px]">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-bold text-ink-soft">
+                        {index + 1}
+                      </span>
+                      <span className="font-semibold text-ink">{job.clock}</span>
+                      <span className="min-w-0 flex-1 truncate text-ink-soft">{job.route}</span>
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-ink-soft">
+                        {formatStatusTh(job.status)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : crewed ? (
                 <p className="mt-2 rounded-card bg-slate-100 px-2.5 py-1.5 text-[12px] text-ink-soft">
-                  ยังไม่มีงานสำหรับคันนี้ เพิ่มงานก่อนออก QR
+                  ยังไม่มีงานสำหรับหน่วยนี้ เพิ่มได้ที่ “ขั้นที่ 2” ด้านล่าง
                 </p>
               ) : null}
 

@@ -95,7 +95,13 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
       </section>
 
       <CollapsibleSection title="เพิ่มภารกิจ" storageKey={`proj.${projectId}.newmission`} defaultOpen={missions.length === 0}>
-        <CreateMissionForm projectId={projectId} />
+        <CreateMissionForm
+          projectId={projectId}
+          projectCode={activeProject.projectCode}
+          existingCount={missions.length}
+          projectStartDate={activeProject.startDate}
+          projectEndDate={activeProject.endDate}
+        />
       </CollapsibleSection>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">

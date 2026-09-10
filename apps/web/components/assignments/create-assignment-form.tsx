@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
-import { DateRangeFields } from "@/components/ui/datetime-field";
+import { DateRangeFields, describeThai } from "@/components/ui/datetime-field";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { describeAssignmentConflicts } from "@/lib/domain/assignment-rules";
@@ -40,6 +40,14 @@ function vehicleLabel(vehicle?: Vehicle) {
   return `${vehicle.plateNumber}${vehicle.vehicleType ? ` / ${vehicle.vehicleType}` : ""}`;
 }
 
+
+/** The operation day a mission belongs to, as a plain YYYY-MM-DD. */
+function missionDate(mission: Mission): string {
+  const fromMeta = (mission.metadata as Record<string, unknown> | undefined)?.operationDate;
+  if (typeof fromMeta === "string" && fromMeta) return fromMeta.slice(0, 10);
+  return mission.plannedStartTime ? String(mission.plannedStartTime).slice(0, 10) : "";
+}
+
 export function CreateAssignmentForm({
   projectId,
   missions,
@@ -54,8 +62,20 @@ export function CreateAssignmentForm({
   const [isPending, startTransition] = useTransition();
   const availableCallSigns = callSigns;
   const [selectedCallSignId, setSelectedCallSignId] = useState(callSigns[0]?.id || "");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [missionId, setMissionId] = useState("");
+  const [startClock, setStartClock] = useState("");
+  const [endClock, setEndClock] = useState("");
+
+  // The mission owns the day; the job owns the clock. Combining them here keeps
+  // one source for the date and removes the contradiction the two forms used to
+  // allow.
+  const operationDate = useMemo(() => {
+    const mission = missions.find((item) => item.id === missionId);
+    return mission ? missionDate(mission) : "";
+  }, [missionId, missions]);
+
+  const startTime = operationDate && startClock ? `${operationDate}T${startClock}` : "";
+  const endTime = operationDate && endClock ? `${operationDate}T${endClock}` : "";
 
   const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
   const vehicleById = useMemo(() => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle])), [vehicles]);
@@ -99,8 +119,8 @@ export function CreateAssignmentForm({
       projectId,
       missionId: formData.get("missionId"),
       callSignId: selectedCallSignId || formData.get("callSignId"),
-      startTime: formData.get("startTime") || null,
-      endTime: formData.get("endTime") || null,
+      startTime: startTime || null,
+      endTime: endTime || null,
       metadata: {
         pickupLocation: formData.get("pickupLocation") || "ยังไม่ระบุจุดรับ",
         dropoffLocation: formData.get("dropoffLocation") || "ยังไม่ระบุจุดส่ง",
@@ -168,28 +188,47 @@ export function CreateAssignmentForm({
       <div className="grid gap-4 md:grid-cols-2">
         <label className="field-label">
           เลือกภารกิจ
-          <select className="field-input" name="missionId" required>
+          <select
+            className="field-input"
+            name="missionId"
+            value={missionId}
+            onChange={(event) => setMissionId(event.target.value)}
+            required
+          >
             <option value="">เลือกภารกิจ</option>
             {missions.map((mission) => (
               <option key={mission.id} value={mission.id}>
-                {mission.missionCode} / {mission.missionName}
+                {mission.missionName}
+                {missionDate(mission) ? ` · ${describeThai(missionDate(mission), false)}` : ""}
               </option>
             ))}
           </select>
+          {operationDate ? (
+            <span className="mt-1 text-xs font-semibold text-operation">
+              งานนี้อยู่ในวันที่ {describeThai(operationDate, false)}
+            </span>
+          ) : (
+            <span className="mt-1 text-xs text-slate-500">เลือกภารกิจก่อน แล้วจึงกำหนดเวลาของงาน</span>
+          )}
         </label>
         <div className="md:col-span-2">
+          {/* Only the clock: the day comes from the mission, so a job can no
+              longer be scheduled on a different date than the mission it serves. */}
           <DateRangeFields
-            legend="ช่วงเวลางาน"
+            legend={operationDate ? `ช่วงเวลางาน ในวันที่ ${describeThai(operationDate, false)}` : "ช่วงเวลางาน"}
             startLabel="เวลาเริ่ม"
             endLabel="เวลาสิ้นสุด"
-            startName="startTime"
-            endName="endTime"
-            start={startTime}
-            end={endTime}
-            onStart={setStartTime}
-            onEnd={setEndTime}
-            withTime
+            startName="startClock"
+            endName="endClock"
+            start={startClock}
+            end={endClock}
+            onStart={setStartClock}
+            onEnd={setEndClock}
+            timeOnly
           />
+          {!operationDate ? (
+            <p className="mt-1 text-xs text-slate-500">เลือกภารกิจก่อน เพื่อให้ระบบรู้ว่างานนี้อยู่วันไหน</p>
+          ) : null}
         </div>
         <label className="field-label">
           จุดรับ

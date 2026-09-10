@@ -207,13 +207,15 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
   const data = input as {
     projectId?: string;
     assignmentId?: string;
+    /** Issue against the crewed unit directly, before any work exists. */
+    callSignId?: string;
     driverId?: string | null;
     expiresAt?: string | null;
     /** Deliberately replace the Call Sign's live QR, invalidating any printed copy. */
     replaceExisting?: boolean;
   };
-  if (!data.projectId || !data.assignmentId) {
-    return actionFailure("กรุณาเลือกโครงการและ Assignment");
+  if (!data.projectId || (!data.assignmentId && !data.callSignId)) {
+    return actionFailure("กรุณาเลือกโครงการและหน่วยรถ");
   }
 
   const { client, error } = getSupabaseWriteClient();
@@ -224,23 +226,55 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างลิงก์ QR สำหรับคนขับ");
   }
 
-  const { data: assignmentForQr, error: assignmentError } = await client
-    .from("assignments")
-    .select("id, project_id, call_sign_id, driver_id, vehicle_id")
-    .eq("id", data.assignmentId)
+  // A QR belongs to the crewed unit, so it can be issued the moment the unit is
+  // crewed — before any work is planned onto it. The assignment is accepted as
+  // an alternative way to name that unit, for callers that only hold a job.
+  let callSignId = data.callSignId ?? "";
+  let crewDriverId: string | null = data.driverId ?? null;
+  let crewVehicleId: string | null = null;
+  const anchorAssignmentId: string | null = data.assignmentId ?? null;
+
+  if (anchorAssignmentId) {
+    const { data: assignmentForQr, error: assignmentError } = await client
+      .from("assignments")
+      .select("id, project_id, call_sign_id, driver_id, vehicle_id")
+      .eq("id", anchorAssignmentId)
+      .eq("project_id", data.projectId)
+      .maybeSingle();
+
+    if (assignmentError) return actionFailure(getDatabaseErrorMessage(assignmentError, "ตรวจสอบ Assignment ก่อนสร้าง QR ไม่สำเร็จ"));
+    if (!assignmentForQr) return actionFailure("ไม่พบ Assignment นี้ในโครงการ กรุณาเลือกงานใหม่");
+
+    callSignId = String(assignmentForQr.call_sign_id || "");
+    crewDriverId = data.driverId ?? assignmentForQr.driver_id ?? null;
+    crewVehicleId = assignmentForQr.vehicle_id ?? null;
+  }
+
+  if (!callSignId) return actionFailure("กรุณาเลือกหน่วยรถ (Call Sign) ก่อนออก QR");
+
+  const { data: callSignRow, error: callSignError } = await client
+    .from("call_signs")
+    .select("id, project_id, call_sign, driver_id, vehicle_id, status")
+    .eq("id", callSignId)
     .eq("project_id", data.projectId)
     .maybeSingle();
 
-  if (assignmentError) return actionFailure(getDatabaseErrorMessage(assignmentError, "ตรวจสอบ Assignment ก่อนสร้าง QR ไม่สำเร็จ"));
-  if (!assignmentForQr) return actionFailure("ไม่พบ Assignment นี้ในโครงการ กรุณาเลือกงานใหม่");
+  if (callSignError) return actionFailure(getDatabaseErrorMessage(callSignError, "ตรวจสอบหน่วยรถก่อนสร้าง QR ไม่สำเร็จ"));
+  if (!callSignRow) return actionFailure("ไม่พบหน่วยรถนี้ในโครงการ");
+
+  // The unit is the source of truth for who is crewed; an assignment only ever
+  // held a snapshot of it.
+  crewDriverId = crewDriverId || callSignRow.driver_id || null;
+  crewVehicleId = crewVehicleId || callSignRow.vehicle_id || null;
 
   const missing: string[] = [];
-  if (!assignmentForQr.call_sign_id) missing.push("Call Sign");
-  if (!assignmentForQr.driver_id && !data.driverId) missing.push("คนขับ");
-  if (!assignmentForQr.vehicle_id) missing.push("รถ");
+  if (!crewDriverId) missing.push("คนขับ");
+  if (!crewVehicleId) missing.push("รถ");
   if (missing.length) {
-    return actionFailure(`ยังสร้าง QR ไม่ได้ เพราะ Assignment นี้ยังขาด ${missing.join(", ")} กรุณาจัดสรรข้อมูลให้ครบก่อน`);
+    return actionFailure(`ยังออก QR ไม่ได้ เพราะหน่วยรถนี้ยังขาด ${missing.join(", ")} กรุณาจับคู่ให้ครบก่อน`);
   }
+
+  const assignmentForQr = { call_sign_id: callSignId, driver_id: crewDriverId, vehicle_id: crewVehicleId };
 
   // One crewed unit, one live QR. The button sits on a job, so pressing it from
   // a second job of the same Call Sign used to mint a second token with a second
@@ -268,7 +302,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
   }
 
   const token = generateDriverAccessToken({
-    assignmentId: data.assignmentId,
+    assignmentId: anchorAssignmentId ?? callSignId,
     callSignId: assignmentForQr.call_sign_id,
     driverId: data.driverId ?? assignmentForQr.driver_id,
     expiresAt: data.expiresAt
@@ -280,7 +314,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     .from("driver_access_tokens")
     .insert({
       project_id: data.projectId,
-      assignment_id: data.assignmentId,
+      assignment_id: anchorAssignmentId,
       call_sign_id: assignmentForQr.call_sign_id,
       driver_id: data.driverId || assignmentForQr.driver_id || null,
       token_hash: hashDriverAccessToken(token),
@@ -294,7 +328,11 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
 
   if (insertError) return actionFailure(getDatabaseErrorMessage(insertError, "สร้างลิงก์ QR สำหรับคนขับไม่สำเร็จ"));
 
-  const packetResult = await createAssignmentPacket(client, data.projectId, data.assignmentId, data.driverId ?? assignmentForQr.driver_id);
+  // The packet describes one job, so a unit with no work yet simply has none —
+  // the driver page builds what it needs from the current job at open time.
+  const packetResult = anchorAssignmentId
+    ? await createAssignmentPacket(client, data.projectId, anchorAssignmentId, crewDriverId)
+    : { packetRecord: null };
   if (!packetResult) {
     await client
       .from("driver_access_tokens")
@@ -308,8 +346,8 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
   }
   const timelineResult = await createTimelineEvent({
     projectId: data.projectId,
-    objectType: "assignment",
-    objectId: data.assignmentId,
+    objectType: anchorAssignmentId ? "assignment" : "call_sign",
+    objectId: anchorAssignmentId ?? callSignId,
     eventType: TIMELINE_EVENTS.DRIVER_ACCESS_TOKEN_CREATED,
     source: "operation_user",
     reason: "สร้าง QR token และ assignment packet สำหรับคนขับ",

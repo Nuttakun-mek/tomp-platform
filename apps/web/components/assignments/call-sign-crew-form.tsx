@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Link2, UserPlus } from "lucide-react";
 import type { CallSign, Driver, Vehicle } from "@tomp/types/domain";
 import { createCallSignAction, updateCallSignCrewAction } from "@/app/actions/call-signs";
+import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
+import { createObserverAccessTokenAction } from "@/app/actions/observer-access";
 import { ActionFeedback } from "@/components/ui/action-feedback";
+import { UnitCredentialSheet, type UnitCredentials } from "./unit-credential-sheet";
 
 // Crewing a unit and opening a job used to live in the same form. They are not
 // the same kind of decision: a unit is crewed once and stands for the length of
@@ -42,6 +45,7 @@ export function CallSignCrewForm({
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
   const [isPending, startTransition] = useTransition();
+  const [credentials, setCredentials] = useState<UnitCredentials | null>(null);
 
   // A person drives one vehicle at a time and a vehicle carries one driver, so
   // anyone already crewed elsewhere is out of the list rather than offered and
@@ -76,11 +80,70 @@ export function CallSignCrewForm({
         setMessage(result.error || "บันทึกหน่วยรถไม่สำเร็จ");
         return;
       }
-      setTone("success");
-      setMessage(editing ? "เปลี่ยนคนขับ/รถของหน่วยนี้แล้ว" : "สร้างหน่วยรถแล้ว ออก QR ได้จากรายการด้านล่าง");
+      if (editing) {
+        setTone("success");
+        setMessage("เปลี่ยนคนขับ/รถของหน่วยนี้แล้ว QR ที่ปริ้นไว้ยังใช้ได้ แต่ต้องออกรหัสใหม่ให้คนขับคนใหม่");
+        reset();
+        router.refresh();
+        return;
+      }
+
+      const created = (result.data as { callSign?: CallSign } | undefined)?.callSign;
+      if (!created) {
+        setTone("success");
+        setMessage("สร้างหน่วยรถแล้ว");
+        reset();
+        router.refresh();
+        return;
+      }
+
+      // Issue both credentials straight away. Someone is standing there waiting
+      // for the QR; making them find a second button is the whole complaint.
+      const sheet = await issueCredentials(created, driverId, vehicleId);
+      setCredentials(sheet);
+      setTone(sheet.driverQr ? "success" : "warning");
+      setMessage(
+        sheet.driverQr
+          ? "สร้างหน่วยรถและออก QR แล้ว รหัส 6 หลักแสดงครั้งเดียว กรุณาบันทึกหรือพิมพ์เก็บไว้"
+          : "สร้างหน่วยรถแล้ว แต่ออก QR ไม่สำเร็จ ลองออกอีกครั้งจากรายการด้านล่าง"
+      );
       reset();
       router.refresh();
     });
+  }
+
+
+  /** Driver QR + PIN and the view-only link, produced together for one unit. */
+  async function issueCredentials(callSign: CallSign, driver: string, vehicle: string): Promise<UnitCredentials> {
+    const QRCode = await import("qrcode");
+    const toQr = (url: string) => (url ? QRCode.toDataURL(url, { margin: 2, width: 300, errorCorrectionLevel: "M" }) : Promise.resolve(null));
+
+    const [driverResult, observerResult] = await Promise.all([
+      createDriverAccessTokenAction({ projectId, callSignId: callSign.id, driverId: driver || null }),
+      createObserverAccessTokenAction({ projectId, callSignId: callSign.id })
+    ]);
+
+    const driverData = driverResult.success ? (driverResult.data as { accessUrl?: string; pin?: string }) : null;
+    const observerData = observerResult.success ? (observerResult.data as { accessUrl?: string; trackUrl?: string }) : null;
+    const driverUrl = driverData?.accessUrl || "";
+    const observerUrl = observerData?.trackUrl || observerData?.accessUrl || "";
+
+    const [driverQr, observerQr] = await Promise.all([toQr(driverUrl), toQr(observerUrl)]);
+
+    const driverRecord = drivers.find((item) => item.id === driver);
+    const vehicleRecord = vehicles.find((item) => item.id === vehicle);
+
+    return {
+      callSignId: callSign.id,
+      callSignLabel: callSign.callSign,
+      driverName: driverRecord?.fullName ?? "ไม่ทราบชื่อคนขับ",
+      vehicleLabel: vehicleRecord ? `${vehicleRecord.plateNumber} · ${vehicleRecord.vehicleType}` : "ไม่ทราบรถ",
+      driverUrl,
+      driverQr,
+      pin: driverData?.pin ?? null,
+      observerUrl,
+      observerQr
+    };
   }
 
   function startEdit(callSign: CallSign) {
@@ -106,6 +169,7 @@ export function CallSignCrewForm({
       </div>
 
       {message ? <ActionFeedback tone={tone} message={message} /> : null}
+      {credentials ? <UnitCredentialSheet credentials={credentials} /> : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="field-label">

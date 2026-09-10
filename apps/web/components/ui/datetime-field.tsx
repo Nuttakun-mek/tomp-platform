@@ -19,6 +19,20 @@ const TH_DATETIME = new Intl.DateTimeFormat("th-TH", {
   minute: "2-digit"
 });
 
+/** Today in the viewer's own timezone, as the value a date input expects. */
+export function todayLocalDate(): string {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+/** Now, rounded down to the minute, as a datetime-local value. */
+export function nowLocalDateTime(): string {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+}
+
 function parse(value: string): Date | null {
   if (!value) return null;
   const date = new Date(value);
@@ -33,8 +47,11 @@ export function describeThai(value: string, withTime: boolean): string {
 
 /** "4 ชม. 30 นาที", or "" when the pair is incomplete or backwards. */
 export function describeDuration(start: string, end: string): string {
-  const from = parse(start);
-  const to = parse(end);
+  // "09:30" alone is not a date; anchor both to the same day so the difference
+  // is still meaningful for a time-only range.
+  const anchor = (value: string) => (/^\d{2}:\d{2}$/.test(value) ? `2000-01-01T${value}` : value);
+  const from = parse(anchor(start));
+  const to = parse(anchor(end));
   if (!from || !to) return "";
   const minutes = Math.round((to.getTime() - from.getTime()) / 60000);
   if (minutes <= 0) return "";
@@ -58,13 +75,16 @@ interface FieldProps {
   withTime?: boolean;
   required?: boolean;
   min?: string;
+  max?: string;
   hint?: string;
+  /** Time inside a day already chosen elsewhere — shows a time picker, not a date. */
+  timeOnly?: boolean;
 }
 
-export function DateTimeField({ label, name, value, onChange, withTime = false, required, min, hint }: FieldProps) {
+export function DateTimeField({ label, name, value, onChange, withTime = false, required, min, max, hint, timeOnly }: FieldProps) {
   const id = useId();
-  const echo = describeThai(value, withTime);
-  const Icon = withTime ? Clock : CalendarDays;
+  const echo = timeOnly ? (value ? `${value} น.` : "") : describeThai(value, withTime);
+  const Icon = withTime || timeOnly ? Clock : CalendarDays;
 
   return (
     <div className="grid gap-1.5">
@@ -76,9 +96,10 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
       <input
         id={id}
         name={name}
-        type={withTime ? "datetime-local" : "date"}
+        type={timeOnly ? "time" : withTime ? "datetime-local" : "date"}
         value={value}
         min={min}
+        max={max}
         required={required}
         onChange={(event) => onChange(event.target.value)}
         className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-operation focus:ring-4 focus:ring-teal-50"
@@ -107,7 +128,9 @@ export function DateRangeFields({
   onStart,
   onEnd,
   withTime = false,
-  required
+  required,
+  timeOnly = false,
+  min
 }: {
   legend?: string;
   startLabel?: string;
@@ -120,6 +143,10 @@ export function DateRangeFields({
   onEnd: (value: string) => void;
   withTime?: boolean;
   required?: boolean;
+  /** Both ends are times within one already-chosen day. */
+  timeOnly?: boolean;
+  /** Refuse anything before this; defaults to now for datetime ranges. */
+  min?: string;
 }) {
   const duration = describeDuration(start, end);
   const backwards = isBackwards(start, end);
@@ -128,16 +155,26 @@ export function DateRangeFields({
     <fieldset className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
       {legend ? <legend className="px-1 text-xs font-bold text-slate-600">{legend}</legend> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <DateTimeField label={startLabel} name={startName} value={start} onChange={onStart} withTime={withTime} required={required} />
+        <DateTimeField
+          label={startLabel}
+          name={startName}
+          value={start}
+          onChange={onStart}
+          withTime={withTime}
+          timeOnly={timeOnly}
+          required={required}
+          min={min}
+        />
         <DateTimeField
           label={endLabel}
           name={endName}
           value={end}
           onChange={onEnd}
           withTime={withTime}
+          timeOnly={timeOnly}
           required={required}
           // The browser stops the impossible case before the form does.
-          min={start || undefined}
+          min={start || min || undefined}
         />
       </div>
       {backwards ? (
