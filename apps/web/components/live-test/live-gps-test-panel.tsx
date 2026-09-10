@@ -8,6 +8,7 @@ import { withTimeout } from "@/lib/async/timeout";
 interface LiveGpsResult {
   projectId: string;
   assignmentId: string;
+  callSignId?: string;
   driverId?: string;
   accessUrl: string;
   pin?: string;
@@ -195,6 +196,7 @@ export function LiveGpsTestPanel() {
             </div>
             <div className="grid gap-1 rounded-panel bg-canvas/60 p-4 text-xs leading-6 text-ink-faint">
               <p>Project ID: {result.projectId}</p>
+              {result.callSignId ? <p>Call Sign ID: {result.callSignId}</p> : null}
               <p>Assignment ID: {result.assignmentId}</p>
               {result.driverId ? <p>Driver ID: {result.driverId}</p> : null}
               {result.packetId ? <p>Packet ID: {result.packetId}</p> : null}

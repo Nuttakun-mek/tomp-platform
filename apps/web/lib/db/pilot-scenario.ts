@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "crypto";
 import { withTimeout } from "@/lib/async/timeout";
-import { generateDriverAccessToken, getDefaultDriverTokenExpiry, hashDriverAccessToken } from "@/lib/driver-access/token";
+import { generateDriverAccessToken, generateDriverPin, getDefaultDriverTokenExpiry, hashDriverAccessToken, hashDriverPin } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { buildWebDriverAssignmentPacket } from "@/lib/driver/assignment-packet";
 import { getRequestBaseUrl } from "@/lib/request-origin";
@@ -129,12 +129,21 @@ export async function createPilotScenarioViaPostgres() {
     currentVersion: 1,
     metadata: { pickupLocation, dropoffLocation, commitmentTime, coordinatorPhone: "+6620000000", operationPhone: "+6621111111" }
   };
-  const callSign = { ...baseRecord(ids.callSign), projectId: ids.project, callSign: callSignCode, groupName: "ทดสอบ Pilot", status: "active" as const };
+  const callSign = {
+    ...baseRecord(ids.callSign),
+    projectId: ids.project,
+    callSign: callSignCode,
+    groupName: "ทดสอบ Pilot",
+    status: "active" as const,
+    driverId: ids.driver,
+    vehicleId: ids.vehicle
+  };
   const driver = { ...baseRecord(ids.driver), organizationId: ids.organization, vendorId: null, fullName: "คนขับทดสอบ Pilot", phone: "+66810000000", licenseType: "pilot", languages: ["th"], status: "assigned" as const };
   const vehicle = { ...baseRecord(ids.vehicle), organizationId: ids.organization, vendorId: null, plateNumber: vehiclePlate, vehicleType: "รถทดสอบ", capacity: 4, status: "assigned" as const };
   const packet = buildWebDriverAssignmentPacket({ project, assignment, callSign, driver, vehicle, missionName });
   const expiresAt = getDefaultDriverTokenExpiry();
-  const token = generateDriverAccessToken({ assignmentId: ids.assignment, driverId: ids.driver, expiresAt });
+  const token = generateDriverAccessToken({ callSignId: ids.callSign, assignmentId: ids.assignment, driverId: ids.driver, expiresAt });
+  const smokePin = generateDriverPin();
 
   await sql.begin(async (tx) => {
     await tx`insert into organizations (id, name, organization_type, status, metadata) values (${ids.organization}, ${"TOMP Internal Pilot"}, ${"operator"}, ${"active"}, ${jsonb({ smokeTest: true })}::jsonb)`;
@@ -148,18 +157,20 @@ export async function createPilotScenarioViaPostgres() {
     await tx`insert into drivers (id, organization_id, vendor_id, full_name, phone, license_type, languages, status, metadata) values (${ids.driver}, ${ids.organization}, null, ${"คนขับทดสอบ Pilot"}, ${"+66810000000"}, ${"pilot"}, ARRAY[${"th"}], ${"assigned"}, ${jsonb({ smokeTest: true })}::jsonb)`;
     await tx`update call_signs set driver_id = ${ids.driver}, vehicle_id = ${ids.vehicle}, metadata = metadata || ${jsonb({ smokeTest: true, crewedUnit: true })}::jsonb where id = ${ids.callSign}`;
     await tx`insert into assignments (id, project_id, mission_id, call_sign_id, vehicle_id, driver_id, status, start_time, end_time, current_version, metadata) values (${ids.assignment}, ${ids.project}, ${ids.mission}, ${ids.callSign}, ${ids.vehicle}, ${ids.driver}, ${"planned"}, ${startTime}, ${endTime}, ${1}, ${jsonb(assignment.metadata)}::jsonb)`;
-    await tx`insert into driver_access_tokens (id, project_id, assignment_id, driver_id, token_hash, status, expires_at, metadata) values (${ids.token}, ${ids.project}, ${ids.assignment}, ${ids.driver}, ${hashDriverAccessToken(token)}, ${"active"}, ${expiresAt}, ${jsonb({ smokeTest: true })}::jsonb)`;
-    await tx`insert into driver_assignment_packets (id, project_id, assignment_id, driver_id, packet_version, payload, published_at, metadata) values (${ids.packet}, ${ids.project}, ${ids.assignment}, ${ids.driver}, ${1}, ${jsonb(packet)}::jsonb, ${new Date().toISOString()}, ${jsonb({ smokeTest: true })}::jsonb)`;
-    await tx`insert into driver_notifications (project_id, assignment_id, driver_id, notification_type, priority, title, body, action_label, status, sent_at, metadata) values (${ids.project}, ${ids.assignment}, ${ids.driver}, ${"assignment_created"}, ${"normal"}, ${"งานใหม่"}, ${"กรุณาตรวจสอบรายละเอียดงานและกดรับทราบ"}, ${"รับทราบ"}, ${"unread"}, ${new Date().toISOString()}, ${jsonb({ smokeTest: true })}::jsonb)`;
-    await tx`insert into route_change_instructions (project_id, assignment_id, requested_by, approved_by, old_route, new_route, reason, impact_summary, status, sent_to_driver_at, metadata) values (${ids.project}, ${ids.assignment}, ${ids.profile}, null, null, ${jsonb(packet.routeInstruction.routePlan)}::jsonb, ${"ทดสอบการแจ้งเปลี่ยนเส้นทาง"}, ${"คนขับต้องกดรับทราบก่อนเดินทางต่อ"}, ${"pending"}, ${new Date().toISOString()}, ${jsonb({ smokeTest: true })}::jsonb)`;
+    await tx`insert into driver_access_tokens (id, project_id, assignment_id, call_sign_id, driver_id, token_hash, access_scope, status, expires_at, metadata) values (${ids.token}, ${ids.project}, ${ids.assignment}, ${ids.callSign}, ${ids.driver}, ${hashDriverAccessToken(token)}, ${"call_sign"}, ${"active"}, ${expiresAt}, ${jsonb({ smokeTest: true, tokenVersion: 2, pinHash: hashDriverPin(smokePin), pinAttempts: 0 })}::jsonb)`;
+    await tx`insert into driver_assignment_packets (id, project_id, assignment_id, call_sign_id, driver_id, packet_version, payload, published_at, metadata) values (${ids.packet}, ${ids.project}, ${ids.assignment}, ${ids.callSign}, ${ids.driver}, ${1}, ${jsonb(packet)}::jsonb, ${new Date().toISOString()}, ${jsonb({ smokeTest: true })}::jsonb)`;
+    await tx`insert into driver_notifications (project_id, assignment_id, call_sign_id, driver_id, notification_type, priority, title, body, action_label, status, sent_at, metadata) values (${ids.project}, ${ids.assignment}, ${ids.callSign}, ${ids.driver}, ${"assignment_created"}, ${"normal"}, ${"งานใหม่"}, ${"กรุณาตรวจสอบรายละเอียดงานและกดรับทราบ"}, ${"รับทราบ"}, ${"unread"}, ${new Date().toISOString()}, ${jsonb({ smokeTest: true })}::jsonb)`;
+    await tx`insert into route_change_instructions (project_id, assignment_id, call_sign_id, requested_by, approved_by, old_route, new_route, reason, impact_summary, status, sent_to_driver_at, metadata) values (${ids.project}, ${ids.assignment}, ${ids.callSign}, ${ids.profile}, null, null, ${jsonb(packet.routeInstruction.routePlan)}::jsonb, ${"ทดสอบการแจ้งเปลี่ยนเส้นทาง"}, ${"คนขับต้องกดรับทราบก่อนเดินทางต่อ"}, ${"pending"}, ${new Date().toISOString()}, ${jsonb({ smokeTest: true })}::jsonb)`;
     await tx`insert into timeline_events (id, project_id, object_type, object_id, event_type, source, reason, after_data, metadata) values (${ids.timeline}, ${ids.project}, ${"assignment"}, ${ids.assignment}, ${"DRIVER_ACCESS_TOKEN_CREATED"}, ${"operation_user"}, ${"สร้างชุดทดสอบ Production Pilot ผ่าน Postgres fallback"}, ${jsonb({ tokenId: ids.token, packetId: ids.packet })}::jsonb, ${jsonb({ smokeTest: true, source: "postgres_direct" })}::jsonb)`;
   });
 
   return {
     projectId: ids.project,
     assignmentId: ids.assignment,
+    callSignId: ids.callSign,
     driverId: ids.driver,
     accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
+    pin: smokePin,
     missionControlUrl: `/mission-control?projectId=${ids.project}`,
     assignmentsUrl: `/projects/${ids.project}/assignments`,
     packetId: ids.packet,

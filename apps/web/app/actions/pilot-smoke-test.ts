@@ -134,12 +134,20 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     currentVersion: 1,
     metadata: { pickupLocation, dropoffLocation, commitmentTime, coordinatorPhone: "+6620000000", operationPhone: "+6621111111" }
   };
-  const callSign = { ...baseRecord(ids.callSign), projectId: ids.project, callSign: callSignCode, groupName: "ทดสอบ Pilot", status: "active" as const };
+  const callSign = {
+    ...baseRecord(ids.callSign),
+    projectId: ids.project,
+    callSign: callSignCode,
+    groupName: "ทดสอบ Pilot",
+    status: "active" as const,
+    driverId: ids.driver,
+    vehicleId: ids.vehicle
+  };
   const driver = { ...baseRecord(ids.driver), organizationId: ids.organization, vendorId: null, fullName: "คนขับทดสอบ Pilot", phone: "+66810000000", licenseType: "pilot", languages: ["th"], status: "assigned" as const };
   const vehicle = { ...baseRecord(ids.vehicle), organizationId: ids.organization, vendorId: null, plateNumber: vehiclePlate, vehicleType: "รถทดสอบ", capacity: 4, status: "assigned" as const };
   const packet = buildWebDriverAssignmentPacket({ project, assignment, callSign, driver, vehicle, missionName });
   const expiresAt = getDefaultDriverTokenExpiry();
-  const token = generateDriverAccessToken({ assignmentId: ids.assignment, driverId: ids.driver, expiresAt });
+  const token = generateDriverAccessToken({ callSignId: ids.callSign, assignmentId: ids.assignment, driverId: ids.driver, expiresAt });
   const smokePin = generateDriverPin();
 
   const steps: InsertStep[] = [
@@ -318,8 +326,10 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       .insert({
         project_id: ids.project,
         assignment_id: ids.assignment,
+        call_sign_id: ids.callSign,
         driver_id: ids.driver,
         token_hash: hashDriverAccessToken(token),
+        access_scope: "call_sign",
         status: "active",
         expires_at: expiresAt,
         // Test tokens carry a PIN too, so the smoke flow exercises the same
@@ -339,6 +349,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       .insert({
         project_id: ids.project,
         assignment_id: ids.assignment,
+        call_sign_id: ids.callSign,
         driver_id: ids.driver,
         packet_version: 1,
         payload: packet,
@@ -357,6 +368,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       client.from("driver_notifications").insert({
         project_id: ids.project,
         assignment_id: ids.assignment,
+        call_sign_id: ids.callSign,
         driver_id: ids.driver,
         notification_type: "assignment_created",
         priority: "normal",
@@ -374,6 +386,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
       client.from("route_change_instructions").insert({
         project_id: ids.project,
         assignment_id: ids.assignment,
+        call_sign_id: ids.callSign,
         requested_by: ids.profile,
         approved_by: null,
         old_route: null,
@@ -410,6 +423,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
   return actionSuccess({
     projectId: ids.project,
     assignmentId: ids.assignment,
+    callSignId: ids.callSign,
     driverId: ids.driver,
     accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
     pin: smokePin,
