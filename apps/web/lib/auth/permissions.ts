@@ -14,6 +14,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "project.create",
     "project.update",
     "project.publish",
+    "project.delete",
     "mission.read",
     "mission.create",
     "assignment.read",

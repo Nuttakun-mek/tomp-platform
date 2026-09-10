@@ -186,3 +186,50 @@ export async function saveProjectContactNumbersAction(input: unknown): Promise<A
 
   return actionSuccess({ coordinatorPhone, operationPhone });
 }
+
+/**
+ * Permanently delete a project and everything under it.
+ *
+ * Archiving hides a project; this removes it, which is what a project created by
+ * mistake needs — an archived typo keeps its project_code reserved forever.
+ *
+ * Guarded three ways, because there is no undo: the caller must hold
+ * `project.delete`, must type the project code back, and the cascade runs inside
+ * a SECURITY DEFINER function that is the only thing allowed past the timeline
+ * immutability trigger.
+ */
+export async function deleteProjectAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as { projectId?: string; confirmCode?: string };
+  const projectId = String(data.projectId || "");
+  const confirmCode = String(data.confirmCode || "").trim();
+  if (!projectId) return actionFailure("ไม่พบโครงการ");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(projectId, "project.delete");
+  if (!permission.allowed) {
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์ลบโครงการนี้");
+  }
+
+  const { data: project, error: readError } = await client
+    .from("projects")
+    .select("id, project_code, project_name")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (readError) return actionFailure(getDatabaseErrorMessage(readError, "อ่านข้อมูลโครงการไม่สำเร็จ"));
+  if (!project) return actionFailure("ไม่พบโครงการนี้");
+
+  // Compared here rather than in the browser: a confirmation the server never
+  // checks is decoration.
+  if (confirmCode !== project.project_code) {
+    return actionFailure(`กรุณาพิมพ์รหัสโครงการ "${project.project_code}" ให้ตรงเพื่อยืนยันการลบ`, {
+      confirmCode: ["รหัสโครงการไม่ตรง"]
+    });
+  }
+
+  const { data: summary, error: deleteError } = await client.rpc("delete_project", { target_project: projectId });
+  if (deleteError) return actionFailure(getDatabaseErrorMessage(deleteError, "ลบโครงการไม่สำเร็จ"));
+
+  return actionSuccess({ deleted: summary ?? { projectId, projectCode: project.project_code } });
+}

@@ -12,6 +12,8 @@ import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getProjects } from "@/lib/data/projects";
 import { getDrivers, getVehicles } from "@/lib/data/resources";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
+import { CreateMissionForm } from "@/components/missions/create-mission-form";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 interface AssignmentsPageProps {
   searchParams?: Promise<{ projectId?: string }>;
@@ -69,6 +71,12 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
         </div>
       </section>
       {!load.ok ? <DataUnavailable description="โหลดข้อมูลงานของโครงการนี้ไม่สำเร็จ" detail={load.error} /> : null}
+      {/* Planning reads top to bottom: create the mission, then assign work to
+          it, then watch the board. Folded away once the project has missions. */}
+      <CollapsibleSection title="เพิ่มภารกิจ" storageKey={`proj.${projectId}.newmission`} defaultOpen={missions.length === 0}>
+        <CreateMissionForm projectId={projectId} />
+      </CollapsibleSection>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:items-start">
         <CreateAssignmentForm
           projectId={projectId}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AccessDenied } from "@/components/auth/access-denied";
-import { CreateMissionForm } from "@/components/missions/create-mission-form";
 import { ProjectArchiveButton } from "@/components/projects/project-archive-button";
+import { ProjectDeletePanel } from "@/components/projects/project-delete-panel";
 import { ProjectAssignmentBoard } from "@/components/projects/project-assignment-board";
 import { ProjectChangePanel } from "@/components/projects/project-change-panel";
 import { ProjectMissionBoard } from "@/components/projects/project-mission-board";
@@ -46,6 +46,9 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
 
   const { permissions, roleKeys } = await getViewerAccess();
   const canManage = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.update");
+  // Deleting is not the same authority as editing: a dispatcher may reschedule
+  // work without being able to erase the project it belongs to.
+  const canDelete = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.delete");
 
   return (
     <div className="grid gap-4">
@@ -66,8 +69,10 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
         <SettingsView
           projectId={project.id}
           canManage={canManage}
+          canDelete={canDelete}
           archived={project.status === "archived"}
           projectName={project.projectName}
+          projectCode={project.projectCode}
           projectMetadata={project.metadata}
         />
       ) : (
@@ -110,10 +115,9 @@ async function OverviewView({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      <CollapsibleSection title="เพิ่มภารกิจ" storageKey={`proj.${projectId}.newmission`} defaultOpen={missions.length === 0}>
-        <CreateMissionForm projectId={projectId} />
-      </CollapsibleSection>
-
+      {/* Creating a mission moved to จัดงาน: it is the first step of planning
+          work, and having it here meant the operator started on one tab and
+          finished on another. ภาพรวม answers "where does this project stand". */}
       <CollapsibleSection title="คำขอเปลี่ยนแปลง" storageKey={`proj.${projectId}.change`} defaultOpen={false}>
         <ProjectChangePanel projectId={projectId} />
       </CollapsibleSection>
@@ -124,17 +128,31 @@ async function OverviewView({ projectId }: { projectId: string }) {
 async function SettingsView({
   projectId,
   projectName,
+  projectCode,
   projectMetadata,
   canManage,
+  canDelete,
   archived
 }: {
   projectId: string;
   projectName: string;
+  projectCode: string;
   projectMetadata: Record<string, unknown>;
   canManage: boolean;
+  canDelete: boolean;
   archived: boolean;
 }) {
-  const members = await getProjectMembers(projectId);
+  const [members, missionsResult, assignmentsResult] = await Promise.all([
+    getProjectMembers(projectId),
+    getMissionsByProjectId(projectId),
+    getAssignmentsByProjectId(projectId)
+  ]);
+  // Shown in the delete confirmation: "this many jobs" makes the scale of the
+  // action concrete in a way the project name alone does not.
+  const counts = {
+    missions: missionsResult.ok ? missionsResult.data.length : 0,
+    assignments: assignmentsResult.ok ? assignmentsResult.data.length : 0
+  };
 
   return (
     <div className="grid gap-4">
@@ -178,17 +196,37 @@ async function SettingsView({
         )}
       </section>
 
-      {canManage ? (
-        <section className="enterprise-panel grid gap-3 p-4">
-          <h2 className="text-lg font-semibold text-ink">{archived ? "กู้คืนโครงการ" : "เก็บถาวรโครงการ"}</h2>
-          <p className="text-sm text-slate-600">
-            {archived
-              ? "โครงการนี้ถูกเก็บถาวรอยู่ กู้คืนเพื่อกลับมาใช้งาน"
-              : "เก็บถาวรจะซ่อนโครงการจากรายการหลัก ข้อมูลทั้งหมดยังอยู่และกู้คืนได้"}
-          </p>
+      {canManage || canDelete ? (
+        <section className="enterprise-panel grid gap-4 p-4">
           <div>
-            <ProjectArchiveButton projectId={projectId} archived={archived} variant="full" />
+            <h2 className="text-lg font-semibold text-ink">โซนอันตราย</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              การกระทำในส่วนนี้ส่งผลกับทั้งโครงการ เก็บถาวรย้อนกลับได้ ลบถาวรย้อนกลับไม่ได้
+            </p>
           </div>
+
+          {canManage ? (
+            <div className="grid gap-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+              <h3 className="text-sm font-bold text-amber-900">{archived ? "กู้คืนโครงการ" : "เก็บถาวรโครงการ"}</h3>
+              <p className="text-sm leading-6 text-amber-800">
+                {archived
+                  ? "โครงการนี้ถูกเก็บถาวรอยู่ กู้คืนเพื่อกลับมาใช้งาน"
+                  : "ซ่อนโครงการจากรายการหลัก ข้อมูลทั้งหมดยังอยู่และกู้คืนได้ทุกเมื่อ"}
+              </p>
+              <div className="mt-1">
+                <ProjectArchiveButton projectId={projectId} archived={archived} variant="full" />
+              </div>
+            </div>
+          ) : null}
+
+          {canDelete ? (
+            <ProjectDeletePanel
+              projectId={projectId}
+              projectCode={projectCode}
+              projectName={projectName}
+              counts={counts}
+            />
+          ) : null}
         </section>
       ) : null}
     </div>
