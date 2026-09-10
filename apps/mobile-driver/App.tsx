@@ -259,15 +259,24 @@ export default function App() {
     [flushOutbox, postStatusToWeb]
   );
 
-  const handleNavigation = useCallback((event: WebViewNavigation) => {
-    setCanGoBack(event.canGoBack);
-    if (event.loading) {
-      setStatus("กำลังเปิดงาน");
-      return;
-    }
-    setStatus("กำลังใช้งาน");
-    setMessage("เปิดหน้าคนขับผ่าน TOMP Web แล้ว");
-  }, []);
+  const handleNavigation = useCallback(
+    (event: WebViewNavigation) => {
+      setCanGoBack(event.canGoBack);
+      if (event.loading) {
+        setStatus("กำลังเปิดงาน");
+        return;
+      }
+      setStatus("กำลังใช้งาน");
+      setMessage("เปิดหน้าคนขับผ่าน TOMP Web แล้ว");
+
+      // The page loads with no idea what the shell is doing, so it offered
+      // "share again" while sharing was already running. Tell it the truth.
+      if (isForegroundSharing()) {
+        postStatusToWeb("gps_sharing", "กำลังแชร์ตำแหน่งจากแอปอยู่");
+      }
+    },
+    [postStatusToWeb]
+  );
 
   const handleShouldStartLoad = useCallback((request: { url: string }) => {
     const decision = decideWebViewNavigation(request.url);
@@ -297,7 +306,13 @@ export default function App() {
     getSavedDriverToken().then((savedToken) => {
       if (savedToken) void openDriverLink(savedToken);
     });
-    getMobileDriverSession().then((session) => setSessionReady(Boolean(session)));
+    // Push registration used to happen only when a session was minted. A driver
+    // returning with a session already in SecureStore never got a token, so
+    // dispatch could not reach them once the app was backgrounded.
+    getMobileDriverSession().then((session) => {
+      setSessionReady(Boolean(session));
+      if (session) void registerPush(session);
+    });
     void flushOutbox();
     Network.getNetworkStateAsync().then((state) => {
       setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
