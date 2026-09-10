@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { gpsFreshness, gpsFreshnessLabelTh, gpsFreshnessTone , GPS_IDLE_SECONDS } from "./gps-freshness";
+import {
+  gpsFreshness,
+  gpsFreshnessLabelTh,
+  gpsFreshnessTone,
+  pingCadenceSeconds,
+  GPS_HEARTBEAT_SLACK_SECONDS,
+  GPS_IDLE_SECONDS
+} from "./gps-freshness";
 
 const NOW = new Date("2026-09-08T12:00:00Z").getTime();
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
@@ -58,5 +65,57 @@ describe("parked driver heartbeat", () => {
 
   it("stopping sharing still wins over the idle flag", () => {
     expect(gpsFreshness(ago(5), "sharing_stopped", now, { idle: true })).toBe("stopped");
+  });
+});
+
+describe("a device that reports its own cadence", () => {
+  const now = Date.parse("2026-01-01T12:00:00.000Z");
+  const ago = (seconds: number) => new Date(now - seconds * 1000).toISOString();
+  // What the mobile app sends on every ping: IDLE_HEARTBEAT_MS.
+  const app = (extra: Record<string, unknown> = {}) => ({ heartbeatMs: 120_000, platform: "mobile_driver", ...extra });
+
+  it("does not call a driver offline for a gap their own cadence allows", () => {
+    // The regression this exists for: a driver parks, the last ping before
+    // stopping is a moving one, and nothing follows until the heartbeat. Judged
+    // on the browser scale that read "ขาดการอัปเดต" for minutes at a time.
+    expect(gpsFreshness(ago(100), "location_ping", now, app())).toBe("live");
+    expect(gpsFreshness(ago(100), "location_ping", now)).toBe("slow");
+    expect(gpsFreshness(ago(180), "location_ping", now, app())).toBe("live");
+    expect(gpsFreshness(ago(180), "location_ping", now)).toBe("offline");
+  });
+
+  it("counts a device as offline once it is past its cadence plus slack", () => {
+    expect(gpsFreshness(ago(120 + GPS_HEARTBEAT_SLACK_SECONDS), "location_ping", now, app())).toBe("live");
+    expect(gpsFreshness(ago(120 + GPS_HEARTBEAT_SLACK_SECONDS + 1), "location_ping", now, app())).toBe("offline");
+  });
+
+  it("keeps a parked driver parked for the whole window", () => {
+    expect(gpsFreshness(ago(5), "location_ping", now, app({ idle: true }))).toBe("idle");
+    expect(gpsFreshness(ago(170), "location_ping", now, app({ idle: true }))).toBe("idle");
+    expect(gpsFreshness(ago(200), "location_ping", now, app({ idle: true }))).toBe("offline");
+  });
+
+  it("never shows the amber warning for a device on a known cadence", () => {
+    for (const age of [40, 90, 130, 175]) {
+      expect(gpsFreshness(ago(age), "location_ping", now, app())).not.toBe("slow");
+    }
+  });
+
+  it("follows the cadence the device actually sent, not a hard-coded one", () => {
+    const slow = { heartbeatMs: 600_000 };
+    expect(gpsFreshness(ago(500), "location_ping", now, slow)).toBe("live");
+    expect(gpsFreshness(ago(700), "location_ping", now, slow)).toBe("offline");
+  });
+
+  it("ignores a cadence that is not a usable number", () => {
+    for (const bad of [{ heartbeatMs: 0 }, { heartbeatMs: -1 }, { heartbeatMs: "120000" }, { heartbeatMs: NaN }]) {
+      expect(pingCadenceSeconds(bad)).toBeNull();
+    }
+    // ...and falls back to the browser scale.
+    expect(gpsFreshness(ago(100), "location_ping", now, { heartbeatMs: "120000" })).toBe("slow");
+  });
+
+  it("stopping sharing still wins over a live cadence", () => {
+    expect(gpsFreshness(ago(5), "sharing_stopped", now, app())).toBe("stopped");
   });
 });

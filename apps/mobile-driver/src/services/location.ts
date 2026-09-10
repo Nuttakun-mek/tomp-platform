@@ -15,12 +15,20 @@ let foregroundWatch: Location.LocationSubscription | null = null;
 
 // The OS hands us a fix every timeInterval whether the vehicle moved or not.
 // Sending every one of those while parked is pure noise, but sending nothing is
-// worse: lib/domain/gps-freshness would call the driver offline after 120s when
-// they are simply waiting at a pickup. So a stationary driver still beats every
+// worse: lib/domain/gps-freshness would call the driver offline when they are
+// simply waiting at a pickup. So a stationary driver still beats every
 // IDLE_HEARTBEAT_MS, flagged so the control room can say "จอดอยู่" instead of
 // "ขาดการอัปเดต".
+//
+// The heartbeat has to stay comfortably under the window the control room uses
+// to call a driver offline, or parking produces a stretch of false red every
+// single time: the last ping before stopping is a *moving* one, nothing follows
+// it until the heartbeat, and the map ages it out in the meantime. Every ping
+// therefore carries the cadence it was sent under, so the control room measures
+// "overdue" against what this device actually promised rather than a constant
+// that has to be kept in sync by hand.
 const MOVED_METERS = 30;
-const IDLE_HEARTBEAT_MS = 5 * 60 * 1000;
+const IDLE_HEARTBEAT_MS = 2 * 60 * 1000;
 
 let lastSent: { latitude: number; longitude: number; at: number } | null = null;
 
@@ -146,7 +154,10 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
   const { send, idle } = decideSend(input.latitude, input.longitude, input.trackingEvent ?? "location_ping");
   if (!send) return { success: true, skipped: true } as const;
 
-  const payload = idle ? { ...input, metadata: { ...(input.metadata ?? {}), idle: true } } : input;
+  const payload = {
+    ...input,
+    metadata: { ...(input.metadata ?? {}), heartbeatMs: IDLE_HEARTBEAT_MS, ...(idle ? { idle: true } : {}) }
+  };
   const session = mobileSession ?? (await getMobileDriverSession());
   const result = await submitLocation(payload, session).catch((error) => ({
     success: false,

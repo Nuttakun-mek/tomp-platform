@@ -9,18 +9,31 @@ export const GPS_LIVE_SECONDS = 35;
 /** Between live and this, the signal is lagging; past it, it is stale. */
 export const GPS_SLOW_SECONDS = 120;
 /**
- * A parked driver only heartbeats every 5 minutes (see the mobile app's
- * IDLE_HEARTBEAT_MS), so an idle-flagged ping gets that window plus slack
- * before it counts as lagging. Without this a driver waiting at a pickup shows
- * as "ขาดการอัปเดต" while everything is working.
+ * Fallback window for a ping flagged idle by an app build that does not report
+ * its cadence. Newer builds send `heartbeatMs` and are judged against that.
  */
 export const GPS_IDLE_SECONDS = 390;
+/**
+ * How long past its promised cadence a device may go before it counts as
+ * offline. One late POST — a tunnel, a retry — should not turn the card red.
+ */
+export const GPS_HEARTBEAT_SLACK_SECONDS = 60;
 
 type Recorded = string | number | Date | null | undefined;
 
 /** True when the driver's app said this fix was sent while standing still. */
 export function isIdlePing(metadata: unknown): boolean {
   return Boolean(metadata && typeof metadata === "object" && (metadata as Record<string, unknown>).idle === true);
+}
+
+/**
+ * How often this device promised to report, in seconds, or null when it did not
+ * say — a browser share, or an app build older than the cadence field.
+ */
+export function pingCadenceSeconds(metadata: unknown): number | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const ms = (metadata as Record<string, unknown>).heartbeatMs;
+  return typeof ms === "number" && Number.isFinite(ms) && ms > 0 ? Math.round(ms / 1000) : null;
 }
 
 export function gpsFreshness(
@@ -35,8 +48,20 @@ export function gpsFreshness(
   if (Number.isNaN(ms)) return "offline";
 
   const ageSeconds = Math.max(0, Math.round((now - ms) / 1000));
-  if (ageSeconds <= GPS_LIVE_SECONDS) return isIdlePing(metadata) ? "idle" : "live";
-  if (isIdlePing(metadata)) return ageSeconds <= GPS_IDLE_SECONDS ? "idle" : "offline";
+  const idle = isIdlePing(metadata);
+  const cadence = pingCadenceSeconds(metadata);
+
+  // When the device tells us how often it reports, judge it against its own
+  // promise. Measuring a 2-minute heartbeat against a 35s/120s scale tuned for
+  // browser GPS turns every parked driver red: the last ping before stopping is
+  // a *moving* one, and nothing follows it until the heartbeat comes due.
+  if (cadence !== null) {
+    if (ageSeconds <= cadence + GPS_HEARTBEAT_SLACK_SECONDS) return idle ? "idle" : "live";
+    return "offline";
+  }
+
+  if (ageSeconds <= GPS_LIVE_SECONDS) return idle ? "idle" : "live";
+  if (idle) return ageSeconds <= GPS_IDLE_SECONDS ? "idle" : "offline";
   if (ageSeconds <= GPS_SLOW_SECONDS) return "slow";
   return "offline";
 }
