@@ -163,6 +163,59 @@ driver API routes and the session claim at once.
 
 ---
 
+## The tests move with the model — they are part of each phase, not after it
+
+Several test assets are wired to "one token means one assignment" and will fail
+or, worse, quietly pass against the wrong thing once the credential moves. Each
+phase owns the ones it breaks.
+
+**Coupled to the current model:**
+
+| Asset | What ties it | Phase that must change it |
+|---|---|---|
+| `scripts/seed-driver-flow-test.mjs` | builds an assignment carrying its own driver and vehicle, then a token from it | 1 — seed the pairing, let the assignment inherit |
+| `scripts/verify-device-rebinding.mjs` (20 checks) | reads the assignment id straight out of the token string, queries `driver_access_tokens where assignment_id = …` | 2 — key on the call sign |
+| `scripts/simulate-mobile-shell.mjs` (14 checks) | the whole QR → PIN → session → GPS chain | 2 |
+| `scripts/live-test-smoke.mjs`, `scripts/load-scenario.mjs` | assignment-keyed fixtures | 1 |
+| `scripts/verify-schema.mjs` | column inventory | 1 |
+
+**Domain tests that stay valid** and should not be rewritten: `driver-day-order`
+(the running order inside a card is unchanged), `driver-evidence` (photos are
+already keyed by driver), `gps-freshness`, `driver-pin-lock`.
+
+**New coverage each phase owes:**
+
+- **1** — a driver occupies one call sign and a vehicle occupies one, enforced by
+  the index rather than by application code, so the test belongs with the schema
+  checks. Plus: a created assignment inherits its crew and cannot be given a
+  different one.
+- **2** — re-crewing issues a new PIN, clears the device binding, and revokes the
+  outgoing driver's sessions, **while the printed QR still resolves**. That last
+  one is the whole point of binding to the slot; if it is not asserted, a later
+  refactor will quietly break the paper in someone's hand. Extend
+  `verify-device-rebinding.mjs` rather than starting a new script — it already
+  drives four browser contexts as four phones.
+- **3** — the one-active-job rule as a pure function (easy to test, and the
+  fleet board and the driver page must agree on it), the acknowledgement
+  transition, and the control room's cancel and park.
+- **4** — the observer token is **refused by every driver write route**. Assert
+  it route by route. A read-only credential that is only read-only by convention
+  is one merge away from not being.
+
+Note that `verify-device-rebinding.mjs` is destructive on whatever token it is
+given: it clears the binding, the attempt counter and any cooldown before it
+starts. Only ever point it at a seeded job.
+
+### Before any of it: do not purge to get a clean slate
+
+The owner's own test project is tagged `metadata.smokeTest = true`, which is
+exactly what the "ล้างข้อมูลทดสอบ" tool keys on. Running it deletes their
+working test data along with the seeded fixtures — that is how a day's GPS
+history disappeared on 2026-09-10. Seed a fresh job instead; the seeder creates
+an independent project every run.
+
+---
+
 ## Open, deliberately
 
 - Where the coordinator's phone number lives. It is read from

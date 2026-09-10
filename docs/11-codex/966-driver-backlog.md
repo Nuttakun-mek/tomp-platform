@@ -107,3 +107,32 @@ defines both profiles, so this is a build, not a code change.
 Worth pairing with any native-side UI change, since those need a reinstall
 anyway — see `965` for which parts of the driver UI are native and which are web
 (the web parts deploy through Vercel and need no new APK).
+
+---
+
+## 6. iOS build, once the Apple Developer account clears
+
+**Status:** account applied for on 2026-09-10, pending approval. Nothing to do
+until it clears, but three gaps are worth knowing about now because they are not
+obvious and each one fails silently.
+
+`app.json` already carries an iOS section — `com.tomp.driver`, and Thai usage
+strings for location and camera — so the app is not starting from nothing.
+
+**What is missing:**
+
+1. **`UIBackgroundModes: ["location"]` is not in `infoPlist`.** Without it iOS
+   stops delivering location the moment the app leaves the foreground. The app
+   will look like it works, right up until the driver switches away — which is
+   the entire point of background GPS. This is the one to fix first.
+2. **Push needs an APNs key, not the FCM key.** The FCM service account uploaded
+   for Android does nothing for iOS. Expo needs an APNs auth key from the Apple
+   developer account, uploaded separately.
+3. **The battery-exemption prompt is Android-only and correctly skipped**
+   (`battery.ts` returns early off Android). iOS has no equivalent to offer;
+   background location there depends on the permission grade the driver picks
+   ("Always" vs "While Using"), so the pre-flight wording will need an iOS
+   variant.
+
+The badge clearing added on 2026-09-10 works on both platforms —
+`setBadgeCountAsync` is the iOS mechanism and it is already called.
