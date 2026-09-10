@@ -1,5 +1,6 @@
 import { buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
 import type { Assignment, CallSign, Driver, DriverAssignmentPacket, Project, Vehicle } from "@tomp/types/domain";
+import { resolveCoordinatorPhone, resolveOperationPhone } from "@/lib/domain/contact-numbers";
 
 function text(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
@@ -42,8 +43,10 @@ export function buildWebDriverAssignmentPacket(input: {
       dropoff: { label: dropoff }
     },
     contactInstruction: {
-      coordinatorPhone: text(input.assignment.metadata.coordinatorPhone || input.assignment.metadata.coordinator_phone, "ยังไม่ระบุ"),
-      operationPhone: text(input.assignment.metadata.operationPhone || input.assignment.metadata.operation_phone, "ยังไม่ระบุ")
+      // The project holds the number and a job may override it, so a control
+      // centre types theirs once instead of once per job.
+      coordinatorPhone: resolveCoordinatorPhone(input.assignment.metadata, input.project.metadata) || "ยังไม่ระบุ",
+      operationPhone: resolveOperationPhone(input.assignment.metadata, input.project.metadata) || "ยังไม่ระบุ"
     },
     safetyInstructions: [{ message: "เปิด GPS ระหว่างปฏิบัติงานเมื่อพร้อม", required: true }],
     metadata: {

@@ -11,6 +11,7 @@ import { enqueueDriverOutbox, flushDriverOutbox, readDriverOutbox, type DriverOu
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import type { DriverNotification } from "@tomp/types/domain";
 import { buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
+import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
 
 type DriverGpsLight = "off" | "live" | "stale";
 type TripStatus = "arrived_pickup" | "passenger_onboard" | "completed";
@@ -52,10 +53,13 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   const dropoff = metaText(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง");
   const commitmentTime = metaText(meta.commitmentTime || meta.commitment_time, "ยังไม่ระบุเวลา");
   const mapsUrl = buildGoogleMapsDirectionsUrl(dropoff, pickup);
-  const coordinatorPhone = metaText(
-    driverAccess.packet?.contactInstruction?.coordinatorPhone || meta.coordinatorPhone || meta.coordinator_phone,
-    ""
-  );
+  // "ยังไม่ระบุ" used to reach here from the packet and render as a dial button
+  // that called nothing. resolveCoordinatorPhone treats a digitless value as
+  // unset, so the button is hidden instead of dead.
+  const coordinatorPhone = resolveCoordinatorPhone(
+    { coordinatorPhone: driverAccess.packet?.contactInstruction?.coordinatorPhone },
+    meta
+  ) || resolveCoordinatorPhone(meta, driverAccess.project.metadata);
 
   const ids = useMemo(() => ({
     projectId: driverAccess.project.id,
@@ -437,7 +441,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       <div className="grid grid-cols-3 gap-2">
         {coordinatorPhone ? (
           <a
-            href={`tel:${coordinatorPhone.replace(/[^\d+]/g, "")}`}
+            href={telHref(coordinatorPhone) ?? "#"}
             className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command bg-operation px-2 text-[12px] font-semibold text-white"
           >
             <Phone className="h-4 w-4" /> โทรศูนย์

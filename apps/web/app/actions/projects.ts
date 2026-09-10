@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth/rbac";
 import { mapProject } from "@/lib/data/mappers";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createProjectTimelineEvent } from "@/lib/timeline";
+import { normalisePhone } from "@/lib/domain/contact-numbers";
 
 interface PgError {
   code?: string;
@@ -144,4 +145,44 @@ async function resolveOrganizationId(client: WriteClient, requested: string | nu
 
   const { data: first } = await client.from("organizations").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle();
   return first?.id ? String(first.id) : null;
+}
+
+/**
+ * The number the driver's "call the centre" button dials, held on the project so
+ * it is typed once rather than once per job. An assignment may still override it
+ * for work with its own on-site coordinator — see lib/domain/contact-numbers.
+ */
+export async function saveProjectContactNumbersAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as { projectId?: string; coordinatorPhone?: string; operationPhone?: string };
+  const projectId = String(data.projectId || "");
+  if (!projectId) return actionFailure("ไม่พบโครงการ");
+
+  const coordinatorPhone = normalisePhone(data.coordinatorPhone);
+  const operationPhone = normalisePhone(data.operationPhone);
+  if (data.coordinatorPhone && !coordinatorPhone) return actionFailure("เบอร์ศูนย์ควบคุมไม่ถูกต้อง");
+  if (data.operationPhone && !operationPhone) return actionFailure("เบอร์ฝ่ายปฏิบัติการไม่ถูกต้อง");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(projectId, "project.update");
+  if (!permission.allowed) {
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขโครงการนี้");
+  }
+
+  const { data: current, error: readError } = await client
+    .from("projects")
+    .select("metadata")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (readError) return actionFailure(getDatabaseErrorMessage(readError, "อ่านข้อมูลโครงการไม่สำเร็จ"));
+  if (!current) return actionFailure("ไม่พบโครงการนี้");
+
+  // Merge rather than replace: project metadata carries other people's keys.
+  const metadata = { ...((current.metadata ?? {}) as Record<string, unknown>), coordinatorPhone, operationPhone };
+
+  const { error: updateError } = await client.from("projects").update({ metadata }).eq("id", projectId);
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "บันทึกเบอร์ติดต่อไม่สำเร็จ"));
+
+  return actionSuccess({ coordinatorPhone, operationPhone });
 }

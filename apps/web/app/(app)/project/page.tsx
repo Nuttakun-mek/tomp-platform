@@ -8,6 +8,8 @@ import { ProjectMissionBoard } from "@/components/projects/project-mission-board
 import { ProjectPublishPanel } from "@/components/projects/project-publish-panel";
 import { ProjectReadinessSummary } from "@/components/projects/project-readiness-summary";
 import { ProjectRenameForm } from "@/components/projects/project-rename-form";
+import { ProjectContactForm } from "@/components/projects/project-contact-form";
+import { resolveCoordinatorPhone, resolveOperationPhone } from "@/lib/domain/contact-numbers";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
@@ -61,7 +63,13 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
       </section>
 
       {tab === "settings" ? (
-        <SettingsView projectId={project.id} canManage={canManage} archived={project.status === "archived"} projectName={project.projectName} />
+        <SettingsView
+          projectId={project.id}
+          canManage={canManage}
+          archived={project.status === "archived"}
+          projectName={project.projectName}
+          projectMetadata={project.metadata}
+        />
       ) : (
         <OverviewView projectId={project.id} />
       )}
@@ -116,11 +124,13 @@ async function OverviewView({ projectId }: { projectId: string }) {
 async function SettingsView({
   projectId,
   projectName,
+  projectMetadata,
   canManage,
   archived
 }: {
   projectId: string;
   projectName: string;
+  projectMetadata: Record<string, unknown>;
   canManage: boolean;
   archived: boolean;
 }) {
@@ -131,6 +141,15 @@ async function SettingsView({
       <section className="enterprise-panel grid gap-3 p-4">
         <h2 className="text-lg font-semibold text-ink">ข้อมูลโครงการ</h2>
         {canManage ? <ProjectRenameForm projectId={projectId} currentName={projectName} /> : <p className="text-sm text-slate-600">ชื่อโครงการ: {projectName}</p>}
+        {canManage ? (
+          <div className="border-t border-black/5 pt-3">
+            <ProjectContactForm
+              projectId={projectId}
+              coordinatorPhone={resolveCoordinatorPhone(null, projectMetadata)}
+              operationPhone={resolveOperationPhone(null, projectMetadata)}
+            />
+          </div>
+        ) : null}
       </section>
 
       <section className="enterprise-panel grid gap-3 p-4">

@@ -226,11 +226,6 @@ an independent project every run.
 
 ## Open, deliberately
 
-- Where the coordinator's phone number lives. It is read from
-  `assignment.metadata.coordinatorPhone` and **written nowhere except the test
-  seeders**, so the driver's "call the centre" button never appears on real
-  work. It belongs on the project as a default, overridable per assignment. Small
-  and independent — worth doing before any of the above.
 - Whether a call sign should span projects. Assumed no: the table is already
   scoped per project and the owner described planning inside a project.
 
@@ -309,11 +304,16 @@ credential: it is **not** the token prefix. An observer token is `tomp_obs_…`,
 so it passes `resolveDriverTokenIdentity`'s `tomp_` gate; only the separate hash
 prefix keeps it out of the driver path.
 
+`0033` is applied on production and proven to refuse a duplicate — by attempting
+the insert, not by trusting that an index with the right name behaves.
+
+The coordinator phone is done: it lives on the project, an assignment may
+override it, and `lib/domain/contact-numbers.ts` resolves the two. A value with
+no digits in it — `"ยังไม่ระบุ"` reached the driver's screen this way — now
+counts as unset, so the call button is hidden rather than dialling nothing.
+
 ### Still remaining
 
-- **Apply `0033`** — `node scripts/apply-migrations.mjs`, answer `y`. Until then
-  the application guard holds the invariant on its own and the database does not
-  back it up.
 - Run physical-device smoke tests with one web driver and one native driver.
 - Decide after pilot whether new QR rows should stop storing the compatibility
   `assignment_id` snapshot.
