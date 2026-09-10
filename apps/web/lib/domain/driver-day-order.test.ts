@@ -56,3 +56,56 @@ describe("isUrgentMeta", () => {
     expect(isUrgentMeta(null)).toBe(false);
   });
 });
+
+describe("a driver's card in the control room", () => {
+  // The fleet board sorts the jobs inside one driver's card through this, so the
+  // rules that matter to a dispatcher are pinned here: the job being worked
+  // stays on top, and work added during the day falls in behind it rather than
+  // jumping the queue.
+  const job = (over: Partial<DriverJobInput> & { id: string }): DriverJobInput => ({
+    status: "published",
+    startTime: null,
+    createdAt: "2026-09-10T06:00:00Z",
+    sequence: null,
+    urgent: false,
+    isCurrent: false,
+    ...over
+  });
+
+  it("keeps the job in progress first when newer work arrives", () => {
+    const ordered = orderDriverJobs([
+      job({ id: "new", createdAt: "2026-09-10T11:00:00Z", startTime: "2026-09-10T12:00:00Z" }),
+      job({ id: "running", isCurrent: true, status: "active", startTime: "2026-09-10T09:00:00Z" })
+    ]);
+    expect(ordered.map((j) => j.id)).toEqual(["running", "new"]);
+  });
+
+  it("queues the remaining work behind the current job in the order it is due", () => {
+    const ordered = orderDriverJobs([
+      job({ id: "later", startTime: "2026-09-10T15:00:00Z" }),
+      job({ id: "running", isCurrent: true, status: "active" }),
+      job({ id: "sooner", startTime: "2026-09-10T13:00:00Z" })
+    ]);
+    expect(ordered.map((j) => j.id)).toEqual(["running", "sooner", "later"]);
+    expect(ordered.find((j) => j.isNext)?.id).toBe("sooner");
+  });
+
+  it("lets the centre push inserted work ahead of the rest, but never ahead of the current job", () => {
+    const ordered = orderDriverJobs([
+      job({ id: "planned", startTime: "2026-09-10T13:00:00Z" }),
+      job({ id: "running", isCurrent: true, status: "active" }),
+      job({ id: "inserted", urgent: true, startTime: "2026-09-10T16:00:00Z" })
+    ]);
+    expect(ordered.map((j) => j.id)).toEqual(["running", "inserted", "planned"]);
+  });
+
+  it("sinks finished and cancelled work to the bottom of the card", () => {
+    const ordered = orderDriverJobs([
+      job({ id: "done", status: "completed", startTime: "2026-09-10T07:00:00Z" }),
+      job({ id: "scrapped", status: "cancelled", startTime: "2026-09-10T08:00:00Z" }),
+      job({ id: "todo", startTime: "2026-09-10T14:00:00Z" }),
+      job({ id: "running", isCurrent: true, status: "active" })
+    ]);
+    expect(ordered.map((j) => j.id)).toEqual(["running", "todo", "done", "scrapped"]);
+  });
+});

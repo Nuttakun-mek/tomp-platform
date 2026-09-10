@@ -4,6 +4,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
 export interface VehicleEvidence {
   assignmentId: string;
+  /** Who checked in. The control room indexes the photo by driver, not by job. */
+  driverId: string | null;
   at: string;
   vehiclePhotoUrl: string | null;
   platePhotoUrl: string | null;
@@ -20,7 +22,7 @@ export const getVehicleEvidenceByProjectId = cache(async function getVehicleEvid
 
   const { data, error } = await client
     .from("vehicle_checkins")
-    .select("assignment_id, photo_url, plate_photo_url, created_at")
+    .select("assignment_id, driver_id, photo_url, plate_photo_url, created_at")
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -60,6 +62,7 @@ export const getVehicleEvidenceByProjectId = cache(async function getVehicleEvid
   for (const [assignmentId, row] of Object.entries(latest)) {
     result[assignmentId] = {
       assignmentId,
+      driverId: str(row, "driver_id") || null,
       at: str(row, "created_at"),
       vehiclePhotoUrl: resolve(str(row, "photo_url")),
       platePhotoUrl: resolve(str(row, "plate_photo_url"))

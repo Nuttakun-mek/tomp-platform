@@ -7,6 +7,7 @@ import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
 import { metaString } from "@/lib/data/location-meta";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
+import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
@@ -115,6 +116,10 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
     return next;
   }, [assignments]);
 
+  // The check-in photo belongs to the driver who took it, not to whichever job
+  // was open at the time — see lib/domain/driver-evidence.
+  const evidenceByDriver = useMemo(() => latestEvidenceByDriver(evidence), [evidence]);
+
   const effectiveNow = now || Date.now();
   const rows = useMemo(() => {
     return assignments
@@ -163,7 +168,27 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
     }
 
     return [...byDriver.entries()]
-      .map(([key, list]) => {
+      .map(([key, unordered]) => {
+        // Inside a card, jobs read as a running order: what the driver is on
+        // now, then what comes next. The `rows` sort above ranks *cards* by how
+        // much attention they need, which is the wrong axis here — it pushed
+        // newly added work above the job in progress.
+        const ordered = orderDriverJobs(
+          unordered.map((row) => ({
+            id: row.assignment.id,
+            status: row.assignment.status,
+            startTime: row.assignment.startTime ?? null,
+            createdAt: row.assignment.createdAt ?? null,
+            sequence: typeof row.assignment.metadata.sequence === "number" ? (row.assignment.metadata.sequence as number) : null,
+            urgent: isUrgentMeta(row.assignment.metadata),
+            isCurrent: row.assignment.status === "active"
+          }))
+        );
+        const rank = new Map(ordered.map((job, index) => [job.id, index]));
+        const list = [...unordered].sort(
+          (a, b) => (rank.get(a.assignment.id) ?? 0) - (rank.get(b.assignment.id) ?? 0)
+        );
+
         // GPS belongs to the driver, so the freshest signal across their jobs is
         // the one that describes them.
         const best = list.reduce((a, b) => (ATTENTION_RANK[b.freshness] > ATTENTION_RANK[a.freshness] ? b : a));
@@ -182,7 +207,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
           messages,
           unread,
           hasIssue: list.some((row) => row.hasIssue),
-          evidence: list.find((row) => row.evidence)?.evidence,
+          evidence: (list[0].driver ? evidenceByDriver.get(list[0].driver.id) : undefined) ?? list.find((row) => row.evidence)?.evidence,
           title: list[0].driver?.fullName ?? list[0].label
         };
       })
@@ -192,7 +217,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         if (rank !== 0) return rank;
         return a.title.localeCompare(b.title, "th");
       });
-  }, [rows]);
+  }, [evidenceByDriver, rows]);
 
   const alertCount = groups.filter((group) => group.unread).length;
   const liveCount = groups.filter((group) => group.freshness === "live").length;
