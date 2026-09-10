@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
-import { Copy, Download, FileDown, Printer } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, Copy, Download, FileDown, Printer } from "lucide-react";
 
 // What the control room hands over for one crewed unit: the driver's QR with its
 // PIN, and the view-only link for whoever is riding or following. Both are
@@ -199,8 +199,11 @@ function CredentialBlock({
 
 export function UnitCredentialSheet({ credentials }: { credentials: UnitCredentials }) {
   const [busy, setBusy] = useState(false);
+  // Open on arrival, because a freshly issued PIN is shown once and closing it
+  // by default would hide the one thing that cannot be recovered. Foldable after
+  // that: two QR codes are the tallest thing on the card.
+  const [open, setOpen] = useState(true);
   const safeName = credentials.callSignLabel.replace(/[^\w-]+/g, "-");
-  const sheetRef = useRef<HTMLDivElement>(null);
 
   async function saveWholeSheet() {
     setBusy(true);
@@ -213,7 +216,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
   }
 
   return (
-    <div ref={sheetRef} className="grid gap-3 rounded-2xl border-2 border-teal-300 bg-teal-50/40 p-3 print:border-0 print:bg-white" data-credential-sheet>
+    <div className="grid gap-3 rounded-2xl border-2 border-teal-300 bg-teal-50/40 p-3 print:border-0 print:bg-white" data-credential-sheet>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-[11px] font-semibold text-teal-700">หน่วยรถพร้อมใช้งาน — QR ออกครบทั้ง 2 ใบแล้ว</p>
@@ -223,6 +226,14 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5 print:hidden">
+          <button
+            type="button"
+            onClick={() => setOpen((current) => !current)}
+            className="flex min-h-9 items-center gap-1.5 rounded-command border border-teal-300 bg-white px-3 text-[12px] font-semibold text-teal-800"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
+            {open ? "ย่อ QR" : "แสดง QR"}
+          </button>
           <button
             type="button"
             onClick={saveWholeSheet}
@@ -242,6 +253,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
       </div>
 
 
+      {open ? (
       <div className="grid gap-3 md:grid-cols-2">
         <CredentialBlock
           tone="driver"
@@ -263,6 +275,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
           filename={`QR-ผู้ติดตาม-${safeName}.png`}
         />
       </div>
+      ) : null}
     </div>
   );
 }

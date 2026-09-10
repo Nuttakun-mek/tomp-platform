@@ -411,7 +411,10 @@ export function DateRangeFields({
   return (
     <fieldset className="grid gap-2 rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white p-3">
       {legend ? <legend className="px-1 text-xs font-bold text-slate-600">{legend}</legend> : null}
-      <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+      {/* The summary keeps its own column, reserved whether or not there is
+          anything to say. Letting it wrap underneath meant the whole form
+          jumped a line the moment a second date was chosen. */}
+      <div className="grid gap-3 sm:grid-cols-2 sm:items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(9rem,auto)]">
         <DateTimeField
           label={startLabel}
           name={startName}
@@ -435,16 +438,20 @@ export function DateRangeFields({
           min={timeOnly ? min : (start ? datePart(start) : undefined) || min}
           max={max}
         />
+        <div className="min-h-[2.75rem] self-center lg:pt-5">
+          {backwards ? (
+            <p className="rounded-lg bg-rose-50 px-2.5 py-1.5 text-[12px] font-semibold leading-4 text-rose-700">
+              วันสิ้นสุดอยู่ก่อนวันเริ่ม กรุณาตรวจสอบ
+            </p>
+          ) : duration ? (
+            <p className="w-fit rounded-full bg-teal-50 px-3 py-1 text-[12px] font-semibold text-operation ring-1 ring-inset ring-teal-100">
+              รวม {duration}
+            </p>
+          ) : (
+            <p className="text-[11px] leading-4 text-slate-400">เลือกครบทั้งสองช่องเพื่อดูจำนวนวัน</p>
+          )}
+        </div>
       </div>
-      {backwards ? (
-        <p className="rounded-lg bg-rose-50 px-2.5 py-1.5 text-[12px] font-semibold text-rose-700">
-          เวลาสิ้นสุดอยู่ก่อนเวลาเริ่ม กรุณาตรวจสอบอีกครั้ง
-        </p>
-      ) : duration ? (
-        <p className="w-fit rounded-full bg-teal-50 px-3 py-1 text-[12px] font-semibold text-operation ring-1 ring-inset ring-teal-100">
-          รวม {duration}
-        </p>
-      ) : null}
     </fieldset>
   );
 }

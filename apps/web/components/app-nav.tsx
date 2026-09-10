@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FolderKanban,
   Gauge,
+  Library,
   MapPinned,
   Menu,
   PanelsTopLeft,
@@ -21,6 +22,7 @@ import type { NavSection } from "@/lib/auth/nav-model";
 
 const ICONS: Record<string, LucideIcon> = {
   Gauge,
+  Library,
   MapPinned,
   ClipboardList,
   FolderKanban,

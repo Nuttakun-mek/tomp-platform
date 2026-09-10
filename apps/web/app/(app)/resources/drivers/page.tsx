@@ -1,4 +1,3 @@
-import { CreateDriverForm } from "@/components/resources/create-driver-form";
 import { DriverReadinessTable } from "@/components/resources/driver-readiness-table";
 import { ResourceQualityCard } from "@/components/resources/resource-quality-card";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
@@ -32,7 +31,6 @@ export default async function DriversPage({ searchParams }: DriversPageProps) {
         <ResourceQualityCard title="ขาดข้อมูล" value={`${missingPhone}`} detail="ควรเติมเบอร์โทรก่อนใช้งานจริง" />
       </div>
       <div className="grid gap-5 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
-        <CreateDriverForm />
         <DriverReadinessTable drivers={drivers} />
       </div>
     </>

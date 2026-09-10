@@ -72,23 +72,10 @@ export function CreateAssignmentForm({
   const [isPending, startTransition] = useTransition();
   const availableCallSigns = callSigns;
   const [selectedCallSignId, setSelectedCallSignId] = useState(callSigns[0]?.id || "");
-  const [missionId, setMissionId] = useState("");
   const [jobDate, setJobDate] = useState("");
   const [startClock, setStartClock] = useState("");
   const [endClock, setEndClock] = useState("");
 
-  // The mission owns the window; the job owns the day inside it and the clock.
-  // One source for the date, so the two can no longer contradict each other.
-  const window = useMemo(() => {
-    const mission = missions.find((item) => item.id === missionId);
-    return mission ? missionWindow(mission) : { from: "", to: "" };
-  }, [missionId, missions]);
-
-  // A single-day mission needs no choice at all — take its only day.
-  const operationDate = window.from && window.from === window.to ? window.from : jobDate;
-
-  const startTime = operationDate && startClock ? `${operationDate}T${startClock}` : "";
-  const endTime = operationDate && endClock ? `${operationDate}T${endClock}` : "";
 
   const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
   const vehicleById = useMemo(() => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle])), [vehicles]);
@@ -96,6 +83,24 @@ export function CreateAssignmentForm({
     () => availableCallSigns.find((callSign) => callSign.id === selectedCallSignId),
     [availableCallSigns, selectedCallSignId]
   );
+  // The unit carries its mission, so choosing the unit chooses the mission.
+  const mission = useMemo(() => {
+    const linked = (selectedCallSign?.metadata as Record<string, unknown> | undefined)?.missionId;
+    return typeof linked === "string" ? missions.find((item) => item.id === linked) : undefined;
+  }, [missions, selectedCallSign]);
+
+  const missionId = mission?.id ?? "";
+
+
+  const window = useMemo(() => (mission ? missionWindow(mission) : { from: "", to: "" }), [mission]);
+  // The mission owns the window; the job owns the day inside it and the clock.
+  // One source for the date, so the two cannot contradict each other.
+  // A single-day mission needs no choice at all — take its only day.
+  const operationDate = window.from && window.from === window.to ? window.from : jobDate;
+
+  const startTime = operationDate && startClock ? `${operationDate}T${startClock}` : "";
+  const endTime = operationDate && endClock ? `${operationDate}T${endClock}` : "";
+
   const selectedCrewReady = Boolean(selectedCallSign && isCallSignCrewed(selectedCallSign));
 
   const conflicts = useMemo(() => {
@@ -130,7 +135,7 @@ export function CreateAssignmentForm({
 
     const parsed = createAssignmentSchema.safeParse({
       projectId,
-      missionId: formData.get("missionId"),
+      missionId,
       callSignId: selectedCallSignId || formData.get("callSignId"),
       startTime: startTime || null,
       endTime: endTime || null,
@@ -162,17 +167,7 @@ export function CreateAssignmentForm({
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid content-start gap-5 p-4">
-      <div className="border-b border-slate-100 pb-4">
-        <p className="section-label">Call Sign เป็นหน่วยรถและคนขับ</p>
-        <h2 className="text-lg font-semibold text-ink">เปิดงานใหม่</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          เลือก Call Sign ที่ผูกคนขับและรถไว้แล้ว ระบบจะบันทึกคนขับและรถลงในงานโดยอัตโนมัติ เพื่อลดการเลือกผิดระหว่างปฏิบัติการ
-        </p>
-      </div>
-
-      {/* Crewing moved to ขั้นที่ 1. This form only opens work onto a unit that
-          is already crewed, so the two decisions stop sharing a screen. */}
+    <form action={handleSubmit} className="grid content-start gap-5">
       <label className="field-label">
         หน่วยรถ (Call Sign)
         <select
@@ -190,8 +185,18 @@ export function CreateAssignmentForm({
           ))}
         </select>
         {selectedCallSign ? (
-          <span className="mt-1 text-xs text-slate-500">
-            คนขับและรถของงานนี้จะถูกบันทึกจากหน่วย {selectedCallSign.callSign} โดยอัตโนมัติ
+          <span className="mt-1 grid gap-0.5 text-xs">
+            <span className="text-slate-500">
+              คนขับและรถของงานนี้จะถูกบันทึกจากหน่วย {selectedCallSign.callSign} โดยอัตโนมัติ
+            </span>
+            {mission ? (
+              <span className="font-semibold text-operation">
+                ภารกิจ {mission.missionName}
+                {windowLabel(mission) ? ` · ${windowLabel(mission)}` : ""}
+              </span>
+            ) : (
+              <span className="font-semibold text-amber-700">หน่วยนี้ยังไม่ได้ผูกภารกิจ กรุณาสร้างหน่วยใหม่พร้อมภารกิจ</span>
+            )}
           </span>
         ) : (
           <span className="mt-1 text-xs text-slate-500">ยังไม่มีหน่วยรถ? สร้างที่ “ขั้นที่ 1” ด้านบนก่อน</span>
@@ -199,32 +204,6 @@ export function CreateAssignmentForm({
       </label>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="field-label">
-          เลือกภารกิจ
-          <select
-            className="field-input"
-            name="missionId"
-            value={missionId}
-            onChange={(event) => setMissionId(event.target.value)}
-            required
-          >
-            <option value="">เลือกภารกิจ</option>
-            {missions.map((mission) => (
-              <option key={mission.id} value={mission.id}>
-                {mission.missionName}
-                {windowLabel(mission) ? ` · ${windowLabel(mission)}` : ""}
-              </option>
-            ))}
-          </select>
-          {operationDate ? (
-            <span className="mt-1 text-xs font-semibold text-operation">
-              งานนี้อยู่ในวันที่ {describeThai(operationDate, false)}
-            </span>
-          ) : (
-            <span className="mt-1 text-xs text-slate-500">เลือกภารกิจก่อน แล้วจึงกำหนดวันและเวลาของงาน</span>
-          )}
-        </label>
-
         {/* Only asked when the mission actually spans more than one day. */}
         {window.from && window.from !== window.to ? (
           <DateTimeField

@@ -43,12 +43,44 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
   }, [comms.outbound, optimisticOutbound]);
   const [filter, setFilter] = useState<string>("all");
   const [target, setTarget] = useState<string>(assignments[0]?.id ?? "");
+
   const [text, setText] = useState("");
   const [banner, setBanner] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [feedLimit, setFeedLimit] = useState(60);
 
   const callSignById = useMemo(() => new Map(callSigns.map((cs) => [cs.id, cs.callSign])), [callSigns]);
+
+  // The message reaches a driver, and a driver is one unit however many jobs
+  // they hold. Listing one option per job put the same call sign in the list
+  // three times over, identical and unchoosable, so the recipients are units and
+  // each carries the job a message should land on: the one running, or the next
+  // one due.
+  const recipients = useMemo(() => {
+    const byUnit = new Map<string, { label: string; assignmentId: string; jobs: number }>();
+    const live = assignments.filter((assignment) => !["cancelled", "archived"].includes(assignment.status));
+
+    for (const assignment of live) {
+      const key = assignment.callSignId || `job:${assignment.id}`;
+      const label = callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`;
+      const held = byUnit.get(key);
+      if (!held) {
+        byUnit.set(key, { label, assignmentId: assignment.id, jobs: 1 });
+        continue;
+      }
+      held.jobs += 1;
+      const heldRow = live.find((item) => item.id === held.assignmentId);
+      const preferable =
+        assignment.status === "active" ||
+        (heldRow?.status !== "active" &&
+          (assignment.startTime ?? "") !== "" &&
+          (heldRow?.startTime ?? "") !== "" &&
+          String(assignment.startTime) < String(heldRow?.startTime));
+      if (preferable) held.assignmentId = assignment.id;
+    }
+
+    return [...byUnit.values()].sort((a, b) => a.label.localeCompare(b.label, "th"));
+  }, [assignments, callSignById]);
   const assignmentInfo = useMemo(() => {
     const map = new Map<string, { label: string; driverId: string | null }>();
     for (const assignment of assignments) {
@@ -136,10 +168,11 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
             value={target}
             onChange={(event) => setTarget(event.target.value)}
           >
-            {assignments.length ? (
-              assignments.map((assignment) => (
-                <option key={assignment.id} value={assignment.id}>
-                  {callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`}
+            {recipients.length ? (
+              recipients.map((recipient) => (
+                <option key={recipient.assignmentId} value={recipient.assignmentId}>
+                  {recipient.label}
+                  {recipient.jobs > 1 ? ` (${recipient.jobs} งาน)` : ""}
                 </option>
               ))
             ) : (

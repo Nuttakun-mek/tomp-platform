@@ -19,12 +19,14 @@ import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getDriverCommsByProjectId } from "@/lib/data/driver-comms";
 import { getLatestDriverLocationsByProjectId } from "@/lib/data/locations";
 import { getProjects } from "@/lib/data/projects";
-import { getDrivers, getVehicles } from "@/lib/data/resources";
+import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getVehicleOperationProfilesByProjectId } from "@/lib/data/vehicle-operations";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import Link from "next/link";
+import { JobStatusBoard } from "@/components/mission-control/job-status-board";
+import { getMissionsByProjectId } from "@/lib/data/missions";
 
 interface MissionControlPageProps {
   searchParams?: Promise<{ projectId?: string }>;
@@ -57,7 +59,7 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     redirect("/projects");
   }
 
-  const [eventsResult, locations, assignmentsResult, vehicleProfiles, assignmentStatuses, callSignsResult, comms, drivers, vehicles, evidence] = await Promise.all([
+  const [eventsResult, locations, assignmentsResult, vehicleProfiles, assignmentStatuses, callSignsResult, comms, drivers, vehicles, evidence, missionsResult] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
     getLatestDriverLocationsByProjectId(activeProject.id),
     getAssignmentsByProjectId(activeProject.id),
@@ -65,11 +67,13 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     getLatestAssignmentStatuses(activeProject.id),
     getCallSignsByProjectId(activeProject.id),
     getDriverCommsByProjectId(activeProject.id),
-    getDrivers(),
-    getVehicles(),
-    getVehicleEvidenceByProjectId(activeProject.id)
+    getProjectDrivers(activeProject.id),
+    getProjectVehicles(activeProject.id),
+    getVehicleEvidenceByProjectId(activeProject.id),
+    getMissionsByProjectId(activeProject.id)
   ]);
 
+  const missions = missionsResult.data;
   const load = combineResults(eventsResult, assignmentsResult, callSignsResult);
   const events = eventsResult.data;
   const assignments = assignmentsResult.data;
@@ -114,6 +118,16 @@ export default async function MissionControlPage({ searchParams }: MissionContro
 
         <CommsConsole projectId={activeProject.id} assignments={assignments} callSigns={callSigns} />
       </MissionControlFeedProvider>
+
+      <CollapsibleSection title="สถานะงานทั้งหมด" storageKey="mc.jobstatus" defaultOpen>
+        <JobStatusBoard
+          assignments={assignments}
+          missions={missions}
+          callSigns={callSigns}
+          drivers={drivers}
+          vehicles={vehicles}
+        />
+      </CollapsibleSection>
 
       <CollapsibleSection title="รายละเอียดรถในโครงการ" storageKey="mc.vehicles" defaultOpen={false}>
         <VehicleMonitorPanel profiles={vehicleProfiles} />

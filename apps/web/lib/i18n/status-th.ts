@@ -41,12 +41,15 @@ export function formatStatusTh(status?: string | null): string {
 }
 
 export function formatPriorityTh(priority?: string | null): string {
+  // The Thai official urgency ladder — ปกติ / ด่วน / ด่วนที่สุด — rather than a
+  // literal translation of low/high/critical. "วิกฤต" describes a situation
+  // going wrong, not how soon a job has to leave.
   const priorityTh: Record<string, string> = {
-    low: "ต่ำ",
+    low: "ไม่เร่งด่วน",
     normal: "ปกติ",
-    high: "สูง",
-    urgent: "เร่งด่วน",
-    critical: "วิกฤต"
+    high: "ด่วน",
+    urgent: "ด่วนมาก",
+    critical: "ด่วนที่สุด"
   };
   if (!priority) return "ปกติ";
   return priorityTh[priority] ?? priority;

@@ -6,13 +6,20 @@ import { demoOr } from "@/lib/data/demo-fallback";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { mapDriver, mapVehicle } from "./mappers";
 
+// The central library: records kept between events, and the pool a project
+// imports from. Project copies are excluded — counting a person once per
+// project that hired them is not a useful number.
 // cache(): one render often needs this list from several components; keep it to one query per request.
 export const getDrivers = cache(async function getDrivers(): Promise<Driver[]> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return demoOr(demoKernel.drivers, []);
 
   try {
-    const { data, error } = await withTimeout(supabase.from("drivers").select("*").order("full_name"), 2200, "drivers");
+    const { data, error } = await withTimeout(
+      supabase.from("drivers").select("*").is("project_id", null).is("deleted_at", null).order("full_name"),
+      2200,
+      "drivers"
+    );
     if (error || !data) return demoOr(demoKernel.drivers, []);
     return data.map(mapDriver);
   } catch {
@@ -25,7 +32,11 @@ export const getVehicles = cache(async function getVehicles(): Promise<Vehicle[]
   if (!supabase) return demoOr(demoKernel.vehicles, []);
 
   try {
-    const { data, error } = await withTimeout(supabase.from("vehicles").select("*").order("plate_number"), 2200, "vehicles");
+    const { data, error } = await withTimeout(
+      supabase.from("vehicles").select("*").is("project_id", null).is("deleted_at", null).order("plate_number"),
+      2200,
+      "vehicles"
+    );
     if (error || !data) return demoOr(demoKernel.vehicles, []);
     return data.map(mapVehicle);
   } catch {
@@ -108,5 +119,42 @@ export const getLibraryVehicles = cache(async function getLibraryVehicles(projec
     return library.filter((row) => !already.has(row.id)).map(mapVehicle);
   } catch {
     return [];
+  }
+});
+
+/**
+ * How many projects have taken each library record.
+ *
+ * Shown next to a library entry so an operator can see it is in use before
+ * deleting it — the delete guard would refuse anyway, but only after the click.
+ */
+export const getResourceUsage = cache(async function getResourceUsage(): Promise<{
+  drivers: Map<string, number>;
+  vehicles: Map<string, number>;
+}> {
+  const { client: supabase } = await resolveReadClient();
+  const empty = { drivers: new Map<string, number>(), vehicles: new Map<string, number>() };
+  if (!supabase) return empty;
+
+  const count = (rows: Array<{ source: string | null }> | null) => {
+    const tally = new Map<string, number>();
+    for (const row of rows ?? []) {
+      if (!row.source) continue;
+      tally.set(row.source, (tally.get(row.source) ?? 0) + 1);
+    }
+    return tally;
+  };
+
+  try {
+    const [driverCopies, vehicleCopies] = await Promise.all([
+      supabase.from("drivers").select("source_driver_id").not("project_id", "is", null).is("deleted_at", null),
+      supabase.from("vehicles").select("source_vehicle_id").not("project_id", "is", null).is("deleted_at", null)
+    ]);
+    return {
+      drivers: count((driverCopies.data ?? []).map((row) => ({ source: row.source_driver_id }))),
+      vehicles: count((vehicleCopies.data ?? []).map((row) => ({ source: row.source_vehicle_id })))
+    };
+  } catch {
+    return empty;
   }
 });

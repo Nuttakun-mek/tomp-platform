@@ -145,10 +145,10 @@ export function CreateMissionForm({
       <label className="field-label">
         ความสำคัญ
         <select className="field-input" name="priority" defaultValue="normal">
-          <option value="low">ต่ำ</option>
+          <option value="low">ไม่เร่งด่วน</option>
           <option value="normal">ปกติ</option>
-          <option value="high">สูง</option>
-          <option value="critical">วิกฤต</option>
+          <option value="high">ด่วน</option>
+          <option value="critical">ด่วนที่สุด</option>
         </select>
       </label>
 

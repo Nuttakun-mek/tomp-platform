@@ -15,7 +15,13 @@ const createAutoCallSignSchema = z.object({
   projectCode: z.string().trim().optional().nullable(),
   callSign: z.string().trim().max(40).optional().nullable(),
   driverId: z.string().uuid().optional().nullable(),
-  vehicleId: z.string().uuid().optional().nullable()
+  vehicleId: z.string().uuid().optional().nullable(),
+  /**
+   * The mission this unit was set up for. Each unit gets its own, so selecting
+   * the unit when opening work is enough to know what it is doing — asking for
+   * both was asking the same question twice.
+   */
+  missionId: z.string().uuid().optional().nullable()
 });
 
 function normalizeCallSignSeed(value?: string | null) {
@@ -152,7 +158,12 @@ export async function createCallSignAction(input: unknown): Promise<ActionResult
     groupName: "ปฏิบัติการ",
     driverId: auto.data.driverId || null,
     vehicleId: auto.data.vehicleId || null,
-    metadata: { source: "assignment_form", generated: !requestedCallSign }
+    metadata: {
+      source: "assignment_form",
+      generated: !requestedCallSign,
+      // Selecting the unit later is enough to know its mission.
+      ...(auto.data.missionId ? { missionId: auto.data.missionId } : {})
+    }
   });
 
   if (!parsed.success) {
@@ -202,10 +213,15 @@ export async function createCallSignAction(input: unknown): Promise<ActionResult
 /**
  * Remove a crewed unit that was put together wrongly.
  *
- * Refused once the unit has work or a live QR: those are things other people are
- * already holding — a printed sheet, a driver's open job — and deleting the unit
- * underneath them fails silently on their side rather than here. Revoke and
- * unplan first, deliberately.
+ * Still refused while the unit has work: a job is someone's plan for the day and
+ * deleting the unit under it fails silently on their side rather than here.
+ *
+ * A live QR is no longer a blocker. It was written when QRs were issued by hand,
+ * so it only fired for units somebody had deliberately handed out. Now every
+ * unit is given its credentials the moment it is crewed, which made the guard
+ * refuse *every* unit — including the one just created by mistake, which is the
+ * whole reason delete exists. The QR is revoked as part of the delete instead,
+ * and the caller has already confirmed.
  */
 export async function deleteCallSignAction(input: unknown): Promise<ActionResult> {
   const data = (input ?? {}) as { projectId?: string; callSignId?: string };
@@ -219,24 +235,60 @@ export async function deleteCallSignAction(input: unknown): Promise<ActionResult
   const permission = await requirePermission(projectId, "assignment.update");
   if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์ลบหน่วยรถนี้");
 
-  const { data: jobs } = await client
+  // Count every assignment, not just the live ones. assignments.call_sign_id is
+  // ON DELETE RESTRICT, so a cancelled job blocks the delete just as firmly as a
+  // running one — and the card, which hides cancelled work, was showing "0 งาน"
+  // next to a delete that failed with a foreign-key message nobody can act on.
+  const { count: everUsed } = await client
+    .from("assignments")
+    .select("id", { count: "exact", head: true })
+    .eq("call_sign_id", callSignId);
+
+  const { data: liveJobs } = await client
     .from("assignments")
     .select("id")
     .eq("call_sign_id", callSignId)
     .not("status", "in", '("cancelled","archived")')
     .limit(1);
-  if (jobs?.length) {
-    return actionFailure("ลบไม่ได้ เพราะหน่วยนี้ยังมีงานอยู่ กรุณายกเลิกงานของหน่วยนี้ก่อน");
+  if (liveJobs?.length) {
+    return actionFailure("ลบไม่ได้ เพราะหน่วยนี้ยังมีงานที่ยังไม่จบ กรุณายกเลิกหรือปิดงานของหน่วยนี้ก่อน");
   }
 
-  const { data: liveQr } = await client
+  // Anything already handed out stops working, deliberately and before the unit
+  // itself goes, so a scanned QR meets a revoked credential rather than a
+  // dangling reference.
+  const revokedAt = new Date().toISOString();
+  await client
     .from("driver_access_tokens")
-    .select("id")
+    .update({ status: "revoked", metadata: { revokedReason: "unit_deleted" } })
     .eq("call_sign_id", callSignId)
-    .eq("status", "active")
-    .limit(1);
-  if (liveQr?.length) {
-    return actionFailure("ลบไม่ได้ เพราะยังมี QR ที่ใช้งานอยู่ กรุณายกเลิก QR ของหน่วยนี้ก่อน");
+    .eq("status", "active");
+  await client
+    .from("observer_access_tokens")
+    .update({ status: "revoked", metadata: { revokedReason: "unit_deleted" } })
+    .eq("call_sign_id", callSignId)
+    .eq("status", "active");
+  await client
+    .from("driver_mobile_sessions")
+    .update({ status: "revoked", revoked_at: revokedAt, updated_at: revokedAt })
+    .eq("call_sign_id", callSignId)
+    .is("revoked_at", null);
+
+  // A unit that has ever carried work is retired rather than erased: its jobs
+  // are history someone may still need to answer for, and the database refuses
+  // to drop it out from under them anyway. A unit created by mistake, with no
+  // work at all, goes for good.
+  if (everUsed && everUsed > 0) {
+    const { error: archiveError } = await client
+      .from("call_signs")
+      .update({ status: "archived", archived_at: new Date().toISOString() })
+      .eq("id", callSignId)
+      .eq("project_id", projectId);
+    if (archiveError) return actionFailure(getDatabaseErrorMessage(archiveError, "เก็บถาวรหน่วยรถไม่สำเร็จ"));
+    return actionSuccess(
+      { archived: callSignId, retiredJobs: everUsed },
+      `หน่วยนี้เคยมีงาน ${everUsed} รายการ จึงเก็บถาวรแทนการลบ เพื่อไม่ให้ประวัติงานหาย — หน่วยจะไม่แสดงในรายการอีก`
+    );
   }
 
   const { error: deleteError } = await client.from("call_signs").delete().eq("id", callSignId).eq("project_id", projectId);

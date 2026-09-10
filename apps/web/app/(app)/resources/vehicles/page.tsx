@@ -1,5 +1,4 @@
 import { LiveLocationMap } from "@/components/mission-control/live-location-map";
-import { CreateVehicleForm } from "@/components/resources/create-vehicle-form";
 import { ResourceQualityCard } from "@/components/resources/resource-quality-card";
 import { VehicleOperationsBoard } from "@/components/resources/vehicle-operations-board";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
@@ -51,7 +50,6 @@ export default async function VehiclesPage({ searchParams }: VehiclesPageProps) 
       <LiveLocationMap initialLocations={locations} height={420} />
 
       <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr] xl:items-start">
-        <CreateVehicleForm />
         <VehicleOperationsBoard profiles={profiles} />
       </div>
     </>

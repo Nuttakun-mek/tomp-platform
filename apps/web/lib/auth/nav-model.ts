@@ -24,6 +24,16 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: "FolderKanban",
         help: "โครงการคือพื้นที่หลัก — เข้าโครงการแล้วจะเจอจัดงาน ศูนย์ควบคุม ทรัพยากร และตั้งค่าของโครงการนั้น",
         anyPermission: ["project.read"]
+      },
+      {
+        // The library sits outside any project on purpose: it is what survives
+        // between them, and there was no way to reach it at all.
+        href: "/resources",
+        label: "ทรัพยากรกลาง",
+        description: "คลังคนขับและรถขององค์กร",
+        icon: "Library",
+        help: "ที่เก็บถาวรของคนขับและรถ ใช้ข้ามโครงการ — เปิดโครงการใหม่แล้วนำเข้าจากที่นี่ โครงการจะได้สำเนาของตัวเอง แก้หรือลบในโครงการไม่กระทบต้นทาง",
+        anyPermission: ["driver.create", "vehicle.create"]
       }
     ]
   },
