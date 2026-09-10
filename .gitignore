@@ -31,3 +31,6 @@ scripts/.seed-test-users.json
 test-results/
 playwright-report/
 /e2e/.cache/
+
+# mobile shell simulation artefact
+mobile-shell-sim.png
