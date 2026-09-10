@@ -1,4 +1,4 @@
-import { TOMP_WEB_ORIGIN } from "../config";
+import { originOf, TOMP_WEB_ORIGIN } from "../config";
 
 const EXTERNAL_ALLOWED_HOSTS = new Set(["www.google.com", "google.com", "maps.google.com"]);
 
@@ -15,7 +15,7 @@ export function decideWebViewNavigation(rawUrl: string): NavigationDecision {
     return { action: "block", reason: "URL ไม่ถูกต้อง" };
   }
 
-  if (url.origin === TOMP_WEB_ORIGIN) {
+  if (originOf(rawUrl) === TOMP_WEB_ORIGIN) {
     if (url.pathname === "/driver" || url.pathname.startsWith("/driver/") || url.pathname.startsWith("/auth/")) {
       return { action: "allow" };
     }

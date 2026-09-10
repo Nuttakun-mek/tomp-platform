@@ -1,4 +1,4 @@
-import { buildDriverWebUrl, TOMP_WEB_ORIGIN } from "../config";
+import { buildDriverWebUrl, originOf, TOMP_WEB_ORIGIN } from "../config";
 
 export interface DriverLinkParseResult {
   token: string;
@@ -51,7 +51,7 @@ export function parseDriverLink(value: string): DriverLinkParseResult | null {
 export function isTompDriverWebUrl(value: string) {
   try {
     const url = new URL(value);
-    return url.origin === TOMP_WEB_ORIGIN && (url.pathname === "/driver" || url.pathname.startsWith("/driver/"));
+    return originOf(value) === TOMP_WEB_ORIGIN && (url.pathname === "/driver" || url.pathname.startsWith("/driver/"));
   } catch {
     return false;
   }
