@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  type AppStateStatus,
   BackHandler,
   Linking,
   Platform,
@@ -20,7 +22,7 @@ import * as Network from "expo-network";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
-import { buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
+import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
 import { buildDriverWebUrl, TOMP_API_BASE_URL, TOMP_DRIVER_APP_VERSION, TOMP_WEB_ORIGIN } from "./src/config";
 import { colors, radius } from "./src/theme";
 import {
@@ -32,6 +34,7 @@ import {
 } from "./src/services/location";
 import { exchangeMobileSessionChallenge } from "./src/services/mobile-session-api";
 import { getInstallationId, getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
+import { flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-queue";
 import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
 import { parseDriverLink } from "./src/services/driver-link";
 import { decideWebViewNavigation } from "./src/services/webview-navigation";
@@ -44,8 +47,8 @@ type ShellStatus = "พร้อมเปิดงาน" | "กำลังเ�
 const bridgeBootstrap = `
   (function () {
     window.TOMP_MOBILE_SHELL = {
-      namespace: "tomp.driver",
-      version: 1,
+      namespace: "${BRIDGE_NAMESPACE}",
+      version: ${BRIDGE_VERSION},
       platform: "android",
       appVersion: "${TOMP_DRIVER_APP_VERSION}",
       canBackgroundLocation: true,
@@ -72,16 +75,35 @@ export default function App() {
   const [sessionReady, setSessionReady] = useState(false);
   const [networkLabel, setNetworkLabel] = useState("กำลังตรวจสอบสัญญาณ");
   const [canGoBack, setCanGoBack] = useState(false);
+  const [outboxCount, setOutboxCount] = useState(0);
 
   const effectiveWebUrl = useMemo(() => webUrl || (currentToken ? buildDriverWebUrl(currentToken) : ""), [currentToken, webUrl]);
 
   const postStatusToWeb = useCallback((nativeStatus: Parameters<typeof buildNativeStatusMessage>[0], text: string, detail?: Record<string, unknown>) => {
     const payload = buildNativeStatusMessage(nativeStatus, text, detail);
-    const serialized = JSON.stringify(payload).replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+    const serialized = JSON.stringify(payload)
+      .replace(/</g, "\\u003c")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
     webViewRef.current?.injectJavaScript(`
       window.dispatchEvent(new CustomEvent("tomp:native-status", { detail: ${serialized} }));
       true;
     `);
+  }, []);
+
+  const flushOutbox = useCallback(async () => {
+    const session = await getMobileDriverSession();
+    if (!session) {
+      setOutboxCount(await getOfflineQueueCount().catch(() => 0));
+      return;
+    }
+
+    const result = await flushOfflineQueue().catch(() => null);
+    const remaining = result?.remaining ?? (await getOfflineQueueCount().catch(() => 0));
+    setOutboxCount(remaining);
+    if (result && (result.sent > 0 || result.dropped > 0)) {
+      setMessage(`ซิงก์รายการค้างส่งแล้ว ${result.sent} รายการ${result.dropped ? ` และตัดรายการที่ส่งไม่ได้ ${result.dropped} รายการ` : ""}`);
+    }
   }, []);
 
   const openDriverLink = useCallback(
@@ -135,6 +157,7 @@ export default function App() {
       if (parsed.type === "mobile-session.set") {
         await saveMobileDriverSession(parsed.payload);
         setSessionReady(true);
+        void flushOutbox();
         postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
         return;
       }
@@ -152,6 +175,7 @@ export default function App() {
         }
         await saveMobileDriverSession(result.data);
         setSessionReady(true);
+        void flushOutbox();
         postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
         return;
       }
@@ -199,7 +223,7 @@ export default function App() {
       const backgroundStarted = backgroundGranted ? await startBackgroundLocationSharing().catch(() => false) : false;
       postStatusToWeb(backgroundStarted ? "gps_sharing" : "gps_error", backgroundStarted ? "เปิด GPS เบื้องหลังแล้ว" : "ยังไม่ได้รับสิทธิ์ GPS เบื้องหลัง");
     },
-    [postStatusToWeb]
+    [flushOutbox, postStatusToWeb]
   );
 
   const handleNavigation = useCallback((event: WebViewNavigation) => {
@@ -235,6 +259,7 @@ export default function App() {
       if (savedToken) void openDriverLink(savedToken);
     });
     getMobileDriverSession().then((session) => setSessionReady(Boolean(session)));
+    void flushOutbox();
     Network.getNetworkStateAsync().then((state) => {
       setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
     });
@@ -248,7 +273,28 @@ export default function App() {
     });
 
     return () => subscription.remove();
-  }, [openDriverLink]);
+  }, [flushOutbox, openDriverLink]);
+
+  useEffect(() => {
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        void flushOutbox();
+        Network.getNetworkStateAsync().then((state) => {
+          setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
+        });
+      }
+    };
+
+    const appStateSubscription = AppState.addEventListener("change", handleAppState);
+    const interval = setInterval(() => {
+      void flushOutbox();
+    }, 30_000);
+
+    return () => {
+      appStateSubscription.remove();
+      clearInterval(interval);
+    };
+  }, [flushOutbox]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -278,6 +324,7 @@ export default function App() {
           <View style={styles.statusGroup}>
             <Text style={styles.statusPill}>{status}</Text>
             <Text style={styles.network}>{networkLabel}</Text>
+            {outboxCount > 0 ? <Text style={styles.outboxText}>ค้างส่ง {outboxCount} รายการ</Text> : null}
           </View>
         </View>
 
@@ -288,6 +335,7 @@ export default function App() {
               <Text style={[styles.webMetaText, sessionReady ? styles.okText : styles.warningText]}>
                 {sessionReady ? "mobile session พร้อม" : "รอ mobile session จาก Web"}
               </Text>
+              {outboxCount > 0 ? <Text style={styles.webMetaText}>ค้างส่ง {outboxCount}</Text> : null}
             </View>
             <DriverWebView
               ref={webViewRef}
@@ -362,6 +410,7 @@ export default function App() {
               <Text style={styles.noteText}>{message}</Text>
               <Text style={styles.noteText}>API: {TOMP_API_BASE_URL}</Text>
               <Text style={styles.noteText}>รุ่นแอป: {TOMP_DRIVER_APP_VERSION}</Text>
+              {outboxCount > 0 ? <Text style={styles.noteText}>รายการที่รอส่งซ้ำ: {outboxCount}</Text> : null}
               {Platform.OS === "android" ? <Text style={styles.noteText}>Android: รองรับ development build สำหรับ GPS เบื้องหลัง</Text> : null}
             </View>
           </View>
@@ -419,6 +468,11 @@ const styles = StyleSheet.create({
     color: "#bdd1df",
     fontSize: 11,
     fontWeight: "700"
+  },
+  outboxText: {
+    color: "#ffd166",
+    fontSize: 11,
+    fontWeight: "800"
   },
   activation: {
     gap: 14,

@@ -15,7 +15,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   const mobileSession = await getMobileDriverSession();
   if (!mobileSession) return;
 
-  await submitLocation(
+  await submitOrQueueLocation(
     {
       latitude: latest.coords.latitude,
       longitude: latest.coords.longitude,
@@ -26,8 +26,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
         platform: "mobile_driver",
         mode: "background"
       }
-    },
-    mobileSession
+    }
   ).catch(() => undefined);
 });
 

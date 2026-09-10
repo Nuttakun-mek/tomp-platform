@@ -1,10 +1,11 @@
 import * as SQLite from "expo-sqlite";
 import type { AssignmentStatusUpdateInput, DriverCheckinInput, DriverIssueReportInput, DriverLocationUpdateInput } from "@tomp/types/schemas";
-import { submitLocation } from "./driver-api";
+import { submitIssueReport, submitLocation, submitReadiness, submitStatusUpdate } from "./driver-api";
 import { getMobileDriverSession } from "./mobile-session-store";
 
 const DATABASE_NAME = "tomp-driver-outbox.db";
 const MAX_QUEUE_SIZE = 2000;
+const MAX_ATTEMPTS = 5;
 
 type OfflineAction =
   | { id: string; kind: "readiness"; payload: DriverCheckinInput; createdAt: string }
@@ -91,14 +92,24 @@ export async function enqueueOfflineAction(kind: OfflineAction["kind"], payload:
 }
 
 async function sendAction(action: OfflineAction) {
-  if (action.kind === "location") return submitLocation(action.payload, await getMobileDriverSession());
-  return { success: false, error: "รายการนี้ต้องส่งผ่าน Driver Web session ไม่ใช่ raw QR token" };
+  const mobileSession = await getMobileDriverSession();
+  if (action.kind === "location") return submitLocation(action.payload, mobileSession);
+  if (action.kind === "readiness") return submitReadiness(action.payload, mobileSession);
+  if (action.kind === "status") return submitStatusUpdate(action.payload, mobileSession);
+  return submitIssueReport(action.payload, mobileSession);
+}
+
+function isTerminalFailure(result: Awaited<ReturnType<typeof sendAction>>, row: OutboxRow) {
+  if ("statusCode" in result && (result.statusCode === 401 || result.statusCode === 403)) return true;
+  if (row.attempt_count + 1 >= MAX_ATTEMPTS) return true;
+  return false;
 }
 
 export async function flushOfflineQueue() {
   const db = await getDatabase();
   const rows = await db.getAllAsync<OutboxRow>("select id, kind, payload, created_at, attempt_count from driver_outbox order by created_at asc limit 100");
   let sent = 0;
+  let dropped = 0;
 
   for (const row of rows) {
     const action = parseRow(row);
@@ -115,6 +126,9 @@ export async function flushOfflineQueue() {
     if (result.success) {
       sent += 1;
       await db.runAsync("delete from driver_outbox where id = ?", [row.id]);
+    } else if (isTerminalFailure(result, row)) {
+      dropped += 1;
+      await db.runAsync("delete from driver_outbox where id = ?", [row.id]);
     } else {
       await db.runAsync("update driver_outbox set attempt_count = attempt_count + 1, last_error = ?, updated_at = ? where id = ?", [
         result.error ?? "ส่งข้อมูลไม่สำเร็จ",
@@ -125,6 +139,7 @@ export async function flushOfflineQueue() {
   }
 
   return {
+    dropped,
     sent,
     remaining: await getOfflineQueueCount()
   };

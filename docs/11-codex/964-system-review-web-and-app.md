@@ -6,15 +6,74 @@ WebView↔native bridge, the mobile services, and the hot read paths.
 
 Baseline before this pass: web 90 tests, driver-core 14, mobile 14 — all green.
 
+Update 2026-09-10: the mobile code items below were patched on `main` after this
+review. Mobile tests now cover the session assignment API contract.
+
 ---
 
 ## Verdict
 
-The **web side is sound**. The **web↔app contract had no single source of truth**
-(fixed here), and the **mobile offline path is non-functional** — two severe bugs
-that silently lose driver location data. Those live in `apps/mobile-driver`,
-which the mobile agent has 17 unmerged commits on, so they are reported here
-rather than patched from main.
+The **web side is sound**. The **web↔app contract now has a shared source of
+truth**, and the severe mobile offline-loss issues have been patched. The next
+risk is not code shape; it is real-device verification under weak network,
+backgrounding, and OS permission states.
+
+## Fixed after this review (mobile)
+
+### P0 — offline queue now has flush triggers
+
+`App.tsx` now calls `flushOfflineQueue()` when:
+
+- the mobile session is established
+- the app starts
+- the app returns to foreground
+- the shell is active every 30 seconds
+
+The shell also shows a small pending-count indicator when rows remain in the
+outbox.
+
+### P0 — background location failures are queued
+
+The `TaskManager` background GPS task now routes failed sends through the same
+`submitOrQueueLocation()` path as foreground GPS. A dead zone should no longer
+silently drop the ping without retry.
+
+### P1 — safer bridge payload embedding
+
+`postStatusToWeb()` no longer double-escapes JSON backslashes. It uses the
+standard safe embeds for `<`, U+2028, and U+2029 before injecting the custom
+event into the WebView.
+
+### P1 — mobile HTTP timeout and response normalization
+
+`driver-api.ts` and `mobile-session-api.ts` now use a 10-second abort timeout and
+normalise non-2xx JSON responses into `{ success:false, statusCode }`.
+
+### P1 — poison rows are evicted
+
+`flushOfflineQueue()` treats 401/403 as terminal and drops rows after five failed
+attempts, so an expired mobile session cannot block newer location pings
+forever.
+
+### P2 — bridge contract re-exported from `@tomp/driver-core`
+
+`apps/mobile-driver/src/bridge/protocol.ts` now re-exports the shared bridge
+constants, types, parser, and status builder. `App.tsx` injects
+`BRIDGE_NAMESPACE` / `BRIDGE_VERSION` from the same source.
+
+### P2 — offline replay supports all queued driver action kinds
+
+`sendAction()` can now replay `readiness`, `status`, `issue`, and `location`
+through the session-authenticated driver API routes. This keeps future queued
+readiness/status/message rows from becoming permanent poison rows.
+
+### P2 — phantom `@tomp/api-client` dependency removed from mobile shell
+
+`apps/mobile-driver` now imports the shared bridge through `@tomp/driver-core`
+but no longer declares `@tomp/api-client` until that package becomes the real
+mobile transport layer. The current mobile shell keeps its own small HTTP layer
+because it needs React Native timeout/error semantics and the live location
+endpoint is not exposed by `@tomp/api-client` yet.
 
 ---
 
@@ -62,9 +121,13 @@ was `throw new Error("… is deprecated …")`. Zero callers. Removed; doc 704 t
 
 ---
 
-## For the mobile agent — `apps/mobile-driver`
+## Original mobile findings — `apps/mobile-driver`
 
-Ranked by impact. Nothing here was changed from main.
+The list below is kept as the original review trail. Items marked P0/P1 above
+were addressed after the review; the remaining action is real-device testing and
+any UX refinement found during that run.
+
+Ranked by impact as originally found.
 
 ### P0 — `flushOfflineQueue()` is never called: the outbox is write-only
 
@@ -139,12 +202,19 @@ and evict any row past a max `attempt_count`.
 
 ### P2 — `sendAction()` can only replay `location`
 
+Status: fixed after review.
+
 Every other kind returns `{ success: false, error: "…ต้องส่งผ่าน Driver Web
 session…" }`, i.e. a permanent failure. Latent today (nothing enqueues those
 kinds) but it becomes a poison-row source the moment readiness/status/issue are
 queued.
 
 ### P2 — three HTTP layers, three `ApiResult` shapes
+
+Status: partially fixed after review. The phantom `@tomp/api-client` dependency
+was removed from the mobile shell; `driver-api.ts` and `mobile-session-api.ts`
+now share the same timeout/error behaviour, but the future shared transport
+package is still a later architecture task.
 
 - `packages/api-client/src/driver.ts` — the documented boundary (docs 810, 812)
 - `apps/mobile-driver/src/services/driver-api.ts` — its own `requestJson`
@@ -157,6 +227,8 @@ actually used. Either adopt the shared client or drop the phantom dependencies;
 right now the documented architecture and the code disagree.
 
 ### P2 — `App.tsx` bridge bootstrap hardcodes the namespace and version
+
+Status: fixed after review.
 
 ```ts
 const bridgeBootstrap = `… namespace: "tomp.driver", version: 1, …`;
@@ -198,7 +270,6 @@ payload.success !== false` → normalised error); the mobile copy does not.
 
 - `npm run typecheck` — clean
 - `npm run lint` — clean
-- `npm test` — web 90/90, driver-core **23/23** (was 14, +9 bridge)
-- `npm test --prefix apps/mobile-driver` — 14/14 (unchanged; nothing in
-  `apps/mobile-driver` was modified)
+- `npm test` — web 90/90, driver-core 23/23
+- `npm test --prefix apps/mobile-driver` — 17/17 (adds driver API session/HTTP contract coverage)
 - `npm run build` — 45/45 pages
