@@ -136,8 +136,49 @@ async function seedIn(sql) {
   console.log("  Clean up with: node scripts/seed-driver-flow-test.mjs --purge\n");
 }
 
+// Evidence photos live in Supabase storage under
+// <projectId>/<assignmentId>/<kind>-<ts>.<ext> (see lib/storage/photo-upload.ts),
+// which purge_smoke_test_data() — SQL only — cannot reach. Remove them before
+// the rows go, while the project ids are still resolvable.
+async function purgeEvidencePhotos() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || envFromLocal("NEXT_PUBLIC_SUPABASE_URL");
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || envFromLocal("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return 0;
+
+  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "content-type": "application/json" };
+  const list = async (prefix) => {
+    const res = await fetch(`${supabaseUrl}/storage/v1/object/list/driver-evidence`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ prefix, limit: 1000 })
+    }).catch(() => null);
+    const json = res && res.ok ? await res.json().catch(() => []) : [];
+    return Array.isArray(json) ? json : [];
+  };
+
+  const projects = await sql`select id from projects where metadata->>'smokeTest' = 'true'`;
+  const paths = [];
+  for (const { id } of projects) {
+    for (const assignment of await list(id)) {
+      for (const file of await list(`${id}/${assignment.name}`)) {
+        paths.push(`${id}/${assignment.name}/${file.name}`);
+      }
+    }
+  }
+  if (!paths.length) return 0;
+
+  const res = await fetch(`${supabaseUrl}/storage/v1/object/driver-evidence`, {
+    method: "DELETE",
+    headers,
+    body: JSON.stringify({ prefixes: paths })
+  }).catch(() => null);
+  return res && res.ok ? paths.length : 0;
+}
+
 async function purge() {
+  const photos = await purgeEvidencePhotos().catch(() => 0);
   const [row] = await sql`select public.purge_smoke_test_data() as result`;
+  console.log(`evidence photos removed -> ${photos}`);
   console.log("purge_smoke_test_data() ->", JSON.stringify(row.result));
 }
 

@@ -12,10 +12,6 @@ export function validatePhotoFile(file: File): { valid: boolean; error?: string 
   return { valid: true };
 }
 
-export function getCheckinPhotoPath(projectId: string, assignmentId: string, kind: "vehicle" | "plate", extension = "jpg"): string {
-  return `project/${projectId}/assignment/${assignmentId}/${kind}-${Date.now()}.${extension}`;
-}
-
 export async function uploadVehiclePhoto(projectId: string, assignmentId: string, file: File) {
   const validation = validatePhotoFile(file);
   if (!validation.valid) return { success: false, error: validation.error };

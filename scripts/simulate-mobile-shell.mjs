@@ -156,6 +156,56 @@ try {
     check("native assignment read works with the session", asn.ok && Boolean(asnJson?.data?.packet), `HTTP ${asn.status}`);
   }
 
+  // 7b. Complete the driver pre-flight so the task view (which owns the
+  // tomp:native-status listener inside DriverLocationShare) actually mounts.
+  const boxes = page.locator('input[type="checkbox"]');
+  const boxCount = await boxes.count();
+  for (let i = 0; i < boxCount; i += 1) await boxes.nth(i).check().catch(() => {});
+  const fileInputs = page.locator('input[type="file"]');
+  const fileCount = await fileInputs.count();
+  // a 1x1 PNG the browser can decode and the client-side compressor can draw
+  const onePixelPng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64"
+  );
+  for (let i = 0; i < fileCount; i += 1) {
+    await fileInputs.nth(i).setInputFiles({ name: `evidence-${i}.png`, mimeType: "image/png", buffer: onePixelPng }).catch(() => {});
+    await page.waitForTimeout(2000);
+  }
+  // wait for both uploads to register before the button enables
+  await page
+    .waitForFunction(() => {
+      const btn = [...document.querySelectorAll("button")].find((b) => /เริ่มงาน/.test(b.textContent || ""));
+      return Boolean(btn) && !btn.disabled;
+    }, null, { timeout: 30000 })
+    .catch(() => {});
+  const startBtn = page.locator("button", { hasText: /ยืนยันและเริ่มงาน/ }).first();
+  if (await startBtn.count()) await startBtn.click({ timeout: 10000 }).catch(() => {});
+  // the readiness submit is a server action — give it room on a cold dev route
+  await page
+    .waitForFunction(
+      () => !((document.querySelector("main") || document.body).innerText || "").includes("ตรวจสอบก่อนเริ่มงาน"),
+      null,
+      { timeout: 45000 }
+    )
+    .catch(() => {});
+  await page.waitForTimeout(1500);
+  const reachedTaskView = await page.evaluate(
+    () => !((document.querySelector("main") || document.body).innerText || "").includes("ตรวจสอบก่อนเริ่มงาน")
+  );
+  const pfDebug = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll("button")].find((b) => /เริ่มงาน|ตรวจสอบให้ครบ/.test(b.textContent || ""));
+    return {
+      boxes: [...document.querySelectorAll('input[type="checkbox"]')].map((b) => b.checked),
+      files: document.querySelectorAll('input[type="file"]').length,
+      btnText: (btn?.textContent || "").trim(),
+      btnDisabled: btn ? btn.disabled : null,
+      err: ([...document.querySelectorAll("p")].find((p) => /อัปโหลด|กรุณา/.test(p.textContent || ""))?.textContent || "").trim()
+    };
+  });
+  check("pre-flight completes and the task view mounts", reachedTaskView,
+    `boxes=${JSON.stringify(pfDebug.boxes)} files=${pfDebug.files} btn="${pfDebug.btnText}" disabled=${pfDebug.btnDisabled} err="${pfDebug.err}"`);
+
   // 8. native -> web status event drives the web UI
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent("tomp:native-status", {
