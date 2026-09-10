@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
-import { createCallSignAction, updateCallSignCrewAction } from "@/app/actions/call-signs";
 import { DateRangeFields } from "@/components/ui/datetime-field";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
-import { Tooltip } from "@/components/ui/tooltip";
 import { describeAssignmentConflicts } from "@/lib/domain/assignment-rules";
 import { isCallSignCrewed } from "@/lib/domain/call-sign-rules";
 import { createAssignmentSchema } from "@/lib/validation";
@@ -44,7 +42,6 @@ function vehicleLabel(vehicle?: Vehicle) {
 
 export function CreateAssignmentForm({
   projectId,
-  projectCode,
   missions,
   callSigns,
   drivers,
@@ -55,12 +52,8 @@ export function CreateAssignmentForm({
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
   const [isPending, startTransition] = useTransition();
-  const [isCrewPending, startCrewTransition] = useTransition();
-  const [availableCallSigns, setAvailableCallSigns] = useState(callSigns);
+  const availableCallSigns = callSigns;
   const [selectedCallSignId, setSelectedCallSignId] = useState(callSigns[0]?.id || "");
-  const [newCallSign, setNewCallSign] = useState("");
-  const [driverId, setDriverId] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
@@ -70,14 +63,7 @@ export function CreateAssignmentForm({
     () => availableCallSigns.find((callSign) => callSign.id === selectedCallSignId),
     [availableCallSigns, selectedCallSignId]
   );
-  const selectedDriver = selectedCallSign?.driverId ? driverById.get(selectedCallSign.driverId) : undefined;
-  const selectedVehicle = selectedCallSign?.vehicleId ? vehicleById.get(selectedCallSign.vehicleId) : undefined;
   const selectedCrewReady = Boolean(selectedCallSign && isCallSignCrewed(selectedCallSign));
-
-  useEffect(() => {
-    setDriverId(selectedCallSign?.driverId || "");
-    setVehicleId(selectedCallSign?.vehicleId || "");
-  }, [selectedCallSign?.driverId, selectedCallSign?.vehicleId]);
 
   const conflicts = useMemo(() => {
     if (!startTime || !endTime || !selectedCallSign) return [];
@@ -90,84 +76,9 @@ export function CreateAssignmentForm({
   }, [existingAssignments, selectedCallSign, startTime, endTime]);
 
   const canCreate = missions.length > 0 && selectedCrewReady;
-  const crewChanged =
-    Boolean(selectedCallSign && (driverId || null) !== (selectedCallSign.driverId || null)) ||
-    Boolean(selectedCallSign && (vehicleId || null) !== (selectedCallSign.vehicleId || null));
 
-  function upsertCallSignInState(callSign: CallSign) {
-    setAvailableCallSigns((items) => {
-      const exists = items.some((item) => item.id === callSign.id);
-      return exists ? items.map((item) => (item.id === callSign.id ? callSign : item)) : [...items, callSign];
-    });
-    setSelectedCallSignId(callSign.id);
-  }
 
-  function handleCreateCallSign() {
-    setMessage(null);
-    if (!driverId || !vehicleId) {
-      setTone("warning");
-      setMessage("กรุณาเลือกคนขับและรถก่อนสร้าง Call Sign");
-      return;
-    }
 
-    startCrewTransition(async () => {
-      const result = await createCallSignAction({
-        projectId,
-        projectCode,
-        callSign: newCallSign.trim() || null,
-        driverId,
-        vehicleId
-      });
-      if (!result.success) {
-        setTone("danger");
-        setMessage(result.error || "สร้าง Call Sign ไม่สำเร็จ");
-        return;
-      }
-
-      const callSign = (result.data as { callSign?: CallSign } | undefined)?.callSign;
-      if (callSign) upsertCallSignInState(callSign);
-      setNewCallSign("");
-      setTone("success");
-      setMessage(result.warning || `สร้าง Call Sign ${callSign?.callSign || ""} พร้อมคู่รถแล้ว`);
-      router.refresh();
-    });
-  }
-
-  function handleUpdateCrew() {
-    setMessage(null);
-    if (!selectedCallSign) {
-      setTone("warning");
-      setMessage("กรุณาเลือก Call Sign ก่อนบันทึกคู่รถ");
-      return;
-    }
-    if (!driverId || !vehicleId) {
-      setTone("warning");
-      setMessage("กรุณาเลือกคนขับและรถให้ครบก่อนบันทึกคู่รถ");
-      return;
-    }
-
-    startCrewTransition(async () => {
-      const result = await updateCallSignCrewAction({
-        projectId,
-        callSignId: selectedCallSign.id,
-        driverId,
-        vehicleId,
-        reason: "บันทึกคู่รถจากหน้าจัดสรรงาน",
-        metadata: { source: "assignment_form" }
-      });
-      if (!result.success) {
-        setTone("danger");
-        setMessage(result.error || "บันทึกคู่รถของ Call Sign ไม่สำเร็จ");
-        return;
-      }
-
-      const callSign = (result.data as { callSign?: CallSign } | undefined)?.callSign;
-      if (callSign) upsertCallSignInState(callSign);
-      setTone("success");
-      setMessage(result.warning || "บันทึกคู่รถของ Call Sign แล้ว");
-      router.refresh();
-    });
-  }
 
   function handleSubmit(formData: FormData) {
     setMessage(null);
@@ -175,12 +86,6 @@ export function CreateAssignmentForm({
     if (!selectedCrewReady) {
       setTone("warning");
       setMessage("กรุณาผูกคนขับและรถให้ Call Sign ก่อนเปิดงานใหม่");
-      return;
-    }
-
-    if (crewChanged) {
-      setTone("warning");
-      setMessage("มีการเปลี่ยนคนขับหรือรถที่ยังไม่ได้บันทึก กรุณาบันทึกคู่รถก่อนเปิดงาน");
       return;
     }
 
@@ -233,98 +138,32 @@ export function CreateAssignmentForm({
         </p>
       </div>
 
-      <section className="grid gap-3 rounded-2xl border border-teal-100 bg-teal-50/60 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-ink">คู่รถประจำ Call Sign</h3>
-            <p className="text-xs leading-5 text-slate-600">QR ในเฟสนี้ยังคงเป็นแบบเดิม แต่การเปิดงานใหม่จะยึดคู่รถจาก Call Sign นี้</p>
-          </div>
-          <Tooltip content="Call Sign คือช่องปฏิบัติการของรถหนึ่งคันพร้อมคนขับหนึ่งคนในโครงการนี้">
-            <span className="grid h-6 w-6 place-items-center rounded-full border border-teal-200 bg-white text-xs font-bold text-teal-700">?</span>
-          </Tooltip>
-        </div>
-
-        <label className="field-label">
-          Call Sign
-          <select
-            className="field-input"
-            name="callSignId"
-            value={selectedCallSignId}
-            onChange={(event) => setSelectedCallSignId(event.target.value)}
-            required
-          >
-            <option value="">เลือก Call Sign</option>
-            {availableCallSigns.map((callSign) => (
-              <option key={callSign.id} value={callSign.id}>
-                {callSign.callSign} - {driverLabel(driverById.get(callSign.driverId || ""))} - {vehicleLabel(vehicleById.get(callSign.vehicleId || ""))}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="field-label">
-            คนขับของ Call Sign
-            <select className="field-input" value={driverId} onChange={(event) => setDriverId(event.target.value)}>
-              <option value="">เลือกคนขับ</option>
-              {drivers.map((driver) => (
-                <option key={driver.id} value={driver.id}>
-                  {driverLabel(driver)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label">
-            รถของ Call Sign
-            <select className="field-input" value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>
-              <option value="">เลือกรถ</option>
-              {vehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicleLabel(vehicle)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-          <input
-            className="field-input"
-            value={newCallSign}
-            onChange={(event) => setNewCallSign(event.target.value)}
-            placeholder="รหัส Call Sign ใหม่ เช่น VAN-01 หรือเว้นว่างเพื่อให้ระบบสร้าง"
-          />
-          <button
-            className="rounded-2xl border border-operation/30 bg-white px-4 py-2.5 text-sm font-semibold text-operation transition hover:bg-operation/10 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isCrewPending || !driverId || !vehicleId}
-            type="button"
-            onClick={handleCreateCallSign}
-          >
-            สร้าง Call Sign
-          </button>
-          <button
-            className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={isCrewPending || !selectedCallSign || !driverId || !vehicleId || !crewChanged}
-            type="button"
-            onClick={handleUpdateCrew}
-          >
-            บันทึกคู่รถ
-          </button>
-        </div>
-
+      {/* Crewing moved to ขั้นที่ 1. This form only opens work onto a unit that
+          is already crewed, so the two decisions stop sharing a screen. */}
+      <label className="field-label">
+        หน่วยรถ (Call Sign)
+        <select
+          className="field-input"
+          name="callSignId"
+          value={selectedCallSignId}
+          onChange={(event) => setSelectedCallSignId(event.target.value)}
+          required
+        >
+          <option value="">เลือกหน่วยรถ</option>
+          {availableCallSigns.map((callSign) => (
+            <option key={callSign.id} value={callSign.id}>
+              {callSign.callSign} - {driverLabel(driverById.get(callSign.driverId || ""))} - {vehicleLabel(vehicleById.get(callSign.vehicleId || ""))}
+            </option>
+          ))}
+        </select>
         {selectedCallSign ? (
-          <div className="grid gap-2 rounded-xl border border-teal-100 bg-white p-3 text-sm md:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold text-slate-500">คนขับที่บันทึกอยู่</p>
-              <p className="font-semibold text-ink">{driverLabel(selectedDriver)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500">รถที่บันทึกอยู่</p>
-              <p className="font-semibold text-ink">{vehicleLabel(selectedVehicle)}</p>
-            </div>
-          </div>
-        ) : null}
-      </section>
+          <span className="mt-1 text-xs text-slate-500">
+            คนขับและรถของงานนี้จะถูกบันทึกจากหน่วย {selectedCallSign.callSign} โดยอัตโนมัติ
+          </span>
+        ) : (
+          <span className="mt-1 text-xs text-slate-500">ยังไม่มีหน่วยรถ? สร้างที่ “ขั้นที่ 1” ด้านบนก่อน</span>
+        )}
+      </label>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="field-label">

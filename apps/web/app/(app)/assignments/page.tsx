@@ -13,6 +13,7 @@ import { getProjects } from "@/lib/data/projects";
 import { getDrivers, getVehicles } from "@/lib/data/resources";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { CreateMissionForm } from "@/components/missions/create-mission-form";
+import { CallSignAccessPanel } from "@/components/assignments/call-sign-access-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 interface AssignmentsPageProps {
@@ -71,8 +72,28 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
         </div>
       </section>
       {!load.ok ? <DataUnavailable description="โหลดข้อมูลงานของโครงการนี้ไม่สำเร็จ" detail={load.error} /> : null}
-      {/* Planning reads top to bottom: create the mission, then assign work to
-          it, then watch the board. Folded away once the project has missions. */}
+      {/* Two steps, in the order they happen. Crewing a unit is done once and
+          stands for the project; opening work onto it happens all day. Keeping
+          them in one form meant every job passed the crewing controls. */}
+      <CallSignAccessPanel
+        projectId={projectId}
+        projectCode={activeProject.projectCode}
+        assignments={assignments}
+        callSigns={callSigns}
+        drivers={drivers}
+        vehicles={vehicles}
+      />
+
+      <section className="enterprise-panel-soft p-4">
+        <p className="section-label">ขั้นที่ 2</p>
+        <h2 className="text-lg font-semibold text-ink">วางแผนงานให้หน่วยรถ</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          {callSigns.length
+            ? "สร้างภารกิจแล้วเปิดงานให้หน่วยที่จัดไว้ในขั้นที่ 1"
+            : "ยังทำขั้นนี้ไม่ได้ — สร้างหน่วยรถในขั้นที่ 1 ก่อน"}
+        </p>
+      </section>
+
       <CollapsibleSection title="เพิ่มภารกิจ" storageKey={`proj.${projectId}.newmission`} defaultOpen={missions.length === 0}>
         <CreateMissionForm projectId={projectId} />
       </CollapsibleSection>

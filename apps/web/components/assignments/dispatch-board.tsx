@@ -1,5 +1,4 @@
 import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
-import { CallSignAccessPanel } from "./call-sign-access-panel";
 import { AssignmentLane } from "./assignment-lane";
 import { DriverJobOrderPanel } from "./driver-job-order-panel";
 
@@ -36,13 +35,6 @@ export function DispatchBoard({ projectId, assignments, missions, callSigns, dri
           <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{assignments.length} งาน</span>
         </div>
       </div>
-      <CallSignAccessPanel
-        projectId={projectId}
-        assignments={assignments}
-        callSigns={callSigns}
-        drivers={drivers}
-        vehicles={vehicles}
-      />
       <DriverJobOrderPanel projectId={projectId} assignments={assignments} callSigns={callSigns} drivers={drivers} />
       {/* Stacked list below lg (a Kanban row does not fit a 390px phone),
           horizontal lane board on wide screens. */}
