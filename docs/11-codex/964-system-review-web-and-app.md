@@ -32,6 +32,10 @@ backgrounding, and OS permission states.
 The shell also shows a small pending-count indicator when rows remain in the
 outbox.
 
+`flushOfflineQueue()` also has an in-flight promise guard. If app foreground,
+session setup, and the 30-second interval trigger at the same time, later calls
+reuse the active flush instead of reading and replaying the same 100 rows again.
+
 ### P0 — background location failures are queued
 
 The `TaskManager` background GPS task now routes failed sends through the same
@@ -54,6 +58,15 @@ normalise non-2xx JSON responses into `{ success:false, statusCode }`.
 `flushOfflineQueue()` treats 401/403 as terminal and drops rows after five failed
 attempts, so an expired mobile session cannot block newer location pings
 forever.
+
+Background GPS now passes the already-read mobile session into the send path, so
+each ping does not read SecureStore twice.
+
+### P1 — queue sync status no longer overwrites the main shell message
+
+Outbox sync feedback is stored in a separate `syncLabel`, so it does not replace
+the current QR/session/GPS status message while the driver is opening or using a
+job.
 
 ### P2 — bridge contract re-exported from `@tomp/driver-core`
 
@@ -271,5 +284,5 @@ payload.success !== false` → normalised error); the mobile copy does not.
 - `npm run typecheck` — clean
 - `npm run lint` — clean
 - `npm test` — web 90/90, driver-core 23/23
-- `npm test --prefix apps/mobile-driver` — 17/17 (adds driver API session/HTTP contract coverage)
+- `npm test --prefix apps/mobile-driver` — 18/18 (adds driver API session/HTTP contract coverage and flush re-entrancy coverage)
 - `npm run build` — 45/45 pages

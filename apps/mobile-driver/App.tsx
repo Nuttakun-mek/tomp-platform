@@ -76,6 +76,7 @@ export default function App() {
   const [networkLabel, setNetworkLabel] = useState("กำลังตรวจสอบสัญญาณ");
   const [canGoBack, setCanGoBack] = useState(false);
   const [outboxCount, setOutboxCount] = useState(0);
+  const [syncLabel, setSyncLabel] = useState("");
 
   const effectiveWebUrl = useMemo(() => webUrl || (currentToken ? buildDriverWebUrl(currentToken) : ""), [currentToken, webUrl]);
 
@@ -102,7 +103,7 @@ export default function App() {
     const remaining = result?.remaining ?? (await getOfflineQueueCount().catch(() => 0));
     setOutboxCount(remaining);
     if (result && (result.sent > 0 || result.dropped > 0)) {
-      setMessage(`ซิงก์รายการค้างส่งแล้ว ${result.sent} รายการ${result.dropped ? ` และตัดรายการที่ส่งไม่ได้ ${result.dropped} รายการ` : ""}`);
+      setSyncLabel(`ซิงก์รายการค้างส่งแล้ว ${result.sent} รายการ${result.dropped ? ` และตัดรายการที่ส่งไม่ได้ ${result.dropped} รายการ` : ""}`);
     }
   }, []);
 
@@ -325,6 +326,7 @@ export default function App() {
             <Text style={styles.statusPill}>{status}</Text>
             <Text style={styles.network}>{networkLabel}</Text>
             {outboxCount > 0 ? <Text style={styles.outboxText}>ค้างส่ง {outboxCount} รายการ</Text> : null}
+            {syncLabel ? <Text style={styles.syncText}>{syncLabel}</Text> : null}
           </View>
         </View>
 
@@ -336,6 +338,7 @@ export default function App() {
                 {sessionReady ? "mobile session พร้อม" : "รอ mobile session จาก Web"}
               </Text>
               {outboxCount > 0 ? <Text style={styles.webMetaText}>ค้างส่ง {outboxCount}</Text> : null}
+              {syncLabel ? <Text style={styles.webMetaText}>{syncLabel}</Text> : null}
             </View>
             <DriverWebView
               ref={webViewRef}
@@ -411,6 +414,7 @@ export default function App() {
               <Text style={styles.noteText}>API: {TOMP_API_BASE_URL}</Text>
               <Text style={styles.noteText}>รุ่นแอป: {TOMP_DRIVER_APP_VERSION}</Text>
               {outboxCount > 0 ? <Text style={styles.noteText}>รายการที่รอส่งซ้ำ: {outboxCount}</Text> : null}
+              {syncLabel ? <Text style={styles.noteText}>{syncLabel}</Text> : null}
               {Platform.OS === "android" ? <Text style={styles.noteText}>Android: รองรับ development build สำหรับ GPS เบื้องหลัง</Text> : null}
             </View>
           </View>
@@ -473,6 +477,13 @@ const styles = StyleSheet.create({
     color: "#ffd166",
     fontSize: 11,
     fontWeight: "800"
+  },
+  syncText: {
+    color: "#8be2da",
+    fontSize: 10,
+    fontWeight: "800",
+    maxWidth: 180,
+    textAlign: "right"
   },
   activation: {
     gap: 14,

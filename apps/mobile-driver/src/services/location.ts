@@ -3,7 +3,7 @@ import * as TaskManager from "expo-task-manager";
 import { LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
 import { enqueueOfflineAction } from "./offline-queue";
-import { getMobileDriverSession } from "./mobile-session-store";
+import { getMobileDriverSession, type MobileDriverSession } from "./mobile-session-store";
 
 type LocationCallback = (location: Location.LocationObject) => void;
 
@@ -26,7 +26,8 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
         platform: "mobile_driver",
         mode: "background"
       }
-    }
+    },
+    mobileSession
   ).catch(() => undefined);
 });
 
@@ -44,9 +45,9 @@ export async function getCurrentLocation() {
   return Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
 }
 
-async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]) {
-  const mobileSession = await getMobileDriverSession();
-  const result = await submitLocation(input, mobileSession).catch((error) => ({
+async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0], mobileSession?: MobileDriverSession | null) {
+  const session = mobileSession ?? (await getMobileDriverSession());
+  const result = await submitLocation(input, session).catch((error) => ({
     success: false,
     error: error instanceof Error ? error.message : "ส่งตำแหน่งไม่สำเร็จ"
   }));

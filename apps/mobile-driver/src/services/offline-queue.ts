@@ -21,7 +21,14 @@ interface OutboxRow {
   attempt_count: number;
 }
 
+export interface FlushOfflineQueueResult {
+  dropped: number;
+  sent: number;
+  remaining: number;
+}
+
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let flushing: Promise<FlushOfflineQueueResult> | null = null;
 
 function createId() {
   const randomPart = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
@@ -105,7 +112,7 @@ function isTerminalFailure(result: Awaited<ReturnType<typeof sendAction>>, row: 
   return false;
 }
 
-export async function flushOfflineQueue() {
+async function runFlush(): Promise<FlushOfflineQueueResult> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<OutboxRow>("select id, kind, payload, created_at, attempt_count from driver_outbox order by created_at asc limit 100");
   let sent = 0;
@@ -143,4 +150,12 @@ export async function flushOfflineQueue() {
     sent,
     remaining: await getOfflineQueueCount()
   };
+}
+
+export function flushOfflineQueue(): Promise<FlushOfflineQueueResult> {
+  if (flushing) return flushing;
+  flushing = runFlush().finally(() => {
+    flushing = null;
+  });
+  return flushing;
 }
