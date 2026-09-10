@@ -63,6 +63,10 @@ export function GET() {
         // Safe boolean only — never the raw env value. false means reads fall
         // back to service-role transport and RLS is not exercised.
         scopedReadsEnabled: scopedReadsFlagOn(),
+        // Safe boolean only. false means QR tokens, PINs and device bindings
+        // would be hashed with the public development fallback — driver auth
+        // is not trustworthy until this is true.
+        driverTokenSecretConfigured: Boolean(readCleanEnv("DRIVER_ACCESS_TOKEN_SECRET")),
         webGpsMode: "foreground-browser",
         timelineImmutableUi: true
       }

@@ -324,7 +324,7 @@ export async function validateDriverAccessTokenAction(input: unknown): Promise<A
 
   const { data: row, error: lookupError } = await client
     .from("driver_access_tokens")
-    .select("id, project_id, assignment_id, driver_id, status, expires_at")
+    .select("id, project_id, assignment_id, driver_id, status, expires_at, usage_count")
     .eq("token_hash", hashDriverAccessToken(token))
     .maybeSingle();
 
@@ -332,7 +332,10 @@ export async function validateDriverAccessTokenAction(input: unknown): Promise<A
   if (!row || row.status !== "active") return actionFailure("ลิงก์คนขับไม่ถูกต้องหรือถูกยกเลิกแล้ว");
   if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return actionFailure("ลิงก์คนขับหมดอายุแล้ว");
 
-  await client.from("driver_access_tokens").update({ last_accessed_at: new Date().toISOString(), used_at: new Date().toISOString(), access_count: 1 }).eq("id", row.id);
+  await client
+    .from("driver_access_tokens")
+    .update({ last_used_at: new Date().toISOString(), usage_count: Number(row.usage_count ?? 0) + 1 })
+    .eq("id", row.id);
 
   await createTimelineEvent({
     projectId: row.project_id,

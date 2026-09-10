@@ -1,6 +1,29 @@
 import "server-only";
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { readCleanEnv } from "@/lib/env";
+
+// Every QR token, PIN and device binding is hashed with this. It is read through
+// readCleanEnv so it resolves the same way as the rest of the config (process.env
+// first, then .env.local at the app root or the repo root) — reading
+// process.env directly meant a monorepo dev server silently hashed everything
+// with the public fallback below while a real secret sat in .env.local.
+//
+// In production a missing secret is a misconfiguration, not something to paper
+// over: falling back would hash real driver credentials with a constant that is
+// published in this repository, so fail loudly instead.
+const DEV_FALLBACK_SECRET = "development-driver-token-secret";
+
+export function driverTokenSecret(): string {
+  const secret = readCleanEnv("DRIVER_ACCESS_TOKEN_SECRET");
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "DRIVER_ACCESS_TOKEN_SECRET is not configured. Refusing to hash driver QR tokens, PINs or device bindings with the public development fallback."
+    );
+  }
+  return DEV_FALLBACK_SECRET;
+}
 
 export interface DriverAccessTokenDraft {
   assignmentId: string;
@@ -15,7 +38,7 @@ export function generateDriverAccessToken(input: DriverAccessTokenDraft): string
 }
 
 export function hashDriverAccessToken(token: string): string {
-  const secret = process.env.DRIVER_ACCESS_TOKEN_SECRET ?? "development-driver-token-secret";
+  const secret = driverTokenSecret();
   return createHash("sha256").update(`${secret}:${token}`).digest("hex");
 }
 
@@ -37,7 +60,7 @@ export function generateDriverPin(): string {
 }
 
 export function hashDriverPin(pin: string): string {
-  const secret = process.env.DRIVER_ACCESS_TOKEN_SECRET ?? "development-driver-token-secret";
+  const secret = driverTokenSecret();
   return createHash("sha256").update(`pin:${secret}:${pin.trim()}`).digest("hex");
 }
 
@@ -62,6 +85,6 @@ export function generateDriverDeviceId(): string {
 }
 
 export function hashDriverDeviceId(deviceId: string): string {
-  const secret = process.env.DRIVER_ACCESS_TOKEN_SECRET ?? "development-driver-token-secret";
+  const secret = driverTokenSecret();
   return createHash("sha256").update(`device:${secret}:${deviceId.trim()}`).digest("hex");
 }

@@ -214,7 +214,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
 
   const { data: tokenRow } = await client
     .from("driver_access_tokens")
-    .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata")
+    .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata, usage_count")
     .eq("token_hash", tokenHash)
     .eq("status", "active")
     .maybeSingle();
@@ -242,14 +242,17 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     return getDriverAssignmentByTokenViaPostgres(token, tokenHash);
   }
 
-  await client
+  // Usage telemetry — the real columns are last_used_at / usage_count. This
+  // used to write last_accessed_at / used_at / access_count, which do not exist,
+  // so every QR open failed silently and the counters never moved.
+  const { error: usageError } = await client
     .from("driver_access_tokens")
     .update({
-      last_accessed_at: new Date().toISOString(),
-      used_at: new Date().toISOString(),
-      access_count: 1
+      last_used_at: new Date().toISOString(),
+      usage_count: Number(tokenRow.usage_count ?? 0) + 1
     })
     .eq("token_hash", tokenHash);
+  if (usageError) console.warn("driver token usage not recorded:", usageError.message);
 
   const [packet, notifications, routeChanges, messages, checkinRes, latestStatusRes] = await Promise.all([
     getDriverAssignmentPacketByAssignmentId(text(assignment, "id")),
@@ -562,18 +565,10 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
 
   await sql`
     update driver_access_tokens
-    set last_accessed_at = now(),
-        used_at = coalesce(used_at, now()),
-        access_count = coalesce(access_count, 0) + 1
+    set last_used_at = now(),
+        usage_count = coalesce(usage_count, 0) + 1
     where token_hash = ${tokenHash}
-  `.catch(async () => {
-    await sql`
-      update driver_access_tokens
-      set last_used_at = now(),
-          usage_count = coalesce(usage_count, 0) + 1
-      where token_hash = ${tokenHash}
-    `.catch(() => undefined);
-  });
+  `.catch(() => undefined);
 
   const packetPayload = packetRows[0]?.payload;
   const pgTokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
