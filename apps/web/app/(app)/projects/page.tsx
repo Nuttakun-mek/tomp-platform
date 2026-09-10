@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight, FolderKanban, Plus } from "lucide-react";
-import { CreateProjectForm } from "@/components/projects/create-project-form";
 import { ProjectArchiveButton } from "@/components/projects/project-archive-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getProjects } from "@/lib/data/projects";
@@ -88,14 +87,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         </div>
       )}
 
-      {canCreate && !showArchived ? (
-        <details className="rounded-panel border border-border bg-white p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-ink">+ สร้างโครงการใหม่ (แบบด่วน)</summary>
-          <div className="mt-3">
-            <CreateProjectForm />
-          </div>
-        </details>
-      ) : null}
+
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { createProjectAction } from "@/app/actions/projects";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
 import { createProjectSchema } from "@/lib/validation";
+import { DateRangeFields } from "@/components/ui/datetime-field";
 
 type FieldErrors = Record<string, string[]>;
 
@@ -110,16 +111,22 @@ export function CreateProjectForm() {
           <input className="field-input" name="projectName" placeholder="เช่น งานรับส่งผู้ร่วมประชุม" />
           <FieldError errors={fieldErrors.projectName} />
         </label>
-        <label className="field-label">
-          วันที่เริ่มต้น
-          <input className="field-input" name="startDate" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        <div className="grid gap-1">
+          <DateRangeFields
+            legend="ช่วงเวลาโครงการ"
+            startLabel="วันที่เริ่มต้น"
+            endLabel="วันที่สิ้นสุด"
+            startName="startDate"
+            endName="endDate"
+            start={startDate}
+            end={endDate}
+            onStart={setStartDate}
+            onEnd={setEndDate}
+            required
+          />
           <FieldError errors={fieldErrors.startDate} />
-        </label>
-        <label className="field-label">
-          วันที่สิ้นสุด
-          <input className="field-input" name="endDate" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           <FieldError errors={fieldErrors.endDate} />
-        </label>
+        </div>
         <label className="field-label">
           เขตเวลา
           <input className="field-input" name="timezone" defaultValue="Asia/Bangkok" />

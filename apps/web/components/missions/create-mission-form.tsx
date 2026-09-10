@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createMissionAction } from "@/app/actions/missions";
+import { DateRangeFields } from "@/components/ui/datetime-field";
 import { useToast } from "@/components/ui/toast";
 import { createMissionSchema } from "@/lib/validation";
 
@@ -10,6 +11,8 @@ export function CreateMissionForm({ projectId }: { projectId: string }) {
   const router = useRouter();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
+  const [plannedStart, setPlannedStart] = useState("");
+  const [plannedEnd, setPlannedEnd] = useState("");
 
   function handleSubmit(formData: FormData) {
     const parsed = createMissionSchema.safeParse({
@@ -69,15 +72,20 @@ export function CreateMissionForm({ projectId }: { projectId: string }) {
             <option value="critical">วิกฤต</option>
           </select>
         </label>
-        <label className="field-label">
-          เวลาเริ่มต้น
-          <input className="field-input" name="plannedStartTime" type="datetime-local" />
-        </label>
-        <label className="field-label">
-          เวลาสิ้นสุด
-          <input className="field-input" name="plannedEndTime" type="datetime-local" />
-        </label>
       </div>
+
+      <DateRangeFields
+        legend="ช่วงเวลาภารกิจ"
+        startLabel="เวลาเริ่มต้น"
+        endLabel="เวลาสิ้นสุด"
+        startName="plannedStartTime"
+        endName="plannedEndTime"
+        start={plannedStart}
+        end={plannedEnd}
+        onStart={setPlannedStart}
+        onEnd={setPlannedEnd}
+        withTime
+      />
 
       <label className="field-label">
         ข้อผูกพันด้านบริการ

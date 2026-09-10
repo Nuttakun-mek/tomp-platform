@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
 import { createCallSignAction, updateCallSignCrewAction } from "@/app/actions/call-signs";
+import { DateRangeFields } from "@/components/ui/datetime-field";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -337,14 +338,20 @@ export function CreateAssignmentForm({
             ))}
           </select>
         </label>
-        <label className="field-label">
-          เวลาเริ่ม
-          <input className="field-input" name="startTime" type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-        </label>
-        <label className="field-label">
-          เวลาสิ้นสุด
-          <input className="field-input" name="endTime" type="datetime-local" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
-        </label>
+        <div className="md:col-span-2">
+          <DateRangeFields
+            legend="ช่วงเวลางาน"
+            startLabel="เวลาเริ่ม"
+            endLabel="เวลาสิ้นสุด"
+            startName="startTime"
+            endName="endTime"
+            start={startTime}
+            end={endTime}
+            onStart={setStartTime}
+            onEnd={setEndTime}
+            withTime
+          />
+        </div>
         <label className="field-label">
           จุดรับ
           <input className="field-input" name="pickupLocation" placeholder="เช่น ประตู 3 อาคารผู้โดยสาร" />
