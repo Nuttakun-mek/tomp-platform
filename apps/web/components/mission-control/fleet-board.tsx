@@ -147,12 +147,57 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
       });
   }, [assignments, callSignById, driverById, effectiveNow, evidence, inboundByAssignment, locationByAssignment, resolvedIds, statuses, vehicleById]);
 
-  const alertCount = rows.filter((row) => row.unread).length;
-  const liveCount = rows.filter((row) => row.freshness === "live").length;
-  const needsAttention = rows.filter((row) => row.unread || row.freshness !== "live").length;
+  // One card per driver, not per assignment. A driver with several jobs used to
+  // fill the board with near-identical cards; GPS and phone are the driver's
+  // anyway, so the jobs belong inside their card.
+  const groups = useMemo(() => {
+    const byDriver = new Map<string, typeof rows>();
+    for (const row of rows) {
+      // Unassigned work has no driver to group under — keep it as its own card.
+      const key = row.driver?.id ?? `assignment:${row.assignment.id}`;
+      const list = byDriver.get(key) ?? [];
+      list.push(row);
+      byDriver.set(key, list);
+    }
 
-  // Attention-ranked rows are already on top, so a cap never hides something urgent.
-  const { visible: visibleRows, hidden, hasMore, expanded: allShown, showAll, reset } = useVisibleSlice(rows, 15);
+    return [...byDriver.entries()]
+      .map(([key, list]) => {
+        // GPS belongs to the driver, so the freshest signal across their jobs is
+        // the one that describes them.
+        const best = list.reduce((a, b) => (ATTENTION_RANK[b.freshness] > ATTENTION_RANK[a.freshness] ? b : a));
+        const located = list
+          .filter((row) => row.location)
+          .sort((a, b) => new Date(b.location!.recordedAt).getTime() - new Date(a.location!.recordedAt).getTime())[0];
+        const messages = list.flatMap((row) => row.messages).sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+        const unread = list.reduce((sum, row) => sum + row.unread, 0);
+        return {
+          key,
+          driver: list[0].driver,
+          vehicle: list.find((row) => row.vehicle)?.vehicle,
+          jobs: list,
+          freshness: best.freshness,
+          location: located?.location,
+          messages,
+          unread,
+          hasIssue: list.some((row) => row.hasIssue),
+          evidence: list.find((row) => row.evidence)?.evidence,
+          title: list[0].driver?.fullName ?? list[0].label
+        };
+      })
+      .sort((a, b) => {
+        if (Boolean(b.unread) !== Boolean(a.unread)) return a.unread ? -1 : 1;
+        const rank = ATTENTION_RANK[a.freshness] - ATTENTION_RANK[b.freshness];
+        if (rank !== 0) return rank;
+        return a.title.localeCompare(b.title, "th");
+      });
+  }, [rows]);
+
+  const alertCount = groups.filter((group) => group.unread).length;
+  const liveCount = groups.filter((group) => group.freshness === "live").length;
+  const needsAttention = groups.filter((group) => group.unread || group.freshness !== "live").length;
+
+  // Attention-ranked groups are already on top, so a cap never hides something urgent.
+  const { visible: visibleGroups, hidden, hasMore, expanded: allShown, showAll, reset } = useVisibleSlice(groups, 15);
 
   return (
     <section className="enterprise-panel overflow-hidden">
@@ -160,13 +205,14 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="section-label">ภาพรวมรถในโครงการ</p>
-            <h2 className="mt-1 text-lg font-semibold text-ink">สถานะรถและคนขับรายคัน</h2>
+            <h2 className="mt-1 text-lg font-semibold text-ink">สถานะคนขับรายคน</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              เรียงรายการที่ต้องติดตามขึ้นก่อน กดการ์ดเพื่อดูรายละเอียดรถ คนขับ ตำแหน่ง และข้อความล่าสุด
+              หนึ่งการ์ดต่อคนขับหนึ่งคน เรียงรายการที่ต้องติดตามขึ้นก่อน กดการ์ดเพื่อดูงานทั้งหมดของคนขับ ตำแหน่ง และข้อความล่าสุด
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <MetricChip label="รถทั้งหมด" value={rows.length} />
+            <MetricChip label="คนขับทั้งหมด" value={groups.length} />
+            <MetricChip label="งานทั้งหมด" value={rows.length} />
             <MetricChip label="GPS สด" value={liveCount} tone="success" />
             <MetricChip label="ต้องติดตาม" value={needsAttention} tone="warning" />
             <MetricChip label="มีข้อความใหม่" value={alertCount} tone={alertCount ? "warning" : "neutral"} />
@@ -177,53 +223,63 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         </div>
       </div>
 
-      {rows.length ? (
+      {groups.length ? (
         <div className="grid gap-2 p-3 sm:p-4 lg:grid-cols-2 2xl:grid-cols-3">
-          {visibleRows.map((row) => {
-            const open = expanded === row.assignment.id;
-            const phone = row.driver?.phone ?? "";
+          {visibleGroups.map((group) => {
+            const open = expanded === group.key;
+            const phone = group.driver?.phone ?? "";
+            const hasNext = group.jobs.some((job) => nextAssignmentIds.has(job.assignment.id));
             return (
               <article
-                key={row.assignment.id}
+                key={group.key}
                 className={`overflow-hidden rounded-2xl border transition ${
-                  row.unread ? "border-rose-300 bg-rose-50/50 shadow-sm" : "border-slate-200 bg-white"
+                  group.unread ? "border-rose-300 bg-rose-50/50 shadow-sm" : "border-slate-200 bg-white"
                 }`}
               >
                 <button
                   type="button"
-                  onClick={() => setExpanded(open ? null : row.assignment.id)}
+                  onClick={() => setExpanded(open ? null : group.key)}
                   className="flex w-full items-start gap-3 px-4 py-3 text-left"
                 >
-                  <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${FRESH_DOT[row.freshness]}`} />
+                  <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${FRESH_DOT[group.freshness]}`} />
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-[15px] font-bold text-ink">{row.label}</span>
-                      {nextAssignmentIds.has(row.assignment.id) ? (
-                        <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
+                      <span className="text-[15px] font-bold text-ink">{group.title}</span>
+                      {group.jobs.length > 1 ? (
+                        <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                          {group.jobs.length} งาน
+                        </span>
                       ) : null}
-                      {row.unread ? (
+                      {hasNext ? (
+                        <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">มีงานถัดไป</span>
+                      ) : null}
+                      {group.unread ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                          {row.hasIssue ? <TriangleAlert className="h-2.5 w-2.5" /> : <MessageSquare className="h-2.5 w-2.5" />}
-                          {row.unread}
+                          {group.hasIssue ? <TriangleAlert className="h-2.5 w-2.5" /> : <MessageSquare className="h-2.5 w-2.5" />}
+                          {group.unread}
                         </span>
                       ) : null}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {row.driver?.fullName ?? "ยังไม่ระบุคนขับ"} / {row.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"}
+                      {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · {group.jobs.map((job) => job.label).join(", ")}
                     </span>
                     <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                      {row.reported ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">
-                          {formatStatusTh(row.reported.status)} / {formatRelativeTh(row.reported.at, effectiveNow)}
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">ยังไม่แจ้งสถานะ</span>
-                      )}
-                      <span className={`rounded-full px-2 py-0.5 ${
-                        row.freshness === "live" ? "bg-emerald-50 text-emerald-700" : row.freshness === "slow" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"
-                      }`}>
-                        {FRESH_LABEL[row.freshness]}
+                      <span
+                        className={`rounded-full px-2 py-0.5 ${
+                          group.freshness === "live"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : group.freshness === "slow"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {FRESH_LABEL[group.freshness]}
                       </span>
+                      {group.location ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
+                          {formatRelativeTh(group.location.recordedAt, effectiveNow)}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
                   <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
@@ -232,13 +288,33 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                 {open ? (
                   <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                     <div className="grid gap-1 text-xs text-slate-600">
-                      <p>คนขับ: <span className="font-medium text-ink">{row.driver?.fullName ?? "-"}</span></p>
+                      <p>คนขับ: <span className="font-medium text-ink">{group.driver?.fullName ?? "-"}</span></p>
                       <p>เบอร์โทร: <span className="font-medium text-ink">{phone || "-"}</span></p>
-                      <p>รถ: <span className="font-medium text-ink">{row.vehicle?.plateNumber ?? "-"} / {row.vehicle?.vehicleType ?? "-"}</span></p>
-                      <p>จุดรับ: <span className="font-medium text-ink">{row.pickup}</span></p>
-                      <p>จุดส่ง: <span className="font-medium text-ink">{row.dropoff}</span></p>
-                      <p>สถานะงาน: <span className="font-medium text-ink">{formatStatusTh(row.assignment.status)}</span></p>
-                      <p>GPS ล่าสุด: <span className="font-medium text-ink">{row.location ? formatRelativeTh(row.location.recordedAt, effectiveNow) : "ยังไม่มีข้อมูล"}</span></p>
+                      <p>รถ: <span className="font-medium text-ink">{group.vehicle?.plateNumber ?? "-"} / {group.vehicle?.vehicleType ?? "-"}</span></p>
+                      <p>GPS ล่าสุด: <span className="font-medium text-ink">{group.location ? formatRelativeTh(group.location.recordedAt, effectiveNow) : "ยังไม่มีข้อมูล"}</span></p>
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <p className="text-xs font-semibold text-slate-600">งานของคนขับคนนี้ ({group.jobs.length})</p>
+                      {group.jobs.map((job) => (
+                        <div key={job.assignment.id} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-bold text-ink">{job.label}</span>
+                            {nextAssignmentIds.has(job.assignment.id) ? (
+                              <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
+                            ) : null}
+                            {job.reported ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">
+                                {formatStatusTh(job.reported.status)} / {formatRelativeTh(job.reported.at, effectiveNow)}
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">ยังไม่แจ้งสถานะ</span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-slate-600">{job.pickup} → {job.dropoff}</p>
+                          <p className="mt-0.5 text-slate-400">สถานะงาน: {formatStatusTh(job.assignment.status)}</p>
+                        </div>
+                      ))}
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -247,9 +323,9 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                           <Phone className="h-3.5 w-3.5" /> โทรหาคนขับ
                         </a>
                       ) : null}
-                      {row.location ? (
+                      {group.location ? (
                         <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${row.location.latitude},${row.location.longitude}`}
+                          href={`https://www.google.com/maps/search/?api=1&query=${group.location.latitude},${group.location.longitude}`}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700"
@@ -259,10 +335,10 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                       ) : null}
                     </div>
 
-                    {row.messages.length ? (
+                    {group.messages.length ? (
                       <div className="grid gap-1.5">
                         <p className="text-xs font-semibold text-slate-600">ข้อความจากคนขับ</p>
-                        {row.messages.slice(-4).map((message) => {
+                        {group.messages.slice(-4).map((message) => {
                           const done = message.status === "closed" || resolvedIds.has(message.id);
                           return (
                             <div
@@ -293,7 +369,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                       </div>
                     ) : null}
 
-                    {row.evidence && (row.evidence.vehiclePhotoUrl || row.evidence.platePhotoUrl) ? (
+                    {group.evidence && (group.evidence.vehiclePhotoUrl || group.evidence.platePhotoUrl) ? (
                       <p className="text-xs font-semibold text-blue-700">มีหลักฐานรูปถ่ายตรวจรถแล้ว</p>
                     ) : (
                       <p className="text-[11px] text-amber-600">ยังไม่มีรูปถ่ายตรวจรถจากคนขับ</p>
