@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import type { DriverLocation } from "@tomp/types/domain";
 
-export type MarkerFreshness = "live" | "slow" | "offline" | "stopped";
+export type MarkerFreshness = "live" | "idle" | "slow" | "offline" | "stopped";
 
 export interface TrackedPoint {
   id: string;
@@ -20,6 +20,9 @@ export interface TrackedPoint {
 
 const COLOR: Record<MarkerFreshness, string> = {
   live: "#10b981",
+  // Parked and heartbeating — working, just not moving, so it must not read as
+  // a warning colour.
+  idle: "#0ea5e9",
   slow: "#f59e0b",
   offline: "#f43f5e",
   stopped: "#64748b"

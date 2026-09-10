@@ -9,7 +9,7 @@ import { VehicleMessageForm } from "./vehicle-message-form";
 
 function gpsTone(profile: VehicleOperationProfile): { label: string; tone: "success" | "warning" | "danger" | "neutral" } {
   if (!profile.latestLocation) return { label: "ยังไม่มี GPS", tone: "neutral" };
-  const freshness = gpsFreshness(profile.latestLocation.recordedAt, profile.latestLocation.sharingEvent, Date.now());
+  const freshness = gpsFreshness(profile.latestLocation.recordedAt, profile.latestLocation.sharingEvent, Date.now(), profile.latestLocation.metadata);
   return { label: gpsFreshnessLabelTh(freshness), tone: gpsFreshnessTone(freshness) };
 }
 

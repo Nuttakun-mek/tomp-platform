@@ -10,7 +10,7 @@ import { formatStatusTh } from "@/lib/i18n/status-th";
 
 function gpsLabel(profile: VehicleOperationProfile) {
   if (!profile.latestLocation) return "ยังไม่มี GPS";
-  return gpsFreshnessLabelTh(gpsFreshness(profile.latestLocation.recordedAt, profile.latestLocation.sharingEvent, Date.now()));
+  return gpsFreshnessLabelTh(gpsFreshness(profile.latestLocation.recordedAt, profile.latestLocation.sharingEvent, Date.now(), profile.latestLocation.metadata));
 }
 
 export function VehicleOperationsBoard({ profiles }: { profiles: VehicleOperationProfile[] }) {

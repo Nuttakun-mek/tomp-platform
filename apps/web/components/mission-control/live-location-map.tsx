@@ -44,7 +44,7 @@ function getLocationIdentity(location: DriverLocation) {
 }
 
 function getFreshness(location: DriverLocation, now: number) {
-  return gpsFreshness(location.recordedAt, location.sharingEvent, now);
+  return gpsFreshness(location.recordedAt, location.sharingEvent, now, location.metadata);
 }
 
 function getAgeLabel(location: DriverLocation, now: number) {

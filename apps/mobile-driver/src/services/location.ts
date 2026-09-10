@@ -13,6 +13,44 @@ type LocationCallback = (location: Location.LocationObject) => void;
 // that could never be removed. They stacked up until the app died natively.
 let foregroundWatch: Location.LocationSubscription | null = null;
 
+// The OS hands us a fix every timeInterval whether the vehicle moved or not.
+// Sending every one of those while parked is pure noise, but sending nothing is
+// worse: lib/domain/gps-freshness would call the driver offline after 120s when
+// they are simply waiting at a pickup. So a stationary driver still beats every
+// IDLE_HEARTBEAT_MS, flagged so the control room can say "จอดอยู่" instead of
+// "ขาดการอัปเดต".
+const MOVED_METERS = 30;
+const IDLE_HEARTBEAT_MS = 5 * 60 * 1000;
+
+let lastSent: { latitude: number; longitude: number; at: number } | null = null;
+
+export function resetLocationThrottle() {
+  lastSent = null;
+}
+
+/** Metres between two coordinates (equirectangular is plenty at these distances). */
+function distanceMeters(aLat: number, aLon: number, bLat: number, bLon: number) {
+  const toRad = Math.PI / 180;
+  const x = (bLon - aLon) * toRad * Math.cos(((aLat + bLat) / 2) * toRad);
+  const y = (bLat - aLat) * toRad;
+  return Math.sqrt(x * x + y * y) * 6371000;
+}
+
+/**
+ * Should this fix go to the server, and is the vehicle sitting still? A fix is
+ * always sent when it is not a routine ping (sharing started/stopped), when the
+ * vehicle has moved, or when the idle heartbeat is due.
+ */
+function decideSend(latitude: number, longitude: number, trackingEvent: string, now = Date.now()) {
+  if (trackingEvent !== "location_ping" || !lastSent) return { send: true, idle: false };
+
+  const moved = distanceMeters(lastSent.latitude, lastSent.longitude, latitude, longitude);
+  if (moved >= MOVED_METERS) return { send: true, idle: false };
+  if (now - lastSent.at >= IDLE_HEARTBEAT_MS) return { send: true, idle: true };
+  return { send: false, idle: true };
+}
+
+
 export function isForegroundSharing() {
   return foregroundWatch !== null;
 }
@@ -105,13 +143,20 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
 }
 
 async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0], mobileSession?: MobileDriverSession | null) {
+  const { send, idle } = decideSend(input.latitude, input.longitude, input.trackingEvent ?? "location_ping");
+  if (!send) return { success: true, skipped: true } as const;
+
+  const payload = idle ? { ...input, metadata: { ...(input.metadata ?? {}), idle: true } } : input;
   const session = mobileSession ?? (await getMobileDriverSession());
-  const result = await submitLocation(input, session).catch((error) => ({
+  const result = await submitLocation(payload, session).catch((error) => ({
     success: false,
     error: error instanceof Error ? error.message : "ส่งตำแหน่งไม่สำเร็จ"
   }));
-  if (!result.success) {
-    await enqueueOfflineAction("location", input);
+
+  if (result.success) {
+    lastSent = { latitude: input.latitude, longitude: input.longitude, at: Date.now() };
+  } else {
+    await enqueueOfflineAction("location", payload);
   }
   return result;
 }
@@ -119,6 +164,7 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
 export async function startForegroundLocationSharing(onLocation: LocationCallback) {
   // Idempotent: a second request while already watching is a no-op.
   if (foregroundWatch) return foregroundWatch;
+  resetLocationThrottle();
 
   // Never block starting the watcher on a first fix.
   const firstLocation = await getCurrentLocation();
@@ -140,7 +186,11 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
   foregroundWatch = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.High,
-      distanceInterval: 15,
+      // Time-driven, not distance-driven. A parked driver still has to look
+      // alive to the control room: lib/domain/gps-freshness calls a fix older
+      // than 35s "slow" and older than 120s "offline", so a distanceInterval
+      // gate would mark a driver waiting at a pickup as lost.
+      distanceInterval: 0,
       timeInterval: 10000
     },
     (location) => {
@@ -177,7 +227,9 @@ export async function startBackgroundLocationSharing() {
     if (alreadyStarted) return true;
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
-      distanceInterval: 25,
+      // Same reason as the foreground watcher: heartbeat on time, not on
+      // movement, so a stationary vehicle keeps reporting.
+      distanceInterval: 0,
       timeInterval: 30000,
       foregroundService: {
         notificationTitle: "TOMP กำลังแชร์ตำแหน่ง",

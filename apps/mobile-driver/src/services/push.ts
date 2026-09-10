@@ -24,8 +24,11 @@ async function ensureAndroidChannel() {
     name: "แจ้งเตือนงานคนขับ",
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: "#007a73",
-    sound: "default"
+    // No `sound` here: expo-notifications reads that field as the filename of a
+    // custom sound bundled in res/raw, so "default" made it hunt for a file that
+    // does not exist and log an error on every launch. Omitting it gives the
+    // channel the system default, which is what we wanted.
+    lightColor: "#007a73"
   });
 }
 
@@ -35,8 +38,13 @@ async function ensureAndroidChannel() {
  * Never throws — a missing push token must not stop the driver working.
  */
 export async function registerForPushNotifications(projectId?: string): Promise<string | null> {
+  // Every failure below is survivable, but swallowing them silently made a
+  // missing token impossible to diagnose — say which step gave up.
   try {
-    if (!Device.isDevice) return null;
+    if (!Device.isDevice) {
+      console.warn("[push] skipped: not a physical device");
+      return null;
+    }
 
     await ensureAndroidChannel();
 
@@ -46,11 +54,20 @@ export async function registerForPushNotifications(projectId?: string): Promise<
       const requested = await Notifications.requestPermissionsAsync();
       granted = requested.granted;
     }
-    if (!granted) return null;
+    if (!granted) {
+      console.warn("[push] no notification permission", JSON.stringify(existing));
+      return null;
+    }
 
     const token = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-    return token?.data ?? null;
-  } catch {
+    if (!token?.data) {
+      console.warn("[push] getExpoPushTokenAsync returned no token");
+      return null;
+    }
+    console.warn("[push] token acquired", token.data.slice(0, 30));
+    return token.data;
+  } catch (error) {
+    console.warn("[push] registration failed:", error instanceof Error ? error.message : String(error));
     return null;
   }
 }
@@ -70,8 +87,10 @@ export async function syncPushToken(token: string, mobileSession: MobileDriverSe
       headers: { "content-type": "application/json", "x-driver-session": mobileSession.session },
       body: JSON.stringify({ token, platform: Platform.OS })
     });
+    if (!response.ok) console.warn('[push] server rejected token:', response.status);
     return response.ok;
-  } catch {
+  } catch (error) {
+    console.warn('[push] could not reach the server:', error instanceof Error ? error.message : String(error));
     return false;
   } finally {
     clearTimeout(timer);

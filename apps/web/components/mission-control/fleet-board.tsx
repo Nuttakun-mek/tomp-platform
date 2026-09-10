@@ -28,6 +28,7 @@ type Freshness = GpsFreshness | "none";
 
 const FRESH_DOT: Record<Freshness, string> = {
   live: "bg-emerald-500",
+  idle: "bg-sky-500",
   slow: "bg-amber-500",
   offline: "bg-rose-500",
   stopped: "bg-slate-400",
@@ -36,17 +37,18 @@ const FRESH_DOT: Record<Freshness, string> = {
 
 const FRESH_LABEL: Record<Freshness, string> = {
   live: "GPS สด",
+  idle: "จอดอยู่",
   slow: "สัญญาณช้า",
   offline: "ขาดการอัปเดต",
   stopped: "หยุดแชร์",
   none: "ยังไม่แชร์ GPS"
 };
 
-const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, stopped: 1, slow: 2, live: 3 };
+const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, stopped: 1, slow: 2, idle: 3, live: 3 };
 
 function freshnessOf(location: DriverLocation | undefined, now: number): Freshness {
   if (!location) return "none";
-  return gpsFreshness(location.recordedAt, location.sharingEvent, now);
+  return gpsFreshness(location.recordedAt, location.sharingEvent, now, location.metadata);
 }
 
 export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicles }: FleetBoardProps) {

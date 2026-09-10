@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "303739466362",
+    "project_id": "tomp-project",
+    "storage_bucket": "tomp-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:303739466362:android:1b676e556f140317cd01c3",
+        "android_client_info": {
+          "package_name": "com.tomp.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZDGj_JMacynoKAyHnBFpq4fqwiFR6VYU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
