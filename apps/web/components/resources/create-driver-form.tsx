@@ -18,7 +18,7 @@ function text(form: FormData, key: string) {
   return String(form.get(key) || "").trim();
 }
 
-export function CreateDriverForm() {
+export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
@@ -31,6 +31,7 @@ export function CreateDriverForm() {
       phone: formData.get("phone"),
       licenseType: text(formData, "licenseType") || null,
       languages,
+      projectId: projectId || null,
       metadata: {
         licenseNumber: text(formData, "licenseNumber"),
         licenseExpiry: text(formData, "licenseExpiry"),

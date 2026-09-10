@@ -29,7 +29,7 @@ function text(form: FormData, key: string) {
   return String(form.get(key) || "").trim();
 }
 
-export function CreateVehicleForm() {
+export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
@@ -39,6 +39,7 @@ export function CreateVehicleForm() {
       plateNumber: formData.get("plateNumber"),
       vehicleType: formData.get("vehicleType"),
       capacity: formData.get("capacity"),
+      projectId: projectId || null,
       metadata: {
         brand: text(formData, "brand"),
         model: text(formData, "model"),

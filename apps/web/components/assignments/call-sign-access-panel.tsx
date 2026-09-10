@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import { useMemo, useState, useTransition } from "react";
-import { Copy, Eye, KeyRound, Printer, QrCode, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, Eye, KeyRound, Printer, QrCode, RefreshCw, Trash2, Undo2 } from "lucide-react";
 import type { Assignment, CallSign, Driver, Vehicle } from "@tomp/types/domain";
+import { deleteCallSignAction, revokeCallSignQrAction } from "@/app/actions/call-signs";
 import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
 import { createObserverAccessTokenAction } from "@/app/actions/observer-access";
 import { ActionFeedback } from "@/components/ui/action-feedback";
@@ -76,7 +78,9 @@ export function CallSignAccessPanel({
   // Set when the server says a live QR already exists: reissuing kills whatever
   // is already printed, so it takes a second, deliberate press.
   const [confirmReissue, setConfirmReissue] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const units = useMemo<Unit[]>(() => {
     const driverById = new Map(drivers.map((d) => [d.id, d]));
@@ -173,6 +177,32 @@ export function CallSignAccessPanel({
     });
   }
 
+  // Pairing the wrong person to the wrong vehicle is easy and the fix has to be
+  // easy too — but not so easy that a unit with a QR already in someone's hand
+  // disappears from under them, so the QR is revoked first, deliberately.
+  function revokeQr(unit: Unit) {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await revokeCallSignQrAction({ projectId, callSignId: unit.callSign.id });
+      setTone(result.success ? "success" : "danger");
+      setMessage(result.success ? "ยกเลิก QR ของหน่วยนี้แล้ว ใบเดิมใช้ไม่ได้อีก" : result.error || "ยกเลิก QR ไม่สำเร็จ");
+      if (result.success) router.refresh();
+    });
+  }
+
+  function removeUnit(unit: Unit) {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await deleteCallSignAction({ projectId, callSignId: unit.callSign.id });
+      setTone(result.success ? "success" : "danger");
+      setMessage(result.success ? `ลบหน่วย ${unit.callSign.callSign} แล้ว` : result.error || "ลบหน่วยรถไม่สำเร็จ");
+      if (result.success) {
+        setConfirmDelete(null);
+        router.refresh();
+      }
+    });
+  }
+
   function issueObserverLink(unit: Unit) {
     setMessage(null);
     startTransition(async () => {
@@ -263,6 +293,28 @@ export function CallSignAccessPanel({
                     className="flex min-h-9 items-center gap-1.5 rounded-command border border-slate-300 bg-white px-3 text-[12px] font-semibold text-ink-soft disabled:opacity-40"
                   >
                     <Eye className="h-3.5 w-3.5" /> ลิงก์ผู้โดยสาร/ผู้ติดตาม
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => revokeQr(unit)}
+                    title="ยกเลิก QR ที่ออกไปแล้วของหน่วยนี้"
+                    className="flex min-h-9 items-center gap-1.5 rounded-command border border-slate-300 bg-white px-3 text-[12px] font-semibold text-ink-soft disabled:opacity-40"
+                  >
+                    <Undo2 className="h-3.5 w-3.5" /> ยกเลิก QR
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => (confirmDelete === unit.callSign.id ? removeUnit(unit) : setConfirmDelete(unit.callSign.id))}
+                    className={`flex min-h-9 items-center gap-1.5 rounded-command px-3 text-[12px] font-semibold disabled:opacity-40 ${
+                      confirmDelete === unit.callSign.id
+                        ? "bg-rose-600 text-white"
+                        : "border border-rose-200 bg-white text-rose-700"
+                    }`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {confirmDelete === unit.callSign.id ? "ยืนยันลบหน่วยนี้" : "ลบหน่วย"}
                   </button>
                 </div>
               </div>

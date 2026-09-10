@@ -387,7 +387,8 @@ export function DateRangeFields({
   withTime = false,
   required,
   timeOnly = false,
-  min
+  min,
+  max
 }: {
   legend?: string;
   startLabel?: string;
@@ -402,6 +403,7 @@ export function DateRangeFields({
   required?: boolean;
   timeOnly?: boolean;
   min?: string;
+  max?: string;
 }) {
   const duration = describeDuration(start, end);
   const backwards = isBackwards(start, end);
@@ -409,7 +411,7 @@ export function DateRangeFields({
   return (
     <fieldset className="grid gap-2 rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white p-3">
       {legend ? <legend className="px-1 text-xs font-bold text-slate-600">{legend}</legend> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
         <DateTimeField
           label={startLabel}
           name={startName}
@@ -419,6 +421,7 @@ export function DateRangeFields({
           timeOnly={timeOnly}
           required={required}
           min={min}
+          max={max}
         />
         <DateTimeField
           label={endLabel}
@@ -430,6 +433,7 @@ export function DateRangeFields({
           required={required}
           // Whichever is later: the range's own floor, or the chosen start.
           min={timeOnly ? min : (start ? datePart(start) : undefined) || min}
+          max={max}
         />
       </div>
       {backwards ? (

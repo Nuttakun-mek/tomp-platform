@@ -144,7 +144,7 @@ async function composeSheet(credentials: UnitCredentials): Promise<string | null
 }
 
 function CredentialBlock({
-  heading, who, how, qr, url, filename, tone
+  heading, who, how, qr, url, filename, tone, pin
 }: {
   heading: string;
   who: string;
@@ -153,6 +153,8 @@ function CredentialBlock({
   url: string;
   filename: string;
   tone: "driver" | "observer";
+  /** Shown inside this block, because it only unlocks this block's QR. */
+  pin?: string | null;
 }) {
   return (
     <div className={`grid gap-2 rounded-2xl border p-3 ${tone === "driver" ? "border-teal-300 bg-white" : "border-slate-300 bg-slate-50/70"}`}>
@@ -166,6 +168,13 @@ function CredentialBlock({
       ) : (
         <div className="grid h-[150px] place-items-center text-xs text-ink-faint">ออก QR ไม่สำเร็จ</div>
       )}
+      {pin ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-center">
+          <p className="text-[10px] font-semibold text-amber-900">รหัสยืนยันของ QR ใบนี้ (แสดงครั้งเดียว)</p>
+          <p className="text-xl font-bold leading-tight tracking-[0.25em] text-amber-900">{pin}</p>
+          <p className="text-[10px] leading-3 text-amber-800">ส่งคนละช่องทางกับ QR</p>
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-1.5 print:hidden">
         <button
           type="button"
@@ -232,25 +241,17 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
         </div>
       </div>
 
-      {credentials.pin ? (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2">
-          <p className="text-[11px] font-semibold text-amber-900">รหัสยืนยันของคนขับ — ใช้คู่กับ QR คนขับเท่านั้น (แสดงครั้งเดียว)</p>
-          <p className="text-2xl font-bold tracking-[0.3em] text-amber-900">{credentials.pin}</p>
-          <p className="mt-0.5 text-[11px] leading-4 text-amber-800">
-            ส่งรหัสนี้คนละช่องทางกับ QR ถ้าปิดหน้านี้แล้วจะดูย้อนหลังไม่ได้ ต้องออกใบใหม่
-          </p>
-        </div>
-      ) : null}
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <CredentialBlock
           tone="driver"
           heading="① QR คนขับ"
           who="สำหรับคนขับของหน่วยนี้เท่านั้น"
-          how="สแกนแล้วกรอกรหัส 6 หลักด้านบน เพื่อเปิดงานและแชร์ตำแหน่ง"
+          how="สแกนแล้วกรอกรหัส 6 หลักในกล่องนี้ เพื่อเปิดงานและแชร์ตำแหน่ง"
           qr={credentials.driverQr}
           url={credentials.driverUrl}
           filename={`QR-คนขับ-${safeName}.png`}
+          pin={credentials.pin}
         />
         <CredentialBlock
           tone="observer"

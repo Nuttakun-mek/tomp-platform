@@ -198,3 +198,82 @@ export async function createCallSignAction(input: unknown): Promise<ActionResult
     timelineResult.success ? undefined : `สร้าง Call Sign แล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
 }
+
+/**
+ * Remove a crewed unit that was put together wrongly.
+ *
+ * Refused once the unit has work or a live QR: those are things other people are
+ * already holding — a printed sheet, a driver's open job — and deleting the unit
+ * underneath them fails silently on their side rather than here. Revoke and
+ * unplan first, deliberately.
+ */
+export async function deleteCallSignAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as { projectId?: string; callSignId?: string };
+  const projectId = String(data.projectId || "");
+  const callSignId = String(data.callSignId || "");
+  if (!projectId || !callSignId) return actionFailure("ไม่พบหน่วยรถที่ต้องการลบ");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(projectId, "assignment.update");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์ลบหน่วยรถนี้");
+
+  const { data: jobs } = await client
+    .from("assignments")
+    .select("id")
+    .eq("call_sign_id", callSignId)
+    .not("status", "in", '("cancelled","archived")')
+    .limit(1);
+  if (jobs?.length) {
+    return actionFailure("ลบไม่ได้ เพราะหน่วยนี้ยังมีงานอยู่ กรุณายกเลิกงานของหน่วยนี้ก่อน");
+  }
+
+  const { data: liveQr } = await client
+    .from("driver_access_tokens")
+    .select("id")
+    .eq("call_sign_id", callSignId)
+    .eq("status", "active")
+    .limit(1);
+  if (liveQr?.length) {
+    return actionFailure("ลบไม่ได้ เพราะยังมี QR ที่ใช้งานอยู่ กรุณายกเลิก QR ของหน่วยนี้ก่อน");
+  }
+
+  const { error: deleteError } = await client.from("call_signs").delete().eq("id", callSignId).eq("project_id", projectId);
+  if (deleteError) return actionFailure(getDatabaseErrorMessage(deleteError, "ลบหน่วยรถไม่สำเร็จ"));
+
+  return actionSuccess({ deleted: callSignId });
+}
+
+/** Revoke a unit's live QR so the unit can be corrected or removed. */
+export async function revokeCallSignQrAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as { projectId?: string; callSignId?: string };
+  const projectId = String(data.projectId || "");
+  const callSignId = String(data.callSignId || "");
+  if (!projectId || !callSignId) return actionFailure("ไม่พบหน่วยรถ");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(projectId, "assignment.update");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์จัดการ QR ของหน่วยนี้");
+
+  const revokedAt = new Date().toISOString();
+  await client
+    .from("driver_access_tokens")
+    .update({ status: "revoked", metadata: { revokedReason: "unit_corrected" } })
+    .eq("call_sign_id", callSignId)
+    .eq("status", "active");
+  await client
+    .from("observer_access_tokens")
+    .update({ status: "revoked", metadata: { revokedReason: "unit_corrected" } })
+    .eq("call_sign_id", callSignId)
+    .eq("status", "active");
+  await client
+    .from("driver_mobile_sessions")
+    .update({ status: "revoked", revoked_at: revokedAt, updated_at: revokedAt })
+    .eq("call_sign_id", callSignId)
+    .is("revoked_at", null);
+
+  return actionSuccess({ revoked: callSignId });
+}

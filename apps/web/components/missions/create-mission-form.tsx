@@ -3,14 +3,14 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createMissionAction } from "@/app/actions/missions";
-import { DateTimeField, todayLocalDate } from "@/components/ui/datetime-field";
+import { DateRangeFields, todayLocalDate } from "@/components/ui/datetime-field";
 import { useToast } from "@/components/ui/toast";
 
-// A mission is *what* is being served and *which day* — nothing more. It used to
-// ask for a code, a name and a type, three text boxes that all read like "name",
-// plus a start and end timestamp that then contradicted the times on the jobs
-// underneath it. The times live on the jobs, where a driver can act on them; the
-// mission only says which day they belong to.
+// A mission is *what* is being served and *over which days* — nothing more. It
+// used to ask for a code, a name and a type, three text boxes that all read like
+// "name", plus a start and end timestamp that then contradicted the times on the
+// jobs underneath it. The clock lives on the jobs, where a driver can act on it;
+// the mission only fixes the window those jobs fall inside.
 //
 // The code is generated rather than asked for: it is bookkeeping, and making an
 // operator invent MIS-001 on the spot is how two missions end up sharing one.
@@ -46,7 +46,8 @@ export function CreateMissionForm({
   const router = useRouter();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
-  const [operationDate, setOperationDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Never before today, and never outside the project's own window.
   const minDate = useMemo(() => {
@@ -56,8 +57,15 @@ export function CreateMissionForm({
 
   function handleSubmit(formData: FormData) {
     const missionName = String(formData.get("missionName") || "").trim();
-    if (!missionName || !operationDate) {
-      toast.warning("กรอกชื่อภารกิจและเลือกวันปฏิบัติการก่อนบันทึก");
+    // A one-day mission is just a range that starts and ends on the same day.
+    const from = startDate;
+    const to = endDate || startDate;
+    if (!missionName || !from) {
+      toast.warning("กรอกชื่อภารกิจและเลือกช่วงวันปฏิบัติการก่อนบันทึก");
+      return;
+    }
+    if (to < from) {
+      toast.warning("วันสิ้นสุดอยู่ก่อนวันเริ่ม กรุณาตรวจสอบอีกครั้ง");
       return;
     }
 
@@ -68,11 +76,11 @@ export function CreateMissionForm({
         missionName,
         missionType: String(formData.get("missionType") || "other"),
         priority: String(formData.get("priority") || "normal"),
-        // The day is the whole point: jobs pick their times inside it.
-        plannedStartTime: `${operationDate}T00:00`,
-        plannedEndTime: `${operationDate}T23:59`,
+        // The days are the whole point: jobs pick their times inside them.
+        plannedStartTime: `${from}T00:00`,
+        plannedEndTime: `${to}T23:59`,
         instruction: String(formData.get("serviceCommitment") || "").trim() || null,
-        metadata: { operationDate }
+        metadata: { operationDate: from, operationStartDate: from, operationEndDate: to }
       });
 
       if (!result.success) {
@@ -80,7 +88,8 @@ export function CreateMissionForm({
         return;
       }
       toast.success(result.warning || "บันทึกภารกิจแล้ว");
-      setOperationDate("");
+      setStartDate("");
+      setEndDate("");
       router.refresh();
     });
   }
@@ -90,8 +99,8 @@ export function CreateMissionForm({
       <div className="border-b border-slate-100 pb-4">
         <h2 className="text-lg font-semibold text-ink">สร้างภารกิจ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          ภารกิจคือ <span className="font-semibold text-ink">งานบริการหนึ่งเรื่องในหนึ่งวัน</span> เช่น “รับผู้ร่วมงานจากสนามบิน วันที่ 15”
-          ส่วนเวลาจริงของแต่ละคันจะไปกำหนดตอนเปิดงานในขั้นถัดไป
+          ภารกิจคือ <span className="font-semibold text-ink">งานบริการหนึ่งเรื่อง</span> เช่น “รับผู้ร่วมงานจากสนามบิน 15–17 ก.ย.”
+          ทำวันเดียวหรือหลายวันก็ได้ ส่วนเวลาจริงของแต่ละเที่ยวจะไปกำหนดตอนเปิดงาน
         </p>
       </div>
 
@@ -102,16 +111,25 @@ export function CreateMissionForm({
       </label>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <DateTimeField
-          label="วันปฏิบัติการ"
-          name="operationDate"
-          value={operationDate}
-          onChange={setOperationDate}
-          min={minDate}
-          max={projectEndDate || undefined}
-          required
-          hint="เลือกวันที่จะให้บริการ"
-        />
+        <div className="md:col-span-2">
+          <DateRangeFields
+            legend="ช่วงวันปฏิบัติการ"
+            startLabel="วันเริ่ม"
+            endLabel="วันสิ้นสุด"
+            startName="operationStartDate"
+            endName="operationEndDate"
+            start={startDate}
+            end={endDate}
+            onStart={setStartDate}
+            onEnd={setEndDate}
+            min={minDate}
+            max={projectEndDate || undefined}
+            required
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            ภารกิจข้ามหลายวันได้ เว้นวันสิ้นสุดไว้ถ้าทำวันเดียว งานแต่ละเที่ยวจะเลือกวันและเวลาภายในช่วงนี้
+          </p>
+        </div>
         <label className="field-label">
           ประเภทภารกิจ
           <select className="field-input" name="missionType" defaultValue="other">

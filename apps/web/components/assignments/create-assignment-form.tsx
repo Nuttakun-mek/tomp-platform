@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
-import { DateRangeFields, describeThai } from "@/components/ui/datetime-field";
+import { DateRangeFields, DateTimeField, describeThai } from "@/components/ui/datetime-field";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { describeAssignmentConflicts } from "@/lib/domain/assignment-rules";
@@ -41,11 +41,21 @@ function vehicleLabel(vehicle?: Vehicle) {
 }
 
 
-/** The operation day a mission belongs to, as a plain YYYY-MM-DD. */
-function missionDate(mission: Mission): string {
-  const fromMeta = (mission.metadata as Record<string, unknown> | undefined)?.operationDate;
-  if (typeof fromMeta === "string" && fromMeta) return fromMeta.slice(0, 10);
-  return mission.plannedStartTime ? String(mission.plannedStartTime).slice(0, 10) : "";
+/** The window of days a mission covers, as plain YYYY-MM-DD bounds. */
+function missionWindow(mission: Mission): { from: string; to: string } {
+  const meta = (mission.metadata ?? {}) as Record<string, unknown>;
+  const metaFrom = typeof meta.operationStartDate === "string" ? meta.operationStartDate : typeof meta.operationDate === "string" ? meta.operationDate : "";
+  const metaTo = typeof meta.operationEndDate === "string" ? meta.operationEndDate : "";
+  const from = (metaFrom || (mission.plannedStartTime ? String(mission.plannedStartTime) : "")).slice(0, 10);
+  const to = (metaTo || (mission.plannedEndTime ? String(mission.plannedEndTime) : "") || from).slice(0, 10);
+  return { from, to: to || from };
+}
+
+/** "15 ก.ย." or "15–17 ก.ย.", for the mission dropdown. */
+function windowLabel(mission: Mission): string {
+  const { from, to } = missionWindow(mission);
+  if (!from) return "";
+  return from === to ? describeThai(from, false) : `${describeThai(from, false)} – ${describeThai(to, false)}`;
 }
 
 export function CreateAssignmentForm({
@@ -63,16 +73,19 @@ export function CreateAssignmentForm({
   const availableCallSigns = callSigns;
   const [selectedCallSignId, setSelectedCallSignId] = useState(callSigns[0]?.id || "");
   const [missionId, setMissionId] = useState("");
+  const [jobDate, setJobDate] = useState("");
   const [startClock, setStartClock] = useState("");
   const [endClock, setEndClock] = useState("");
 
-  // The mission owns the day; the job owns the clock. Combining them here keeps
-  // one source for the date and removes the contradiction the two forms used to
-  // allow.
-  const operationDate = useMemo(() => {
+  // The mission owns the window; the job owns the day inside it and the clock.
+  // One source for the date, so the two can no longer contradict each other.
+  const window = useMemo(() => {
     const mission = missions.find((item) => item.id === missionId);
-    return mission ? missionDate(mission) : "";
+    return mission ? missionWindow(mission) : { from: "", to: "" };
   }, [missionId, missions]);
+
+  // A single-day mission needs no choice at all — take its only day.
+  const operationDate = window.from && window.from === window.to ? window.from : jobDate;
 
   const startTime = operationDate && startClock ? `${operationDate}T${startClock}` : "";
   const endTime = operationDate && endClock ? `${operationDate}T${endClock}` : "";
@@ -199,7 +212,7 @@ export function CreateAssignmentForm({
             {missions.map((mission) => (
               <option key={mission.id} value={mission.id}>
                 {mission.missionName}
-                {missionDate(mission) ? ` · ${describeThai(missionDate(mission), false)}` : ""}
+                {windowLabel(mission) ? ` · ${windowLabel(mission)}` : ""}
               </option>
             ))}
           </select>
@@ -208,9 +221,23 @@ export function CreateAssignmentForm({
               งานนี้อยู่ในวันที่ {describeThai(operationDate, false)}
             </span>
           ) : (
-            <span className="mt-1 text-xs text-slate-500">เลือกภารกิจก่อน แล้วจึงกำหนดเวลาของงาน</span>
+            <span className="mt-1 text-xs text-slate-500">เลือกภารกิจก่อน แล้วจึงกำหนดวันและเวลาของงาน</span>
           )}
         </label>
+
+        {/* Only asked when the mission actually spans more than one day. */}
+        {window.from && window.from !== window.to ? (
+          <DateTimeField
+            label="วันของงานนี้"
+            name="jobDate"
+            value={jobDate}
+            onChange={setJobDate}
+            min={window.from}
+            max={window.to}
+            required
+            hint={`เลือกได้ระหว่าง ${describeThai(window.from, false)} ถึง ${describeThai(window.to, false)}`}
+          />
+        ) : null}
         <div className="md:col-span-2">
           {/* Only the clock: the day comes from the mission, so a job can no
               longer be scheduled on a different date than the mission it serves. */}

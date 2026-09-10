@@ -233,3 +233,74 @@ export async function deleteProjectAction(input: unknown): Promise<ActionResult>
 
   return actionSuccess({ deleted: summary ?? { projectId, projectCode: project.project_code } });
 }
+
+/**
+ * Edit the project's own details after creation.
+ *
+ * Settings could only rename: dates, timezone and code were fixed at creation,
+ * so an event that moved by a week meant a new project and an orphaned one.
+ * Dates are validated against each other here rather than only in the browser.
+ */
+export async function updateProjectDetailsAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as {
+    projectId?: string;
+    projectName?: string;
+    projectCode?: string;
+    startDate?: string;
+    endDate?: string;
+    timezone?: string;
+  };
+  const projectId = String(data.projectId || "");
+  if (!projectId) return actionFailure("ไม่พบโครงการ");
+
+  const projectName = String(data.projectName || "").trim();
+  const projectCode = String(data.projectCode || "").trim();
+  const startDate = String(data.startDate || "").trim();
+  const endDate = String(data.endDate || "").trim();
+  const timezone = String(data.timezone || "").trim() || "Asia/Bangkok";
+
+  if (projectName.length < 2) return actionFailure("ชื่อโครงการสั้นเกินไป");
+  if (projectCode.length < 2) return actionFailure("รหัสโครงการสั้นเกินไป");
+  if (!startDate || !endDate) return actionFailure("กรุณาเลือกวันเริ่มและวันสิ้นสุดโครงการ");
+  if (endDate < startDate) return actionFailure("วันสิ้นสุดอยู่ก่อนวันเริ่ม กรุณาตรวจสอบอีกครั้ง");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(projectId, "project.update");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขโครงการนี้");
+
+  // Missions already planned outside the new window would silently fall out of
+  // range, so say so instead of moving the goalposts under them.
+  const { data: strays } = await client
+    .from("missions")
+    .select("mission_name, planned_start_time")
+    .eq("project_id", projectId)
+    .not("planned_start_time", "is", null)
+    .or(`planned_start_time.lt.${startDate}T00:00:00,planned_start_time.gt.${endDate}T23:59:59`)
+    .limit(3);
+
+  const { error: updateError } = await client
+    .from("projects")
+    .update({
+      project_name: projectName,
+      project_code: projectCode,
+      start_date: startDate,
+      end_date: endDate,
+      timezone
+    })
+    .eq("id", projectId);
+
+  if (updateError) {
+    const message = /duplicate key|unique/i.test(updateError.message)
+      ? "รหัสโครงการนี้ถูกใช้แล้ว กรุณาใช้รหัสอื่น"
+      : "บันทึกข้อมูลโครงการไม่สำเร็จ";
+    return actionFailure(getDatabaseErrorMessage(updateError, message));
+  }
+
+  const warning = strays?.length
+    ? `บันทึกแล้ว แต่มีภารกิจ ${strays.length} รายการอยู่นอกช่วงวันใหม่ เช่น “${strays[0].mission_name}” กรุณาตรวจสอบ`
+    : undefined;
+
+  return actionSuccess({ projectId, projectName, projectCode, startDate, endDate, timezone }, warning);
+}

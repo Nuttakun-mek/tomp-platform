@@ -106,12 +106,12 @@ export function CreateProjectForm() {
           </div>
           <FieldError errors={fieldErrors.projectCode} />
         </label>
-        <label className="field-label">
+        <label className="field-label md:col-span-2">
           ชื่อโครงการ
           <input className="field-input" name="projectName" placeholder="เช่น งานรับส่งผู้ร่วมประชุม" />
           <FieldError errors={fieldErrors.projectName} />
         </label>
-        <div className="grid gap-1">
+        <div className="grid gap-1 md:col-span-2">
           <DateRangeFields
             legend="ช่วงเวลาโครงการ"
             startLabel="วันที่เริ่มต้น"

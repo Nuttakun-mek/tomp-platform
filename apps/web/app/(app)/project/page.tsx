@@ -7,7 +7,7 @@ import { ProjectChangePanel } from "@/components/projects/project-change-panel";
 import { ProjectMissionBoard } from "@/components/projects/project-mission-board";
 import { ProjectPublishPanel } from "@/components/projects/project-publish-panel";
 import { ProjectReadinessSummary } from "@/components/projects/project-readiness-summary";
-import { ProjectRenameForm } from "@/components/projects/project-rename-form";
+import { ProjectDetailsForm } from "@/components/projects/project-details-form";
 import { ProjectContactForm } from "@/components/projects/project-contact-form";
 import { resolveCoordinatorPhone, resolveOperationPhone } from "@/lib/domain/contact-numbers";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
@@ -74,6 +74,9 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
           projectName={project.projectName}
           projectCode={project.projectCode}
           projectMetadata={project.metadata}
+          startDate={project.startDate}
+          endDate={project.endDate}
+          timezone={project.timezone}
         />
       ) : (
         <OverviewView projectId={project.id} />
@@ -130,6 +133,9 @@ async function SettingsView({
   projectName,
   projectCode,
   projectMetadata,
+  startDate,
+  endDate,
+  timezone,
   canManage,
   canDelete,
   archived
@@ -138,6 +144,9 @@ async function SettingsView({
   projectName: string;
   projectCode: string;
   projectMetadata: Record<string, unknown>;
+  startDate: string;
+  endDate: string;
+  timezone: string;
   canManage: boolean;
   canDelete: boolean;
   archived: boolean;
@@ -158,7 +167,20 @@ async function SettingsView({
     <div className="grid gap-4">
       <section className="enterprise-panel grid gap-3 p-4">
         <h2 className="text-lg font-semibold text-ink">ข้อมูลโครงการ</h2>
-        {canManage ? <ProjectRenameForm projectId={projectId} currentName={projectName} /> : <p className="text-sm text-slate-600">ชื่อโครงการ: {projectName}</p>}
+        {canManage ? (
+          <ProjectDetailsForm
+            projectId={projectId}
+            projectName={projectName}
+            projectCode={projectCode}
+            startDate={startDate}
+            endDate={endDate}
+            timezone={timezone}
+          />
+        ) : (
+          <p className="text-sm text-slate-600">
+            {projectName} · {startDate} – {endDate}
+          </p>
+        )}
         {canManage ? (
           <div className="border-t border-black/5 pt-3">
             <ProjectContactForm

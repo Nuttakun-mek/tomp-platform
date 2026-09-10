@@ -87,6 +87,8 @@ export const updateCallSignCrewSchema = z.object({
 
 export const createVehicleSchema = z.object({
   organizationId: optionalUuidSchema,
+  /** Null keeps the record in the shared library; set scopes it to one project. */
+  projectId: optionalUuidSchema,
   vendorId: optionalUuidSchema,
   plateNumber: z.string().trim().min(1).max(40),
   vehicleType: z.string().trim().min(1).max(80),
@@ -96,6 +98,8 @@ export const createVehicleSchema = z.object({
 
 export const createDriverSchema = z.object({
   organizationId: optionalUuidSchema,
+  /** Null keeps the record in the shared library; set scopes it to one project. */
+  projectId: optionalUuidSchema,
   vendorId: optionalUuidSchema,
   fullName: z.string().trim().min(2).max(160),
   phone: z.string().trim().min(3).max(40),
