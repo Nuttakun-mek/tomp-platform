@@ -4,20 +4,30 @@ import { cookies } from "next/headers";
 import { isSessionDeviceCurrent } from "@/lib/driver-access/device-binding";
 import { markMobileSessionUsed } from "@/lib/driver-access/mobile-session";
 import { DRIVER_SESSION_COOKIE, DRIVER_SESSION_HEADER, verifyDriverSession } from "@/lib/driver-access/session";
+import { resolveDriverCurrentAssignment } from "@/lib/data/driver-current-assignment";
 
 export interface DriverSessionContext {
   tokenId: string;
   projectId: string;
   assignmentId: string;
+  callSignId?: string | null;
   driverId: string;
   deviceHash: string;
 }
 
-function contextFromPayload(payload: NonNullable<ReturnType<typeof verifyDriverSession>>): DriverSessionContext {
+async function contextFromPayload(payload: NonNullable<ReturnType<typeof verifyDriverSession>>): Promise<DriverSessionContext | null> {
+  const current = await resolveDriverCurrentAssignment({
+    projectId: payload.pid,
+    assignmentId: payload.aid,
+    callSignId: payload.csid,
+    driverId: payload.did
+  });
+  if (!current) return null;
   return {
     tokenId: payload.tid,
     projectId: payload.pid,
-    assignmentId: payload.aid,
+    assignmentId: current.id,
+    callSignId: payload.csid || current.callSignId || null,
     driverId: payload.did,
     deviceHash: payload.dev
   };
@@ -53,7 +63,12 @@ export async function resolveDriverSession(
     return { ok: false, status: 401, error: DEVICE_MOVED };
   }
 
-  return { ok: true, context: contextFromPayload(payload) };
+  const context = await contextFromPayload(payload);
+  if (!context) {
+    return { ok: false, status: 404, error: "ไม่พบงานที่กำลังใช้งานสำหรับ Call Sign นี้ กรุณาติดต่อศูนย์ควบคุม" };
+  }
+
+  return { ok: true, context };
 }
 
 // Same, for server actions (no Request object): reads the session cookie.

@@ -1,6 +1,7 @@
 import type { Assignment, CallSign, Driver, DriverAssignmentPacket, DriverNotification, Project, RouteChangeInstruction, Vehicle } from "@tomp/types/domain";
 import { hashDriverAccessToken } from "@/lib/driver-access/token";
 import { getDriverAssignmentPacketByAssignmentId, getDriverIssueMessagesByAssignmentId, getDriverNotificationsByAssignmentId, getRouteChangesByAssignmentId, type DriverIssueMessage } from "@/lib/data/driver-operations";
+import { resolveDriverCurrentAssignment } from "@/lib/data/driver-current-assignment";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -8,7 +9,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 export interface DriverTokenIdentity {
   tokenId: string;
   projectId: string;
-  assignmentId: string;
+  assignmentId?: string | null;
+  callSignId?: string | null;
   driverId: string;
   pinRequired: boolean;
   deviceBoundTo: string | null;
@@ -24,7 +26,7 @@ export async function resolveDriverTokenIdentity(token: string): Promise<DriverT
   if (client) {
     const { data } = await client
       .from("driver_access_tokens")
-      .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata")
+      .select("id, project_id, assignment_id, call_sign_id, driver_id, status, expires_at, metadata")
       .eq("token_hash", tokenHash)
       .eq("status", "active")
       .maybeSingle();
@@ -34,17 +36,18 @@ export async function resolveDriverTokenIdentity(token: string): Promise<DriverT
   const sql = getPostgresClient();
   if (!sql) return null;
   const rows = await sql<Array<Record<string, unknown>>>`
-    select id, project_id, assignment_id, driver_id, expires_at, metadata
+    select id, project_id, assignment_id, call_sign_id, driver_id, expires_at, metadata
     from driver_access_tokens where token_hash = ${tokenHash} and status = 'active' limit 1
   `;
   return rows[0] ? identityFromRow(rows[0]) : null;
 }
 
 function identityFromRow(row: Record<string, unknown>): DriverTokenIdentity | null {
-  const assignmentId = typeof row.assignment_id === "string" ? row.assignment_id : "";
+  const assignmentId = typeof row.assignment_id === "string" ? row.assignment_id : null;
+  const callSignId = typeof row.call_sign_id === "string" ? row.call_sign_id : null;
   const projectId = typeof row.project_id === "string" ? row.project_id : "";
   const driverId = typeof row.driver_id === "string" ? row.driver_id : "";
-  if (!assignmentId || !projectId || !driverId) return null;
+  if ((!assignmentId && !callSignId) || !projectId || !driverId) return null;
   const expiresAt = row.expires_at ? new Date(String(row.expires_at)).getTime() : 0;
   if (expiresAt && expiresAt <= Date.now()) return null;
 
@@ -53,6 +56,7 @@ function identityFromRow(row: Record<string, unknown>): DriverTokenIdentity | nu
     tokenId: String(row.id),
     projectId,
     assignmentId,
+    callSignId,
     driverId,
     pinRequired: typeof meta.pinHash === "string" && meta.pinHash.length > 0,
     deviceBoundTo: typeof meta.deviceHash === "string" && meta.deviceHash ? meta.deviceHash : null
@@ -109,6 +113,7 @@ export interface DriverAssignmentSessionContext {
   tokenId: string;
   projectId: string;
   assignmentId: string;
+  callSignId?: string | null;
   driverId: string;
 }
 
@@ -214,18 +219,26 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
 
   const { data: tokenRow } = await client
     .from("driver_access_tokens")
-    .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata, usage_count")
+    .select("id, project_id, assignment_id, call_sign_id, driver_id, status, expires_at, metadata, usage_count")
     .eq("token_hash", tokenHash)
     .eq("status", "active")
     .maybeSingle();
 
-  if (!tokenRow?.project_id || !tokenRow.assignment_id || (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now())) {
+  if (!tokenRow?.project_id || !tokenRow.driver_id || (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now())) {
     return getDriverAssignmentByTokenViaPostgres(token, tokenHash);
   }
 
+  const current = await resolveDriverCurrentAssignment({
+    projectId: String(tokenRow.project_id),
+    assignmentId: typeof tokenRow.assignment_id === "string" ? tokenRow.assignment_id : null,
+    callSignId: typeof tokenRow.call_sign_id === "string" ? tokenRow.call_sign_id : null,
+    driverId: String(tokenRow.driver_id)
+  });
+  if (!current) return getDriverAssignmentByTokenViaPostgres(token, tokenHash);
+
   const [{ data: project }, { data: assignment }] = await Promise.all([
     client.from("projects").select("*").eq("id", tokenRow.project_id).maybeSingle(),
-    client.from("assignments").select("*").eq("id", tokenRow.assignment_id).maybeSingle()
+    client.from("assignments").select("*").eq("id", current.id).maybeSingle()
   ]);
 
   if (!project || !assignment) {
@@ -234,7 +247,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
 
   const [{ data: callSign }, { data: driver }, { data: vehicle }] = await Promise.all([
     client.from("call_signs").select("*").eq("id", assignment.call_sign_id).maybeSingle(),
-    assignment.driver_id ? client.from("drivers").select("*").eq("id", assignment.driver_id).maybeSingle() : Promise.resolve({ data: null }),
+    tokenRow.driver_id ? client.from("drivers").select("*").eq("id", tokenRow.driver_id).maybeSingle() : Promise.resolve({ data: null }),
     assignment.vehicle_id ? client.from("vehicles").select("*").eq("id", assignment.vehicle_id).maybeSingle() : Promise.resolve({ data: null })
   ]);
 
@@ -276,7 +289,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     .from("assignments")
     .select("id, call_sign_id, start_time, end_time, status, metadata, created_at")
     .eq("project_id", text(assignment, "project_id"))
-    .eq("driver_id", text(driver, "id"))
+    .eq("call_sign_id", text(assignment, "call_sign_id"))
     .neq("status", "cancelled")
     .order("start_time", { ascending: true });
 
@@ -334,6 +347,8 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
       projectId: text(callSign, "project_id"),
       callSign: text(callSign, "call_sign"),
       groupName: nullableText(callSign, "group_name"),
+      driverId: nullableText(callSign, "driver_id"),
+      vehicleId: nullableText(callSign, "vehicle_id"),
       status: text(callSign, "status", "active") as CallSign["status"]
     },
     driver: {
@@ -366,7 +381,7 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
 
   const { data: tokenRow } = await client
     .from("driver_access_tokens")
-    .select("id, project_id, assignment_id, driver_id, status, expires_at, metadata")
+    .select("id, project_id, assignment_id, call_sign_id, driver_id, status, expires_at, metadata")
     .eq("id", context.tokenId)
     .eq("status", "active")
     .maybeSingle();
@@ -377,15 +392,24 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
 
   if (
     String(tokenRow.project_id) !== context.projectId ||
-    String(tokenRow.assignment_id) !== context.assignmentId ||
+    (tokenRow.assignment_id && String(tokenRow.assignment_id) !== context.assignmentId && !tokenRow.call_sign_id) ||
+    (tokenRow.call_sign_id && context.callSignId && String(tokenRow.call_sign_id) !== context.callSignId) ||
     String(tokenRow.driver_id) !== context.driverId
   ) {
     return null;
   }
 
+  const current = await resolveDriverCurrentAssignment({
+    projectId: context.projectId,
+    assignmentId: context.assignmentId,
+    callSignId: context.callSignId || (typeof tokenRow.call_sign_id === "string" ? tokenRow.call_sign_id : null),
+    driverId: context.driverId
+  });
+  if (!current) return null;
+
   const [{ data: project }, { data: assignment }] = await Promise.all([
     client.from("projects").select("*").eq("id", context.projectId).maybeSingle(),
-    client.from("assignments").select("*").eq("id", context.assignmentId).maybeSingle()
+    client.from("assignments").select("*").eq("id", current.id).maybeSingle()
   ]);
 
   if (!project || !assignment) {
@@ -393,7 +417,7 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
   }
 
   const assignmentRow = assignment as Row;
-  if (text(assignmentRow, "project_id") !== context.projectId || text(assignmentRow, "driver_id") !== context.driverId) {
+  if (text(assignmentRow, "project_id") !== context.projectId || (text(assignmentRow, "driver_id") && text(assignmentRow, "driver_id") !== context.driverId)) {
     return null;
   }
 
@@ -408,15 +432,15 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
   }
 
   const [packet, notifications, routeChanges, messages, checkinRes, latestStatusRes] = await Promise.all([
-    getDriverAssignmentPacketByAssignmentId(context.assignmentId),
-    getDriverNotificationsByAssignmentId(context.assignmentId),
-    getRouteChangesByAssignmentId(context.assignmentId),
-    getDriverIssueMessagesByAssignmentId(context.assignmentId),
-    client.from("driver_checkins").select("id").eq("assignment_id", context.assignmentId).eq("status", "ready").limit(1),
+    getDriverAssignmentPacketByAssignmentId(current.id),
+    getDriverNotificationsByAssignmentId(current.id),
+    getRouteChangesByAssignmentId(current.id),
+    getDriverIssueMessagesByAssignmentId(current.id),
+    client.from("driver_checkins").select("id").eq("assignment_id", current.id).eq("status", "ready").limit(1),
     client
       .from("assignment_status_updates")
       .select("status, created_at")
-      .eq("assignment_id", context.assignmentId)
+      .eq("assignment_id", current.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -427,7 +451,7 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
     .from("assignments")
     .select("id, call_sign_id, start_time, end_time, status, metadata, created_at")
     .eq("project_id", context.projectId)
-    .eq("driver_id", context.driverId)
+    .eq("call_sign_id", text(assignmentRow, "call_sign_id"))
     .neq("status", "cancelled")
     .order("start_time", { ascending: true });
   const visibleDayRows = ((dayAssignmentRows || []) as Row[]).filter((row) => sameOperationDay(nullableText(row, "start_time"), operationAnchor));
@@ -450,7 +474,7 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
     routeChanges,
     messages,
     latestStatus: latestStatusRow ? { status: text(latestStatusRow, "status"), at: text(latestStatusRow, "created_at") } : null,
-    dayAssignments: buildDayAssignments(visibleDayRows, context.assignmentId, (id) => dayCallSignById.get(id)),
+    dayAssignments: buildDayAssignments(visibleDayRows, current.id, (id) => dayCallSignById.get(id)),
     activated: Boolean((checkinRes.data as unknown[] | null)?.length),
     project: {
       ...base(project as Row),
@@ -483,6 +507,8 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
       projectId: text(callSign as Row, "project_id"),
       callSign: text(callSign as Row, "call_sign"),
       groupName: nullableText(callSign as Row, "group_name"),
+      driverId: nullableText(callSign as Row, "driver_id"),
+      vehicleId: nullableText(callSign as Row, "vehicle_id"),
       status: text(callSign as Row, "status", "active") as CallSign["status"]
     },
     driver: {
@@ -512,18 +538,26 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   if (!sql) return null;
 
   const tokenRows = await sql<Row[]>`
-    select id, project_id, assignment_id, driver_id, status, expires_at, metadata
+    select id, project_id, assignment_id, call_sign_id, driver_id, status, expires_at, metadata
     from driver_access_tokens
     where token_hash = ${tokenHash}
       and status = 'active'
     limit 1
   `;
   const tokenRow = tokenRows[0];
-  if (!tokenRow?.project_id || !tokenRow.assignment_id) return null;
+  if (!tokenRow?.project_id || !tokenRow.driver_id) return null;
   if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) return null;
 
+  const current = await resolveDriverCurrentAssignment({
+    projectId: String(tokenRow.project_id),
+    assignmentId: nullableText(tokenRow, "assignment_id"),
+    callSignId: nullableText(tokenRow, "call_sign_id"),
+    driverId: String(tokenRow.driver_id)
+  });
+  if (!current) return null;
+
   const assignmentRows = await sql<Row[]>`
-    select * from assignments where id = ${String(tokenRow.assignment_id)} limit 1
+    select * from assignments where id = ${current.id} limit 1
   `;
   const assignment = assignmentRows[0];
   if (!assignment) return null;
@@ -531,14 +565,14 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows, checkinRows, latestStatusRows] = await Promise.all([
     sql<Row[]>`select * from projects where id = ${String(tokenRow.project_id)} limit 1`,
     sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
-    assignment.driver_id ? sql<Row[]>`select * from drivers where id = ${String(assignment.driver_id)} limit 1` : Promise.resolve([]),
+    tokenRow.driver_id ? sql<Row[]>`select * from drivers where id = ${String(tokenRow.driver_id)} limit 1` : Promise.resolve([]),
     assignment.vehicle_id ? sql<Row[]>`select * from vehicles where id = ${String(assignment.vehicle_id)} limit 1` : Promise.resolve([]),
-    sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 1`,
-    sql<Row[]>`select * from driver_notifications where assignment_id = ${String(tokenRow.assignment_id)} order by sent_at desc limit 10`,
-    sql<Row[]>`select * from route_change_instructions where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 5`,
-    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${String(tokenRow.assignment_id)} order by created_at asc limit 50`,
-    sql<Row[]>`select id from driver_checkins where assignment_id = ${String(tokenRow.assignment_id)} and status = 'ready' limit 1`,
-    sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${String(tokenRow.assignment_id)} order by created_at desc limit 1`
+    sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${current.id} order by created_at desc limit 1`,
+    sql<Row[]>`select * from driver_notifications where assignment_id = ${current.id} order by sent_at desc limit 10`,
+    sql<Row[]>`select * from route_change_instructions where assignment_id = ${current.id} order by created_at desc limit 5`,
+    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
+    sql<Row[]>`select id from driver_checkins where assignment_id = ${current.id} and status = 'ready' limit 1`,
+    sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${current.id} order by created_at desc limit 1`
   ]);
 
   const project = projectRows[0];
@@ -551,7 +585,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     select id, call_sign_id, start_time, end_time, status, metadata, created_at
     from assignments
     where project_id = ${String(tokenRow.project_id)}
-      and driver_id = ${String(driver.id)}
+      and call_sign_id = ${String(assignment.call_sign_id)}
       and status <> 'cancelled'
     order by start_time asc nulls last, created_at asc
   `;
@@ -647,6 +681,8 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
       projectId: text(callSign, "project_id"),
       callSign: text(callSign, "call_sign"),
       groupName: nullableText(callSign, "group_name"),
+      driverId: nullableText(callSign, "driver_id"),
+      vehicleId: nullableText(callSign, "vehicle_id"),
       status: text(callSign, "status", "active") as CallSign["status"]
     },
     driver: {
@@ -676,41 +712,50 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
   if (!sql) return null;
 
   const tokenRows = await sql<Row[]>`
-    select id, project_id, assignment_id, driver_id, status, expires_at, metadata
+    select id, project_id, assignment_id, call_sign_id, driver_id, status, expires_at, metadata
     from driver_access_tokens
     where id = ${context.tokenId}
       and status = 'active'
     limit 1
   `;
   const tokenRow = tokenRows[0];
-  if (!tokenRow?.project_id || !tokenRow.assignment_id || !tokenRow.driver_id) return null;
+  if (!tokenRow?.project_id || !tokenRow.driver_id) return null;
   if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) return null;
   if (
     String(tokenRow.project_id) !== context.projectId ||
-    String(tokenRow.assignment_id) !== context.assignmentId ||
+    (tokenRow.assignment_id && String(tokenRow.assignment_id) !== context.assignmentId && !tokenRow.call_sign_id) ||
+    (tokenRow.call_sign_id && context.callSignId && String(tokenRow.call_sign_id) !== context.callSignId) ||
     String(tokenRow.driver_id) !== context.driverId
   ) {
     return null;
   }
 
+  const current = await resolveDriverCurrentAssignment({
+    projectId: context.projectId,
+    assignmentId: context.assignmentId,
+    callSignId: context.callSignId || nullableText(tokenRow, "call_sign_id"),
+    driverId: context.driverId
+  });
+  if (!current) return null;
+
   const assignmentRows = await sql<Row[]>`
-    select * from assignments where id = ${context.assignmentId} limit 1
+    select * from assignments where id = ${current.id} limit 1
   `;
   const assignment = assignmentRows[0];
   if (!assignment) return null;
-  if (text(assignment, "project_id") !== context.projectId || text(assignment, "driver_id") !== context.driverId) return null;
+  if (text(assignment, "project_id") !== context.projectId || (text(assignment, "driver_id") && text(assignment, "driver_id") !== context.driverId)) return null;
 
   const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows, checkinRows, latestStatusRows] = await Promise.all([
     sql<Row[]>`select * from projects where id = ${context.projectId} limit 1`,
     sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
     sql<Row[]>`select * from drivers where id = ${context.driverId} limit 1`,
     assignment.vehicle_id ? sql<Row[]>`select * from vehicles where id = ${String(assignment.vehicle_id)} limit 1` : Promise.resolve([]),
-    sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${context.assignmentId} order by created_at desc limit 1`,
-    sql<Row[]>`select * from driver_notifications where assignment_id = ${context.assignmentId} order by sent_at desc limit 10`,
-    sql<Row[]>`select * from route_change_instructions where assignment_id = ${context.assignmentId} order by created_at desc limit 5`,
-    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${context.assignmentId} order by created_at asc limit 50`,
-    sql<Row[]>`select id from driver_checkins where assignment_id = ${context.assignmentId} and status = 'ready' limit 1`,
-    sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${context.assignmentId} order by created_at desc limit 1`
+    sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${current.id} order by created_at desc limit 1`,
+    sql<Row[]>`select * from driver_notifications where assignment_id = ${current.id} order by sent_at desc limit 10`,
+    sql<Row[]>`select * from route_change_instructions where assignment_id = ${current.id} order by created_at desc limit 5`,
+    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
+    sql<Row[]>`select id from driver_checkins where assignment_id = ${current.id} and status = 'ready' limit 1`,
+    sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${current.id} order by created_at desc limit 1`
   ]);
 
   const project = projectRows[0];
@@ -724,7 +769,7 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
     select id, call_sign_id, start_time, end_time, status, metadata, created_at
     from assignments
     where project_id = ${context.projectId}
-      and driver_id = ${context.driverId}
+      and call_sign_id = ${String(assignment.call_sign_id)}
       and status <> 'cancelled'
     order by start_time asc nulls last, created_at asc
   `;
@@ -744,7 +789,7 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
     packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,
     activated: checkinRows.length > 0,
     latestStatus: latestStatusRows[0] ? { status: text(latestStatusRows[0], "status"), at: text(latestStatusRows[0], "created_at") } : null,
-    dayAssignments: buildDayAssignments(visibleDayRows, context.assignmentId, (id) => dayCallSignById.get(id)),
+    dayAssignments: buildDayAssignments(visibleDayRows, current.id, (id) => dayCallSignById.get(id)),
     messages: messageRows.map((row) => ({
       id: text(row, "id"),
       text: text(row, "message"),
@@ -809,6 +854,8 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
       projectId: text(callSign, "project_id"),
       callSign: text(callSign, "call_sign"),
       groupName: nullableText(callSign, "group_name"),
+      driverId: nullableText(callSign, "driver_id"),
+      vehicleId: nullableText(callSign, "vehicle_id"),
       status: text(callSign, "status", "active") as CallSign["status"]
     },
     driver: {
@@ -846,17 +893,25 @@ export async function getDriverUpdatesByToken(token: string): Promise<DriverUpda
 
   const { data: tokenRow } = await client
     .from("driver_access_tokens")
-    .select("assignment_id, driver_id, project_id, status, expires_at")
+    .select("assignment_id, call_sign_id, driver_id, project_id, status, expires_at")
     .eq("token_hash", tokenHash)
     .eq("status", "active")
     .maybeSingle();
 
-  if (!tokenRow?.assignment_id || !tokenRow.driver_id || !tokenRow.project_id) return getDriverUpdatesByTokenViaPostgres(tokenHash);
+  if (!tokenRow?.driver_id || !tokenRow.project_id) return getDriverUpdatesByTokenViaPostgres(tokenHash);
   if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) return null;
+
+  const current = await resolveDriverCurrentAssignment({
+    projectId: String(tokenRow.project_id),
+    assignmentId: typeof tokenRow.assignment_id === "string" ? tokenRow.assignment_id : null,
+    callSignId: typeof tokenRow.call_sign_id === "string" ? tokenRow.call_sign_id : null,
+    driverId: String(tokenRow.driver_id)
+  });
+  if (!current) return null;
 
   return getDriverUpdatesFor({
     projectId: String(tokenRow.project_id),
-    assignmentId: String(tokenRow.assignment_id),
+    assignmentId: current.id,
     driverId: String(tokenRow.driver_id)
   });
 }
@@ -877,19 +932,20 @@ export async function getDriverUpdatesFor({
     return getDriverUpdatesForViaPostgres(projectId, assignmentId, driverId);
   }
 
-  const [{ data: assignmentRow }, notifications, messages, latestStatusRes, { data: dayRows }] = await Promise.all([
-    client.from("assignments").select("status, start_time").eq("id", assignmentId).maybeSingle(),
+  const [{ data: assignmentRow }, notifications, messages, latestStatusRes] = await Promise.all([
+    client.from("assignments").select("status, start_time, call_sign_id").eq("id", assignmentId).maybeSingle(),
     getDriverNotificationsByAssignmentId(assignmentId),
     getDriverIssueMessagesByAssignmentId(assignmentId),
-    client.from("assignment_status_updates").select("status, created_at").eq("assignment_id", assignmentId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    client
-      .from("assignments")
-      .select("id, call_sign_id, start_time, end_time, status, metadata, created_at")
-      .eq("project_id", projectId)
-      .eq("driver_id", driverId)
-      .neq("status", "cancelled")
-      .order("start_time", { ascending: true })
+    client.from("assignment_status_updates").select("status, created_at").eq("assignment_id", assignmentId).order("created_at", { ascending: false }).limit(1).maybeSingle()
   ]);
+  const assignmentCallSignId = text(assignmentRow as Row | null, "call_sign_id");
+  const { data: dayRows } = await client
+    .from("assignments")
+    .select("id, call_sign_id, start_time, end_time, status, metadata, created_at")
+    .eq("project_id", projectId)
+    .eq(assignmentCallSignId ? "call_sign_id" : "driver_id", assignmentCallSignId || driverId)
+    .neq("status", "cancelled")
+    .order("start_time", { ascending: true });
 
   const operationAnchor = nullableText(assignmentRow as Row | null, "start_time") || new Date().toISOString();
   const visibleDayRows = ((dayRows || []) as Row[]).filter((row) => sameOperationDay(nullableText(row, "start_time"), operationAnchor));
@@ -915,34 +971,51 @@ async function getDriverUpdatesByTokenViaPostgres(tokenHash: string): Promise<Dr
   if (!sql) return null;
 
   const tokenRows = await sql<Row[]>`
-    select assignment_id, driver_id, project_id, expires_at
+    select assignment_id, call_sign_id, driver_id, project_id, expires_at
     from driver_access_tokens
     where token_hash = ${tokenHash} and status = 'active'
     limit 1
   `;
   const tokenRow = tokenRows[0];
-  if (!tokenRow?.assignment_id || !tokenRow.driver_id || !tokenRow.project_id) return null;
+  if (!tokenRow?.driver_id || !tokenRow.project_id) return null;
   if (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now()) return null;
 
-  return getDriverUpdatesForViaPostgres(String(tokenRow.project_id), String(tokenRow.assignment_id), String(tokenRow.driver_id));
+  const current = await resolveDriverCurrentAssignment({
+    projectId: String(tokenRow.project_id),
+    assignmentId: nullableText(tokenRow, "assignment_id"),
+    callSignId: nullableText(tokenRow, "call_sign_id"),
+    driverId: String(tokenRow.driver_id)
+  });
+  if (!current) return null;
+
+  return getDriverUpdatesForViaPostgres(String(tokenRow.project_id), current.id, String(tokenRow.driver_id));
 }
 
 async function getDriverUpdatesForViaPostgres(projectId: string, assignmentId: string, driverId: string): Promise<DriverUpdates | null> {
   const sql = getPostgresClient();
   if (!sql) return null;
 
-  const [assignmentRows, notifications, messages, latestStatusRows, dayRows] = await Promise.all([
-    sql<Row[]>`select status, start_time from assignments where id = ${assignmentId} limit 1`,
+  const [assignmentRows, notifications, messages, latestStatusRows] = await Promise.all([
+    sql<Row[]>`select status, start_time, call_sign_id from assignments where id = ${assignmentId} limit 1`,
     getDriverNotificationsByAssignmentId(assignmentId),
     getDriverIssueMessagesByAssignmentId(assignmentId),
-    sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${assignmentId} order by created_at desc limit 1`,
-    sql<Row[]>`
+    sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${assignmentId} order by created_at desc limit 1`
+  ]);
+
+  const assignmentCallSignId = nullableText(assignmentRows[0], "call_sign_id");
+  const dayRows = assignmentCallSignId
+    ? await sql<Row[]>`
+      select id, call_sign_id, start_time, end_time, status, metadata, created_at
+      from assignments
+      where project_id = ${projectId} and call_sign_id = ${assignmentCallSignId} and status <> 'cancelled'
+      order by start_time asc nulls last, created_at asc
+    `
+    : await sql<Row[]>`
       select id, call_sign_id, start_time, end_time, status, metadata, created_at
       from assignments
       where project_id = ${projectId} and driver_id = ${driverId} and status <> 'cancelled'
       order by start_time asc nulls last, created_at asc
-    `
-  ]);
+    `;
 
   const operationAnchor = nullableText(assignmentRows[0], "start_time") || new Date().toISOString();
   const visibleDayRows = dayRows.filter((row) => sameOperationDay(nullableText(row, "start_time"), operationAnchor));

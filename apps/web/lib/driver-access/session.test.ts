@@ -12,6 +12,14 @@ describe("driver session token", () => {
     expect(payload?.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 
+  it("allows call sign-scoped sessions without a fixed assignment", () => {
+    const scoped = { tid: "t1", pid: "p1", csid: "cs1", did: "d1", dev: "devhash" };
+    const value = mintDriverSession(scoped);
+    const payload = verifyDriverSession(value);
+    expect(payload).toMatchObject(scoped);
+    expect(payload?.aid).toBeFalsy();
+  });
+
   it("rejects a tampered body", () => {
     const value = mintDriverSession(base);
     const [body, sig] = value.split(".");

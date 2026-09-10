@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
-import { driverCheckinAction, recordVehicleEvidenceAction } from "@/app/actions/driver";
+import { assignmentStatusUpdateAction, driverCheckinAction, recordVehicleEvidenceAction } from "@/app/actions/driver";
 import { DriverPhotoCheck } from "@/components/driver/driver-photo-check";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
 
@@ -19,11 +19,31 @@ export function DriverPreflight({ driverAccess }: { driverAccess: DriverAccessAs
   const [checks, setChecks] = useState({ name: false, phone: false, vehicle: false, gps: false });
   const [photos, setPhotos] = useState<{ vehicle?: string; plate?: string }>({});
   const [error, setError] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState(["acknowledged", "active", "completed"].includes(driverAccess.assignment.status));
   const [isPending, startTransition] = useTransition();
 
   const allChecked = CONFIRMS.every(([key]) => checks[key]);
   const photosReady = Boolean(photos.vehicle && photos.plate);
-  const ready = allChecked && photosReady;
+  const ready = acknowledged && allChecked && photosReady;
+
+  function acknowledge() {
+    setError(null);
+    startTransition(async () => {
+      const result = await assignmentStatusUpdateAction({
+        projectId: driverAccess.project.id,
+        assignmentId: driverAccess.assignment.id,
+        driverId: driverAccess.driver.id,
+        status: "acknowledged",
+        source: "driver_qr",
+        metadata: { via: "driver_preflight" }
+      });
+      if (!result.success) {
+        setError(result.error || "บันทึกการรับทราบงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        return;
+      }
+      setAcknowledged(true);
+    });
+  }
 
   function submit() {
     if (!ready) {
@@ -74,6 +94,23 @@ export function DriverPreflight({ driverAccess }: { driverAccess: DriverAccessAs
       </section>
 
       <section className="smart-card grid gap-3">
+        {!acknowledged ? (
+          <div className="grid gap-2 rounded-card border border-blue-200 bg-blue-50 p-3">
+            <p className="text-[13px] font-semibold text-blue-950">โปรดรับทราบงานก่อนยืนยันความพร้อม</p>
+            <p className="text-[12px] leading-5 text-blue-800">ระบบจะบันทึกว่าคนขับได้รับงานนี้แล้ว แต่ยังไม่เริ่มงานจนกว่าจะส่งข้อมูลความพร้อมครบถ้วน</p>
+            <button
+              type="button"
+              onClick={acknowledge}
+              disabled={isPending}
+              className="flex min-h-12 items-center justify-center rounded-command bg-route px-4 text-[15px] font-bold text-white disabled:opacity-60"
+            >
+              {isPending ? "กำลังบันทึก..." : "รับทราบงาน"}
+            </button>
+          </div>
+        ) : (
+          <p className="rounded-card bg-emerald-50 px-3 py-2 text-[13px] font-semibold text-emerald-800">รับทราบงานแล้ว กรุณาตรวจความพร้อมก่อนเริ่มงาน</p>
+        )}
+
         <DriverPhotoCheck onChange={setPhotos} />
 
         <div className="grid gap-1.5">

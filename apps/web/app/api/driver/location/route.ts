@@ -11,6 +11,7 @@ async function updateLocationSession(input: {
   client: NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
   projectId: string;
   assignmentId: string;
+  callSignId?: string | null;
   driverId: string | null;
   vehicleId: string | null;
   recordedAt: string;
@@ -20,6 +21,7 @@ async function updateLocationSession(input: {
     await input.client.from("driver_location_sessions").insert({
       project_id: input.projectId,
       assignment_id: input.assignmentId,
+      call_sign_id: input.callSignId || null,
       driver_id: input.driverId,
       vehicle_id: input.vehicleId,
       started_at: input.recordedAt,
@@ -92,6 +94,7 @@ async function writeDriverLocationViaSupabase(
     .insert({
       project_id: ctx.projectId,
       assignment_id: ctx.assignmentId,
+      call_sign_id: ctx.callSignId || null,
       driver_id: ctx.driverId,
       vehicle_id: vehicleId,
       latitude: input.latitude,
@@ -113,6 +116,7 @@ async function writeDriverLocationViaSupabase(
     client,
     projectId: ctx.projectId,
     assignmentId: ctx.assignmentId,
+    callSignId: ctx.callSignId || null,
     driverId: ctx.driverId,
     vehicleId,
     recordedAt,
@@ -149,15 +153,15 @@ async function writeDriverLocationViaPostgres(ctx: DriverSessionContext, input: 
   const metadata = JSON.stringify({ ...input.metadata, pilot: true, source: "postgres_direct", userAgent: request.headers.get("user-agent") });
 
   const inserted = await sql<Array<{ id: string; recorded_at: string }>>`
-    insert into gps_locations (project_id, assignment_id, driver_id, vehicle_id, latitude, longitude, accuracy, recorded_at, source, sharing_event, metadata)
-    values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.driverId}, ${vehicleId}, ${input.latitude}, ${input.longitude}, ${input.accuracy ?? null}, ${recordedAt}, ${"driver_web_app"}, ${input.trackingEvent}, ${metadata}::jsonb)
+    insert into gps_locations (project_id, assignment_id, call_sign_id, driver_id, vehicle_id, latitude, longitude, accuracy, recorded_at, source, sharing_event, metadata)
+    values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.callSignId || null}, ${ctx.driverId}, ${vehicleId}, ${input.latitude}, ${input.longitude}, ${input.accuracy ?? null}, ${recordedAt}, ${"driver_web_app"}, ${input.trackingEvent}, ${metadata}::jsonb)
     returning id, recorded_at
   `;
 
   if (input.trackingEvent === "sharing_started") {
     await sql`
-      insert into driver_location_sessions (project_id, assignment_id, driver_id, vehicle_id, started_at, consent_given_at, status, last_ping_at, metadata)
-      values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.driverId}, ${vehicleId}, ${recordedAt}, ${recordedAt}, ${"healthy"}, ${recordedAt}, ${JSON.stringify({ source: "web_driver" })}::jsonb)
+      insert into driver_location_sessions (project_id, assignment_id, call_sign_id, driver_id, vehicle_id, started_at, consent_given_at, status, last_ping_at, metadata)
+      values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.callSignId || null}, ${ctx.driverId}, ${vehicleId}, ${recordedAt}, ${recordedAt}, ${"healthy"}, ${recordedAt}, ${JSON.stringify({ source: "web_driver" })}::jsonb)
     `;
   } else {
     await sql`

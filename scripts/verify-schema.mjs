@@ -37,8 +37,9 @@ const REQUIRED_TABLES = [
   "role_permissions", "project_members", "user_role_assignments",
   "publish_snapshots", "publish_locks", "change_requests",
   "driver_access_tokens", "driver_checkins", "driver_issue_reports",
-  "driver_notifications", "assignment_status_updates", "gps_locations",
-  "driver_location_sessions"
+  "driver_assignment_packets", "driver_notifications", "assignment_status_updates", "gps_locations",
+  "driver_location_sessions", "driver_mobile_sessions", "route_change_instructions",
+  "driver_contact_events", "driver_acknowledgements", "observer_access_tokens"
 ];
 
 // (table, constraint substring) — a representative sample, not exhaustive.
@@ -47,7 +48,8 @@ const REQUIRED_CONSTRAINTS = [
   ["assignments", "assignments_status_check"],
   ["missions", "missions_project_code_unique"],
   ["publish_locks", "publish_locks_project_active_unique"],
-  ["change_requests", "change_requests_status_check"]
+  ["change_requests", "change_requests_status_check"],
+  ["observer_access_tokens", "observer_access_tokens_status_check"]
 ];
 
 const sql = postgres(url, { max: 1, onnotice: () => {} });

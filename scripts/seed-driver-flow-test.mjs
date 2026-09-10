@@ -122,12 +122,12 @@ async function seedIn(sql) {
       ${sql.json({ smokeTest: true, pickupLocation: "โรงแรมทดสอบ", dropoffLocation: "ศูนย์ประชุมทดสอบ", commitmentTime: "09:00" })})
     returning id`;
 
-  const token = `tomp_${assignment.id}_${driver.id}_${crypto.randomBytes(32).toString("base64url")}`;
+  const token = `tomp_${callSign.id}_${driver.id}_${crypto.randomBytes(32).toString("base64url")}`;
   const pin = makePin();
 
   await sql`
-    insert into driver_access_tokens (project_id, assignment_id, driver_id, token_hash, access_scope, status, expires_at, metadata)
-    values (${project.id}, ${assignment.id}, ${driver.id}, ${hashToken(token)}, 'assignment', 'active', now() + interval '24 hours',
+    insert into driver_access_tokens (project_id, assignment_id, call_sign_id, driver_id, token_hash, access_scope, status, expires_at, metadata)
+    values (${project.id}, ${assignment.id}, ${callSign.id}, ${driver.id}, ${hashToken(token)}, 'call_sign', 'active', now() + interval '24 hours',
       ${sql.json({ smokeTest: true, pinHash: hashPin(pin) })})`;
 
   console.log("\nSeeded a driver job tagged smokeTest=true.\n");

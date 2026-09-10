@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { driverTokenSecret, generateDriverAccessToken, hashDriverAccessToken, verifyDriverAccessTokenHash } from "../token";
+import {
+  driverTokenSecret,
+  generateDriverAccessToken,
+  generateObserverAccessToken,
+  hashDriverAccessToken,
+  hashObserverAccessToken,
+  verifyDriverAccessTokenHash,
+  verifyObserverAccessTokenHash
+} from "../token";
 
 describe("driver access tokens", () => {
   it("generates and verifies hashed driver tokens", () => {
@@ -9,6 +17,23 @@ describe("driver access tokens", () => {
     expect(token).toContain("tomp_assignment-1_driver-1_");
     expect(hash).toHaveLength(64);
     expect(verifyDriverAccessTokenHash(token, hash)).toBe(true);
+  });
+
+  it("generates call sign-scoped driver tokens", () => {
+    const token = generateDriverAccessToken({ callSignId: "call-sign-1", driverId: "driver-1" });
+    expect(token).toContain("tomp_call-sign-1_driver-1_");
+  });
+
+  it("keeps observer token hashes separate from driver token hashes", () => {
+    const token = generateObserverAccessToken({ callSignId: "call-sign-1" });
+    const observerHash = hashObserverAccessToken(token);
+    const driverHash = hashDriverAccessToken(token);
+
+    expect(token).toContain("tomp_obs_call-sign-1_");
+    expect(observerHash).toHaveLength(64);
+    expect(observerHash).not.toBe(driverHash);
+    expect(verifyObserverAccessTokenHash(token, observerHash)).toBe(true);
+    expect(verifyDriverAccessTokenHash(token, observerHash)).toBe(false);
   });
 });
 

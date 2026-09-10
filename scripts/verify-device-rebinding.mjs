@@ -19,6 +19,7 @@
 // smoke-test job.
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { chromium } from "playwright";
 import postgres from "postgres";
 
@@ -36,7 +37,18 @@ const envv = (k) => {
 const sql = postgres((process.env.SUPABASE_DB_URL || envv("SUPABASE_DB_URL")).replace(/:6543\//, ":5432/"), {
   ssl: "require", prepare: false, max: 1, onnotice() {}
 });
-const ASSIGNMENT = TOKEN.split("_")[1];
+const tokenSecret = process.env.DRIVER_ACCESS_TOKEN_SECRET || envv("DRIVER_ACCESS_TOKEN_SECRET") || "development-driver-token-secret";
+const tokenHash = crypto.createHash("sha256").update(`${tokenSecret}:${TOKEN}`).digest("hex");
+const [tokenRow] = await sql`
+  select id, assignment_id, call_sign_id
+  from driver_access_tokens
+  where token_hash = ${tokenHash}
+  limit 1`;
+if (!tokenRow) {
+  console.error("The supplied QR token was not found in driver_access_tokens for this database/secret.");
+  await sql.end();
+  process.exit(2);
+}
 const NL = String.fromCharCode(10);
 const firstLine = (t) => t.split(NL)[0];
 const lastLines = (t, n) => t.split(NL).slice(-n).join(" | ");
@@ -50,14 +62,14 @@ const state = async () =>
   (await sql`
     select status, metadata->>'deviceHash' d, metadata->>'pinAttempts' a,
            metadata->>'pinLockedUntil' l, metadata->'deviceRebindings' r
-    from driver_access_tokens where assignment_id = ${ASSIGNMENT}`)[0];
+    from driver_access_tokens where id = ${tokenRow.id}`)[0];
 
 // Start from an unclaimed token every run, or the second run inherits the
 // binding and cooldown the first one left behind.
 await sql`
   update driver_access_tokens
   set metadata = metadata - 'deviceHash' - 'pinAttempts' - 'pinLockedUntil' - 'deviceRebindings'
-  where assignment_id = ${ASSIGNMENT}`;
+  where id = ${tokenRow.id}`;
 
 const browser = await chromium.launch();
 const url = `${BASE}/driver?token=${encodeURIComponent(TOKEN)}`;
@@ -130,7 +142,7 @@ await D.open();
 text = await D.enter(PIN);
 check("even the right PIN waits out the cooldown", text.includes("กรุณารออีก"), lastLines(text, 3).slice(0, 90));
 
-await sql`update driver_access_tokens set metadata = metadata - 'pinLockedUntil' where assignment_id = ${ASSIGNMENT}`;
+await sql`update driver_access_tokens set metadata = metadata - 'pinLockedUntil' where id = ${tokenRow.id}`;
 await D.enter(PIN);
 await new Promise((resolve) => setTimeout(resolve, 2500));
 text = await D.reread();
@@ -167,9 +179,9 @@ if (liveSession) {
 
 const revoked = await sql`
   select count(*)::int c from driver_mobile_sessions
-  where token_id = (select id from driver_access_tokens where assignment_id = ${ASSIGNMENT})
+  where token_id = ${tokenRow.id}
     and revoked_at is null and device_hash <> (
-      select metadata->>'deviceHash' from driver_access_tokens where assignment_id = ${ASSIGNMENT})`;
+      select metadata->>'deviceHash' from driver_access_tokens where id = ${tokenRow.id})`;
 check("no native session survives on a device that no longer holds the job", revoked[0].c === 0, `${revoked[0].c} still active`);
 
 const failed = out.filter((r) => !r.ok).length;

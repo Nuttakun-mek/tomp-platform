@@ -7,10 +7,13 @@ ten QR codes, and the day's work is planned onto each of them.
 This document records the analysis, the decisions taken, and the order to build
 in.
 
-Update on 2026-09-10: phase 1 has started. `call_signs` now carries the current
-`driver_id` and `vehicle_id`, assignment creation inherits that crew server-side,
-and an audit table records crew changes. QR/token scope is intentionally still
-assignment-based until phase 2.
+Update on 2026-09-10: phases 1-4 are now implemented as a backward-compatible
+foundation. `call_signs` carries the current `driver_id` and `vehicle_id`;
+assignment creation inherits that crew server-side; QR tokens created from now
+on are scoped to the Call Sign while legacy assignment QR links still work; the
+driver session can carry either `aid` or `csid`; driver API routes resolve the
+current Call Sign job at request time; acknowledgement and parked statuses are
+available; and observer access uses a separate read-only token and page.
 
 ---
 
@@ -230,3 +233,50 @@ an independent project every run.
   and independent — worth doing before any of the above.
 - Whether a call sign should span projects. Assumed no: the table is already
   scoped per project and the owner described planning inside a project.
+
+---
+
+## Implementation notes from phases 2-4
+
+### Phase 2: QR scope
+
+Implemented in migration `0032_call_sign_qr_job_flow_observer.sql` and the
+driver access/session/data-access layer. New QR rows keep `assignment_id` as the
+initial job snapshot for compatibility, but set `access_scope = 'call_sign'`
+and `call_sign_id`. Existing QR rows remain assignment-scoped and continue to
+open the original job.
+
+The smoke-test seed and device-rebinding harness now follow the same model:
+`seed-driver-flow-test.mjs` creates a Call Sign-scoped QR, and
+`verify-device-rebinding.mjs` finds the token by hash instead of deriving an
+assignment id from the raw token string.
+
+The driver session now accepts either an assignment claim (`aid`) or a Call Sign
+claim (`csid`). For Call Sign sessions, API routes resolve the current job on
+every request: active first, then acknowledged/ready/published/planned in
+operational order. This lets the control room add the next task without
+creating a new printed QR.
+
+### Phase 3: job flow
+
+`acknowledged` and `parked` are now valid assignment statuses. Driver preflight
+records acknowledgement before readiness, and readiness/status actions guard
+against starting a second active job for the same Call Sign. The database also
+enforces the invariant with `assignments_one_active_job_per_call_sign_idx`.
+
+The control room can park a blocking assignment with `parkAssignmentAction`.
+Parking changes status without deleting history and writes a timeline event.
+
+### Phase 4: observer credential
+
+Observer access uses `observer_access_tokens` and a separate hash namespace.
+The `/track/[token]` page is read-only and does not mint a driver session, so it
+cannot call driver write APIs. It shows only the project, Call Sign, current job
+route summary, vehicle label, and latest GPS point.
+
+### Remaining after the foundation
+
+- Expose observer-link creation in a polished control-room UI.
+- Run physical-device smoke tests with one web driver and one native driver.
+- Decide after pilot whether new QR rows should stop storing the compatibility
+  `assignment_id` snapshot.

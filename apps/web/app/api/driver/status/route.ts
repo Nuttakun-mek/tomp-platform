@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { assignmentStatusUpdateAction } from "@/app/actions/driver";
+import { trustedDriverScope } from "@/lib/driver/trusted-scope";
 import { resolveDriverSession } from "@/lib/api/driver-token";
 
 export async function POST(request: Request) {
@@ -13,6 +14,6 @@ export async function POST(request: Request) {
     projectId: auth.context.projectId,
     assignmentId: auth.context.assignmentId,
     driverId: auth.context.driverId
-  });
+  }, trustedDriverScope(auth.context));
   return NextResponse.json(result, { status: result.success ? 200 : 400 });
 }

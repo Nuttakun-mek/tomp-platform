@@ -152,7 +152,7 @@ export const assignmentStatusUpdateSchema = z.object({
   projectId: uuidSchema,
   assignmentId: uuidSchema,
   driverId: optionalUuidSchema,
-  status: z.enum(["ready", "arrived_pickup", "passenger_onboard", "completed", "blocked"]),
+  status: z.enum(["acknowledged", "ready", "arrived_pickup", "passenger_onboard", "completed", "blocked"]),
   source: z.enum(["driver_qr", "operation_user", "coordinator", "system"]).default("driver_qr"),
   metadata: metadataSchema
 });

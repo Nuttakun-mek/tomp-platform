@@ -133,7 +133,8 @@ export async function establishDriverSessionAction(input: unknown): Promise<Acti
   store.set(DRIVER_SESSION_COOKIE, mintDriverSession({
     tid: identity.tokenId,
     pid: identity.projectId,
-    aid: identity.assignmentId,
+    aid: identity.assignmentId || null,
+    csid: identity.callSignId || null,
     did: identity.driverId,
     dev: deviceHash
   }), {

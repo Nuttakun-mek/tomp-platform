@@ -34,6 +34,7 @@ export async function createMobileSessionChallenge(ctx: DriverSessionContext) {
     token_id: ctx.tokenId,
     project_id: ctx.projectId,
     assignment_id: ctx.assignmentId,
+    call_sign_id: ctx.callSignId || null,
     driver_id: ctx.driverId,
     device_hash: ctx.deviceHash,
     challenge_hash: challengeHash,
@@ -53,10 +54,10 @@ export async function createMobileSessionChallenge(ctx: DriverSessionContext) {
   if (!sql) throw new Error("ยังไม่ได้ตั้งค่าฐานข้อมูลสำหรับ mobile session");
   await sql`
     insert into driver_mobile_sessions (
-      token_id, project_id, assignment_id, driver_id, device_hash,
+      token_id, project_id, assignment_id, call_sign_id, driver_id, device_hash,
       challenge_hash, status, challenge_expires_at, metadata
     ) values (
-      ${row.token_id}, ${row.project_id}, ${row.assignment_id}, ${row.driver_id}, ${row.device_hash},
+      ${row.token_id}, ${row.project_id}, ${row.assignment_id}, ${row.call_sign_id}, ${row.driver_id}, ${row.device_hash},
       ${row.challenge_hash}, ${row.status}, ${row.challenge_expires_at}, ${JSON.stringify(row.metadata)}::jsonb
     )
   `;
@@ -74,7 +75,7 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
   if (client) {
     const { data: sessionRow, error } = await client
       .from("driver_mobile_sessions")
-      .select("id, token_id, project_id, assignment_id, driver_id, device_hash, challenge_expires_at, status")
+      .select("id, token_id, project_id, assignment_id, call_sign_id, driver_id, device_hash, challenge_expires_at, status")
       .eq("challenge_hash", challengeHash)
       .eq("status", "challenge_issued")
       .gt("challenge_expires_at", issuedAt)
@@ -86,7 +87,8 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
     const session = mintDriverSession({
       tid: String(sessionRow.token_id),
       pid: String(sessionRow.project_id),
-      aid: String(sessionRow.assignment_id),
+      aid: sessionRow.assignment_id ? String(sessionRow.assignment_id) : null,
+      csid: sessionRow.call_sign_id ? String(sessionRow.call_sign_id) : null,
       did: String(sessionRow.driver_id),
       dev: String(sessionRow.device_hash)
     });
@@ -112,8 +114,8 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
 
   const sql = getPostgresClient();
   if (!sql) throw new Error("ยังไม่ได้ตั้งค่าฐานข้อมูลสำหรับ mobile session");
-  const rows = await sql<Array<{ id: string; token_id: string; project_id: string; assignment_id: string; driver_id: string; device_hash: string }>>`
-    select id, token_id, project_id, assignment_id, driver_id, device_hash
+  const rows = await sql<Array<{ id: string; token_id: string; project_id: string; assignment_id: string | null; call_sign_id: string | null; driver_id: string; device_hash: string }>>`
+    select id, token_id, project_id, assignment_id, call_sign_id, driver_id, device_hash
     from driver_mobile_sessions
     where challenge_hash = ${challengeHash}
       and status = 'challenge_issued'
@@ -127,6 +129,7 @@ export async function exchangeMobileSessionChallenge(input: { code: string; inst
     tid: sessionRow.token_id,
     pid: sessionRow.project_id,
     aid: sessionRow.assignment_id,
+    csid: sessionRow.call_sign_id,
     did: sessionRow.driver_id,
     dev: sessionRow.device_hash
   });
@@ -227,7 +230,7 @@ export async function saveMobileSessionPushToken(
       .from("driver_mobile_sessions")
       .select("id, metadata")
       .eq("token_id", ctx.tokenId)
-      .eq("assignment_id", ctx.assignmentId)
+      .eq(ctx.callSignId ? "call_sign_id" : "assignment_id", ctx.callSignId || ctx.assignmentId)
       .eq("status", "active")
       .is("revoked_at", null)
       .order("created_at", { ascending: false })
@@ -252,7 +255,8 @@ export async function saveMobileSessionPushToken(
           updated_at = ${updatedAt}
       where id = (
         select id from driver_mobile_sessions
-        where token_id = ${ctx.tokenId} and assignment_id = ${ctx.assignmentId}
+        where token_id = ${ctx.tokenId}
+          and (assignment_id = ${ctx.assignmentId} or call_sign_id = ${ctx.callSignId || ""})
           and status = 'active' and revoked_at is null
         order by created_at desc limit 1
       )

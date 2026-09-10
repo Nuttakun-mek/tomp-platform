@@ -36,6 +36,7 @@ const statusTh: Record<string, string> = {
 
 export function formatStatusTh(status?: string | null): string {
   if (!status) return "ยังไม่ระบุ";
+  if (status === "parked") return "พักงานไว้ชั่วคราว";
   return statusTh[status] ?? status;
 }
 

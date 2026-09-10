@@ -17,8 +17,10 @@ export interface DriverSessionPayload {
   tid: string;
   /** project id */
   pid: string;
-  /** assignment id */
-  aid: string;
+  /** assignment id. Present on legacy and snapshot-scoped sessions. */
+  aid?: string | null;
+  /** call_signs.id. Present on Call Sign-scoped sessions. */
+  csid?: string | null;
   /** driver id */
   did: string;
   /** sha256 of the claiming device */
@@ -62,7 +64,7 @@ export function verifyDriverSession(value: string | null | undefined): DriverSes
     return null;
   }
 
-  if (!payload.tid || !payload.aid || !payload.pid || !payload.did) return null;
+  if (!payload.tid || !payload.pid || !payload.did || (!payload.aid && !payload.csid)) return null;
   if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
   return payload;
 }

@@ -5,6 +5,7 @@ import { AssignmentRiskBadge } from "./assignment-risk-badge";
 import { CallSignCard } from "./call-sign-card";
 import { DriverVehiclePairCard } from "./driver-vehicle-pair-card";
 import { CancelAssignmentButton } from "@/components/assignments/cancel-assignment-button";
+import { ParkAssignmentButton } from "@/components/assignments/park-assignment-button";
 import { useVisibleSlice } from "@/components/ui/use-visible-slice";
 
 interface LaneProps {
@@ -38,6 +39,7 @@ export function AssignmentLane({ title, assignments, missions, callSigns, driver
             const driver = drivers.find((item) => item.id === assignment.driverId);
             const vehicle = vehicles.find((item) => item.id === assignment.vehicleId);
             const canCancel = !["completed", "cancelled", "archived"].includes(assignment.status);
+            const canPark = ["published", "acknowledged", "active", "planned"].includes(assignment.status);
             return (
               <article key={assignment.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -48,7 +50,8 @@ export function AssignmentLane({ title, assignments, missions, callSigns, driver
                 <DriverVehiclePairCard driver={driver} vehicle={vehicle} />
                 <p className="mt-2 text-xs text-slate-500">{timeLabel(assignment.startTime)}</p>
                 {canCancel ? (
-                  <div className="mt-3">
+                  <div className="mt-3 grid gap-2">
+                    {canPark ? <ParkAssignmentButton projectId={assignment.projectId} assignmentId={assignment.id} /> : null}
                     <CancelAssignmentButton projectId={assignment.projectId} assignmentId={assignment.id} />
                   </div>
                 ) : null}

@@ -16,7 +16,9 @@ const laneDefinitions = [
   { title: "ต้องติดตาม", match: (assignment: Assignment) => ["draft", "planned"].includes(assignment.status) && (!assignment.driverId || !assignment.vehicleId || !assignment.callSignId) },
   { title: "เตรียมพร้อม", match: (assignment: Assignment) => Boolean(assignment.driverId && assignment.vehicleId && assignment.callSignId) && ["draft", "planned"].includes(assignment.status) },
   { title: "พร้อมปฏิบัติงาน", match: (assignment: Assignment) => assignment.status === "published" },
+  { title: "รับทราบแล้ว", match: (assignment: Assignment) => assignment.status === "acknowledged" },
   { title: "กำลังปฏิบัติงาน", match: (assignment: Assignment) => assignment.status === "active" },
+  { title: "พักงานไว้ชั่วคราว", match: (assignment: Assignment) => assignment.status === "parked" },
   { title: "เสร็จสิ้น", match: (assignment: Assignment) => assignment.status === "completed" },
   { title: "ยกเลิก", match: (assignment: Assignment) => assignment.status === "cancelled" }
 ];

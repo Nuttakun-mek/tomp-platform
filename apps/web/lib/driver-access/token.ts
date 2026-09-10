@@ -26,7 +26,8 @@ export function driverTokenSecret(): string {
 }
 
 export interface DriverAccessTokenDraft {
-  assignmentId: string;
+  assignmentId?: string | null;
+  callSignId?: string | null;
   driverId?: string | null;
   expiresAt?: string | null;
 }
@@ -34,7 +35,8 @@ export interface DriverAccessTokenDraft {
 export function generateDriverAccessToken(input: DriverAccessTokenDraft): string {
   const entropy = randomBytes(32).toString("base64url");
   const driverPart = input.driverId ?? "pending";
-  return `tomp_${input.assignmentId}_${driverPart}_${entropy}`;
+  const scopePart = input.callSignId ?? input.assignmentId ?? "unscoped";
+  return `tomp_${scopePart}_${driverPart}_${entropy}`;
 }
 
 export function hashDriverAccessToken(token: string): string {
@@ -87,4 +89,25 @@ export function generateDriverDeviceId(): string {
 export function hashDriverDeviceId(deviceId: string): string {
   const secret = driverTokenSecret();
   return createHash("sha256").update(`device:${secret}:${deviceId.trim()}`).digest("hex");
+}
+
+export interface ObserverAccessTokenDraft {
+  callSignId: string;
+  expiresAt?: string | null;
+}
+
+export function generateObserverAccessToken(input: ObserverAccessTokenDraft): string {
+  return `tomp_obs_${input.callSignId}_${randomBytes(32).toString("base64url")}`;
+}
+
+export function hashObserverAccessToken(token: string): string {
+  const secret = driverTokenSecret();
+  return createHash("sha256").update(`observer:${secret}:${token}`).digest("hex");
+}
+
+export function verifyObserverAccessTokenHash(token: string, expectedHash: string): boolean {
+  const actual = Buffer.from(hashObserverAccessToken(token), "hex");
+  const expected = Buffer.from(expectedHash, "hex");
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(actual, expected);
 }

@@ -2,15 +2,19 @@
 
 ## Latest Command Results
 
-Run date: 2026-09-09.
+Run date: 2026-09-10.
 
 | Command | Result |
 | --- | --- |
-| `npm.cmd install` | Passed |
-| `npm.cmd run typecheck` | Passed |
-| `npm.cmd run lint` | Passed |
-| `npm.cmd run test` | Passed: 20 test files, 68 tests |
-| `NEXT_TELEMETRY_DISABLED=1 npm.cmd run build` | Passed; 43 app routes generated |
+| `npm.cmd install` | Passed; dependencies already up to date, 480 packages audited. Existing audit report: 13 vulnerabilities. |
+| `npm.cmd run typecheck` | Passed; `@tomp/web` TypeScript completed with `tsc --noEmit`. |
+| `npm.cmd run lint` | Passed; `@tomp/web` ESLint completed with no errors. |
+| `npm.cmd run test` | Passed; web 24 test files / 134 tests, driver-core 6 test files / 23 tests. |
+| `npm.cmd --prefix apps/mobile-driver run typecheck` | Passed; mobile-driver TypeScript completed with `tsc --noEmit`. |
+| `npm.cmd --prefix apps/mobile-driver run test` | Passed; mobile-driver 5 test files / 18 tests. |
+| `$env:NEXT_TELEMETRY_DISABLED='1'; npm.cmd run build` | Passed; 46 app routes generated. |
+| `node scripts/apply-migrations.mjs --yes` | Passed; applied `0032_call_sign_qr_job_flow_observer.sql` to Supabase production. |
+| `node scripts/apply-migrations.mjs --dry-run` | Passed; no pending migrations remain. |
 | `npm.cmd run security:env` | Passed; no `NEXT_PUBLIC_*` service/secret key found in source |
 
 ## Current Verification Scope
@@ -78,3 +82,12 @@ This verification covers the Thai-first UI/UX reset UX-31 to UX-42:
 - The QR panel can generate QR/PIN for all ready assignments in one operation.
 - Mission Control fleet cards were rebuilt for compact scanning, GPS freshness, unread message badges, and expandable vehicle detail.
 - New user-facing copy in replaced files uses formal Thai. A full copy audit is still required for older files with legacy encoding.
+
+## 2026-09-10 Call Sign QR Flow Notes
+
+- Call Sign is now the crewed unit foundation for driver QR access.
+- New driver QR tokens are scoped to `call_sign_id` while keeping `assignment_id` as a compatibility snapshot.
+- Driver sessions can carry either `aid` or `csid`; API reads resolve the current job at request time.
+- `acknowledged` and `parked` assignment statuses are now included in code and schema.
+- Production Supabase has migration `0032_call_sign_qr_job_flow_observer.sql` applied.
+- Observer tracking is read-only through `/track/[token]`; it does not grant driver write access.

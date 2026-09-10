@@ -161,6 +161,70 @@ export async function cancelAssignmentAction(input: unknown): Promise<ActionResu
   );
 }
 
+export async function parkAssignmentAction(input: unknown): Promise<ActionResult> {
+  const data = input as { projectId?: string; assignmentId?: string; reason?: string };
+  if (!data.projectId || !data.assignmentId) return actionFailure("ไม่พบข้อมูลงานที่ต้องการพักไว้");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const permission = await requirePermission(data.projectId, "assignment.update");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์พักงานนี้");
+
+  const { data: before, error: readError } = await client
+    .from("assignments")
+    .select("*")
+    .eq("id", data.assignmentId)
+    .eq("project_id", data.projectId)
+    .maybeSingle();
+  if (readError) return actionFailure(getDatabaseErrorMessage(readError, "อ่านข้อมูลงานไม่สำเร็จ"));
+  if (!before) return actionFailure("ไม่พบงานนี้ในโครงการ");
+  if (["completed", "cancelled", "archived"].includes(String(before.status))) {
+    return actionFailure("งานนี้ปิดแล้ว จึงไม่สามารถพักงานได้");
+  }
+
+  const parkedAt = new Date().toISOString();
+  const { data: updated, error: updateError } = await client
+    .from("assignments")
+    .update({
+      status: "parked",
+      updated_at: parkedAt,
+      metadata: {
+        ...((before.metadata && typeof before.metadata === "object") ? before.metadata : {}),
+        parkedReason: data.reason || "พักงานโดยศูนย์ควบคุม",
+        parkedAt
+      }
+    })
+    .eq("id", data.assignmentId)
+    .eq("project_id", data.projectId)
+    .select()
+    .single();
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "พักงานไม่สำเร็จ"));
+
+  const timelineResult = await createTimelineEvent({
+    projectId: data.projectId,
+    objectType: "assignment",
+    objectId: data.assignmentId,
+    eventType: TIMELINE_EVENTS.ASSIGNMENT_PARKED,
+    source: "operation_user",
+    reason: data.reason || "พักงานโดยศูนย์ควบคุม",
+    beforeData: before,
+    afterData: updated,
+    metadata: { action: "park_assignment" }
+  });
+
+  revalidatePath("/assignments");
+  revalidatePath("/resources/vehicles");
+  revalidatePath(`/projects/${data.projectId}`);
+  revalidatePath(`/projects/${data.projectId}/assignments`);
+  revalidatePath("/mission-control");
+
+  return actionSuccess(
+    { assignment: mapAssignment(updated), timelineEvent: timelineResult.data },
+    timelineResult.success ? undefined : `พักงานแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
+  );
+}
+
 // Save the order a driver works their jobs, and which are urgent. Written into
 // each assignment's metadata so the driver's QR page and the fleet board can
 // read it without a new column.

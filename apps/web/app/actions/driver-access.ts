@@ -100,6 +100,7 @@ async function createAssignmentPacket(client: NonNullable<ReturnType<typeof getS
     .insert({
       project_id: projectId,
       assignment_id: assignmentId,
+      call_sign_id: text(callSign, "id") || null,
       driver_id: explicitDriverId || assignment.driver_id || null,
       packet_version: packet.packetVersion,
       payload: packet,
@@ -159,6 +160,7 @@ async function createDriverAccessTokenViaPostgres(
 
   const token = generateDriverAccessToken({
     assignmentId: String(data.assignmentId),
+    callSignId: String(assignment.call_sign_id),
     driverId: String(data.driverId || assignment.driver_id),
     expiresAt: data.expiresAt
   });
@@ -167,16 +169,16 @@ async function createDriverAccessTokenViaPostgres(
   const tokenMeta = JSON.stringify({ tokenVersion: 2, pinHash: hashDriverPin(pin), pinAttempts: 0, source: "postgres_fallback" });
 
   const tokenRows = await sql<Row[]>`
-    insert into driver_access_tokens (project_id, assignment_id, driver_id, token_hash, status, expires_at, metadata)
-    values (${String(data.projectId)}, ${String(data.assignmentId)}, ${String(data.driverId || assignment.driver_id)}, ${hashDriverAccessToken(token)}, 'active', ${expiresAt}, ${tokenMeta}::jsonb)
+    insert into driver_access_tokens (project_id, assignment_id, call_sign_id, driver_id, token_hash, access_scope, status, expires_at, metadata)
+    values (${String(data.projectId)}, ${String(data.assignmentId)}, ${String(assignment.call_sign_id)}, ${String(data.driverId || assignment.driver_id)}, ${hashDriverAccessToken(token)}, 'call_sign', 'active', ${expiresAt}, ${tokenMeta}::jsonb)
     returning id, expires_at, status
   `;
   const tokenRow = tokenRows[0];
 
   const packet = buildPacketPayload({ project, assignment, callSign, driver, vehicle, mission: missionRows[0] || null });
   const packetRows = await sql<Row[]>`
-    insert into driver_assignment_packets (project_id, assignment_id, driver_id, packet_version, payload, published_at, metadata)
-    values (${String(data.projectId)}, ${String(data.assignmentId)}, ${String(data.driverId || assignment.driver_id)}, ${Number(packet.packetVersion) || 1}, ${JSON.stringify(packet)}::jsonb, ${packet.publishedAt}, ${JSON.stringify({ source: "createDriverAccessTokenAction", mode: "postgres_fallback" })}::jsonb)
+    insert into driver_assignment_packets (project_id, assignment_id, call_sign_id, driver_id, packet_version, payload, published_at, metadata)
+    values (${String(data.projectId)}, ${String(data.assignmentId)}, ${String(assignment.call_sign_id)}, ${String(data.driverId || assignment.driver_id)}, ${Number(packet.packetVersion) || 1}, ${JSON.stringify(packet)}::jsonb, ${packet.publishedAt}, ${JSON.stringify({ source: "createDriverAccessTokenAction", mode: "postgres_fallback" })}::jsonb)
     returning id, packet_version, published_at
   `;
 
@@ -228,6 +230,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
 
   const token = generateDriverAccessToken({
     assignmentId: data.assignmentId,
+    callSignId: assignmentForQr.call_sign_id,
     driverId: data.driverId ?? assignmentForQr.driver_id,
     expiresAt: data.expiresAt
   });
@@ -239,8 +242,10 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     .insert({
       project_id: data.projectId,
       assignment_id: data.assignmentId,
+      call_sign_id: assignmentForQr.call_sign_id,
       driver_id: data.driverId || assignmentForQr.driver_id || null,
       token_hash: hashDriverAccessToken(token),
+      access_scope: "call_sign",
       status: "active",
       expires_at: expiresAt,
       metadata: { tokenVersion: 2, pinHash: hashDriverPin(pin), pinAttempts: 0 }
@@ -297,15 +302,15 @@ export async function revokeDriverAccessTokenAction(input: unknown): Promise<Act
     .update({ status: "revoked", revoked_at: new Date().toISOString(), metadata: { reason: data.reason || "Revoked by operation user" } })
     .eq("id", data.tokenId)
     .eq("project_id", data.projectId)
-    .select("id, assignment_id, status, revoked_at")
+    .select("id, assignment_id, call_sign_id, status, revoked_at")
     .single();
 
   if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "ยกเลิกลิงก์ QR สำหรับคนขับไม่สำเร็จ"));
 
   const timelineResult = await createTimelineEvent({
     projectId: data.projectId,
-    objectType: "assignment",
-    objectId: row.assignment_id,
+    objectType: row.assignment_id ? "assignment" : "call_sign",
+    objectId: row.assignment_id || row.call_sign_id,
     eventType: TIMELINE_EVENTS.DRIVER_ACCESS_TOKEN_REVOKED,
     source: "operation_user",
     reason: data.reason || "ยกเลิก QR token สำหรับคนขับ",
@@ -324,7 +329,7 @@ export async function validateDriverAccessTokenAction(input: unknown): Promise<A
 
   const { data: row, error: lookupError } = await client
     .from("driver_access_tokens")
-    .select("id, project_id, assignment_id, driver_id, status, expires_at, usage_count")
+    .select("id, project_id, assignment_id, call_sign_id, driver_id, status, expires_at, usage_count")
     .eq("token_hash", hashDriverAccessToken(token))
     .maybeSingle();
 
@@ -339,13 +344,13 @@ export async function validateDriverAccessTokenAction(input: unknown): Promise<A
 
   await createTimelineEvent({
     projectId: row.project_id,
-    objectType: "assignment",
-    objectId: row.assignment_id,
+    objectType: row.assignment_id ? "assignment" : "call_sign",
+    objectId: row.assignment_id || row.call_sign_id,
     eventType: TIMELINE_EVENTS.DRIVER_ACCESS_TOKEN_USED,
     source: "driver_qr",
     reason: "คนขับเปิดลิงก์ QR และผ่านการตรวจสอบ token",
     afterData: { tokenId: row.id }
   });
 
-  return actionSuccess({ projectId: row.project_id, assignmentId: row.assignment_id, tokenId: row.id });
+  return actionSuccess({ projectId: row.project_id, assignmentId: row.assignment_id, callSignId: row.call_sign_id, tokenId: row.id });
 }
