@@ -107,3 +107,21 @@ export function addNotificationTapListener(onTap: (data: Record<string, unknown>
     onTap(data);
   });
 }
+
+/**
+ * Clear our notifications from the shade and zero the launcher badge.
+ *
+ * Android counts the badge from the notifications still sitting in the shade.
+ * A driver who reads a dispatch message inside the app never taps the banner,
+ * so nothing dismisses it and the count climbs all day on messages they have
+ * already dealt with. The app shows the same messages, so once it is in front
+ * of the driver the shade copy has done its job.
+ */
+export async function clearDeliveredNotifications(): Promise<void> {
+  try {
+    await Notifications.dismissAllNotificationsAsync();
+    await Notifications.setBadgeCountAsync(0);
+  } catch {
+    // Cosmetic. Never worth interrupting the driver over.
+  }
+}

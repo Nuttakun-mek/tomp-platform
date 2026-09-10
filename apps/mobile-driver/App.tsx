@@ -37,7 +37,7 @@ import {
 } from "./src/services/location";
 import { promptBatteryExemptionOnce } from "./src/services/battery";
 import { exchangeMobileSessionChallenge } from "./src/services/mobile-session-api";
-import { addNotificationTapListener, registerForPushNotifications, syncPushToken } from "./src/services/push";
+import { addNotificationTapListener, clearDeliveredNotifications, registerForPushNotifications, syncPushToken } from "./src/services/push";
 import { getInstallationId, getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
 import { flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-queue";
 import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
@@ -327,6 +327,7 @@ export default function App() {
     const tapSubscription = addNotificationTapListener(() => {
       setMode("web");
       webViewRef.current?.reload();
+      void clearDeliveredNotifications();
     });
 
     const subscription = ExpoLinking.addEventListener("url", ({ url }) => {
@@ -337,13 +338,22 @@ export default function App() {
       if (url) void openDriverLink(url);
     });
 
-    return () => subscription.remove();
+    // The notification listener was never taken back off, so a remount stacked
+    // a second handler and a single tap reloaded the WebView twice.
+    return () => {
+      subscription.remove();
+      tapSubscription.remove();
+    };
   }, [flushOutbox, openDriverLink]);
 
   useEffect(() => {
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState === "active") {
         void flushOutbox();
+        // The driver is looking at the app, so anything still queued in the
+        // shade has been seen. Clearing it here is what actually brings the
+        // launcher badge back down.
+        void clearDeliveredNotifications();
         Network.getNetworkStateAsync().then((state) => {
           setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
         });
