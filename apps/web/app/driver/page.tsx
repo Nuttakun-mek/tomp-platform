@@ -35,23 +35,29 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
 
   const store = await cookies();
 
-  // One QR opens the job on one device. Once a phone has claimed it, another
-  // device holding the same link is turned away even if it knows the PIN.
-  if (driverAccess.deviceBoundTo) {
-    const deviceId = store.get(`${DRIVER_DEVICE_COOKIE_PREFIX}id`)?.value ?? "";
-    if (!deviceId || hashDriverDeviceId(deviceId) !== driverAccess.deviceBoundTo) {
-      return (
-        <DriverNotice
-          title="งานนี้เปิดใช้บนอุปกรณ์อื่นแล้ว"
-          detail="เพื่อความปลอดภัย หนึ่ง QR ใช้ได้กับเครื่องเดียว หากต้องการย้ายเครื่อง กรุณาให้ศูนย์ควบคุมออก QR และรหัสใหม่"
-        />
-      );
-    }
+  // One QR opens the job on one device at a time. A different phone is not
+  // turned away outright any more: if the token carries a PIN, knowing it is
+  // enough to move the job here — that is the path back for a driver whose app
+  // was reinstalled or whose handset changed, and it keeps the job (and its
+  // history) on the same Mission Control card instead of spawning a second one.
+  const deviceId = store.get(`${DRIVER_DEVICE_COOKIE_PREFIX}id`)?.value ?? "";
+  const deviceMatches = Boolean(
+    driverAccess.deviceBoundTo && deviceId && hashDriverDeviceId(deviceId) === driverAccess.deviceBoundTo
+  );
+  const otherDeviceHolds = Boolean(driverAccess.deviceBoundTo) && !deviceMatches;
+
+  if (otherDeviceHolds && !driverAccess.pinRequired) {
+    return (
+      <DriverNotice
+        title="งานนี้เปิดใช้บนอุปกรณ์อื่นแล้ว"
+        detail="ลิงก์นี้ออกก่อนระบบรหัส 6 หลัก จึงย้ายเครื่องเองไม่ได้ กรุณาให้ศูนย์ควบคุมออก QR และรหัสใหม่"
+      />
+    );
   }
 
   if (driverAccess.pinRequired) {
     const verified = store.get(`${DRIVER_PIN_COOKIE_PREFIX}${driverAccess.tokenId}`)?.value === "1";
-    if (!verified) return <DriverPinGate token={token} />;
+    if (!verified || otherDeviceHolds) return <DriverPinGate token={token} takeover={otherDeviceHolds} />;
   }
 
   // Gate: identity confirmation + evidence photos happen before the driver sees

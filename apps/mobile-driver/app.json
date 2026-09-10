@@ -30,8 +30,10 @@
         "CAMERA",
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK",
-        "POST_NOTIFICATIONS"
-      ]
+        "POST_NOTIFICATIONS",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       [

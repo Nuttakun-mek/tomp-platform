@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { KeyRound } from "lucide-react";
 import { verifyDriverPinAction } from "@/app/actions/driver-pin";
 
-export function DriverPinGate({ token }: { token: string }) {
+/**
+ * `takeover` means another phone currently holds this job. Entering the PIN
+ * moves it here rather than being refused, so the wording has to say so — a
+ * driver who reinstalled the app would otherwise assume the link is dead.
+ */
+export function DriverPinGate({ token, takeover = false }: { token: string; takeover?: boolean }) {
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,9 +36,11 @@ export function DriverPinGate({ token }: { token: string }) {
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-operation-soft text-operation">
           <KeyRound className="h-6 w-6" />
         </span>
-        <h1 className="mt-2 text-lg font-bold text-ink">กรอกรหัสยืนยัน</h1>
+        <h1 className="mt-2 text-lg font-bold text-ink">{takeover ? "ย้ายงานมาที่เครื่องนี้" : "กรอกรหัสยืนยัน"}</h1>
         <p className="mx-auto max-w-xs text-[13px] leading-6 text-ink-soft">
-          ศูนย์ควบคุมจะแจ้งรหัส 6 หลักให้คุณแยกจาก QR กรอกรหัสเพื่อเปิดงาน
+          {takeover
+            ? "งานนี้เปิดค้างอยู่บนเครื่องอื่น กรอกรหัส 6 หลักเดิมเพื่อย้ายมาที่เครื่องนี้ ไม่ต้องขอ QR ใหม่"
+            : "ศูนย์ควบคุมจะแจ้งรหัส 6 หลักให้คุณแยกจาก QR กรอกรหัสเพื่อเปิดงาน"}
         </p>
       </div>
 
@@ -53,10 +60,10 @@ export function DriverPinGate({ token }: { token: string }) {
           disabled={isPending || pin.length !== 6}
           className="min-h-13 rounded-xl bg-operation px-4 py-3.5 text-[15px] font-bold text-white disabled:opacity-50"
         >
-          {isPending ? "กำลังตรวจสอบ..." : "ยืนยัน"}
+          {isPending ? "กำลังตรวจสอบ..." : takeover ? "ย้ายมาที่เครื่องนี้" : "ยืนยัน"}
         </button>
       </form>
-      <p className="text-center text-[12px] text-ink-faint">กรอกผิดเกิน 5 ครั้ง ลิงก์จะถูกล็อก</p>
+      <p className="text-center text-[12px] text-ink-faint">กรอกผิดครบ 5 ครั้ง ต้องรอ 15 นาทีจึงลองใหม่ได้ ลิงก์ไม่ถูกยกเลิก</p>
     </div>
   );
 }

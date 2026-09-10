@@ -4,6 +4,13 @@ import { cookies } from "next/headers";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { resolveDriverTokenIdentity } from "@/lib/data/driver-access";
 import { getPostgresClient } from "@/lib/db/postgres";
+import {
+  deviceBindPatch,
+  pinFailurePatch,
+  pinLockedMessage,
+  pinWrongMessage,
+  readPinLock
+} from "@/lib/domain/driver-pin-lock";
 import { DRIVER_SESSION_COOKIE, DRIVER_SESSION_MAX_AGE, mintDriverSession } from "@/lib/driver-access/session";
 import {
   DRIVER_DEVICE_COOKIE_PREFIX,
@@ -15,7 +22,13 @@ import {
 } from "@/lib/driver-access/token";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 
-const MAX_ATTEMPTS = 5;
+// Order matters here: the PIN is checked BEFORE the device binding, so a driver
+// whose phone lost its cookie (reinstall, cleared data, new handset) can prove
+// who they are and take the job back on the same QR. Checking the device first
+// — as this did originally — meant the only fix was issuing a new QR, which
+// splits the driver into a second Mission Control card and orphans the job
+// history. The QR alone is still not enough: without the PIN nothing moves, and
+// wrong PINs cool the link down instead of killing it (see driver-pin-lock).
 
 export async function verifyDriverPinAction(input: unknown): Promise<ActionResult> {
   const data = (input ?? {}) as { token?: string; pin?: string };
@@ -40,39 +53,48 @@ export async function verifyDriverPinAction(input: unknown): Promise<ActionResul
 
   const meta = (row.metadata ?? {}) as Record<string, unknown>;
   const pinHash = typeof meta.pinHash === "string" ? meta.pinHash : "";
-  const attempts = typeof meta.pinAttempts === "number" ? meta.pinAttempts : 0;
   const boundDevice = typeof meta.deviceHash === "string" ? meta.deviceHash : "";
   const deviceId = await resolveDeviceId();
   const deviceHash = hashDriverDeviceId(deviceId);
 
-  if (boundDevice && boundDevice !== deviceHash) return actionFailure(DEVICE_TAKEN);
-
-  // Tokens issued before the PIN feature have no pinHash — let them through.
+  // Tokens issued before the PIN feature have no second factor, so the device
+  // binding is all they have — keep it strict for them.
   if (!pinHash) {
+    if (boundDevice && boundDevice !== deviceHash) return actionFailure(DEVICE_TAKEN_NO_PIN);
     await client.from("driver_access_tokens").update({ metadata: { ...meta, deviceHash } }).eq("id", row.id);
     await setPinCookie(String(row.id));
     return actionSuccess({ verified: true });
   }
 
-  if (attempts >= MAX_ATTEMPTS) {
-    await client.from("driver_access_tokens").update({ status: "revoked" }).eq("id", row.id);
-    return actionFailure("กรอกรหัสผิดเกินกำหนด ลิงก์ถูกล็อก กรุณาขอลิงก์ใหม่จากศูนย์ควบคุม");
-  }
+  const lock = readPinLock(meta);
+  if (lock.locked) return actionFailure(pinLockedMessage(lock.retryAfterSeconds));
 
   if (!verifyDriverPin(pin, pinHash)) {
+    const failure = pinFailurePatch(lock);
     await client
       .from("driver_access_tokens")
-      .update({ metadata: { ...meta, pinAttempts: attempts + 1 } })
+      .update({ metadata: { ...meta, pinAttempts: failure.pinAttempts, pinLockedUntil: failure.pinLockedUntil } })
       .eq("id", row.id);
-    return actionFailure(`รหัสไม่ถูกต้อง (เหลือ ${MAX_ATTEMPTS - attempts - 1} ครั้ง)`);
+    return failure.remaining === 0
+      ? actionFailure(pinLockedMessage(Math.ceil((new Date(String(failure.pinLockedUntil)).getTime() - Date.now()) / 1000)))
+      : actionFailure(pinWrongMessage(failure.remaining));
   }
 
+  const bind = deviceBindPatch(boundDevice, deviceHash, meta.deviceRebindings);
   await client
     .from("driver_access_tokens")
-    .update({ metadata: { ...meta, pinAttempts: 0, deviceHash } })
+    .update({
+      metadata: {
+        ...meta,
+        pinAttempts: 0,
+        pinLockedUntil: null,
+        deviceHash: bind.deviceHash,
+        deviceRebindings: bind.deviceRebindings
+      }
+    })
     .eq("id", row.id);
   await setPinCookie(String(row.id));
-  return actionSuccess({ verified: true });
+  return actionSuccess({ verified: true, rebound: bind.rebound });
 }
 
 // Exchange a QR token (that has already cleared the visible device + PIN flow)
@@ -89,14 +111,18 @@ export async function establishDriverSessionAction(input: unknown): Promise<Acti
   const store = await cookies();
   const deviceId = store.get(DRIVER_DEVICE_COOKIE_PREFIX + "id")?.value ?? "";
   const deviceHash = deviceId ? hashDriverDeviceId(deviceId) : "";
+  const pinOk = store.get(`${DRIVER_PIN_COOKIE_PREFIX}${identity.tokenId}`)?.value === "1";
 
-  if (identity.deviceBoundTo && identity.deviceBoundTo !== deviceHash) {
-    return actionFailure(DEVICE_TAKEN);
+  // A device mismatch is no longer fatal on its own: verifyDriverPinAction has
+  // already re-bound the token to this phone before setting the PIN cookie, so
+  // the mismatch we can still see here is a stale identity read. Without a PIN
+  // on the token, the binding remains the only factor and stays strict.
+  if (identity.deviceBoundTo && identity.deviceBoundTo !== deviceHash && !(identity.pinRequired && pinOk)) {
+    return actionFailure(identity.pinRequired ? DEVICE_TAKEN_NEEDS_PIN : DEVICE_TAKEN_NO_PIN, { needsPin: identity.pinRequired ? ["1"] : [] });
   }
 
-  if (identity.pinRequired) {
-    const pinOk = store.get(`${DRIVER_PIN_COOKIE_PREFIX}${identity.tokenId}`)?.value === "1";
-    if (!pinOk) return actionFailure("ต้องยืนยันรหัสก่อนเปิดงาน", { needsPin: ["1"] });
+  if (identity.pinRequired && !pinOk) {
+    return actionFailure("ต้องยืนยันรหัสก่อนเปิดงาน", { needsPin: ["1"] });
   }
 
   store.set(DRIVER_SESSION_COOKIE, mintDriverSession({
@@ -134,38 +160,47 @@ async function verifyDriverPinViaPostgres(token: string, pin: string): Promise<A
 
   const meta = row.metadata ?? {};
   const pinHash = typeof meta.pinHash === "string" ? meta.pinHash : "";
-  const attempts = typeof meta.pinAttempts === "number" ? meta.pinAttempts : 0;
   const boundDevice = typeof meta.deviceHash === "string" ? meta.deviceHash : "";
   const deviceId = await resolveDeviceId();
   const deviceHash = hashDriverDeviceId(deviceId);
 
-  if (boundDevice && boundDevice !== deviceHash) return actionFailure(DEVICE_TAKEN);
-
   if (!pinHash) {
+    if (boundDevice && boundDevice !== deviceHash) return actionFailure(DEVICE_TAKEN_NO_PIN);
     const boundMeta = JSON.stringify({ ...meta, deviceHash });
     await sql`update driver_access_tokens set metadata = ${boundMeta}::jsonb where id = ${row.id}`;
     await setPinCookie(row.id);
     return actionSuccess({ verified: true });
   }
 
-  if (attempts >= MAX_ATTEMPTS) {
-    await sql`update driver_access_tokens set status = 'revoked' where id = ${row.id}`;
-    return actionFailure("กรอกรหัสผิดเกินกำหนด ลิงก์ถูกล็อก กรุณาขอลิงก์ใหม่จากศูนย์ควบคุม");
-  }
+  const lock = readPinLock(meta);
+  if (lock.locked) return actionFailure(pinLockedMessage(lock.retryAfterSeconds));
 
   if (!verifyDriverPin(pin, pinHash)) {
-    const updatedMeta = JSON.stringify({ ...meta, pinAttempts: attempts + 1 });
+    const failure = pinFailurePatch(lock);
+    const updatedMeta = JSON.stringify({ ...meta, pinAttempts: failure.pinAttempts, pinLockedUntil: failure.pinLockedUntil });
     await sql`update driver_access_tokens set metadata = ${updatedMeta}::jsonb where id = ${row.id}`;
-    return actionFailure(`รหัสไม่ถูกต้อง (เหลือ ${MAX_ATTEMPTS - attempts - 1} ครั้ง)`);
+    return failure.remaining === 0
+      ? actionFailure(pinLockedMessage(Math.ceil((new Date(String(failure.pinLockedUntil)).getTime() - Date.now()) / 1000)))
+      : actionFailure(pinWrongMessage(failure.remaining));
   }
 
-  const resetMeta = JSON.stringify({ ...meta, pinAttempts: 0, deviceHash });
+  const bind = deviceBindPatch(boundDevice, deviceHash, meta.deviceRebindings);
+  const resetMeta = JSON.stringify({
+    ...meta,
+    pinAttempts: 0,
+    pinLockedUntil: null,
+    deviceHash: bind.deviceHash,
+    deviceRebindings: bind.deviceRebindings
+  });
   await sql`update driver_access_tokens set metadata = ${resetMeta}::jsonb where id = ${row.id}`;
   await setPinCookie(row.id);
-  return actionSuccess({ verified: true });
+  return actionSuccess({ verified: true, rebound: bind.rebound });
 }
 
-const DEVICE_TAKEN = "งานนี้ถูกเปิดใช้บนอุปกรณ์อื่นแล้ว หากต้องการย้ายเครื่อง กรุณาให้ศูนย์ควบคุมออก QR ใหม่";
+/** The token has no PIN, so there is no way to prove a device change is legitimate. */
+const DEVICE_TAKEN_NO_PIN = "งานนี้ถูกเปิดใช้บนอุปกรณ์อื่นแล้ว หากต้องการย้ายเครื่อง กรุณาให้ศูนย์ควบคุมออก QR ใหม่";
+/** The token has a PIN, so the driver can move the job here by entering it. */
+const DEVICE_TAKEN_NEEDS_PIN = "งานนี้เปิดอยู่บนเครื่องอื่น กรอกรหัส 6 หลักเพื่อย้ายมาที่เครื่องนี้";
 
 // Returns the caller's device id, creating one if this phone has never claimed a
 // job before. The raw id stays in an httpOnly cookie; only the hash is stored.

@@ -35,6 +35,7 @@ import {
   stopLocationSharing,
   stopStaleBackgroundLocationTask
 } from "./src/services/location";
+import { promptBatteryExemptionOnce } from "./src/services/battery";
 import { exchangeMobileSessionChallenge } from "./src/services/mobile-session-api";
 import { addNotificationTapListener, registerForPushNotifications, syncPushToken } from "./src/services/push";
 import { getInstallationId, getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
@@ -249,6 +250,9 @@ export default function App() {
         await requestBackgroundLocationPermission();
       }
       const backgroundStarted = await startBackgroundLocationSharing();
+      // Ask once, and only now: the driver has just chosen to share, so the
+      // reason for the exemption is obvious to them.
+      if (backgroundStarted) void promptBatteryExemptionOnce();
       postStatusToWeb(
         "gps_sharing",
         backgroundStarted

@@ -34,3 +34,9 @@ playwright-report/
 
 # mobile shell simulation artefact
 mobile-shell-sim.png
+
+# FCM / Google service-account keys — these are real secrets, never commit
+*service-account*.json
+tomp-project-*.json
+fcm-key*.json
+apps/mobile-driver/credentials.json
