@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { resolveDriverTokenIdentity } from "@/lib/data/driver-access";
+import { revokeMobileSessionsForOtherDevices } from "@/lib/driver-access/device-binding";
 import { getPostgresClient } from "@/lib/db/postgres";
 import {
   deviceBindPatch,
@@ -93,6 +94,10 @@ export async function verifyDriverPinAction(input: unknown): Promise<ActionResul
       }
     })
     .eq("id", row.id);
+  // The phone that just lost the job keeps a signed session that stays valid
+  // for hours. Cut its native session off here; resolveDriverSession turns away
+  // the cookie.
+  if (bind.rebound) await revokeMobileSessionsForOtherDevices(String(row.id), deviceHash);
   await setPinCookie(String(row.id));
   return actionSuccess({ verified: true, rebound: bind.rebound });
 }
@@ -193,6 +198,7 @@ async function verifyDriverPinViaPostgres(token: string, pin: string): Promise<A
     deviceRebindings: bind.deviceRebindings
   });
   await sql`update driver_access_tokens set metadata = ${resetMeta}::jsonb where id = ${row.id}`;
+  if (bind.rebound) await revokeMobileSessionsForOtherDevices(row.id, deviceHash);
   await setPinCookie(row.id);
   return actionSuccess({ verified: true, rebound: bind.rebound });
 }

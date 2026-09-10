@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { driverTokenSecret } from "@/lib/driver-access/token";
 
 // A driver session is the credential the driver's operational API calls carry —
 // NOT the raw QR token. It is minted only after the visible page flow has
@@ -26,9 +27,11 @@ export interface DriverSessionPayload {
   exp: number;
 }
 
-function secret(): string {
-  return process.env.DRIVER_ACCESS_TOKEN_SECRET ?? "development-driver-token-secret";
-}
+// Same secret, read the same way as everything else that hashes driver
+// credentials. Reading process.env directly here meant a monorepo dev server
+// signed sessions with the public fallback while a real secret sat in
+// .env.local — the bug already fixed in token.ts, which this file had kept.
+const secret = driverTokenSecret;
 
 function sign(body: string): string {
   return createHmac("sha256", secret()).update(`dsess:${body}`).digest("base64url");

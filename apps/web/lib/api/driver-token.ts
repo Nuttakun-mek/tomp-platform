@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { isSessionDeviceCurrent } from "@/lib/driver-access/device-binding";
 import { markMobileSessionUsed } from "@/lib/driver-access/mobile-session";
 import { DRIVER_SESSION_COOKIE, DRIVER_SESSION_HEADER, verifyDriverSession } from "@/lib/driver-access/session";
 
@@ -44,6 +45,14 @@ export async function resolveDriverSession(
     }
   }
 
+  // The signature proves this session was minted for a device; it cannot prove
+  // that device still holds the job. Since the PIN can move a job to a new
+  // phone, the old phone's session stays cryptographically valid for its full
+  // 12 hours — and would go on posting GPS and statuses for work it handed over.
+  if (!(await isSessionDeviceCurrent(payload.tid, payload.dev))) {
+    return { ok: false, status: 401, error: DEVICE_MOVED };
+  }
+
   return { ok: true, context: contextFromPayload(payload) };
 }
 
@@ -52,5 +61,8 @@ export async function resolveDriverSessionFromCookies(): Promise<DriverSessionCo
   const value = (await cookies()).get(DRIVER_SESSION_COOKIE)?.value;
   const payload = verifyDriverSession(value);
   if (!payload) return null;
+  if (!(await isSessionDeviceCurrent(payload.tid, payload.dev))) return null;
   return contextFromPayload(payload);
 }
+
+const DEVICE_MOVED = "งานนี้ถูกย้ายไปเปิดบนเครื่องอื่นแล้ว หากเครื่องนี้คือเครื่องที่ใช้งาน กรุณาสแกน QR และกรอกรหัสอีกครั้ง";

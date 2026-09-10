@@ -66,6 +66,7 @@ async function phone() {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const pg = await ctx.newPage();
   return {
+    page: () => pg,
     open: async () => {
       await pg.goto(url, { waitUntil: "domcontentloaded" });
       await pg.waitForTimeout(700);
@@ -140,6 +141,36 @@ check(
 );
 st = await state();
 check("the replacement handset now holds the job", Boolean(st.d) && st.d !== boundToA, `rebinds=${(st.r ?? []).length}`);
+
+// The phone that lost the job must stop being able to act on it. Its dsess
+// cookie is signed and unexpired, so nothing about the credential itself says
+// it is stale — only the token's current binding does.
+const apiUrl = `${BASE}/api/driver/assignment`;
+const dsessOf = async (ctxPage) => {
+  const cookies = await ctxPage.context().cookies();
+  return cookies.find((c) => c.name === "dsess")?.value ?? "";
+};
+
+const staleSession = await dsessOf(B.page());
+check("the phone that lost the job still holds a signed session", Boolean(staleSession), staleSession ? "present" : "no cookie minted");
+
+if (staleSession) {
+  const res = await fetch(apiUrl, { headers: { cookie: `dsess=${staleSession}` } });
+  check("...but the API refuses it now the job moved", res.status === 401, `HTTP ${res.status}`);
+}
+
+const liveSession = await dsessOf(D.page());
+if (liveSession) {
+  const res = await fetch(apiUrl, { headers: { cookie: `dsess=${liveSession}` } });
+  check("the phone that holds the job is still served", res.status !== 401, `HTTP ${res.status}`);
+}
+
+const revoked = await sql`
+  select count(*)::int c from driver_mobile_sessions
+  where token_id = (select id from driver_access_tokens where assignment_id = ${ASSIGNMENT})
+    and revoked_at is null and device_hash <> (
+      select metadata->>'deviceHash' from driver_access_tokens where assignment_id = ${ASSIGNMENT})`;
+check("no native session survives on a device that no longer holds the job", revoked[0].c === 0, `${revoked[0].c} still active`);
 
 const failed = out.filter((r) => !r.ok).length;
 console.log(`${NL}${out.length - failed}/${out.length} checks passed`);
