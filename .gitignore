@@ -40,3 +40,8 @@ mobile-shell-sim.png
 tomp-project-*.json
 fcm-key*.json
 apps/mobile-driver/credentials.json
+
+# Vercel env pulls — these hold the real service-role key, DB password and
+# driver token secret. `vercel env pull` writes them without asking.
+.env.vercel*
+.vercel

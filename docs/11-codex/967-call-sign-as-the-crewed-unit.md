@@ -274,9 +274,46 @@ The `/track/[token]` page is read-only and does not mint a driver session, so it
 cannot call driver write APIs. It shows only the project, Call Sign, current job
 route summary, vehicle label, and latest GPS point.
 
-### Remaining after the foundation
+### Review pass, 2026-09-10
 
-- Expose observer-link creation in a polished control-room UI.
+Phases 1-4 verified green: typecheck, lint, 162 tests, build, and
+`verify-device-rebinding.mjs` still 20/20 against the restructured model.
+
+One gap was found that the phase work did not record. **Nothing stopped a
+second QR being issued for the same Call Sign.** 0032 constrains one active
+*job* per Call Sign but said nothing about the credential, and the button lived
+on a job — so pressing it from a second job of the same unit minted a second
+live token with a second PIN. The driver's phone binds to one; the other stays
+valid. That is the duplicate-credential problem the restructure exists to end,
+arriving through a different door.
+
+Closed three ways:
+
+- `0033_one_active_qr_per_call_sign.sql` — partial unique index on the live
+  token per Call Sign, for the driver QR and the observer link, after revoking
+  any duplicates that predate it.
+- `createDriverAccessTokenAction` refuses rather than silently reissuing, and
+  takes an explicit `replaceExisting` when the operator means it. Refusing is
+  the right default: the QR may already be printed and taped to a windscreen,
+  and reissuing kills that sheet.
+- The control room now issues access **per Call Sign**, not per job
+  (`call-sign-access-panel.tsx`, replacing `driver-qr-action-card.tsx` and
+  `driver-access-generator.tsx`). The old bulk mode looped over assignments and
+  would have generated one credential per job.
+
+Observer-link creation is wired into the same panel, which also closes the first
+item that was listed as remaining.
+
+`access-scope.test.ts` pins the property that actually protects the observer
+credential: it is **not** the token prefix. An observer token is `tomp_obs_…`,
+so it passes `resolveDriverTokenIdentity`'s `tomp_` gate; only the separate hash
+prefix keeps it out of the driver path.
+
+### Still remaining
+
+- **Apply `0033`** — `node scripts/apply-migrations.mjs`, answer `y`. Until then
+  the application guard holds the invariant on its own and the database does not
+  back it up.
 - Run physical-device smoke tests with one web driver and one native driver.
 - Decide after pilot whether new QR rows should stop storing the compatibility
   `assignment_id` snapshot.

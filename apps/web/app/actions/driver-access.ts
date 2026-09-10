@@ -196,8 +196,22 @@ async function createDriverAccessTokenViaPostgres(
   });
 }
 
+/**
+ * Refusing rather than silently reissuing: the operator may be looking at a job
+ * whose Call Sign already has a printed QR taped to a windscreen.
+ */
+const QR_ALREADY_LIVE =
+  "Call Sign นี้มี QR ที่ใช้งานอยู่แล้ว หากออกใบใหม่ ใบเดิมและรหัสเดิมจะใช้ไม่ได้ทันที กรุณายืนยันการออกใบใหม่";
+
 export async function createDriverAccessTokenAction(input: unknown): Promise<ActionResult> {
-  const data = input as { projectId?: string; assignmentId?: string; driverId?: string | null; expiresAt?: string | null };
+  const data = input as {
+    projectId?: string;
+    assignmentId?: string;
+    driverId?: string | null;
+    expiresAt?: string | null;
+    /** Deliberately replace the Call Sign's live QR, invalidating any printed copy. */
+    replaceExisting?: boolean;
+  };
   if (!data.projectId || !data.assignmentId) {
     return actionFailure("กรุณาเลือกโครงการและ Assignment");
   }
@@ -226,6 +240,31 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
   if (!assignmentForQr.vehicle_id) missing.push("รถ");
   if (missing.length) {
     return actionFailure(`ยังสร้าง QR ไม่ได้ เพราะ Assignment นี้ยังขาด ${missing.join(", ")} กรุณาจัดสรรข้อมูลให้ครบก่อน`);
+  }
+
+  // One crewed unit, one live QR. The button sits on a job, so pressing it from
+  // a second job of the same Call Sign used to mint a second token with a second
+  // PIN — the driver's phone binds to one and the other stays live. Reissuing is
+  // still allowed, but only when the operator says so, because the QR may
+  // already be printed and in someone's hand: a new one kills that sheet.
+  const { data: liveToken } = await client
+    .from("driver_access_tokens")
+    .select("id, created_at")
+    .eq("call_sign_id", assignmentForQr.call_sign_id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (liveToken && !data.replaceExisting) {
+    return actionFailure(QR_ALREADY_LIVE, { callSignId: [String(assignmentForQr.call_sign_id)] });
+  }
+
+  if (liveToken) {
+    // Revoke before inserting: the partial unique index in 0033 refuses two
+    // active rows for one Call Sign, and it is the last word on this.
+    await client
+      .from("driver_access_tokens")
+      .update({ status: "revoked", metadata: { revokedReason: "reissued_by_control_room" } })
+      .eq("id", liveToken.id);
   }
 
   const token = generateDriverAccessToken({
