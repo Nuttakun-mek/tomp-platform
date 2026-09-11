@@ -167,10 +167,9 @@ Nothing on the phone has been rebuilt since the source-level i18n changes in
   developer machine. A real driver's phone cannot run that. `eas.json` already
   defines `preview` and `production`; this is a build, not a code change, and it
   blocks any rollout past the one test device.
-- **iOS: `UIBackgroundModes: ["location"]` is missing from `infoPlist`.** iOS
-  stops delivering location the moment the app leaves the foreground, which is
-  the entire point of background GPS. Fix it before the first iOS build rather
-  than debugging it afterwards.
+- ~~**iOS: `UIBackgroundModes` is missing from `infoPlist`.**~~ **Wrong.** The
+  `expo-location` plugin generates it at prebuild from
+  `isIosBackgroundLocationEnabled: true`. See `975`.
 - **iOS push needs an APNs key**, not the FCM service account. Separate upload,
   and it needs the Apple Developer account that is still pending.
 - The 38 Thai strings in `apps/mobile-driver/src` need the same treatment as the

@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
-import { decideLocationSend, LOCATION_HEARTBEAT_MS, type LastSentFix } from "@tomp/driver-core";
+import { Platform } from "react-native";
+import { decideLocationSend, LOCATION_HEARTBEAT_MS, LOCATION_MOVED_METERS, type LastSentFix } from "@tomp/driver-core";
 import { BACKGROUND_GPS_ENABLED, LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
 import { enqueueOfflineAction } from "./offline-queue";
@@ -33,8 +34,58 @@ let foregroundWatch: Location.LocationSubscription | null = null;
 // the web page and this app cannot drift apart. They feed the same map.
 let lastSent: LastSentFix | null = null;
 
+// `timeInterval` is Android-only — expo-location documents it as such, and iOS
+// ignores it entirely. So the cadence both watchers below ask for (10s / 30s)
+// does not exist on iOS: there, delivery is governed only by `distanceInterval`.
+//
+// That matters because the whole parked-driver design assumes a tick arrives
+// regularly and the send rule throttles it down to a heartbeat. Take the ticks
+// away and a stationary iOS driver has nothing to throttle — no movement, no
+// callback, no heartbeat, and the control room calls them offline for standing
+// where they were told to wait.
+//
+// So the heartbeat gets its own clock instead of borrowing the OS's. The last
+// fix is kept, and every tick offers it to the same send rule, which still
+// decides whether anything goes out. Harmless on Android, where the callbacks
+// already arrive; on iOS it is the only thing keeping a parked driver alive.
+const HEARTBEAT_TICK_MS = 30_000;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let lastKnownFix: { latitude: number; longitude: number; accuracy: number | null } | null = null;
+
 export function resetLocationThrottle() {
   lastSent = null;
+  lastKnownFix = null;
+}
+
+function rememberFix(location: Location.LocationObject) {
+  lastKnownFix = {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    accuracy: location.coords.accuracy
+  };
+}
+
+function startHeartbeat() {
+  if (heartbeatTimer) return;
+  heartbeatTimer = setInterval(() => {
+    if (!lastKnownFix) return;
+    // `recordedAt` is now, not the time of the fix being reused. A heartbeat
+    // says "still here, as of this moment" — stamping it with the old fix time
+    // would make it arrive already stale and defeat the point of sending it.
+    void submitOrQueueLocation({
+      latitude: lastKnownFix.latitude,
+      longitude: lastKnownFix.longitude,
+      accuracy: lastKnownFix.accuracy,
+      recordedAt: new Date().toISOString(),
+      trackingEvent: "location_ping",
+      metadata: { platform: "mobile_driver", mode: "heartbeat" }
+    });
+  }, HEARTBEAT_TICK_MS);
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
 }
 
 function createLocationClientEventId(recordedAt: string | null | undefined, trackingEvent: string) {
@@ -56,6 +107,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     const payload = data as { locations?: Location.LocationObject[] } | undefined;
     const latest = payload?.locations?.[0];
     if (!latest) return;
+    rememberFix(latest);
     const mobileSession = await getMobileDriverSession();
     if (!mobileSession) return;
 
@@ -197,14 +249,21 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
   foregroundWatch = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.High,
-      // Time-driven, not distance-driven. A parked driver still has to look
-      // alive to the control room: lib/domain/gps-freshness calls a fix older
-      // than 35s "slow" and older than 120s "offline", so a distanceInterval
-      // gate would mark a driver waiting at a pickup as lost.
-      distanceInterval: 0,
+      // Android is time-driven: ask for a tick every 10s and let the send rule
+      // throttle it. `distanceInterval: 0` is safe there because `timeInterval`
+      // bounds how often the callback fires.
+      //
+      // iOS ignores `timeInterval`, so the same zero means "tell me about every
+      // fix the GPS produces" — a continuous stream for the whole shift, which
+      // over a five-day operation is a flat battery rather than a busy map. It
+      // gets a real distance gate instead, matched to the distance the send rule
+      // already treats as movement, and the heartbeat timer covers standing
+      // still.
+      distanceInterval: Platform.OS === "ios" ? LOCATION_MOVED_METERS : 0,
       timeInterval: 10000
     },
     (location) => {
+      rememberFix(location);
       onLocation(location);
       void submitOrQueueLocation({
         latitude: location.coords.latitude,
@@ -219,6 +278,7 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
       });
     }
   );
+  startHeartbeat();
   return foregroundWatch;
 }
 
@@ -238,10 +298,16 @@ export async function startBackgroundLocationSharing() {
     if (alreadyStarted) return true;
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
-      // Same reason as the foreground watcher: heartbeat on time, not on
-      // movement, so a stationary vehicle keeps reporting.
-      distanceInterval: 0,
+      // Same split as the foreground watcher: Android is bounded by
+      // `timeInterval`, iOS is not, so iOS gets a distance gate.
+      distanceInterval: Platform.OS === "ios" ? LOCATION_MOVED_METERS : 0,
       timeInterval: 30000,
+      // iOS only. Tells CoreLocation this is a vehicle rather than the default
+      // "other", which is how it decides when GPS may be powered down, and shows
+      // the blue status bar while the app tracks in the background — the driver
+      // should be able to see that it is on, and Apple expects it to be visible.
+      activityType: Location.ActivityType.AutomotiveNavigation,
+      showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: "TOMP กำลังแชร์ตำแหน่ง",
         notificationBody: "ศูนย์ควบคุมกำลังติดตามตำแหน่งระหว่างปฏิบัติงาน",
@@ -255,6 +321,10 @@ export async function startBackgroundLocationSharing() {
 }
 
 export async function stopLocationSharing() {
+  // The clock goes first: it must not fire a heartbeat for a driver who has
+  // just stopped sharing, which would put them back on the map after they left.
+  stopHeartbeat();
+
   // Remove the watcher first so no further pings fire while we are stopping.
   if (foregroundWatch) {
     try {
