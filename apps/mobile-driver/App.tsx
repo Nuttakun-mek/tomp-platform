@@ -522,7 +522,16 @@ export default function App() {
               <Text style={styles.noteText}>รุ่นแอป: {TOMP_DRIVER_APP_VERSION}</Text>
               {outboxCount > 0 ? <Text style={styles.noteText}>รายการที่รอส่งซ้ำ: {outboxCount}</Text> : null}
               {syncLabel ? <Text style={styles.noteText}>{syncLabel}</Text> : null}
-              {Platform.OS === "android" ? <Text style={styles.noteText}>Android: รองรับ development build สำหรับ GPS เบื้องหลัง</Text> : null}
+              {/* iOS never prompts its way to background location: the driver
+                  has to pick "ตลอดเวลา" in Settings themselves, and until they
+                  do, tracking stops the moment the screen locks. Saying nothing
+                  on iOS — which is what this line used to do — leaves them with
+                  no way to know that. */}
+              <Text style={styles.noteText}>
+                {Platform.OS === "ios"
+                  ? "iOS: ต้องตั้งค่า > TOMP Driver > ตำแหน่ง เป็น “ตลอดเวลา” ไม่เช่นนั้นตำแหน่งจะหยุดส่งเมื่อล็อกหน้าจอ"
+                  : "Android: ตั้งค่าตำแหน่งเป็น “อนุญาตตลอดเวลา” เพื่อให้ส่งตำแหน่งต่อเนื่องขณะปิดหน้าจอ"}
+              </Text>
             </View>
           </View>
         )}

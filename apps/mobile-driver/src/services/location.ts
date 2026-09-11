@@ -298,9 +298,22 @@ export async function startBackgroundLocationSharing() {
     if (alreadyStarted) return true;
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
-      // Same split as the foreground watcher: Android is bounded by
-      // `timeInterval`, iOS is not, so iOS gets a distance gate.
-      distanceInterval: Platform.OS === "ios" ? LOCATION_MOVED_METERS : 0,
+      // Deliberately 0 on both platforms — the opposite of the foreground
+      // watcher, and for a reason that only shows up in the background.
+      //
+      // On iOS the app is kept alive by the location updates themselves. Put a
+      // distance gate here and a parked vehicle produces no updates, so iOS
+      // suspends the process, so the JS heartbeat timer stops running — the
+      // heartbeat would die exactly when it is the only thing left to send,
+      // which is the failure it exists to prevent. A continuous stream is what
+      // keeps the runtime awake.
+      //
+      // The cost is bounded by `Accuracy.Balanced`, which resolves from cell and
+      // wifi rather than holding the GPS radio open, and by the send rule, which
+      // still forwards at most one ping per heartbeat while standing still. The
+      // OS talking to us often is cheap; us talking to the server often is not,
+      // and that is throttled elsewhere.
+      distanceInterval: 0,
       timeInterval: 30000,
       // iOS only. Tells CoreLocation this is a vehicle rather than the default
       // "other", which is how it decides when GPS may be powered down, and shows
