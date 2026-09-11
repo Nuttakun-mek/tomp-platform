@@ -53,6 +53,35 @@ export default async function ResourcesPage({ searchParams }: ResourcesPageProps
           </p>
         </section>
 
+        {/* A project starts empty by design — resources are per-project copies now
+            — but an empty list on a project that has been running for weeks reads
+            as data loss rather than a step not taken yet. Say which it is. */}
+        {drivers.length === 0 && vehicles.length === 0 ? (
+          <section className="enterprise-panel-soft border-teal-200 bg-teal-50/60 p-4">
+            <p className="flex items-center gap-2 text-sm font-bold text-teal-900">
+              <Library className="h-4 w-4" /> เริ่มต้นด้วยการนำเข้าทรัพยากร
+            </p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-teal-900">
+              โครงการเก็บคนขับและรถเป็นสำเนาของตัวเอง เพื่อให้สถานะและการแก้ไขไม่ข้ามไปโครงการอื่น
+              โครงการนี้จึงยังว่างอยู่ — ไม่ใช่ข้อมูลหาย
+              {libraryDrivers.length + libraryVehicles.length > 0 ? (
+                <>
+                  {" "}ตอนนี้คลังกลางมีคนขับ {libraryDrivers.length} คน และรถ {libraryVehicles.length} คัน
+                  กด <span className="font-semibold">“นำเข้าจากคลังกลาง”</span> ด้านล่างเพื่อดึงเข้าโครงการนี้
+                </>
+              ) : (
+                <>
+                  {" "}คลังกลางยังไม่มีรายการ เพิ่มคนขับและรถได้ที่ด้านล่าง หรือที่เมนู{" "}
+                  <Link href="/resources" className="font-semibold underline">
+                    ทรัพยากรกลาง
+                  </Link>{" "}
+                  เพื่อเก็บไว้ใช้ข้ามโครงการ
+                </>
+              )}
+            </p>
+          </section>
+        ) : null}
+
         <ProjectResourceManager
           projectId={projectId}
           drivers={drivers}

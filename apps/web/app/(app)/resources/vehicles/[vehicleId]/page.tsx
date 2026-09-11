@@ -1,12 +1,15 @@
-import { redirect } from "next/navigation";
+import { VehicleProfileDetail } from "@/components/resources/vehicle-profile-detail";
 
 interface VehicleProfilePageProps {
   params: Promise<{ vehicleId: string }>;
 }
 
-// Pretty URL shim. On production this route is shadowed by a vercel.json rewrite
-// to /resources/vehicle?vehicleId=...; locally we redirect so both behave alike.
+// This used to redirect to /resources/vehicle?vehicleId=… because the legacy
+// root vercel.json served the pretty URL through a rewrite, and its builds+routes
+// config could not match a nested dynamic segment. That config went with the
+// move to apps/web/vercel.json, so the nested route resolves natively now and
+// the hop only cost a round trip on every vehicle opened.
 export default async function VehicleProfilePage({ params }: VehicleProfilePageProps) {
   const { vehicleId } = await params;
-  redirect(`/resources/vehicle?vehicleId=${encodeURIComponent(vehicleId)}`);
+  return <VehicleProfileDetail vehicleId={vehicleId} />;
 }

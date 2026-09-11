@@ -97,14 +97,6 @@ scroll, and the states past the fold were the late ones. It now lives in
 
 **Needs building**
 
-- Existing projects see empty resource lists until someone imports from the
-  library. Intended, but it will surprise on first use — a one-time prompt on the
-  project resources page would soften it.
-- `/resources/drivers` and `/resources/vehicles` still exist as sub-pages. The
-  vehicles one earns its place (live map, job queues); the drivers one is now
-  just a readiness table and could fold into the main page.
-- `/resources/vehicle` (singular) is an orphan route kept only for a legacy
-  rewrite. Check whether that rewrite still exists before removing it.
 - Physical-device testing has not resumed since the mobile work in `965`.
 - The reminder-before-next-job feature is still parked, with a settable lead
   time rather than a fixed ten minutes (`966`).
@@ -115,6 +107,18 @@ scroll, and the states past the fold were the late ones. It now lives in
 - Anything in `967`'s "Still remaining" that depends on a pilot.
 
 ---
+
+### Closed since this note was written
+
+- The empty project resource list now explains itself, and says whether the
+  library has anything to import.
+- `/resources/drivers` and its readiness table are gone. The table showed name,
+  phone and ready-or-not, all of which the project resource list already shows;
+  the one thing it added — flagging a driver with no phone — moved onto the row
+  itself, where the record is.
+- `/resources/vehicle` (singular) is deleted. The legacy rewrite it existed for
+  went with the move to `apps/web/vercel.json`, so `[vehicleId]` resolves
+  natively and the redirect only cost a round trip per vehicle opened.
 
 ## Verifying
 

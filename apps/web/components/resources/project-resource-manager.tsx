@@ -23,18 +23,24 @@ interface Row {
   id: string;
   primary: string;
   secondary: string;
+  /** Why this record is not yet usable, or empty when it is fine. */
+  missing: string;
 }
 
 const asDriverRow = (driver: Driver): Row => ({
   id: driver.id,
   primary: driver.fullName,
-  secondary: [driver.phone, driver.licenseType].filter(Boolean).join(" · ") || "ไม่มีข้อมูลเพิ่มเติม"
+  secondary: [driver.phone, driver.licenseType].filter(Boolean).join(" · ") || "ไม่มีข้อมูลเพิ่มเติม",
+  // Dispatch cannot reach a driver with no number, so it is flagged where the
+  // record is, rather than on a separate readiness page nobody opened.
+  missing: driver.phone ? "" : "ยังไม่มีเบอร์โทร"
 });
 
 const asVehicleRow = (vehicle: Vehicle): Row => ({
   id: vehicle.id,
   primary: vehicle.plateNumber,
-  secondary: [vehicle.vehicleType, vehicle.capacity ? `${vehicle.capacity} ที่นั่ง` : ""].filter(Boolean).join(" · ")
+  secondary: [vehicle.vehicleType, vehicle.capacity ? `${vehicle.capacity} ที่นั่ง` : ""].filter(Boolean).join(" · "),
+  missing: !vehicle.plateNumber ? "ยังไม่มีทะเบียน" : !vehicle.capacity ? "ยังไม่ระบุจำนวนที่นั่ง" : ""
 });
 
 function Section({
@@ -174,6 +180,11 @@ function Section({
               <span className="min-w-0">
                 <span className="text-[13px] font-semibold text-ink">{row.primary}</span>
                 <span className="ml-2 text-xs text-ink-soft">{row.secondary}</span>
+                {row.missing ? (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                    {row.missing}
+                  </span>
+                ) : null}
                 {usedBy?.get(row.id) ? (
                   <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-operation">
                     ใช้อยู่ {usedBy.get(row.id)} โครงการ
