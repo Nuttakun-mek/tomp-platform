@@ -14,6 +14,7 @@ import { buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
 import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
 
 type DriverGpsLight = "off" | "live" | "stale";
+export type DriverTaskViewMode = "home" | "next" | "messages" | "gps";
 type TripStatus = "arrived_pickup" | "passenger_onboard" | "completed";
 
 const TRIP_STEPS: Array<{ status: TripStatus; label: string }> = [
@@ -47,7 +48,7 @@ function jobTimeLabel(start?: string | null, end?: string | null) {
   return "ยังไม่ระบุเวลา";
 }
 
-export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAssignment }) {
+export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
   const meta = driverAccess.assignment.metadata;
   const pickup = metaText(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ");
   const dropoff = metaText(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง");
@@ -229,9 +230,15 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
   const currentStep = TRIP_STEPS[tripStep];
   const doneSteps = TRIP_STEPS.slice(0, tripStep);
   const laterSteps = TRIP_STEPS.slice(tripStep + 1);
+  const showTask = view === "home" || view === "next";
+  const showGps = view === "home" || view === "gps";
+  const showAssignments = view === "home" || view === "next";
+  const showComms = view === "home" || view === "messages";
+  const viewTitle =
+    view === "next" ? "งานต่อไปที่ต้องดำเนินการ" : view === "messages" ? "ข้อความและการแจ้งปัญหา" : view === "gps" ? "การแชร์ตำแหน่ง" : "หน้างานของคุณ";
 
   return (
-    <div className="grid gap-3 pb-6">
+    <div id="driver-home" className="grid gap-3 pb-6">
       <header className="grid gap-2">
         <div className="flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[11px] font-bold uppercase tracking-[0.16em] text-operation">{driverAccess.project.projectName}</p>
@@ -246,6 +253,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
             {formatStatusTh(driverAccess.assignment.status)}
           </span>
         </div>
+        <p className="text-[13px] font-semibold text-ink-soft">{viewTitle}</p>
       </header>
 
       <section className="rounded-card border border-border bg-white">
@@ -287,7 +295,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
       ) : null}
 
       {/* Card: the job to do now — route, target time, and progress steps together. */}
-      <section className="smart-card grid gap-2.5">
+      {showTask ? <section id="driver-current-task" className="smart-card grid gap-2.5 scroll-mt-3">
         <p className="text-[13px] font-bold text-ink">งานปัจจุบัน</p>
         <div className="grid gap-2">
           <div className="flex items-start gap-2">
@@ -320,7 +328,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         ) : null}
 
         {currentStep ? (
-          <div className="grid gap-2">
+          <div id="driver-next-action" className="grid gap-2 scroll-mt-3">
             <p className="text-[12px] font-semibold text-ink-soft">งานถัดไปที่ต้องทำ</p>
             <button
               type="button"
@@ -355,10 +363,10 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         ) : (
           <p className="rounded-card bg-emerald-50 px-3 py-3 text-center text-[14px] font-bold text-emerald-800">งานนี้เสร็จสิ้นแล้ว</p>
         )}
-      </section>
+      </section> : null}
 
       {/* Card: location sharing — its own card so it can be hidden whole while sharing runs. */}
-      <section className="smart-card grid gap-3">
+      {showGps ? <section id="driver-gps" className="smart-card grid gap-3 scroll-mt-3">
         <a
           href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
           className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
@@ -366,9 +374,9 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
           เปิดในแอป TOMP Driver เพื่อแชร์ GPS ต่อเนื่องเมื่อปิดจอ
         </a>
         <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} />
-      </section>
+      </section> : null}
 
-      {dayAssignments.length > 1 ? (
+      {showAssignments && dayAssignments.length > 1 ? (
         <section className="smart-card grid gap-2.5">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -438,7 +446,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         </section>
       ) : null}
 
-      <div className="grid grid-cols-3 gap-2">
+      {showComms ? <div className="grid grid-cols-3 gap-2">
         {coordinatorPhone ? (
           <a
             href={telHref(coordinatorPhone) ?? "#"}
@@ -464,9 +472,9 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         >
           <TriangleAlert className="h-4 w-4" /> แจ้งปัญหา
         </button>
-      </div>
+      </div> : null}
 
-      {issueOpen ? (
+      {showComms && issueOpen ? (
         <section className="smart-card grid gap-2">
           <p className="text-[13px] font-semibold text-ink">เลือกประเภทปัญหา</p>
           <div className="grid grid-cols-2 gap-2">
@@ -485,7 +493,7 @@ export function DriverTaskView({ driverAccess }: { driverAccess: DriverAccessAss
         </section>
       ) : null}
 
-      <DriverChatThread messages={messages} notifications={notifications} onSend={sendMessage} sending={isPending} />
+      {showComms ? <DriverChatThread messages={messages} notifications={notifications} onSend={sendMessage} sending={isPending} /> : null}
     </div>
   );
 }

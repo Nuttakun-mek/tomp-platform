@@ -24,7 +24,7 @@ import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
-import { buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, TOMP_WEB_ORIGIN } from "./src/config";
+import { buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, type DriverWebViewKey } from "./src/config";
 import { colors, radius } from "./src/theme";
 import {
   hasBackgroundLocationPermission,
@@ -51,6 +51,14 @@ const DriverWebView = WebView as unknown as ComponentType<WebViewProps & RefAttr
 
 type ShellMode = "activation" | "web";
 type ShellStatus = "พร้อมเปิดงาน" | "กำลังเปิดงาน" | "กำลังใช้งาน" | "ต้องตรวจสอบ";
+type DriverMenuKey = "home" | "next" | "messages" | "location";
+
+const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; view?: DriverWebViewKey }> = [
+  { key: "home", label: "หน้างาน", view: "home" },
+  { key: "next", label: "งานต่อไป", view: "next" },
+  { key: "messages", label: "ข้อความ", view: "messages" },
+  { key: "location", label: "แชร์ตำแหน่ง", view: "gps" }
+];
 
 const bridgeBootstrap = `
   (function () {
@@ -88,15 +96,23 @@ export default function App() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [outboxCount, setOutboxCount] = useState(0);
   const [syncLabel, setSyncLabel] = useState("");
+  const [activeDriverMenu, setActiveDriverMenu] = useState<DriverMenuKey>("home");
 
-  const effectiveWebUrl = useMemo(() => webUrl || (currentToken ? buildDriverWebUrl(currentToken, locale) : ""), [currentToken, locale, webUrl]);
+  const activeWebView = useMemo(
+    () => DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.view ?? "home",
+    [activeDriverMenu]
+  );
+  const effectiveWebUrl = useMemo(
+    () => webUrl || (currentToken ? buildDriverWebUrl(currentToken, locale, activeWebView) : ""),
+    [activeWebView, currentToken, locale, webUrl]
+  );
 
   const changeLocale = useCallback((nextLocale: MobileLocale) => {
     localeRef.current = nextLocale;
     setLocale(nextLocale);
     void saveMobileLocale(nextLocale);
-    if (currentToken) setWebUrl(buildDriverWebUrl(currentToken, nextLocale));
-  }, [currentToken]);
+    if (currentToken) setWebUrl(buildDriverWebUrl(currentToken, nextLocale, activeWebView));
+  }, [activeWebView, currentToken]);
 
   const postStatusToWeb = useCallback((nativeStatus: Parameters<typeof buildNativeStatusMessage>[0], text: string, detail?: Record<string, unknown>) => {
     const payload = buildNativeStatusMessage(nativeStatus, text, detail);
@@ -148,9 +164,10 @@ export default function App() {
       void saveMobileLocale(parsed.locale);
       setCurrentToken(parsed.token);
       setTokenInput(parsed.token);
-      setWebUrl(parsed.webUrl);
+      setWebUrl(buildDriverWebUrl(parsed.token, parsed.locale, "home"));
       setScannerOpen(false);
       setQrLocked(false);
+      setActiveDriverMenu("home");
       setMode("web");
       setStatus("กำลังเปิดงาน");
       setMessage(parsed.source === "raw-token" ? "กำลังเปิดงานจาก token" : "กำลังเปิดงานจาก QR");
@@ -189,7 +206,7 @@ export default function App() {
         setSessionReady(true);
         void flushOutbox();
         void registerPush(parsed.payload);
-        postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
+        postStatusToWeb("session_ready", "แอปพร้อมส่งตำแหน่ง GPS เบื้องหลัง");
         return;
       }
 
@@ -201,14 +218,14 @@ export default function App() {
         });
         if (!result.success || !result.data) {
           setSessionReady(false);
-          postStatusToWeb("session_missing", result.error || "แลก mobile session ไม่สำเร็จ");
+          postStatusToWeb("session_missing", result.error || "ยืนยันสิทธิ์แอปไม่สำเร็จ");
           return;
         }
         await saveMobileDriverSession(result.data);
         setSessionReady(true);
         void flushOutbox();
         void registerPush(result.data);
-        postStatusToWeb("session_ready", "mobile session พร้อมสำหรับ GPS เบื้องหลัง");
+        postStatusToWeb("session_ready", "แอปพร้อมส่งตำแหน่ง GPS เบื้องหลัง");
         return;
       }
 
@@ -238,7 +255,7 @@ export default function App() {
       const session = await getMobileDriverSession();
       if (!session) {
         setSessionReady(false);
-        postStatusToWeb("session_missing", "ยังไม่มี mobile session หลังยืนยัน PIN จึงยังไม่เริ่ม GPS เบื้องหลัง");
+        postStatusToWeb("session_missing", "ยังไม่พร้อมส่งตำแหน่ง GPS เบื้องหลัง กรุณายืนยันงานในหน้าคนขับก่อน");
         return;
       }
 
@@ -313,6 +330,11 @@ export default function App() {
     return false;
   }, [postStatusToWeb]);
 
+  const openDriverMenu = useCallback((item: { key: DriverMenuKey; view?: DriverWebViewKey }) => {
+    setActiveDriverMenu(item.key);
+    if (currentToken && item.view) setWebUrl(buildDriverWebUrl(currentToken, localeRef.current, item.view));
+  }, [currentToken]);
+
   const resetAssignment = useCallback(async () => {
     await stopLocationSharing().catch(() => undefined);
     await clearDriverToken();
@@ -320,8 +342,20 @@ export default function App() {
     setWebUrl("");
     setMode("activation");
     setStatus("พร้อมเปิดงาน");
+    setActiveDriverMenu("home");
     setMessage("ออกจากงานแล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
   }, []);
+
+  const confirmResetAssignment = useCallback(() => {
+    Alert.alert(
+      "ออกจากงานนี้",
+      "ต้องการออกจากงานนี้หรือไม่ ระบบจะหยุดแชร์ตำแหน่งและกลับไปหน้าเปิดงานด้วย QR",
+      [
+        { text: "ยกเลิก", style: "cancel" },
+        { text: "ออกจากงาน", style: "destructive", onPress: () => void resetAssignment() }
+      ]
+    );
+  }, [resetAssignment]);
 
   useEffect(() => {
     // A background location task survives a crash and is restored on launch. If
@@ -406,13 +440,13 @@ export default function App() {
         return true;
       }
       if (mode === "web") {
-        setMode("activation");
+        confirmResetAssignment();
         return true;
       }
       return false;
     });
     return () => subscription.remove();
-  }, [canGoBack, mode]);
+  }, [canGoBack, confirmResetAssignment, mode]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -441,40 +475,68 @@ export default function App() {
 
         {mode === "web" && effectiveWebUrl ? (
           <View style={styles.webContainer}>
-            <View style={styles.webMeta}>
-              <Text style={styles.webMetaText}>Web: {TOMP_WEB_ORIGIN}</Text>
-              <Text style={[styles.webMetaText, sessionReady ? styles.okText : styles.warningText]}>
-                {sessionReady ? "mobile session พร้อม" : "รอ mobile session จาก Web"}
-              </Text>
-              {outboxCount > 0 ? <Text style={styles.webMetaText}>ค้างส่ง {outboxCount}</Text> : null}
-              {syncLabel ? <Text style={styles.webMetaText}>{syncLabel}</Text> : null}
-            </View>
-            <DriverWebView
-              ref={webViewRef}
-              source={{ uri: effectiveWebUrl }}
-              injectedJavaScriptBeforeContentLoaded={bridgeBootstrap}
-              onMessage={handleBridgeMessage}
-              onNavigationStateChange={handleNavigation}
-              onShouldStartLoadWithRequest={handleShouldStartLoad}
-              sharedCookiesEnabled
-              thirdPartyCookiesEnabled
-              javaScriptEnabled
-              domStorageEnabled
-              startInLoadingState
-              renderLoading={() => (
-                <View style={styles.loading}>
-                  <ActivityIndicator color={colors.operation} />
-                  <Text style={styles.loadingText}>กำลังเปิดหน้าคนขับ</Text>
+            <View style={styles.operationStrip}>
+              <View style={styles.operationStatusItem}>
+                <View style={[styles.statusDot, sessionReady ? styles.statusDotOk : styles.statusDotPending]} />
+                <View style={styles.operationStatusCopy}>
+                  <Text style={styles.operationStatusTitle}>{sessionReady ? "เชื่อมต่อศูนย์ควบคุมแล้ว" : "กำลังเตรียมการเชื่อมต่อ"}</Text>
+                  <Text style={styles.operationStatusText}>
+                    {sessionReady ? "พร้อมส่งสถานะและตำแหน่งระหว่างปฏิบัติงาน" : "กรุณายืนยันงานในหน้าคนขับเพื่อเปิดการส่งข้อมูล"}
+                  </Text>
                 </View>
-              )}
-            />
+              </View>
+              <Text style={styles.webVersionText}>เวอร์ชัน {TOMP_DRIVER_APP_VERSION}</Text>
+            </View>
+            {outboxCount > 0 || syncLabel ? (
+              <View style={styles.syncNotice}>
+                {outboxCount > 0 ? <Text style={styles.syncNoticeText}>มีข้อมูลรอส่ง {outboxCount} รายการ ระบบจะส่งซ้ำเมื่อสัญญาณพร้อม</Text> : null}
+                {syncLabel ? <Text style={styles.syncNoticeText}>{syncLabel}</Text> : null}
+              </View>
+            ) : null}
+            {activeDriverMenu === "location" ? (
+              <View style={styles.locationAssist}>
+                <View style={styles.locationAssistCopy}>
+                  <Text style={styles.locationAssistTitle}>การแชร์ตำแหน่ง</Text>
+                  <Text style={styles.locationAssistText}>
+                    ใช้หน้านี้เพื่อเริ่มแชร์ GPS ตรวจสอบสิทธิ์ตำแหน่ง และเปิดการตั้งค่าอุปกรณ์เมื่อระบบแจ้งว่าต้องตรวจสอบ
+                  </Text>
+                </View>
+                <Pressable style={styles.locationSettingsButton} onPress={() => Linking.openSettings()}>
+                  <Text style={styles.locationSettingsButtonText}>ตั้งค่าอุปกรณ์</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <View style={styles.webFrame}>
+              <DriverWebView
+                ref={webViewRef}
+                source={{ uri: effectiveWebUrl }}
+                injectedJavaScriptBeforeContentLoaded={bridgeBootstrap}
+                onMessage={handleBridgeMessage}
+                onNavigationStateChange={handleNavigation}
+                onShouldStartLoadWithRequest={handleShouldStartLoad}
+                sharedCookiesEnabled
+                thirdPartyCookiesEnabled
+                javaScriptEnabled
+                domStorageEnabled
+                startInLoadingState
+                renderLoading={() => (
+                  <View style={styles.loading}>
+                    <ActivityIndicator color={colors.operation} />
+                    <Text style={styles.loadingText}>กำลังเปิดหน้าคนขับ</Text>
+                  </View>
+                )}
+              />
+            </View>
             <View style={styles.bottomBar}>
-              <Pressable style={styles.secondaryButton} onPress={resetAssignment}>
-                <Text style={styles.secondaryButtonText}>{mt(locale, "logoutJob")}</Text>
-              </Pressable>
-              <Pressable style={styles.primaryButton} onPress={() => webViewRef.current?.reload()}>
-                <Text style={styles.primaryButtonText}>{mt(locale, "reload")}</Text>
-              </Pressable>
+              {DRIVER_MENU_ITEMS.map((item) => (
+                <Pressable
+                  key={item.key}
+                  style={[styles.menuButton, activeDriverMenu === item.key && styles.menuButtonActive]}
+                  onPress={() => openDriverMenu(item)}
+                >
+                  <Text style={[styles.menuButtonText, activeDriverMenu === item.key && styles.menuButtonTextActive]}>{item.label}</Text>
+                </Pressable>
+              ))}
             </View>
           </View>
         ) : (
@@ -830,26 +892,116 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     flex: 1
   },
-  webMeta: {
+  operationStrip: {
     alignItems: "center",
-    backgroundColor: "#f6fafc",
+    backgroundColor: "#f7fbfc",
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
     flexDirection: "row",
+    gap: 10,
     justifyContent: "space-between",
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  operationStatusItem: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 9
+  },
+  statusDot: {
+    borderRadius: radius.pill,
+    height: 10,
+    width: 10
+  },
+  statusDotOk: {
+    backgroundColor: colors.success
+  },
+  statusDotPending: {
+    backgroundColor: colors.warning
+  },
+  operationStatusCopy: {
+    flex: 1
+  },
+  operationStatusTitle: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  operationStatusText: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 14
+  },
+  webVersionText: {
+    backgroundColor: "#ffffff",
+    borderColor: colors.line,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    color: colors.muted,
+    flexShrink: 0,
+    fontSize: 10,
+    fontWeight: "900",
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  syncNotice: {
+    backgroundColor: "#fff8e7",
+    borderBottomColor: "#f1d294",
+    borderBottomWidth: 1,
+    gap: 2,
+    paddingHorizontal: 14,
     paddingVertical: 8
   },
-  webMetaText: {
-    color: colors.muted,
+  syncNoticeText: {
+    color: colors.warning,
     fontSize: 11,
-    fontWeight: "700"
+    fontWeight: "800",
+    lineHeight: 15
   },
-  okText: {
-    color: colors.success
+  locationAssist: {
+    alignItems: "center",
+    backgroundColor: "#eefaf8",
+    borderBottomColor: "#cce6e3",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10
   },
-  warningText: {
-    color: colors.warning
+  locationAssistCopy: {
+    flex: 1,
+    gap: 2
+  },
+  locationAssistTitle: {
+    color: colors.operationDeep,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  locationAssistText: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 14
+  },
+  locationSettingsButton: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 38,
+    paddingHorizontal: 10
+  },
+  locationSettingsButtonText: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  webFrame: {
+    flex: 1
   },
   loading: {
     alignItems: "center",
@@ -872,9 +1024,59 @@ const styles = StyleSheet.create({
     borderTopColor: colors.line,
     borderTopWidth: 1,
     flexDirection: "row",
-    gap: 10,
+    gap: 6,
     paddingBottom: Platform.OS === "android" ? 18 : 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingTop: 10
+  },
+  menuButton: {
+    alignItems: "center",
+    borderRadius: radius.md,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 2
+  },
+  menuButtonActive: {
+    backgroundColor: colors.operation
+  },
+  menuButtonText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  menuButtonTextActive: {
+    color: "#ffffff"
+  },
+  bottomPrimaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.operation,
+    borderRadius: radius.md,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 14
+  },
+  bottomPrimaryButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  bottomSecondaryButton: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 14
+  },
+  bottomSecondaryButtonText: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900"
   }
 });

@@ -62,6 +62,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   const [mapOpen, setMapOpen] = useState(true);
   const [cardOpen, setCardOpen] = useState(true);
   const [canResume, setCanResume] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
   const lastSentRef = useRef<LastSentFix | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
@@ -199,6 +200,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   const startSharing = useCallback(async () => {
     lastSentRef.current = null;
     if (watchIdRef.current != null) return;
+    setConfirmStop(false);
     const shell = getMobileShell(window);
     if (shell?.canBackgroundLocation) {
       window.localStorage.setItem(consentKey(driverAccess.token), "1");
@@ -247,6 +249,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   }, [driverAccess.token, requestWakeLock, sendPosition, setSignal]);
 
   const stopSharing = useCallback(async () => {
+    setConfirmStop(false);
     const shell = getMobileShell(window);
     if (shell?.canBackgroundLocation) {
       shell.postMessage(buildBridgeMessage("gps.stop", { reason: "driver_requested" }));
@@ -281,6 +284,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
 
       if (payload.message) setMessage(payload.message);
       if (payload.status === "gps_sharing") {
+        setConfirmStop(false);
         const locationDetail = payload.detail as
           | { latitude?: number; longitude?: number; accuracy?: number | null; recordedAt?: string }
           | undefined;
@@ -298,6 +302,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
         }
       }
       if (payload.status === "gps_stopped") {
+        setConfirmStop(false);
         setState("idle");
         setSignal("off");
       }
@@ -413,7 +418,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       ) : null}
 
       <div className="rounded-card bg-blue-50 px-3 py-2 text-[12px] leading-5 text-blue-800">
-        Web app ส่ง GPS ได้เมื่อหน้านี้ยังทำงานอยู่ หากต้องการต่อเนื่องตอนปิดจอหรือสลับแอป ควรใช้แอป TOMP Driver ในขั้นถัดไป
+        หน้าเว็บส่ง GPS ได้เมื่อหน้านี้ยังทำงานอยู่ หากต้องการต่อเนื่องตอนปิดจอหรือสลับแอป ควรใช้แอป TOMP Driver ในขั้นถัดไป
       </div>
 
       <div className="grid gap-2">
@@ -425,14 +430,37 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
         >
           {isSharing ? "แชร์ตำแหน่งต่อ" : canResume ? "แชร์ตำแหน่งต่อ" : "เริ่มแชร์ตำแหน่ง"}
         </button>
-        {isSharing ? (
+        {isSharing && !confirmStop ? (
           <button
             type="button"
-            onClick={() => void stopSharing()}
+            onClick={() => setConfirmStop(true)}
             className="min-h-11 rounded-command border border-border bg-white px-4 text-[13px] font-semibold text-ink-soft"
           >
-            หยุดแชร์ตำแหน่ง
+            ขอหยุดแชร์ตำแหน่ง
           </button>
+        ) : null}
+        {isSharing && confirmStop ? (
+          <div className="grid gap-2 rounded-card border border-amber-300 bg-amber-50 p-3">
+            <p className="text-[12px] font-semibold leading-5 text-amber-900">
+              ยืนยันอีกครั้งก่อนหยุดแชร์ GPS เพื่อป้องกันการกดผิดระหว่างปฏิบัติงาน
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmStop(false)}
+                className="min-h-11 rounded-command border border-amber-300 bg-white px-3 text-[13px] font-semibold text-ink"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => void stopSharing()}
+                className="min-h-11 rounded-command bg-amber-600 px-3 text-[13px] font-bold text-white"
+              >
+                ยืนยันหยุดแชร์
+              </button>
+            </div>
+          </div>
         ) : null}
       </div>
 

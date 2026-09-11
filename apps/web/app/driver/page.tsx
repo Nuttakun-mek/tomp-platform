@@ -8,7 +8,7 @@ import { getDriverAssignmentByToken, getDriverWaitingContext } from "@/lib/data/
 import { DRIVER_DEVICE_COOKIE_PREFIX, DRIVER_PIN_COOKIE_PREFIX, hashDriverDeviceId } from "@/lib/driver-access/token";
 
 interface DriverPageProps {
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; view?: string }>;
 }
 
 function DriverNotice({ title, detail }: { title: string; detail: string }) {
@@ -23,6 +23,7 @@ function DriverNotice({ title, detail }: { title: string; detail: string }) {
 export default async function DriverPage({ searchParams }: DriverPageProps) {
   const params = searchParams ? await searchParams : {};
   const token = params.token || "";
+  const view = params.view === "next" || params.view === "messages" || params.view === "gps" ? params.view : "home";
   const driverAccess = token ? await getDriverAssignmentByToken(token) : null;
 
   if (!driverAccess) {
@@ -88,7 +89,7 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
   // DriverSessionGate exchanges the QR token for the scoped API session first.
   return (
     <DriverSessionGate token={token}>
-      {driverAccess.activated ? <DriverTaskView driverAccess={driverAccess} /> : <DriverPreflight driverAccess={driverAccess} />}
+      {driverAccess.activated ? <DriverTaskView driverAccess={driverAccess} view={view} /> : <DriverPreflight driverAccess={driverAccess} />}
     </DriverSessionGate>
   );
 }
