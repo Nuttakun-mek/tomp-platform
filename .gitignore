@@ -45,3 +45,6 @@ apps/mobile-driver/credentials.json
 # driver token secret. `vercel env pull` writes them without asking.
 .env.vercel*
 .vercel
+
+# Apple signing keys (.p8). Download once from Apple; never committed.
+apps/mobile-driver/credentials/
