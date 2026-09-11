@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { driverLocationUpdateSchema } from "@tomp/types/schemas";
 import { resolveDriverSession, type DriverSessionContext } from "@/lib/api/driver-token";
 import { getPostgresClient } from "@/lib/db/postgres";
+import { extractLocationClientEventId, isDuplicateLocationClientEventError } from "@/lib/driver/location-idempotency";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -88,6 +89,22 @@ async function writeDriverLocationViaSupabase(
   const { data: assignment } = await client.from("assignments").select("vehicle_id").eq("id", ctx.assignmentId).maybeSingle();
   const vehicleId = typeof assignment?.vehicle_id === "string" ? assignment.vehicle_id : null;
   const recordedAt = input.recordedAt || new Date().toISOString();
+  const clientEventId = extractLocationClientEventId(input.metadata);
+
+  if (clientEventId) {
+    const { data: existing } = await client
+      .from("gps_locations")
+      .select("id, recorded_at")
+      .eq("project_id", ctx.projectId)
+      .eq("assignment_id", ctx.assignmentId)
+      .eq("driver_id", ctx.driverId)
+      .eq("metadata->>clientEventId", clientEventId)
+      .maybeSingle();
+
+    if (existing?.id) {
+      return NextResponse.json({ success: true, data: { id: existing.id, recordedAt: existing.recorded_at, duplicate: true } });
+    }
+  }
 
   const { data: inserted, error: insertError } = await client
     .from("gps_locations")
@@ -109,6 +126,9 @@ async function writeDriverLocationViaSupabase(
     .single();
 
   if (insertError) {
+    if (clientEventId && isDuplicateLocationClientEventError(insertError)) {
+      return NextResponse.json({ success: true, data: { id: clientEventId, recordedAt, duplicate: true } });
+    }
     return writeDriverLocationViaPostgres(ctx, input, request, insertError.message);
   }
 
@@ -150,13 +170,37 @@ async function writeDriverLocationViaPostgres(ctx: DriverSessionContext, input: 
   `;
   const vehicleId = assignmentRows[0]?.vehicle_id ?? null;
   const recordedAt = input.recordedAt || new Date().toISOString();
+  const clientEventId = extractLocationClientEventId(input.metadata);
   const metadata = JSON.stringify({ ...input.metadata, pilot: true, source: "postgres_direct", userAgent: request.headers.get("user-agent") });
 
-  const inserted = await sql<Array<{ id: string; recorded_at: string }>>`
-    insert into gps_locations (project_id, assignment_id, call_sign_id, driver_id, vehicle_id, latitude, longitude, accuracy, recorded_at, source, sharing_event, metadata)
-    values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.callSignId || null}, ${ctx.driverId}, ${vehicleId}, ${input.latitude}, ${input.longitude}, ${input.accuracy ?? null}, ${recordedAt}, ${"driver_web_app"}, ${input.trackingEvent}, ${metadata}::jsonb)
-    returning id, recorded_at
-  `;
+  if (clientEventId) {
+    const existing = await sql<Array<{ id: string; recorded_at: string }>>`
+      select id, recorded_at
+      from gps_locations
+      where project_id = ${ctx.projectId}
+        and assignment_id = ${ctx.assignmentId}
+        and driver_id = ${ctx.driverId}
+        and metadata->>'clientEventId' = ${clientEventId}
+      limit 1
+    `;
+    if (existing[0]) {
+      return NextResponse.json({ success: true, data: { id: existing[0].id, recordedAt: existing[0].recorded_at, duplicate: true } });
+    }
+  }
+
+  let inserted: Array<{ id: string; recorded_at: string }>;
+  try {
+    inserted = await sql<Array<{ id: string; recorded_at: string }>>`
+      insert into gps_locations (project_id, assignment_id, call_sign_id, driver_id, vehicle_id, latitude, longitude, accuracy, recorded_at, source, sharing_event, metadata)
+      values (${ctx.projectId}, ${ctx.assignmentId}, ${ctx.callSignId || null}, ${ctx.driverId}, ${vehicleId}, ${input.latitude}, ${input.longitude}, ${input.accuracy ?? null}, ${recordedAt}, ${"driver_web_app"}, ${input.trackingEvent}, ${metadata}::jsonb)
+      returning id, recorded_at
+    `;
+  } catch (error) {
+    if (clientEventId && isDuplicateLocationClientEventError(error)) {
+      return NextResponse.json({ success: true, data: { id: clientEventId, recordedAt, duplicate: true } });
+    }
+    throw error;
+  }
 
   if (input.trackingEvent === "sharing_started") {
     await sql`

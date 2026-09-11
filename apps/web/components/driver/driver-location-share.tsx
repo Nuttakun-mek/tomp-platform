@@ -49,6 +49,12 @@ function formatTime(iso: string) {
   return new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(iso));
 }
 
+function createLocationClientEventId(recordedAt: string, trackingEvent: TrackingEvent) {
+  const compactTime = recordedAt.replace(/[^0-9TZ]/g, "");
+  const randomPart = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+  return `web:${trackingEvent}:${compactTime}:${randomPart}`;
+}
+
 export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLocationShareProps) {
   const [state, setState] = useState<ShareState>("idle");
   const [message, setMessage] = useState("ยังไม่ได้แชร์ตำแหน่ง");
@@ -128,6 +134,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
           recordedAt: ping.recordedAt,
           trackingEvent,
           metadata: {
+            clientEventId: createLocationClientEventId(ping.recordedAt, trackingEvent),
             assignmentId: ping.assignmentId,
             projectId: ping.projectId,
             projectCode: driverAccess.project.projectCode,

@@ -37,6 +37,12 @@ export function resetLocationThrottle() {
   lastSent = null;
 }
 
+function createLocationClientEventId(recordedAt: string | null | undefined, trackingEvent: string) {
+  const compactTime = (recordedAt || new Date().toISOString()).replace(/[^0-9TZ]/g, "");
+  const randomPart = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+  return `mobile:${trackingEvent}:${compactTime}:${randomPart}`;
+}
+
 export function isForegroundSharing() {
   return foregroundWatch !== null;
 }
@@ -134,7 +140,12 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
 
   const payload = {
     ...input,
-    metadata: { ...(input.metadata ?? {}), heartbeatMs: LOCATION_HEARTBEAT_MS, ...(idle ? { idle: true } : {}) }
+    metadata: {
+      ...(input.metadata ?? {}),
+      clientEventId: (input.metadata as Record<string, unknown> | undefined)?.clientEventId ?? createLocationClientEventId(input.recordedAt, input.trackingEvent ?? "location_ping"),
+      heartbeatMs: LOCATION_HEARTBEAT_MS,
+      ...(idle ? { idle: true } : {})
+    }
   };
   // Claim the slot before the network call, not after it.
   //
