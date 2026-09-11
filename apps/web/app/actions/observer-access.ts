@@ -8,8 +8,13 @@ import { getRequestBaseUrl } from "@/lib/request-origin";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
+// Pressing "passenger link" twice used to mint a second live token, and a third,
+// with no way to see or revoke the earlier ones — a unit could quietly carry
+// several working links. Now that the plaintext is kept (0036), the ordinary
+// press *shows* the link that already exists and only an explicit reissue
+// replaces it, which is also what an operator means when they press it again.
 export async function createObserverAccessTokenAction(input: unknown): Promise<ActionResult> {
-  const data = input as { projectId?: string; callSignId?: string; expiresAt?: string | null; reason?: string | null };
+  const data = input as { projectId?: string; callSignId?: string; expiresAt?: string | null; reason?: string | null; reissue?: boolean };
   if (!data.projectId || !data.callSignId) return actionFailure("กรุณาเลือกโครงการและ Call Sign");
 
   const permission = await requirePermission(data.projectId, "assignment.update");
@@ -27,6 +32,40 @@ export async function createObserverAccessTokenAction(input: unknown): Promise<A
   if (callSignError) return actionFailure(getDatabaseErrorMessage(callSignError, "ตรวจสอบ Call Sign ไม่สำเร็จ"));
   if (!callSign) return actionFailure("ไม่พบ Call Sign ในโครงการนี้");
 
+  const nowIso = new Date().toISOString();
+  const { data: liveTokens } = await client
+    .from("observer_access_tokens")
+    .select("id, token_plaintext, expires_at")
+    .eq("project_id", data.projectId)
+    .eq("call_sign_id", data.callSignId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+
+  const usable = (liveTokens ?? []).filter(
+    (row) => !row.expires_at || String(row.expires_at) > nowIso
+  );
+
+  if (!data.reissue) {
+    const existing = usable.find((row) => typeof row.token_plaintext === "string" && row.token_plaintext);
+    if (existing) {
+      return actionSuccess({
+        tokenRecord: { id: existing.id, status: "active", expires_at: existing.expires_at },
+        reused: true,
+        accessUrl: `${await getRequestBaseUrl()}/track/${encodeURIComponent(String(existing.token_plaintext))}`
+      });
+    }
+  }
+
+  // Reissuing, or replacing a pre-0036 token whose plaintext was never kept:
+  // either way the older links must stop working, or the unit ends up with
+  // several live links and revoking the one on screen changes nothing.
+  if (usable.length) {
+    await client
+      .from("observer_access_tokens")
+      .update({ status: "revoked" })
+      .in("id", usable.map((row) => row.id));
+  }
+
   const token = generateObserverAccessToken({ callSignId: data.callSignId, expiresAt: data.expiresAt });
   const expiresAt = data.expiresAt || getDefaultDriverTokenExpiry(12);
   const { data: row, error: insertError } = await client
@@ -35,6 +74,10 @@ export async function createObserverAccessTokenAction(input: unknown): Promise<A
       project_id: data.projectId,
       call_sign_id: data.callSignId,
       token_hash: hashObserverAccessToken(token),
+      // Kept in the clear so the passenger QR can be drawn again after a reload.
+      // The observer link is read-only and carries no PIN; the driver token,
+      // which opens a job, stays hash-only. See migration 0036.
+      token_plaintext: token,
       status: "active",
       expires_at: expiresAt,
       metadata: { source: "control_room", label: callSign.call_sign, reason: data.reason || null }

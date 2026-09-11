@@ -23,6 +23,7 @@ export function DispatchWorkspace({
   drivers,
   vehicles,
   assignments,
+  observerLinks,
   projectStartDate,
   projectEndDate,
   jobForm
@@ -34,6 +35,8 @@ export function DispatchWorkspace({
   drivers: Driver[];
   vehicles: Vehicle[];
   assignments: Assignment[];
+  /** Live passenger links per call sign, read on the server so the QR survives a reload. */
+  observerLinks?: Record<string, string>;
   projectStartDate?: string | null;
   projectEndDate?: string | null;
   /** Step 2, rendered between the setup card and the unit list it feeds. */
@@ -101,6 +104,7 @@ export function DispatchWorkspace({
         drivers={drivers}
         vehicles={vehicles}
         issued={issued}
+        observerLinks={observerLinks}
         onIssued={rememberCredentials}
       />
     </>

@@ -168,3 +168,57 @@ function buildObserverView(project: Row, callSign: Row, assignment: Row | null, 
       : null
   };
 }
+
+/**
+ * The live passenger link for each unit in a project, keyed by call sign.
+ *
+ * This is what makes the QR redrawable. It is read on the server and handed to
+ * the unit card, so the passenger QR is on screen the moment the page loads
+ * rather than only in the tab that happened to issue it.
+ *
+ * Units issued before migration 0036 are absent: their plaintext was never
+ * stored, so there is nothing to return and the card offers a reissue instead.
+ */
+export async function getObserverLinksByProjectId(projectId: string): Promise<Record<string, string>> {
+  if (!projectId) return {};
+  const nowIso = new Date().toISOString();
+  const links: Record<string, string> = {};
+
+  const { client } = getSupabaseWriteClient();
+  if (client) {
+    const { data } = await client
+      .from("observer_access_tokens")
+      .select("call_sign_id, token_plaintext, expires_at")
+      .eq("project_id", projectId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    for (const row of data ?? []) {
+      const callSignId = typeof row.call_sign_id === "string" ? row.call_sign_id : "";
+      const plain = typeof row.token_plaintext === "string" ? row.token_plaintext : "";
+      if (!callSignId || !plain || links[callSignId]) continue;
+      if (row.expires_at && String(row.expires_at) <= nowIso) continue;
+      links[callSignId] = plain;
+    }
+    return links;
+  }
+
+  const sql = getPostgresClient();
+  if (!sql) return links;
+  try {
+    const rows = await sql<Array<{ call_sign_id: string; token_plaintext: string | null; expires_at: string | null }>>`
+      select call_sign_id, token_plaintext, expires_at
+      from observer_access_tokens
+      where project_id = ${projectId} and status = 'active'
+      order by created_at desc
+    `;
+    for (const row of rows) {
+      if (!row.token_plaintext || links[row.call_sign_id]) continue;
+      if (row.expires_at && String(row.expires_at) <= nowIso) continue;
+      links[row.call_sign_id] = row.token_plaintext;
+    }
+  } catch {
+    // A card with no link offers to issue one, which is the safe default.
+  }
+  return links;
+}

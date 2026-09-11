@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { ChevronDown, Copy, Download, FileDown, Printer } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Download, FileDown, Printer } from "lucide-react";
 
 // What the control room hands over for one crewed unit: the driver's QR with its
 // PIN, and the view-only link for whoever is riding or following. Both are
@@ -144,7 +144,7 @@ async function composeSheet(credentials: UnitCredentials): Promise<string | null
 }
 
 function CredentialBlock({
-  heading, who, how, qr, url, filename, tone, pin
+  heading, who, how, qr, url, filename, tone, pin, missingNote
 }: {
   heading: string;
   who: string;
@@ -155,6 +155,8 @@ function CredentialBlock({
   tone: "driver" | "observer";
   /** Shown inside this block, because it only unlocks this block's QR. */
   pin?: string | null;
+  /** What to say when there is no QR to draw — absent is not the same as failed. */
+  missingNote?: string;
 }) {
   return (
     <div className={`grid gap-2 rounded-2xl border p-3 ${tone === "driver" ? "border-teal-300 bg-white" : "border-slate-300 bg-slate-50/70"}`}>
@@ -166,7 +168,9 @@ function CredentialBlock({
       {qr ? (
         <Image src={qr} alt={heading} width={150} height={150} unoptimized className="mx-auto" />
       ) : (
-        <div className="grid h-[150px] place-items-center text-xs text-ink-faint">ออก QR ไม่สำเร็จ</div>
+        <div className="grid h-[150px] place-items-center px-3 text-center text-[11px] leading-4 text-ink-faint">
+          {missingNote ?? "ออก QR ไม่สำเร็จ"}
+        </div>
       )}
       {pin ? (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-center">
@@ -199,17 +203,26 @@ function CredentialBlock({
 
 export function UnitCredentialSheet({ credentials }: { credentials: UnitCredentials }) {
   const [busy, setBusy] = useState(false);
+  // Whether this operator has actually taken a copy. The driver half cannot be
+  // recovered, so "you still have not saved it" is worth saying until they have.
+  const [saved, setSaved] = useState(false);
   // Open on arrival, because a freshly issued PIN is shown once and closing it
   // by default would hide the one thing that cannot be recovered. Foldable after
   // that: two QR codes are the tallest thing on the card.
   const [open, setOpen] = useState(true);
   const safeName = credentials.callSignLabel.replace(/[^\w-]+/g, "-");
+  // The driver half exists in this tab and nowhere else: the token is stored as
+  // a hash and the PIN with it, so a reload does not hide them, it loses them.
+  const hasDriverHalf = Boolean(credentials.driverQr || credentials.pin);
 
   async function saveWholeSheet() {
     setBusy(true);
     try {
       const dataUrl = await composeSheet(credentials);
-      if (dataUrl) saveDataUrl(dataUrl, `หน่วยรถ-${safeName}-QR.png`);
+      if (dataUrl) {
+        saveDataUrl(dataUrl, `หน่วยรถ-${safeName}-QR.png`);
+        setSaved(true);
+      }
     } finally {
       setBusy(false);
     }
@@ -219,13 +232,15 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
     <div className="grid gap-3 rounded-2xl border-2 border-teal-300 bg-teal-50/40 p-3 print:border-0 print:bg-white" data-credential-sheet>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-semibold text-teal-700">หน่วยรถพร้อมใช้งาน — QR ออกครบทั้ง 2 ใบแล้ว</p>
+          <p className="text-[11px] font-semibold text-teal-700">
+            {hasDriverHalf ? "หน่วยรถพร้อมใช้งาน — QR ออกครบทั้ง 2 ใบแล้ว" : "หน่วยรถพร้อมใช้งาน — แสดง QR ผู้โดยสารใบเดิม"}
+          </p>
           <p className="text-base font-bold text-ink">{credentials.callSignLabel}</p>
           <p className="text-[12px] text-ink-soft">
             คนขับ {credentials.driverName} · รถ {credentials.vehicleLabel}
           </p>
           <p className="mt-1 text-[11px] leading-4 text-teal-800">
-            แผ่น QR นี้จะค้างอยู่ในแท็บนี้ แม้กดซ่อนหรือรีเฟรชหน้าเบา ๆ และจะออกใบใหม่เฉพาะเมื่อกด “ออก QR ใหม่” จากการ์ดหน่วยรถเท่านั้น
+            QR ผู้โดยสารดูซ้ำได้ทุกเมื่อ เพราะเป็นลิงก์อ่านอย่างเดียว — ส่วน QR คนขับกับรหัส PIN เก็บเป็นค่าเข้ารหัส จึงแสดงได้ครั้งเดียวเท่านั้น
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5 print:hidden">
@@ -247,7 +262,10 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
           </button>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => {
+              setSaved(true);
+              window.print();
+            }}
             className="flex min-h-9 items-center gap-1.5 rounded-command bg-ink px-3 text-[12px] font-semibold text-white"
           >
             <Printer className="h-3.5 w-3.5" /> พิมพ์ / บันทึก PDF
@@ -255,6 +273,25 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
         </div>
       </div>
 
+
+      {hasDriverHalf ? (
+        <div
+          className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${
+            saved ? "border-emerald-300 bg-emerald-50" : "border-amber-400 bg-amber-50"
+          }`}
+        >
+          {saved ? (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+          ) : (
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+          )}
+          <p className={`text-[11px] font-semibold leading-4 ${saved ? "text-emerald-900" : "text-amber-900"}`}>
+            {saved
+              ? "บันทึกแล้ว — ตรวจดูว่าไฟล์หรือใบที่พิมพ์อ่านได้ครบก่อนปิดหน้านี้"
+              : "ต้องดาวน์โหลดหรือพิมพ์เดี๋ยวนี้ ก่อนปิดหรือรีเฟรชหน้านี้ — QR คนขับและรหัส PIN จะไม่แสดงอีก ถ้าพลาดต้องออกใบใหม่ ซึ่งใบที่แจกไปแล้วจะใช้ไม่ได้ทันที"}
+          </p>
+        </div>
+      ) : null}
 
       {open ? (
       <div className="grid gap-3 md:grid-cols-2">
@@ -267,6 +304,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
           url={credentials.driverUrl}
           filename={`QR-คนขับ-${safeName}.png`}
           pin={credentials.pin}
+          missingNote="QR คนขับแสดงได้ครั้งเดียวตอนออกใบ และไม่ได้เก็บไว้ในระบบ — กด “ออก QR ใหม่” ที่การ์ดหน่วยรถเพื่อออกใบใหม่ (ใบเดิมจะใช้ไม่ได้ทันที)"
         />
         <CredentialBlock
           tone="observer"

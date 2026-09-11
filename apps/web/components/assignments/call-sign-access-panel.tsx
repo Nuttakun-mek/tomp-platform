@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Eye, QrCode, RefreshCw, Trash2, Undo2 } from "lucide-react";
 import type { Assignment, CallSign, Driver, Vehicle } from "@tomp/types/domain";
@@ -96,6 +96,7 @@ export function CallSignAccessPanel({
   drivers,
   vehicles,
   issued = {},
+  observerLinks = {},
   onIssued
 }: {
   projectId: string;
@@ -105,6 +106,15 @@ export function CallSignAccessPanel({
   vehicles: Vehicle[];
   /** Credentials issued this session, keyed by unit — the PIN lives only here. */
   issued?: Record<string, UnitCredentials>;
+  /**
+   * The live passenger link per unit, read from the database on the server.
+   *
+   * The driver token cannot appear here and never will: it is stored as a hash,
+   * so after a reload there is genuinely nothing to draw. The observer link is
+   * read-only and is kept in the clear for exactly this reason (0036), which is
+   * why the passenger QR survives a refresh and the driver's does not.
+   */
+  observerLinks?: Record<string, string>;
   onIssued?: (credentials: UnitCredentials) => void;
 }) {
   const [message, setMessage] = useState<string | null>(null);
@@ -116,7 +126,36 @@ export function CallSignAccessPanel({
   // Collapsed by default once there are enough units to make the page long.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+  // Passenger QR codes drawn from the links already in the database, so the
+  // card is complete at load instead of only in the tab that issued it.
+  const [storedObserverQr, setStoredObserverQr] = useState<Record<string, string>>({});
   const router = useRouter();
+
+  const observerUrls = useMemo(() => {
+    // The row holds the token; the link is that token on this origin. Built on
+    // the client so the server does not have to know its own public URL here.
+    const origin = typeof window === "undefined" ? "" : window.location.origin;
+    const map: Record<string, string> = {};
+    for (const [callSignId, token] of Object.entries(observerLinks)) {
+      if (token) map[callSignId] = `${origin}/track/${encodeURIComponent(token)}`;
+    }
+    return map;
+  }, [observerLinks]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const drawn: Record<string, string> = {};
+      for (const [callSignId, url] of Object.entries(observerUrls)) {
+        const image = await renderQr(url).catch(() => null);
+        if (image) drawn[callSignId] = image;
+      }
+      if (!cancelled && Object.keys(drawn).length) setStoredObserverQr(drawn);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [observerUrls]);
 
   const units = useMemo<Unit[]>(() => {
     const driverById = new Map(drivers.map((d) => [d.id, d]));
@@ -249,6 +288,35 @@ export function CallSignAccessPanel({
     });
   }
 
+  /**
+   * What the unit's sheet should show right now.
+   *
+   * The two halves have different lifetimes and the card has to be honest about
+   * that: the driver half exists only in this tab until the page is reloaded,
+   * the passenger half is read back from the database every time. Merging them
+   * here is what stopped the sheet showing one half and claiming the other was
+   * never issued.
+   */
+  function sheetFor(unit: Unit): UnitCredentials | null {
+    const live = issued[unit.callSign.id];
+    const storedUrl = observerUrls[unit.callSign.id] ?? "";
+    const storedQr = storedObserverQr[unit.callSign.id] ?? null;
+    if (!live && !storedUrl) return null;
+    return {
+      callSignId: unit.callSign.id,
+      callSignLabel: unit.callSign.callSign,
+      driverName: live?.driverName ?? unit.driver?.fullName ?? "ไม่ทราบชื่อคนขับ",
+      vehicleLabel:
+        live?.vehicleLabel ??
+        (unit.vehicle ? `${unit.vehicle.plateNumber} · ${unit.vehicle.vehicleType}` : "ไม่ทราบรถ"),
+      driverUrl: live?.driverUrl ?? "",
+      driverQr: live?.driverQr ?? null,
+      pin: live?.pin ?? null,
+      observerUrl: live?.observerUrl || storedUrl,
+      observerQr: live?.observerQr || storedQr
+    };
+  }
+
   function issueObserverLink(unit: Unit) {
     setMessage(null);
     startTransition(async () => {
@@ -258,7 +326,7 @@ export function CallSignAccessPanel({
         setMessage(result.error || "สร้างลิงก์ไม่สำเร็จ");
         return;
       }
-      const data = result.data as { trackUrl?: string; accessUrl?: string };
+      const data = result.data as { trackUrl?: string; accessUrl?: string; reused?: boolean };
       const url = data.trackUrl || data.accessUrl || "";
 
       // This used to stop at the URL and render it as text, so the button called
@@ -278,7 +346,14 @@ export function CallSignAccessPanel({
       });
       setExpanded((current) => new Set(current).add(unit.callSign.id));
       setTone("success");
-      setMessage("สร้าง QR ผู้โดยสาร/ผู้ติดตามแล้ว ลิงก์นี้ดูตำแหน่งได้อย่างเดียว แก้ไขงานไม่ได้");
+      setMessage(
+        data.reused
+          ? "แสดง QR ผู้โดยสารใบเดิม ลิงก์นี้ยังใช้งานได้ ไม่ได้ออกใบใหม่"
+          : "สร้าง QR ผู้โดยสาร/ผู้ติดตามแล้ว ลิงก์นี้ดูตำแหน่งได้อย่างเดียว แก้ไขงานไม่ได้"
+      );
+      // A new link is now in the database; refresh so it is redrawn from there
+      // on the next load rather than living only in this tab.
+      if (!data.reused) router.refresh();
     });
   }
 
@@ -314,6 +389,8 @@ export function CallSignAccessPanel({
           const crewed = Boolean(unit.driver && unit.vehicle);
           const needsConfirm = confirmReissue === unit.callSign.id;
           const hasIssuedSheet = Boolean(issued[unit.callSign.id]);
+          const sheet = sheetFor(unit);
+          const hasObserverLink = Boolean(observerUrls[unit.callSign.id]);
           const open = expanded.has(unit.callSign.id);
           const accent = accentFor(unit.callSign.callSign);
 
@@ -373,7 +450,7 @@ export function CallSignAccessPanel({
                 ))}
               </dl>
 
-              {issued[unit.callSign.id] ? <UnitCredentialSheet credentials={issued[unit.callSign.id]} /> : null}
+              {sheet ? <UnitCredentialSheet credentials={sheet} /> : null}
 
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -392,9 +469,15 @@ export function CallSignAccessPanel({
                     type="button"
                     disabled={isPending || !crewed}
                     onClick={() => issueObserverLink(unit)}
+                    title={
+                      hasObserverLink
+                        ? "แสดง QR ผู้โดยสารใบเดิมที่ยังใช้งานได้"
+                        : "สร้าง QR สำหรับผู้โดยสาร/ผู้ติดตาม ดูตำแหน่งได้อย่างเดียว"
+                    }
                     className="flex min-h-9 items-center gap-1.5 rounded-command border border-slate-300 bg-white px-3 text-[12px] font-semibold text-ink-soft disabled:opacity-40"
                   >
-                    <Eye className="h-3.5 w-3.5" /> ลิงก์ผู้โดยสาร/ผู้ติดตาม
+                    <Eye className="h-3.5 w-3.5" />
+                    {hasObserverLink ? "แสดง QR ผู้โดยสาร" : "สร้าง QR ผู้โดยสาร/ผู้ติดตาม"}
                   </button>
                   <button
                     type="button"
