@@ -23,3 +23,61 @@ export function buildLocationPingPayload(input: DriverLocationPing): DriverLocat
 export function getLocationWarningMessage(health: DriverLocationHealth) {
   return health.status === "healthy" ? null : health.message;
 }
+
+// How often a stationary driver still reports, and how far they must move
+// before a fix is worth sending on its own.
+//
+// Both apps share this because both feed the same map. The mobile app had a
+// throttle and the web page had none, so a web driver wrote a row every few
+// seconds while moving and then — the moment the browser suspended the tab —
+// nothing at all, which the control room reads as "ขาดการอัปเดต" on a driver
+// who is simply sitting at a pickup with the screen off.
+//
+// The cadence rides along on every ping (`heartbeatMs`) so the control room
+// measures "overdue" against what the device actually promised, rather than a
+// constant that has to be kept in step by hand across two codebases.
+export const LOCATION_MOVED_METERS = 30;
+export const LOCATION_HEARTBEAT_MS = 2 * 60 * 1000;
+
+export interface LastSentFix {
+  latitude: number;
+  longitude: number;
+  at: number;
+}
+
+/** Metres between two coordinates; equirectangular is plenty at these distances. */
+export function distanceMeters(aLat: number, aLon: number, bLat: number, bLon: number) {
+  const toRad = Math.PI / 180;
+  const x = (bLon - aLon) * toRad * Math.cos(((aLat + bLat) / 2) * toRad);
+  const y = (bLat - aLat) * toRad;
+  return Math.sqrt(x * x + y * y) * 6371000;
+}
+
+export interface SendDecision {
+  /** Whether this fix should reach the server at all. */
+  send: boolean;
+  /** Whether the vehicle is standing still, which decides the map's wording. */
+  idle: boolean;
+}
+
+/**
+ * Should this fix be sent, and is the vehicle stationary?
+ *
+ * Always sent when it is not a routine ping (sharing started or stopped), when
+ * there is nothing to compare against yet, when the vehicle has moved, or when
+ * the heartbeat is due.
+ */
+export function decideLocationSend(
+  lastSent: LastSentFix | null,
+  latitude: number,
+  longitude: number,
+  trackingEvent: string,
+  now = Date.now()
+): SendDecision {
+  if (trackingEvent !== "location_ping" || !lastSent) return { send: true, idle: false };
+
+  const moved = distanceMeters(lastSent.latitude, lastSent.longitude, latitude, longitude);
+  if (moved >= LOCATION_MOVED_METERS) return { send: true, idle: false };
+  if (now - lastSent.at >= LOCATION_HEARTBEAT_MS) return { send: true, idle: true };
+  return { send: false, idle: true };
+}

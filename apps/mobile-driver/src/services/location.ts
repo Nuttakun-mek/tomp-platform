@@ -1,5 +1,6 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
+import { decideLocationSend, LOCATION_HEARTBEAT_MS, type LastSentFix } from "@tomp/driver-core";
 import { BACKGROUND_GPS_ENABLED, LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
 import { enqueueOfflineAction } from "./offline-queue";
@@ -27,37 +28,14 @@ let foregroundWatch: Location.LocationSubscription | null = null;
 // therefore carries the cadence it was sent under, so the control room measures
 // "overdue" against what this device actually promised rather than a constant
 // that has to be kept in sync by hand.
-const MOVED_METERS = 30;
-const IDLE_HEARTBEAT_MS = 2 * 60 * 1000;
-
-let lastSent: { latitude: number; longitude: number; at: number } | null = null;
+// The send rule — how far is "moved", how often a parked driver still reports,
+// and the cadence that rides along on every ping — lives in @tomp/driver-core so
+// the web page and this app cannot drift apart. They feed the same map.
+let lastSent: LastSentFix | null = null;
 
 export function resetLocationThrottle() {
   lastSent = null;
 }
-
-/** Metres between two coordinates (equirectangular is plenty at these distances). */
-function distanceMeters(aLat: number, aLon: number, bLat: number, bLon: number) {
-  const toRad = Math.PI / 180;
-  const x = (bLon - aLon) * toRad * Math.cos(((aLat + bLat) / 2) * toRad);
-  const y = (bLat - aLat) * toRad;
-  return Math.sqrt(x * x + y * y) * 6371000;
-}
-
-/**
- * Should this fix go to the server, and is the vehicle sitting still? A fix is
- * always sent when it is not a routine ping (sharing started/stopped), when the
- * vehicle has moved, or when the idle heartbeat is due.
- */
-function decideSend(latitude: number, longitude: number, trackingEvent: string, now = Date.now()) {
-  if (trackingEvent !== "location_ping" || !lastSent) return { send: true, idle: false };
-
-  const moved = distanceMeters(lastSent.latitude, lastSent.longitude, latitude, longitude);
-  if (moved >= MOVED_METERS) return { send: true, idle: false };
-  if (now - lastSent.at >= IDLE_HEARTBEAT_MS) return { send: true, idle: true };
-  return { send: false, idle: true };
-}
-
 
 export function isForegroundSharing() {
   return foregroundWatch !== null;
@@ -151,22 +129,33 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
 }
 
 async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0], mobileSession?: MobileDriverSession | null) {
-  const { send, idle } = decideSend(input.latitude, input.longitude, input.trackingEvent ?? "location_ping");
+  const { send, idle } = decideLocationSend(lastSent, input.latitude, input.longitude, input.trackingEvent ?? "location_ping");
   if (!send) return { success: true, skipped: true } as const;
 
   const payload = {
     ...input,
-    metadata: { ...(input.metadata ?? {}), heartbeatMs: IDLE_HEARTBEAT_MS, ...(idle ? { idle: true } : {}) }
+    metadata: { ...(input.metadata ?? {}), heartbeatMs: LOCATION_HEARTBEAT_MS, ...(idle ? { idle: true } : {}) }
   };
+  // Claim the slot before the network call, not after it.
+  //
+  // Two watchers run at once — foreground and background — and both reach
+  // decideSend before either finishes sending, so both saw the heartbeat as due
+  // and both sent it. Every heartbeat wrote two identical rows, which is how a
+  // 2-minute cadence showed up in the data as "121s, 0s, 122s, 0s".
+  const previous = lastSent;
+  lastSent = { latitude: input.latitude, longitude: input.longitude, at: Date.now() };
+
   const session = mobileSession ?? (await getMobileDriverSession());
   const result = await submitLocation(payload, session).catch((error) => ({
     success: false,
     error: error instanceof Error ? error.message : "ส่งตำแหน่งไม่สำเร็จ"
   }));
 
-  if (result.success) {
-    lastSent = { latitude: input.latitude, longitude: input.longitude, at: Date.now() };
-  } else {
+  if (!result.success) {
+    // Put the claim back: a failed send must not buy silence for a whole
+    // heartbeat, or one dropped request reads to the control room as a driver
+    // who has gone offline.
+    lastSent = previous;
     await enqueueOfflineAction("location", payload);
   }
   return result;

@@ -3,10 +3,13 @@
 import {
   buildBridgeMessage,
   buildLocationPingPayload,
+  decideLocationSend,
   evaluateLocationHealth,
   getMobileShell,
+  LOCATION_HEARTBEAT_MS,
   NATIVE_STATUS_EVENT,
-  parseNativeStatusDetail
+  parseNativeStatusDetail,
+  type LastSentFix
 } from "@tomp/driver-core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, MapPin } from "lucide-react";
@@ -53,6 +56,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   const [mapOpen, setMapOpen] = useState(true);
   const [cardOpen, setCardOpen] = useState(true);
   const [canResume, setCanResume] = useState(false);
+  const lastSentRef = useRef<LastSentFix | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
   const lastLocationRef = useRef<LastLocation | null>(null);
@@ -100,7 +104,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   );
 
   const postLocation = useCallback(
-    async (location: LastLocation, trackingEvent: TrackingEvent) => {
+    async (location: LastLocation, trackingEvent: TrackingEvent, idle = false) => {
       const ping = buildLocationPingPayload({
         projectId: driverAccess.project.id,
         assignmentId: driverAccess.assignment.id,
@@ -132,7 +136,11 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
             driverName: driverAccess.driver.fullName,
             driverPhone: driverAccess.driver.phone,
             vehiclePlate: driverAccess.vehicle.plateNumber,
-            assignmentStatus: driverAccess.assignment.status
+            assignmentStatus: driverAccess.assignment.status,
+            // Read by lib/domain/gps-freshness: judge "overdue" against the
+            // cadence this device promised, not the browser-tuned constants.
+            heartbeatMs: LOCATION_HEARTBEAT_MS,
+            ...(idle ? { idle: true } : {})
           }
         })
       });
@@ -144,6 +152,18 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
 
   const sendPosition = useCallback(
     async (position: GeolocationPosition, trackingEvent: TrackingEvent) => {
+      // watchPosition fires every few seconds whether or not the vehicle moved,
+      // and every one of those used to become a row. The same rule the mobile
+      // app follows applies here — both feed the same map — so a parked driver
+      // beats once per heartbeat and the ping carries the cadence it promised.
+      const { send, idle } = decideLocationSend(
+        lastSentRef.current,
+        position.coords.latitude,
+        position.coords.longitude,
+        trackingEvent
+      );
+      if (!send) return;
+
       const location: LastLocation = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -151,13 +171,24 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
         recordedAt: new Date(position.timestamp).toISOString(),
         sentAt: new Date().toISOString()
       };
-      await postLocation(location, trackingEvent);
+
+      // Claim the slot before awaiting, and hand it back on failure: a dropped
+      // request must not buy silence for a whole heartbeat.
+      const previous = lastSentRef.current;
+      lastSentRef.current = { latitude: location.latitude, longitude: location.longitude, at: Date.now() };
+      try {
+        await postLocation(location, trackingEvent, idle);
+      } catch (error) {
+        lastSentRef.current = previous;
+        throw error;
+      }
       markFresh(location);
     },
     [markFresh, postLocation]
   );
 
   const startSharing = useCallback(async () => {
+    lastSentRef.current = null;
     if (watchIdRef.current != null) return;
     const shell = getMobileShell(window);
     if (shell?.canBackgroundLocation) {
