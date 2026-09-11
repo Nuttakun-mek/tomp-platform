@@ -226,6 +226,13 @@ export default function App() {
         return;
       }
 
+      // Everything below is gps.start, and it says so. It used to be the
+      // fall-through, which only stayed correct because parseBridgeMessage
+      // happens to reject unknown types — so the day a fifth message is added to
+      // the parser, every older build would start GPS for it. Naming the case
+      // makes an unknown message do nothing, which is what it should do.
+      if (parsed.type !== "gps.start") return;
+
       const session = await getMobileDriverSession();
       if (!session) {
         setSessionReady(false);

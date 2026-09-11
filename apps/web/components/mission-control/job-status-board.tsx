@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
+import { CancelAssignmentButton } from "@/components/assignments/cancel-assignment-button";
+import { ParkAssignmentButton } from "@/components/assignments/park-assignment-button";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
 // Eight kanban lanes needed a sideways scroll to read, which on an operations
@@ -13,6 +15,11 @@ import { formatStatusTh } from "@/lib/i18n/status-th";
 // It lives in ศูนย์ควบคุม rather than จัดงาน because it answers "where does
 // everything stand", not "what shall I set up". จัดงาน already shows each unit's
 // own jobs in running order, which is the planning question.
+//
+// Parking and cancelling live here too. They were on the lane board this
+// replaced, and moving the board without them left the control room's only
+// escape hatch — for a driver stuck on a job that cannot be completed — with no
+// button anywhere, while the action it calls sat there working.
 
 const GROUPS: Array<{ key: string; label: string; match: (a: Assignment) => boolean; tone: string }> = [
   { key: "attention", label: "ต้องติดตาม", tone: "bg-rose-100 text-rose-800 ring-rose-200", match: (a) => ["draft", "planned"].includes(a.status) && (!a.driverId || !a.vehicleId || !a.callSignId) },
@@ -26,6 +33,11 @@ const GROUPS: Array<{ key: string; label: string; match: (a: Assignment) => bool
 ];
 
 const TH_DAY = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short" });
+
+/** Work that is finished or withdrawn has nothing left to withdraw. */
+const canCancel = (status: string) => !["completed", "cancelled", "archived"].includes(status);
+/** Parking only makes sense for work that is scheduled or under way. */
+const canPark = (status: string) => ["published", "acknowledged", "active", "planned"].includes(status);
 
 function whenLabel(start?: string | null, end?: string | null) {
   if (!start && !end) return "ยังไม่ระบุเวลา";
@@ -119,8 +131,16 @@ export function JobStatusBoard({
                   {vehicleById.get(assignment.vehicleId ?? "") ?? "ยังไม่มีรถ"}
                 </span>
               </span>
-              <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                {formatStatusTh(assignment.status)}
+              <span className="flex shrink-0 items-center gap-1.5">
+                <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
+                  {formatStatusTh(assignment.status)}
+                </span>
+                {canPark(assignment.status) ? (
+                  <ParkAssignmentButton projectId={assignment.projectId} assignmentId={assignment.id} />
+                ) : null}
+                {canCancel(assignment.status) ? (
+                  <CancelAssignmentButton projectId={assignment.projectId} assignmentId={assignment.id} />
+                ) : null}
               </span>
             </li>
           ))}
