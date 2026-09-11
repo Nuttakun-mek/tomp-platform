@@ -20,22 +20,31 @@ export const GPS_IDLE_SECONDS = 390;
  */
 export const GPS_HEARTBEAT_SLACK_SECONDS = 60;
 /**
- * The same allowance for a device that says it is standing still.
+ * How long a device that reports its own cadence may go quiet before the board
+ * gives up on it.
  *
- * A parked phone cannot keep the cadence it promised, and the reason is the
- * reason it is parked: Android defers background work once the device stops
- * moving and the screen goes off, foreground service or not. Measured on a real
- * driver on 2026-09-11 — while moving the pings arrived every 32s like clockwork,
- * and the moment the vehicle stopped the gaps went 175s, then 401s, against a
- * 180s limit. The control room watched a driver standing exactly where they were
- * told to wait turn red.
+ * Between the fresh window above and this one, the unit reads as parked rather
+ * than missing. That band exists because of how Android actually behaves: once
+ * the device stops moving and the screen goes off it defers background work,
+ * foreground service or not, and the app can only send a heartbeat when the OS
+ * hands it a location. Measured on a real driver on 2026-09-11 — pings every 32s
+ * while the vehicle moved, then 175s, then 401s once it stopped.
  *
- * So a stationary device is judged more loosely than a moving one. The cost is
- * that a phone which genuinely dies while parked takes longer to show red; that
- * is the right trade, because a driver who parks is common and a driver whose
- * phone dies is rare, and the false red was arriving several times an hour.
+ * The band is keyed on the cadence being reported at all, deliberately **not**
+ * on whether the last ping was flagged idle. Keying it on the flag was the first
+ * attempt and it broke in traffic: a vehicle creeping forward more than
+ * LOCATION_MOVED_METERS sends that ping as moving, so the next deferral was
+ * judged against the tight window and a driver sitting in a jam went red. Stop-
+ * and-go is the normal state of a Bangkok shift, not an edge case.
+ *
+ * Fifteen minutes is chosen against what the states look like from the server:
+ * a throttled-but-healthy device keeps trickling pings — minutes apart, but they
+ * arrive — while a phone that is dead, killed, or has stopped sharing sends
+ * nothing further at all. Fifteen minutes is past any deferral seen in practice
+ * and still soon enough that a dispatcher hears about a genuinely lost vehicle
+ * while it matters.
  */
-export const GPS_IDLE_HEARTBEAT_SLACK_SECONDS = 300;
+export const GPS_THROTTLED_SECONDS = 15 * 60;
 
 type Recorded = string | number | Date | null | undefined;
 
@@ -70,8 +79,12 @@ export function gpsFreshness(
   const cadence = pingCadenceSeconds(metadata);
 
   if (cadence !== null) {
-    const slack = idle ? GPS_IDLE_HEARTBEAT_SLACK_SECONDS : GPS_HEARTBEAT_SLACK_SECONDS;
-    if (ageSeconds <= cadence + slack) return idle ? "idle" : "live";
+    // Reporting on time: believe what the ping says it was doing.
+    if (ageSeconds <= cadence + GPS_HEARTBEAT_SLACK_SECONDS) return idle ? "idle" : "live";
+    // Late, but not gone. A device only falls this far behind when it has been
+    // sitting still long enough for the OS to defer it — so "parked" is not a
+    // guess here, it is what the silence means.
+    if (ageSeconds <= GPS_THROTTLED_SECONDS) return "idle";
     return "offline";
   }
 
