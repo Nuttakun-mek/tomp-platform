@@ -20,31 +20,25 @@ export const GPS_IDLE_SECONDS = 390;
  */
 export const GPS_HEARTBEAT_SLACK_SECONDS = 60;
 /**
- * How long a device that reports its own cadence may go quiet before the board
- * gives up on it.
+ * How long the "slow signal" warning lasts before a unit is written off, counted
+ * from the moment its own promised cadence lapsed.
  *
- * Between the fresh window above and this one, the unit reads as parked rather
- * than missing. That band exists because of how Android actually behaves: once
- * the device stops moving and the screen goes off it defers background work,
- * foreground service or not, and the app can only send a heartbeat when the OS
- * hands it a location. Measured on a real driver on 2026-09-11 — pings every 32s
- * while the vehicle moved, then 175s, then 401s once it stopped.
+ * It is measured from the end of the fresh window rather than from the last ping,
+ * so it scales with whatever the device promised. A fixed deadline could fall
+ * *inside* the fresh window of a device on a slow cadence — a ten-minute
+ * heartbeat against a ten-minute deadline — and declare a unit offline while it
+ * was still keeping its word.
  *
- * The band is keyed on the cadence being reported at all, deliberately **not**
- * on whether the last ping was flagged idle. Keying it on the flag was the first
- * attempt and it broke in traffic: a vehicle creeping forward more than
- * LOCATION_MOVED_METERS sends that ping as moving, so the next deferral was
- * judged against the tight window and a driver sitting in a jam went red. Stop-
- * and-go is the normal state of a Bangkok shift, not an edge case.
+ * The warning itself is why this can be generous without deceiving anyone: the
+ * board says "slow signal" from the moment the link goes quiet, so nobody is
+ * looking at a calm colour and believing the position is current. A long fuse is
+ * only a lie when the states before it look fine.
  *
- * Fifteen minutes is chosen against what the states look like from the server:
- * a throttled-but-healthy device keeps trickling pings — minutes apart, but they
- * arrive — while a phone that is dead, killed, or has stopped sharing sends
- * nothing further at all. Fifteen minutes is past any deferral seen in practice
- * and still soon enough that a dispatcher hears about a genuinely lost vehicle
- * while it matters.
+ * Seven minutes past the promise is beyond any deferral seen in practice —
+ * measured gaps on a parked Android reached 401 seconds — while still bounding
+ * how long a dead phone sits on the board as merely slow.
  */
-export const GPS_THROTTLED_SECONDS = 15 * 60;
+export const GPS_SLOW_GRACE_SECONDS = 7 * 60;
 
 type Recorded = string | number | Date | null | undefined;
 
@@ -81,10 +75,13 @@ export function gpsFreshness(
   if (cadence !== null) {
     // Reporting on time: believe what the ping says it was doing.
     if (ageSeconds <= cadence + GPS_HEARTBEAT_SLACK_SECONDS) return idle ? "idle" : "live";
-    // Late, but not gone. A device only falls this far behind when it has been
-    // sitting still long enough for the OS to defer it — so "parked" is not a
-    // guess here, it is what the silence means.
-    if (ageSeconds <= GPS_THROTTLED_SECONDS) return "idle";
+    // Late, but not yet gone — and said so plainly. This band was first written
+    // as "idle", which put a unit nobody had heard from in ten minutes on the
+    // board in the same calm blue as one reporting perfectly. That reads as a
+    // live connection, and a position that old is exactly when an operator most
+    // needs to know not to trust it. "Slow signal" is the honest word for a
+    // device whose last fix has aged past the cadence it promised.
+    if (ageSeconds <= cadence + GPS_HEARTBEAT_SLACK_SECONDS + GPS_SLOW_GRACE_SECONDS) return "slow";
     return "offline";
   }
 

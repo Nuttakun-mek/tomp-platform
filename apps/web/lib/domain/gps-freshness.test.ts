@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   GPS_HEARTBEAT_SLACK_SECONDS,
-  GPS_THROTTLED_SECONDS,
+  GPS_SLOW_GRACE_SECONDS,
   GPS_IDLE_SECONDS,
   gpsFreshness,
   gpsFreshnessLabel,
@@ -97,7 +97,9 @@ describe("a device that reports its own cadence", () => {
   // red, which is what the control room reported.
   it("survives the gaps Android actually produces once a vehicle stops", () => {
     expect(gpsFreshness(agoFrom(175), "location_ping", now, app({ idle: true }))).toBe("idle");
-    expect(gpsFreshness(agoFrom(401), "location_ping", now, app({ idle: true }))).toBe("idle");
+    // Still on the board rather than written off — but named as a slow signal,
+    // because nobody has heard from it for nearly seven minutes.
+    expect(gpsFreshness(agoFrom(401), "location_ping", now, app({ idle: true }))).toBe("slow");
   });
 
   // The case that broke the first attempt at this. A vehicle creeping through a
@@ -105,31 +107,40 @@ describe("a device that reports its own cadence", () => {
   // like anything else standing still. Judging that gap on the tight window put a
   // driver stuck in traffic on the board as missing.
   it("does not call a driver in stop-and-go traffic offline", () => {
-    expect(gpsFreshness(agoFrom(401), "location_ping", now, app())).toBe("idle");
-    expect(gpsFreshness(agoFrom(600), "location_ping", now, app())).toBe("idle");
+    expect(gpsFreshness(agoFrom(401), "location_ping", now, app())).toBe("slow");
+    expect(gpsFreshness(agoFrom(600), "location_ping", now, app())).toBe("slow");
+  });
+
+  // The board must never show a calm colour for a link that has gone quiet:
+  // that is a live connection to anyone reading it, at the exact moment the
+  // position is least worth trusting.
+  it("never reads as fresh once the promised cadence has lapsed", () => {
+    for (const age of [200, 401, 600, 599]) {
+      expect(["live", "idle"]).not.toContain(gpsFreshness(agoFrom(age), "location_ping", now, app({ idle: true })));
+    }
   });
 
   it("still gives up on a device that has genuinely gone", () => {
-    expect(gpsFreshness(agoFrom(GPS_THROTTLED_SECONDS), "location_ping", now, app())).toBe("idle");
-    expect(gpsFreshness(agoFrom(GPS_THROTTLED_SECONDS + 1), "location_ping", now, app())).toBe("offline");
-    expect(gpsFreshness(agoFrom(GPS_THROTTLED_SECONDS + 1), "location_ping", now, app({ idle: true }))).toBe("offline");
+    const gone = 120 + GPS_HEARTBEAT_SLACK_SECONDS + GPS_SLOW_GRACE_SECONDS;
+    expect(gpsFreshness(agoFrom(gone), "location_ping", now, app())).toBe("slow");
+    expect(gpsFreshness(agoFrom(gone + 1), "location_ping", now, app())).toBe("offline");
+    expect(gpsFreshness(agoFrom(gone + 1), "location_ping", now, app({ idle: true }))).toBe("offline");
   });
 
   it("counts a device as offline once it is past its cadence plus slack", () => {
     expect(gpsFreshness(agoFrom(120 + GPS_HEARTBEAT_SLACK_SECONDS), "location_ping", now, app())).toBe("live");
     // Past the fresh window it reads as parked rather than missing - the point
     // of the middle band - and only turns red past GPS_THROTTLED_SECONDS.
-    expect(gpsFreshness(agoFrom(120 + GPS_HEARTBEAT_SLACK_SECONDS + 1), "location_ping", now, app())).toBe("idle");
+    expect(gpsFreshness(agoFrom(120 + GPS_HEARTBEAT_SLACK_SECONDS + 1), "location_ping", now, app())).toBe("slow");
   });
 
   it("keeps a parked driver parked for the whole window", () => {
     expect(gpsFreshness(agoFrom(5), "location_ping", now, app({ idle: true }))).toBe("idle");
     expect(gpsFreshness(agoFrom(170), "location_ping", now, app({ idle: true }))).toBe("idle");
-    expect(gpsFreshness(agoFrom(200), "location_ping", now, app({ idle: true }))).toBe("idle");
-    expect(gpsFreshness(agoFrom(900), "location_ping", now, app({ idle: true }))).toBe("idle");
+    expect(gpsFreshness(agoFrom(200), "location_ping", now, app({ idle: true }))).toBe("slow");
   });
 
-  it("never shows the amber warning for a device on a known cadence", () => {
+  it("shows no amber warning while the device is keeping its promise", () => {
     for (const age of [40, 90, 130, 175]) {
       expect(gpsFreshness(agoFrom(age), "location_ping", now, app())).not.toBe("slow");
     }
@@ -141,9 +152,10 @@ describe("a device that reports its own cadence", () => {
     // have called it lost several minutes ago.
     expect(gpsFreshness(agoFrom(500), "location_ping", now, slow)).toBe("live");
     // Past that promise it drops to parked, not missing...
-    expect(gpsFreshness(agoFrom(700), "location_ping", now, slow)).toBe("idle");
-    // ...and only counts as gone once nothing has arrived for the throttle window.
-    expect(gpsFreshness(agoFrom(GPS_THROTTLED_SECONDS + 1), "location_ping", now, slow)).toBe("offline");
+    expect(gpsFreshness(agoFrom(700), "location_ping", now, slow)).toBe("slow");
+    // ...and the grace runs from *its* promise, not from a fixed clock, so a
+    // ten-minute cadence is never called offline while it is still keeping it.
+    expect(gpsFreshness(agoFrom(600 + GPS_HEARTBEAT_SLACK_SECONDS + GPS_SLOW_GRACE_SECONDS + 1), "location_ping", now, slow)).toBe("offline");
   });
 
   it("ignores a cadence that is not a usable number", () => {
