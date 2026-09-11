@@ -66,3 +66,32 @@ describe("decideLocationSend", () => {
     expect(jitter).toEqual({ send: false, idle: true });
   });
 });
+
+describe("a fix too vague to prove anything", () => {
+  const here = { latitude: 13.85, longitude: 100.55, at: Date.now() - 10_000 };
+
+  // Cell-tower positions are accurate to about 100 metres and repeat the same
+  // coordinates fix after fix, because the tower does not move. Read literally
+  // that is "moved 0 metres", which is how a vehicle driving across town was
+  // reported as parked on 2026-09-11 until a real GPS fix jumped the marker 1.2km.
+  it("does not claim a vehicle is parked on a 100-metre fix", () => {
+    const decision = decideLocationSend(here, 13.85, 100.55, "location_ping", Date.now(), 100);
+    expect(decision.idle).toBe(false);
+  });
+
+  it("still trusts a fix precise enough to measure the distance it is judging", () => {
+    const decision = decideLocationSend(here, 13.85, 100.55, "location_ping", Date.now(), 12);
+    expect(decision.idle).toBe(true);
+  });
+
+  it("behaves as before when the device reports no accuracy at all", () => {
+    expect(decideLocationSend(here, 13.85, 100.55, "location_ping", Date.now()).idle).toBe(true);
+    expect(decideLocationSend(here, 13.85, 100.55, "location_ping", Date.now(), null).idle).toBe(true);
+  });
+
+  it("a coarse fix that did move is still movement", () => {
+    const decision = decideLocationSend(here, 13.8545, 100.55, "location_ping", Date.now(), 100);
+    expect(decision.send).toBe(true);
+    expect(decision.idle).toBe(false);
+  });
+});

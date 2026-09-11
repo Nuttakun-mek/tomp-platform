@@ -72,12 +72,23 @@ export function decideLocationSend(
   latitude: number,
   longitude: number,
   trackingEvent: string,
-  now = Date.now()
+  now = Date.now(),
+  accuracyMeters?: number | null
 ): SendDecision {
   if (trackingEvent !== "location_ping" || !lastSent) return { send: true, idle: false };
 
   const moved = distanceMeters(lastSent.latitude, lastSent.longitude, latitude, longitude);
   if (moved >= LOCATION_MOVED_METERS) return { send: true, idle: false };
-  if (now - lastSent.at >= LOCATION_HEARTBEAT_MS) return { send: true, idle: true };
-  return { send: false, idle: true };
+
+  // A fix cannot prove the vehicle stayed put if it is vaguer than the distance
+  // being measured. Cell-tower positions are accurate to about 100 metres and
+  // repeat the same coordinates fix after fix, so "moved 0 metres" was read as
+  // "parked" for a vehicle driving across town — until a real GPS fix landed and
+  // the marker jumped a kilometre. Where the fix is too coarse to tell, say so
+  // rather than claiming the vehicle is stationary.
+  const tooCoarseToTell =
+    typeof accuracyMeters === "number" && Number.isFinite(accuracyMeters) && accuracyMeters > LOCATION_MOVED_METERS;
+
+  if (now - lastSent.at >= LOCATION_HEARTBEAT_MS) return { send: true, idle: !tooCoarseToTell };
+  return { send: false, idle: !tooCoarseToTell };
 }

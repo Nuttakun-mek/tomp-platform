@@ -167,7 +167,9 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
         lastSentRef.current,
         position.coords.latitude,
         position.coords.longitude,
-        trackingEvent
+        trackingEvent,
+        Date.now(),
+        position.coords.accuracy
       );
       if (!send) return;
 

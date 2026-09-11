@@ -187,7 +187,14 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
 }
 
 async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0], mobileSession?: MobileDriverSession | null) {
-  const { send, idle } = decideLocationSend(lastSent, input.latitude, input.longitude, input.trackingEvent ?? "location_ping");
+  const { send, idle } = decideLocationSend(
+    lastSent,
+    input.latitude,
+    input.longitude,
+    input.trackingEvent ?? "location_ping",
+    Date.now(),
+    input.accuracy
+  );
   if (!send) return { success: true, skipped: true } as const;
 
   const payload = {
@@ -297,7 +304,18 @@ export async function startBackgroundLocationSharing() {
     const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
     if (alreadyStarted) return true;
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.Balanced,
+      // High, not Balanced. Balanced resolves from cell towers and wifi, which
+      // on a real shift produced fixes accurate to 100 metres — and worse than
+      // coarse, they were *identical* fix after fix, because a cell tower does
+      // not move. The send rule compares against the last position, read zero
+      // metres of movement, and reported a vehicle driving across town as parked
+      // at the tower. Then a real GPS fix arrived and the marker jumped 1.2km.
+      //
+      // Measured 2026-09-11: accuracy swung 10m, 83m, 100m, 48m, 100m, with the
+      // 100m readings repeating the same coordinates for twenty minutes. The web
+      // page has always asked for high accuracy, which is why this only appeared
+      // when drivers moved from the browser to the app.
+      accuracy: Location.Accuracy.High,
       // Deliberately 0 on both platforms — the opposite of the foreground
       // watcher, and for a reason that only shows up in the background.
       //
