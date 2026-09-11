@@ -20,6 +20,14 @@ import {
 import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
 import * as ExpoLinking from "expo-linking";
 import * as Network from "expo-network";
+import { useFonts } from "expo-font";
+import {
+  NotoSansThai_400Regular,
+  NotoSansThai_500Medium,
+  NotoSansThai_600SemiBold,
+  NotoSansThai_700Bold,
+  NotoSansThai_900Black
+} from "@expo-google-fonts/noto-sans-thai";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
@@ -38,7 +46,13 @@ import {
 } from "./src/services/location";
 import { promptBatteryExemptionOnce } from "./src/services/battery";
 import { exchangeMobileSessionChallenge } from "./src/services/mobile-session-api";
-import { addNotificationTapListener, clearDeliveredNotifications, registerForPushNotifications, syncPushToken } from "./src/services/push";
+import {
+  addNotificationReceivedListener,
+  addNotificationTapListener,
+  clearDeliveredNotifications,
+  registerForPushNotifications,
+  syncPushToken
+} from "./src/services/push";
 import { getInstallationId, getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
 import { flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-queue";
 import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
@@ -50,14 +64,14 @@ import { getMobileLocale, saveMobileLocale } from "./src/services/locale-store";
 const DriverWebView = WebView as unknown as ComponentType<WebViewProps & RefAttributes<WebView>>;
 
 type ShellMode = "activation" | "web";
-type ShellStatus = "พร้อมเปิดงาน" | "กำลังเปิดงาน" | "กำลังใช้งาน" | "ต้องตรวจสอบ";
+type ShellStatus = "รอรับงาน" | "กำลังเปิดข้อมูล" | "อยู่ระหว่างปฏิบัติงาน" | "ต้องตรวจสอบ";
 type DriverMenuKey = "home" | "next" | "messages" | "location";
 
 const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; view?: DriverWebViewKey }> = [
-  { key: "home", label: "หน้างาน", view: "home" },
-  { key: "next", label: "งานต่อไป", view: "next" },
+  { key: "home", label: "ภารกิจ", view: "home" },
+  { key: "next", label: "แผนงาน", view: "next" },
   { key: "messages", label: "ข้อความ", view: "messages" },
-  { key: "location", label: "แชร์ตำแหน่ง", view: "gps" }
+  { key: "location", label: "ตั้งค่า GPS", view: "gps" }
 ];
 
 const bridgeBootstrap = `
@@ -78,9 +92,16 @@ const bridgeBootstrap = `
 `;
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    NotoSansThai_400Regular,
+    NotoSansThai_500Medium,
+    NotoSansThai_600SemiBold,
+    NotoSansThai_700Bold,
+    NotoSansThai_900Black
+  });
   const webViewRef = useRef<WebView>(null);
   const [mode, setMode] = useState<ShellMode>("activation");
-  const [status, setStatus] = useState<ShellStatus>("พร้อมเปิดงาน");
+  const [status, setStatus] = useState<ShellStatus>("รอรับงาน");
   const [tokenInput, setTokenInput] = useState("");
   const [currentToken, setCurrentToken] = useState("");
   const [webUrl, setWebUrl] = useState("");
@@ -93,19 +114,35 @@ export default function App() {
   const localeRef = useRef<MobileLocale>("th");
   const [sessionReady, setSessionReady] = useState(false);
   const [networkLabel, setNetworkLabel] = useState("กำลังตรวจสอบสัญญาณ");
+  const [networkConnected, setNetworkConnected] = useState<boolean | null>(null);
+  const [locationSharingActive, setLocationSharingActive] = useState(false);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
   const [outboxCount, setOutboxCount] = useState(0);
   const [syncLabel, setSyncLabel] = useState("");
   const [activeDriverMenu, setActiveDriverMenu] = useState<DriverMenuKey>("home");
+  const activeDriverMenuRef = useRef<DriverMenuKey>("home");
+  const currentTokenRef = useRef("");
 
   const activeWebView = useMemo(
     () => DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.view ?? "home",
     [activeDriverMenu]
   );
+  const networkTone = locationSharingActive ? "live" : networkConnected === false ? "offline" : "idle";
+  const networkDisplayLabel =
+    networkConnected === false ? "ออฟไลน์" : locationSharingActive ? "ออนไลน์ · กำลังส่ง GPS" : "ออนไลน์ · ยังไม่ได้ส่ง GPS";
   const effectiveWebUrl = useMemo(
     () => webUrl || (currentToken ? buildDriverWebUrl(currentToken, locale, activeWebView) : ""),
     [activeWebView, currentToken, locale, webUrl]
   );
+
+  useEffect(() => {
+    activeDriverMenuRef.current = activeDriverMenu;
+  }, [activeDriverMenu]);
+
+  useEffect(() => {
+    currentTokenRef.current = currentToken;
+  }, [currentToken]);
 
   const changeLocale = useCallback((nextLocale: MobileLocale) => {
     localeRef.current = nextLocale;
@@ -162,15 +199,17 @@ export default function App() {
       localeRef.current = parsed.locale;
       setLocale(parsed.locale);
       void saveMobileLocale(parsed.locale);
+      currentTokenRef.current = parsed.token;
       setCurrentToken(parsed.token);
       setTokenInput(parsed.token);
       setWebUrl(buildDriverWebUrl(parsed.token, parsed.locale, "home"));
       setScannerOpen(false);
       setQrLocked(false);
+      activeDriverMenuRef.current = "home";
       setActiveDriverMenu("home");
       setMode("web");
-      setStatus("กำลังเปิดงาน");
-      setMessage(parsed.source === "raw-token" ? "กำลังเปิดงานจาก token" : "กำลังเปิดงานจาก QR");
+      setStatus("กำลังเปิดข้อมูล");
+      setMessage(parsed.source === "raw-token" ? "กำลังเปิดข้อมูลจาก token" : "กำลังเปิดข้อมูลจาก QR");
     },
     []
   );
@@ -239,9 +278,15 @@ export default function App() {
         return;
       }
 
+      if (parsed.type === "driver.notification.unread") {
+        setHasUnreadMessages(activeDriverMenuRef.current !== "messages");
+        return;
+      }
+
       if (parsed.type === "gps.stop") {
         await stopLocationSharing();
-        postStatusToWeb("gps_stopped", "หยุดแชร์ตำแหน่งจากแอปแล้ว");
+        setLocationSharingActive(false);
+        postStatusToWeb("gps_stopped", "หยุดส่งตำแหน่ง GPS จากแอปแล้ว");
         return;
       }
 
@@ -255,6 +300,7 @@ export default function App() {
       const session = await getMobileDriverSession();
       if (!session) {
         setSessionReady(false);
+        setLocationSharingActive(false);
         postStatusToWeb("session_missing", "ยังไม่พร้อมส่งตำแหน่ง GPS เบื้องหลัง กรุณายืนยันงานในหน้าคนขับก่อน");
         return;
       }
@@ -262,19 +308,22 @@ export default function App() {
       // A repeat gps.start (the web "share again" button) must not stack a
       // second watcher on top of the running one.
       if (isForegroundSharing()) {
-        postStatusToWeb("gps_sharing", "กำลังแชร์ตำแหน่งจากแอปอยู่แล้ว");
+        setLocationSharingActive(true);
+        postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่แล้ว");
         return;
       }
 
       const foregroundGranted = await requestForegroundLocationPermission();
       if (!foregroundGranted) {
+        setLocationSharingActive(false);
         postStatusToWeb("gps_error", "ไม่ได้รับสิทธิ์ตำแหน่งขณะเปิดแอป");
         return;
       }
 
-      postStatusToWeb("gps_starting", "กำลังเริ่มแชร์ตำแหน่งจากแอป");
+      setLocationSharingActive(true);
+      postStatusToWeb("gps_starting", "กำลังเริ่มส่งตำแหน่ง GPS จากแอป");
       await startForegroundLocationSharing((location) => {
-        postStatusToWeb("gps_sharing", "กำลังแชร์ตำแหน่งจากแอป", {
+        postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอป", {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           accuracy: location.coords.accuracy,
@@ -297,7 +346,7 @@ export default function App() {
         "gps_sharing",
         backgroundStarted
           ? "เปิด GPS เบื้องหลังแล้ว"
-          : "แชร์ตำแหน่งขณะเปิดแอปแล้ว — เปิด GPS เบื้องหลังได้โดยตั้งค่าตำแหน่งเป็น อนุญาตตลอดเวลา"
+          : "ส่งตำแหน่ง GPS ขณะเปิดแอปแล้ว หากต้องการส่งต่อเนื่องเมื่อปิดจอ ให้ตั้งค่าสิทธิ์ตำแหน่งเป็น อนุญาตตลอดเวลา"
       );
     },
     [flushOutbox, postStatusToWeb]
@@ -307,16 +356,17 @@ export default function App() {
     (event: WebViewNavigation) => {
       setCanGoBack(event.canGoBack);
       if (event.loading) {
-        setStatus("กำลังเปิดงาน");
+        setStatus("กำลังเปิดข้อมูล");
         return;
       }
-      setStatus("กำลังใช้งาน");
+      setStatus("อยู่ระหว่างปฏิบัติงาน");
       setMessage("เปิดหน้าคนขับผ่าน TOMP Web แล้ว");
 
       // The page loads with no idea what the shell is doing, so it offered
       // "share again" while sharing was already running. Tell it the truth.
       if (isForegroundSharing()) {
-        postStatusToWeb("gps_sharing", "กำลังแชร์ตำแหน่งจากแอปอยู่");
+        setLocationSharingActive(true);
+        postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่");
       }
     },
     [postStatusToWeb]
@@ -331,17 +381,24 @@ export default function App() {
   }, [postStatusToWeb]);
 
   const openDriverMenu = useCallback((item: { key: DriverMenuKey; view?: DriverWebViewKey }) => {
+    activeDriverMenuRef.current = item.key;
     setActiveDriverMenu(item.key);
+    if (item.key === "messages") {
+      setHasUnreadMessages(false);
+      void clearDeliveredNotifications();
+    }
     if (currentToken && item.view) setWebUrl(buildDriverWebUrl(currentToken, localeRef.current, item.view));
   }, [currentToken]);
 
   const resetAssignment = useCallback(async () => {
     await stopLocationSharing().catch(() => undefined);
     await clearDriverToken();
+    currentTokenRef.current = "";
+    activeDriverMenuRef.current = "home";
     setCurrentToken("");
     setWebUrl("");
     setMode("activation");
-    setStatus("พร้อมเปิดงาน");
+    setStatus("รอรับงาน");
     setActiveDriverMenu("home");
     setMessage("ออกจากงานแล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
   }, []);
@@ -349,7 +406,7 @@ export default function App() {
   const confirmResetAssignment = useCallback(() => {
     Alert.alert(
       "ออกจากงานนี้",
-      "ต้องการออกจากงานนี้หรือไม่ ระบบจะหยุดแชร์ตำแหน่งและกลับไปหน้าเปิดงานด้วย QR",
+      "ต้องการออกจากงานนี้หรือไม่ ระบบจะหยุดส่งตำแหน่ง GPS และกลับไปหน้ารับงานจากศูนย์ควบคุม",
       [
         { text: "ยกเลิก", style: "cancel" },
         { text: "ออกจากงาน", style: "destructive", onPress: () => void resetAssignment() }
@@ -381,6 +438,7 @@ export default function App() {
     });
     void flushOutbox();
     Network.getNetworkStateAsync().then((state) => {
+      setNetworkConnected(Boolean(state.isConnected));
       setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
     });
 
@@ -388,8 +446,16 @@ export default function App() {
     // shell — the driver is being told to look at something.
     const tapSubscription = addNotificationTapListener(() => {
       setMode("web");
+      setActiveDriverMenu("messages");
+      setHasUnreadMessages(false);
+      const token = currentTokenRef.current;
+      if (token) setWebUrl(buildDriverWebUrl(token, localeRef.current, "messages"));
       webViewRef.current?.reload();
       void clearDeliveredNotifications();
+    });
+
+    const receivedSubscription = addNotificationReceivedListener(() => {
+      if (activeDriverMenuRef.current !== "messages") setHasUnreadMessages(true);
     });
 
     const subscription = ExpoLinking.addEventListener("url", ({ url }) => {
@@ -405,8 +471,9 @@ export default function App() {
     return () => {
       subscription.remove();
       tapSubscription.remove();
+      receivedSubscription.remove();
     };
-  }, [flushOutbox, openDriverLink]);
+  }, [flushOutbox, openDriverLink, registerPush]);
 
   useEffect(() => {
     const handleAppState = (nextState: AppStateStatus) => {
@@ -417,6 +484,7 @@ export default function App() {
         // launcher badge back down.
         void clearDeliveredNotifications();
         Network.getNetworkStateAsync().then((state) => {
+          setNetworkConnected(Boolean(state.isConnected));
           setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
         });
       }
@@ -448,6 +516,17 @@ export default function App() {
     return () => subscription.remove();
   }, [canGoBack, confirmResetAssignment, mode]);
 
+  if (!fontsLoaded) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.command} />
+        <View style={styles.fontLoading}>
+          <ActivityIndicator color="#8be2da" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={colors.command} />
@@ -467,7 +546,14 @@ export default function App() {
               ))}
             </View>
             {mode === "web" ? <Text style={styles.statusPill}>{status}</Text> : null}
-            <Text style={styles.network}>{networkLabel}</Text>
+            <Text
+              style={[
+                styles.network,
+                networkTone === "live" ? styles.networkLive : networkTone === "offline" ? styles.networkOffline : styles.networkIdle
+              ]}
+            >
+              {networkDisplayLabel || networkLabel}
+            </Text>
             {outboxCount > 0 ? <Text style={styles.outboxText}>ค้างส่ง {outboxCount} รายการ</Text> : null}
             {syncLabel ? <Text style={styles.syncText}>{syncLabel}</Text> : null}
           </View>
@@ -496,9 +582,9 @@ export default function App() {
             {activeDriverMenu === "location" ? (
               <View style={styles.locationAssist}>
                 <View style={styles.locationAssistCopy}>
-                  <Text style={styles.locationAssistTitle}>การแชร์ตำแหน่ง</Text>
+                  <Text style={styles.locationAssistTitle}>การส่งตำแหน่ง GPS</Text>
                   <Text style={styles.locationAssistText}>
-                    ใช้หน้านี้เพื่อเริ่มแชร์ GPS ตรวจสอบสิทธิ์ตำแหน่ง และเปิดการตั้งค่าอุปกรณ์เมื่อระบบแจ้งว่าต้องตรวจสอบ
+                    จัดการการส่งตำแหน่ง GPS ให้ศูนย์ควบคุม ตรวจสอบสิทธิ์ตำแหน่ง และเปิดการตั้งค่าอุปกรณ์เมื่อจำเป็น
                   </Text>
                 </View>
                 <Pressable style={styles.locationSettingsButton} onPress={() => Linking.openSettings()}>
@@ -531,9 +617,14 @@ export default function App() {
               {DRIVER_MENU_ITEMS.map((item) => (
                 <Pressable
                   key={item.key}
-                  style={[styles.menuButton, activeDriverMenu === item.key && styles.menuButtonActive]}
+                  style={[
+                    styles.menuButton,
+                    item.key === "messages" && hasUnreadMessages && activeDriverMenu !== item.key && styles.menuButtonUnread,
+                    activeDriverMenu === item.key && styles.menuButtonActive
+                  ]}
                   onPress={() => openDriverMenu(item)}
                 >
+                  {item.key === "messages" && hasUnreadMessages ? <View style={styles.menuBadge} /> : null}
                   <Text style={[styles.menuButtonText, activeDriverMenu === item.key && styles.menuButtonTextActive]}>{item.label}</Text>
                 </Pressable>
               ))}
@@ -624,14 +715,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
     flex: 1
   },
+  fontLoading: {
+    alignItems: "center",
+    backgroundColor: colors.command,
+    flex: 1,
+    justifyContent: "center"
+  },
   topbar: {
     alignItems: "flex-start",
     backgroundColor: colors.command,
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 18,
-    paddingBottom: 18,
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 18 : 22
+    paddingBottom: 20,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 28 : 34
   },
   identity: {
     flex: 1,
@@ -640,19 +737,21 @@ const styles = StyleSheet.create({
   },
   product: {
     color: "#8be2da",
-    fontSize: 20,
+    fontFamily: "NotoSansThai_900Black",
+    fontSize: 24,
     fontWeight: "900",
     letterSpacing: 0.3
   },
   title: {
     color: "#ffffff",
-    fontSize: 20,
+    fontFamily: "NotoSansThai_900Black",
+    fontSize: 18,
     fontWeight: "900"
   },
   statusGroup: {
     alignItems: "flex-end",
     gap: 8,
-    paddingTop: 2
+    paddingTop: 10
   },
   localeSwitch: {
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -671,6 +770,7 @@ const styles = StyleSheet.create({
   },
   localeButtonText: {
     color: "#bdd1df",
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 10,
     fontWeight: "900"
   },
@@ -681,23 +781,43 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: radius.pill,
     color: "#ffffff",
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 12,
     fontWeight: "800",
     paddingHorizontal: 10,
     paddingVertical: 6
   },
   network: {
+    borderRadius: radius.pill,
     color: "#bdd1df",
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 12,
-    fontWeight: "700"
+    fontWeight: "700",
+    overflow: "hidden",
+    paddingHorizontal: 9,
+    paddingVertical: 4
+  },
+  networkLive: {
+    backgroundColor: "rgba(34,197,94,0.16)",
+    color: "#86efac"
+  },
+  networkIdle: {
+    backgroundColor: "rgba(245,158,11,0.13)",
+    color: "#f8d181"
+  },
+  networkOffline: {
+    backgroundColor: "rgba(239,68,68,0.14)",
+    color: "#fecaca"
   },
   outboxText: {
     color: "#ffd166",
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 11,
     fontWeight: "800"
   },
   syncText: {
     color: "#8be2da",
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 10,
     fontWeight: "800",
     maxWidth: 180,
@@ -721,11 +841,13 @@ const styles = StyleSheet.create({
   },
   kicker: {
     color: colors.operationDeep,
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 12,
     fontWeight: "900"
   },
   heroTitle: {
     color: colors.ink,
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 25,
     fontWeight: "900",
     lineHeight: 31,
@@ -733,6 +855,7 @@ const styles = StyleSheet.create({
   },
   heroCopy: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_400Regular",
     fontSize: 14,
     lineHeight: 22,
     marginTop: 8
@@ -755,6 +878,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: "#ffffff",
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 16,
     fontWeight: "900"
   },
@@ -765,6 +889,7 @@ const styles = StyleSheet.create({
   },
   manualToggleText: {
     color: colors.operationDeep,
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 13,
     fontWeight: "900"
   },
@@ -783,11 +908,13 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.ink,
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 15,
     fontWeight: "900"
   },
   orText: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_400Regular",
     fontSize: 13,
     textAlign: "center"
   },
@@ -797,6 +924,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     color: colors.ink,
+    fontFamily: "NotoSansThai_400Regular",
     fontSize: 16,
     minHeight: 52,
     paddingHorizontal: 14
@@ -828,6 +956,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(6,20,33,0.78)",
     borderRadius: radius.pill,
     color: "#ffffff",
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 14,
     fontWeight: "900",
     paddingHorizontal: 14,
@@ -843,6 +972,7 @@ const styles = StyleSheet.create({
   },
   noteTitle: {
     color: colors.operationDeep,
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 14,
     fontWeight: "900"
   },
@@ -858,6 +988,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#dff3f1",
     borderRadius: radius.pill,
     color: colors.operationDeep,
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 12,
     fontWeight: "900",
     height: 24,
@@ -867,6 +998,7 @@ const styles = StyleSheet.create({
   },
   instructionText: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_400Regular",
     flex: 1,
     fontSize: 13,
     lineHeight: 20
@@ -878,6 +1010,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     color: colors.ink,
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 12,
     fontWeight: "900",
     paddingHorizontal: 10,
@@ -885,6 +1018,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_400Regular",
     fontSize: 12,
     lineHeight: 18
   },
@@ -925,11 +1059,13 @@ const styles = StyleSheet.create({
   },
   operationStatusTitle: {
     color: colors.ink,
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 12,
     fontWeight: "900"
   },
   operationStatusText: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_500Medium",
     fontSize: 10,
     fontWeight: "700",
     lineHeight: 14
@@ -940,6 +1076,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     color: colors.muted,
+    fontFamily: "NotoSansThai_700Bold",
     flexShrink: 0,
     fontSize: 10,
     fontWeight: "900",
@@ -956,6 +1093,7 @@ const styles = StyleSheet.create({
   },
   syncNoticeText: {
     color: colors.warning,
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 15
@@ -976,11 +1114,13 @@ const styles = StyleSheet.create({
   },
   locationAssistTitle: {
     color: colors.operationDeep,
+    fontFamily: "NotoSansThai_900Black",
     fontSize: 12,
     fontWeight: "900"
   },
   locationAssistText: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_500Medium",
     fontSize: 10,
     fontWeight: "700",
     lineHeight: 14
@@ -997,6 +1137,7 @@ const styles = StyleSheet.create({
   },
   locationSettingsButtonText: {
     color: colors.ink,
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 11,
     fontWeight: "900"
   },
@@ -1016,6 +1157,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 14,
     fontWeight: "800"
   },
@@ -1025,7 +1167,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 6,
-    paddingBottom: Platform.OS === "android" ? 18 : 10,
+    paddingBottom: Platform.OS === "android" ? 30 : 12,
     paddingHorizontal: 8,
     paddingTop: 10
   },
@@ -1035,19 +1177,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     minHeight: 44,
-    paddingHorizontal: 2
+    paddingHorizontal: 2,
+    position: "relative"
   },
   menuButtonActive: {
     backgroundColor: colors.operation
   },
+  menuButtonUnread: {
+    backgroundColor: "#fff1f2",
+    borderColor: "#fecdd3",
+    borderWidth: 1
+  },
   menuButtonText: {
     color: colors.muted,
+    fontFamily: "NotoSansThai_700Bold",
     fontSize: 11,
     fontWeight: "900",
     textAlign: "center"
   },
   menuButtonTextActive: {
     color: "#ffffff"
+  },
+  menuBadge: {
+    backgroundColor: colors.danger,
+    borderColor: "#ffffff",
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    height: 12,
+    position: "absolute",
+    right: 10,
+    top: 7,
+    width: 12,
+    zIndex: 2
   },
   bottomPrimaryButton: {
     alignItems: "center",

@@ -54,6 +54,11 @@ describe("bridge messages", () => {
     expect(parseBridgeMessage(JSON.stringify(message))).toEqual(message);
   });
 
+  it("supports unread driver notification signals", () => {
+    const message = buildBridgeMessage("driver.notification.unread", { count: 2 });
+    expect(parseBridgeMessage(JSON.stringify(message))).toEqual(message);
+  });
+
   it("rejects malformed, foreign and wrong-version payloads", () => {
     expect(parseBridgeMessage("not json")).toBeNull();
     expect(parseBridgeMessage(JSON.stringify({ namespace: "other", version: BRIDGE_VERSION, type: "gps.start" }))).toBeNull();

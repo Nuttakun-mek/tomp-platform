@@ -10,7 +10,7 @@ import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import { enqueueDriverOutbox, flushDriverOutbox, readDriverOutbox, type DriverOutboxItem } from "@/lib/driver/outbox";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import type { DriverNotification } from "@tomp/types/domain";
-import { buildGoogleMapsDirectionsUrl } from "@tomp/driver-core";
+import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail } from "@tomp/driver-core";
 import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
 
 type DriverGpsLight = "off" | "live" | "stale";
@@ -24,7 +24,7 @@ const TRIP_STEPS: Array<{ status: TripStatus; label: string }> = [
 ];
 
 const ISSUE_TYPES: Array<{ type: string; label: string; severity: "info" | "warning" | "critical" }> = [
-  { type: "delay", label: "รถติด / มาถึงช้า", severity: "warning" },
+  { type: "delay", label: "การจราจรหนาแน่น / อาจถึงล่าช้า", severity: "warning" },
   { type: "vehicle", label: "รถมีปัญหา", severity: "warning" },
   { type: "passenger", label: "ติดต่อผู้โดยสารไม่ได้", severity: "warning" },
   { type: "route", label: "เส้นทางมีปัญหา", severity: "warning" },
@@ -138,6 +138,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
             if (!seenIds.current.has(notification.id)) {
               seenIds.current.add(notification.id);
               setBanner({ tone: "info", text: `ข้อความจากศูนย์ควบคุม: ${notification.title || notification.body}` });
+              getMobileShell(window)?.postMessage(buildBridgeMessage("driver.notification.unread", { count: 1 }));
             }
           }
         }
@@ -158,10 +159,21 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
     };
   }, [driverAccess.token]);
 
+  useEffect(() => {
+    const handleNativeStatus = (event: Event) => {
+      const payload = parseNativeStatusDetail((event as CustomEvent).detail);
+      if (!payload) return;
+      if (payload.status === "gps_sharing") setGpsLight("live");
+      if (payload.status === "gps_stopped" || payload.status === "gps_error" || payload.status === "session_missing") setGpsLight("off");
+    };
+    window.addEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+    return () => window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+  }, []);
+
   function enqueueFailed(kind: "status" | "message" | "issue", payload: Record<string, unknown>, text: string) {
     enqueueDriverOutbox(driverAccess.token, { kind, payload });
     setOutboxCount(readDriverOutbox(driverAccess.token).length);
-      setBanner({ tone: "error", text });
+    setBanner({ tone: "error", text });
   }
 
   function advanceTrip(status: TripStatus, nextIndex: number) {
@@ -226,7 +238,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   }
 
   const gpsDot = gpsLight === "live" ? "bg-emerald-500" : gpsLight === "stale" ? "bg-amber-500" : "bg-slate-300";
-  const gpsLabel = gpsLight === "live" ? "GPS สด" : gpsLight === "stale" ? "GPS ขาดช่วง" : "ยังไม่แชร์ GPS";
+  const gpsLabel = gpsLight === "live" ? "กำลังส่ง GPS" : gpsLight === "stale" ? "GPS ขาดช่วง" : "ยังไม่ได้ส่ง GPS";
   const currentStep = TRIP_STEPS[tripStep];
   const doneSteps = TRIP_STEPS.slice(0, tripStep);
   const laterSteps = TRIP_STEPS.slice(tripStep + 1);
@@ -235,7 +247,13 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const showAssignments = view === "home" || view === "next";
   const showComms = view === "home" || view === "messages";
   const viewTitle =
-    view === "next" ? "งานต่อไปที่ต้องดำเนินการ" : view === "messages" ? "ข้อความและการแจ้งปัญหา" : view === "gps" ? "การแชร์ตำแหน่ง" : "หน้างานของคุณ";
+    view === "next"
+      ? "ลำดับภารกิจตามแผน"
+      : view === "messages"
+        ? "การสื่อสารกับศูนย์ควบคุม"
+        : view === "gps"
+          ? "การส่งตำแหน่ง GPS"
+          : "ภารกิจปัจจุบัน";
 
   return (
     <div id="driver-home" className="grid gap-3 pb-6">
@@ -296,7 +314,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
 
       {/* Card: the job to do now — route, target time, and progress steps together. */}
       {showTask ? <section id="driver-current-task" className="smart-card grid gap-2.5 scroll-mt-3">
-        <p className="text-[13px] font-bold text-ink">งานปัจจุบัน</p>
+        <p className="text-[13px] font-bold text-ink">ภารกิจปัจจุบัน</p>
         <div className="grid gap-2">
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-operation" />
@@ -329,7 +347,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
 
         {currentStep ? (
           <div id="driver-next-action" className="grid gap-2 scroll-mt-3">
-            <p className="text-[12px] font-semibold text-ink-soft">งานถัดไปที่ต้องทำ</p>
+            <p className="text-[12px] font-semibold text-ink-soft">ขั้นตอนถัดไปที่ต้องดำเนินการ</p>
             <button
               type="button"
               disabled={isPending}
@@ -371,20 +389,25 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
           className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
         >
-          เปิดในแอป TOMP Driver เพื่อแชร์ GPS ต่อเนื่องเมื่อปิดจอ
+          เปิดในแอป TOMP Driver เพื่อส่ง GPS ต่อเนื่องเมื่อปิดจอ
         </a>
         <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} />
       </section> : null}
 
-      {showAssignments && dayAssignments.length > 1 ? (
+      {showAssignments && (view === "next" || dayAssignments.length > 1) ? (
         <section className="smart-card grid gap-2.5">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[13px] font-bold text-ink">งานวันนี้</p>
-              <p className="text-[12px] text-ink-faint">เรียงตามลำดับที่ควรทำ · แตะเพื่อดูรายละเอียด</p>
+              <p className="text-[13px] font-bold text-ink">ลำดับงานวันนี้</p>
+              <p className="text-[12px] text-ink-faint">เรียงตามลำดับปฏิบัติงาน · แตะเพื่อดูรายละเอียด</p>
             </div>
             <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">{dayAssignments.length} งาน</span>
           </div>
+          {!dayAssignments.length ? (
+            <p className="rounded-card border border-dashed border-border bg-canvas px-3 py-5 text-center text-[13px] font-semibold text-ink-soft">
+              ยังไม่มีงานถัดไปในลำดับงานวันนี้
+            </p>
+          ) : null}
           <div className="grid gap-2">
             {dayAssignments.map((item) => {
               const open = openJobId === item.assignmentId;
@@ -446,6 +469,15 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         </section>
       ) : null}
 
+      {view === "messages" ? (
+        <section className="smart-card grid gap-1.5">
+          <p className="text-[13px] font-bold text-ink">ศูนย์การสื่อสาร</p>
+          <p className="text-[12px] leading-5 text-ink-faint">
+            ใช้สำหรับส่งข้อความ แจ้งเหตุขัดข้อง หรือโทรติดต่อศูนย์ควบคุมระหว่างปฏิบัติงาน
+          </p>
+        </section>
+      ) : null}
+
       {showComms ? <div className="grid grid-cols-3 gap-2">
         {coordinatorPhone ? (
           <a
@@ -463,7 +495,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           href="#driver-chat"
           className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command border border-border bg-white px-2 text-[12px] font-semibold text-ink"
         >
-          <MessageSquare className="h-4 w-4" /> แชท
+          <MessageSquare className="h-4 w-4" /> ข้อความ
         </a>
         <button
           type="button"

@@ -14,7 +14,13 @@ export interface ChatBubble {
   tone?: "info" | "issue" | "critical";
 }
 
-const QUICK_MESSAGES = ["ถึงจุดรับแล้ว", "กำลังไปจุดส่ง", "รถติด คาดว่าช้า ~15 นาที", "ติดต่อผู้โดยสารไม่ได้", "ถึงจุดส่งแล้ว"];
+const QUICK_MESSAGES = [
+  "ถึงจุดรับแล้ว",
+  "กำลังเดินทางไปจุดส่ง",
+  "การจราจรหนาแน่น คาดว่าจะล่าช้าประมาณ 15 นาที",
+  "ไม่สามารถติดต่อผู้โดยสารได้",
+  "ถึงจุดส่งแล้ว"
+];
 
 export function buildBubbles(messages: DriverIssueMessage[], notifications: DriverNotification[]): ChatBubble[] {
   const fromDriver: ChatBubble[] = messages.map((m) => ({
@@ -72,7 +78,7 @@ export function DriverChatThread({
 
   return (
     <section id="driver-chat" className="grid gap-2 rounded-card border border-border bg-white p-3">
-      <p className="text-[13px] font-bold text-ink">แชทกับศูนย์ควบคุม</p>
+      <p className="text-[13px] font-bold text-ink">การสื่อสารกับศูนย์ควบคุม</p>
 
       <div className="grid max-h-64 gap-1.5 overflow-y-auto rounded-card bg-canvas p-2">
         {bubbles.length ? (
@@ -94,7 +100,7 @@ export function DriverChatThread({
             </div>
           ))
         ) : (
-          <p className="px-2 py-5 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ พิมพ์ด้านล่างเพื่อคุยกับศูนย์ควบคุม</p>
+          <p className="px-2 py-5 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ สามารถส่งข้อความถึงศูนย์ควบคุมได้จากช่องด้านล่าง</p>
         )}
         <div ref={endRef} />
       </div>

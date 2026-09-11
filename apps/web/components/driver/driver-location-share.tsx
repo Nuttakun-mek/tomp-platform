@@ -57,7 +57,7 @@ function createLocationClientEventId(recordedAt: string, trackingEvent: Tracking
 
 export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLocationShareProps) {
   const [state, setState] = useState<ShareState>("idle");
-  const [message, setMessage] = useState("ยังไม่ได้แชร์ตำแหน่ง");
+  const [message, setMessage] = useState("ยังไม่ได้ส่งตำแหน่ง GPS");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
   const [mapOpen, setMapOpen] = useState(true);
   const [cardOpen, setCardOpen] = useState(true);
@@ -103,7 +103,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       setSignal("live");
       if (staleTimerRef.current != null) window.clearTimeout(staleTimerRef.current);
       staleTimerRef.current = window.setTimeout(() => {
-        setMessage("ยังเปิดแชร์ GPS อยู่ แต่ไม่มีพิกัดใหม่เกิน 45 วินาที");
+        setMessage("ยังเปิดการส่ง GPS อยู่ แต่ไม่มีพิกัดใหม่เกิน 45 วินาที");
         setSignal("stale");
       }, 45000);
     },
@@ -206,7 +206,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       window.localStorage.setItem(consentKey(driverAccess.token), "1");
       setCanResume(true);
       setState("requesting");
-      setMessage("กำลังขอให้แอป TOMP Driver เริ่มแชร์ตำแหน่ง");
+      setMessage("กำลังขอให้แอป TOMP Driver เริ่มส่งตำแหน่ง GPS");
       shell.postMessage(buildBridgeMessage("gps.start", { reason: "driver_requested" }));
       return;
     }
@@ -214,7 +214,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
     if (!("geolocation" in navigator)) {
       setState("error");
       setSignal("off");
-      setMessage("อุปกรณ์นี้ไม่รองรับการแชร์ตำแหน่ง");
+      setMessage("อุปกรณ์นี้ไม่รองรับการส่งตำแหน่ง GPS");
       return;
     }
 
@@ -257,7 +257,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       setCanResume(false);
       setState("idle");
       setSignal("off");
-      setMessage("ส่งคำสั่งหยุดแชร์ตำแหน่งไปยังแอปแล้ว");
+      setMessage("ส่งคำสั่งหยุดส่งตำแหน่ง GPS ไปยังแอปแล้ว");
       return;
     }
 
@@ -274,7 +274,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
     await releaseWakeLock();
     setState("idle");
     setSignal("off");
-    setMessage("หยุดแชร์ตำแหน่งแล้ว");
+    setMessage("หยุดส่งตำแหน่ง GPS แล้ว");
   }, [driverAccess.token, postLocation, releaseWakeLock, setSignal]);
 
   useEffect(() => {
@@ -371,7 +371,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   );
 
   const statusLabel =
-    state === "sharing" ? "กำลังแชร์" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "stale" ? "ขาดช่วง" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่แชร์";
+    state === "sharing" ? "กำลังส่ง" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "stale" ? "ขาดช่วง" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่ได้ส่ง";
 
   const mapPoint: TrackedPoint | null = lastLocation
     ? {
@@ -396,7 +396,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
         className="flex w-full items-start justify-between gap-2 p-3.5 text-left"
       >
         <span className="min-w-0">
-          <span className="block text-[13px] font-bold text-ink">แชร์ตำแหน่ง GPS</span>
+          <span className="block text-[13px] font-bold text-ink">ส่งตำแหน่ง GPS</span>
           <span className="block text-[12px] leading-5 text-ink-faint">{cardOpen ? message : statusLabel}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
@@ -428,7 +428,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
           onClick={() => void startSharing()}
           className="min-h-13 rounded-command bg-route px-4 text-[15px] font-bold text-white disabled:opacity-50"
         >
-          {isSharing ? "แชร์ตำแหน่งต่อ" : canResume ? "แชร์ตำแหน่งต่อ" : "เริ่มแชร์ตำแหน่ง"}
+          {isSharing ? "ส่งตำแหน่ง GPS ต่อ" : canResume ? "ส่งตำแหน่ง GPS ต่อ" : "เริ่มส่งตำแหน่ง GPS"}
         </button>
         {isSharing && !confirmStop ? (
           <button
@@ -436,13 +436,13 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
             onClick={() => setConfirmStop(true)}
             className="min-h-11 rounded-command border border-border bg-white px-4 text-[13px] font-semibold text-ink-soft"
           >
-            ขอหยุดแชร์ตำแหน่ง
+            ขอหยุดส่งตำแหน่ง
           </button>
         ) : null}
         {isSharing && confirmStop ? (
           <div className="grid gap-2 rounded-card border border-amber-300 bg-amber-50 p-3">
             <p className="text-[12px] font-semibold leading-5 text-amber-900">
-              ยืนยันอีกครั้งก่อนหยุดแชร์ GPS เพื่อป้องกันการกดผิดระหว่างปฏิบัติงาน
+              ยืนยันอีกครั้งก่อนหยุดส่ง GPS เพื่อป้องกันการกดผิดระหว่างปฏิบัติงาน
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -457,7 +457,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
                 onClick={() => void stopSharing()}
                 className="min-h-11 rounded-command bg-amber-600 px-3 text-[13px] font-bold text-white"
               >
-                ยืนยันหยุดแชร์
+                ยืนยันหยุดส่ง
               </button>
             </div>
           </div>

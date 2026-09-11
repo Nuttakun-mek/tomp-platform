@@ -8,12 +8,12 @@ export function normalizeMobileLocale(value: unknown): MobileLocale {
 
 export const mobileCopy = {
   th: {
-    ready: "พร้อมเปิดงาน",
-    opening: "กำลังเปิดงาน",
-    active: "กำลังใช้งาน",
+    ready: "รอรับงาน",
+    opening: "กำลังเปิดข้อมูล",
+    active: "อยู่ระหว่างปฏิบัติงาน",
     needsCheck: "ต้องตรวจสอบ",
     driverPage: "หน้าคนขับ",
-    openWithQr: "เปิดงานด้วย QR",
+    openWithQr: "รับงานผ่าน QR",
     scanQr: "สแกน QR รับงาน",
     closeCamera: "ปิดกล้อง",
     openJob: "เปิดงาน",
@@ -22,8 +22,8 @@ export const mobileCopy = {
     logoutJob: "ออกจากงาน",
     reload: "รีเฟรช",
     systemStatus: "สถานะระบบ",
-    pasteUrl: "หรือวาง URL/token จากศูนย์ควบคุม",
-    scanInstruction: "สแกน QR หรือวาง URL งานที่ได้รับจากศูนย์ควบคุม"
+    pasteUrl: "วาง URL/token จากศูนย์ควบคุม",
+    scanInstruction: "สแกน QR งานที่ได้รับจากศูนย์ควบคุม"
   },
   en: {
     ready: "Ready",

@@ -344,7 +344,7 @@ export async function startBackgroundLocationSharing() {
       activityType: Location.ActivityType.AutomotiveNavigation,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
-        notificationTitle: "TOMP กำลังแชร์ตำแหน่ง",
+        notificationTitle: "TOMP กำลังส่งตำแหน่ง GPS",
         notificationBody: "ศูนย์ควบคุมกำลังติดตามตำแหน่งระหว่างปฏิบัติงาน",
         notificationColor: "#007a73"
       }

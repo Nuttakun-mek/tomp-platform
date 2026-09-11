@@ -21,6 +21,7 @@ export type BridgeMessageType =
   | "gps.start"
   | "gps.stop"
   | "open.url"
+  | "driver.notification.unread"
   | "mobile-session.challenge"
   | "mobile-session.set";
 
@@ -28,6 +29,7 @@ export type BridgeMessage =
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.start"; payload?: { reason?: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.stop"; payload?: { reason?: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "open.url"; payload: { url: string } }
+  | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "driver.notification.unread"; payload?: { count?: number } }
   | {
       namespace: typeof BRIDGE_NAMESPACE;
       version: typeof BRIDGE_VERSION;
@@ -104,6 +106,7 @@ export interface BridgePayloadMap {
   "gps.start": { reason?: string };
   "gps.stop": { reason?: string };
   "open.url": { url: string };
+  "driver.notification.unread": { count?: number };
   "mobile-session.challenge": { code: string; expiresAt: string };
   "mobile-session.set": { session: string; expiresAt: string };
 }
@@ -128,6 +131,10 @@ export function parseBridgeMessage(raw: string): BridgeMessage | null {
   if (parsed.namespace !== BRIDGE_NAMESPACE || parsed.version !== BRIDGE_VERSION) return null;
 
   if (parsed.type === "gps.start" || parsed.type === "gps.stop") return parsed as BridgeMessage;
+
+  if (parsed.type === "driver.notification.unread") {
+    return parsed as BridgeMessage;
+  }
 
   if (parsed.type === "open.url" && isRecord(parsed.payload) && typeof parsed.payload.url === "string") {
     return parsed as BridgeMessage;

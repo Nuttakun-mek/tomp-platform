@@ -108,6 +108,13 @@ export function addNotificationTapListener(onTap: (data: Record<string, unknown>
   });
 }
 
+export function addNotificationReceivedListener(onReceived: (data: Record<string, unknown>) => void) {
+  return Notifications.addNotificationReceivedListener((notification) => {
+    const data = (notification.request.content.data ?? {}) as Record<string, unknown>;
+    onReceived(data);
+  });
+}
+
 /**
  * Clear our notifications from the shade and zero the launcher badge.
  *
