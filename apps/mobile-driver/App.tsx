@@ -24,7 +24,7 @@ import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
-import { buildDriverWebUrl, EAS_PROJECT_ID, TOMP_API_BASE_URL, TOMP_DRIVER_APP_VERSION, TOMP_WEB_ORIGIN } from "./src/config";
+import { buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, TOMP_WEB_ORIGIN } from "./src/config";
 import { colors, radius } from "./src/theme";
 import {
   hasBackgroundLocationPermission,
@@ -528,24 +528,23 @@ export default function App() {
 
             <View style={styles.noteCard}>
               <Text style={styles.noteTitle}>แนวทางการใช้งาน</Text>
-              <Text style={styles.noteText}>1. เปิดแอปและสแกน QR จากศูนย์ควบคุมก่อนเริ่มงาน</Text>
-              <Text style={styles.noteText}>2. ตรวจสอบรายละเอียดงานและกดยืนยันตามขั้นตอนในหน้าคนขับ</Text>
-              <Text style={styles.noteText}>3. อนุญาตตำแหน่ง GPS เพื่อให้ศูนย์ควบคุมติดตามสถานะระหว่างปฏิบัติงาน</Text>
-              <Text style={styles.noteText}>สถานะล่าสุด: {message}</Text>
-              <Text style={styles.noteText}>API: {TOMP_API_BASE_URL}</Text>
-              <Text style={styles.noteText}>รุ่นแอป: {TOMP_DRIVER_APP_VERSION}</Text>
+              <View style={styles.instructionList}>
+                <View style={styles.instructionRow}>
+                  <Text style={styles.instructionNumber}>1</Text>
+                  <Text style={styles.instructionText}>สแกน QR ที่ได้รับจากศูนย์ควบคุมเพื่อเปิดงานของคุณ</Text>
+                </View>
+                <View style={styles.instructionRow}>
+                  <Text style={styles.instructionNumber}>2</Text>
+                  <Text style={styles.instructionText}>ตรวจสอบรายละเอียดงาน คนขับ รถ จุดรับ จุดส่ง และเวลาปฏิบัติงานให้ถูกต้อง</Text>
+                </View>
+                <View style={styles.instructionRow}>
+                  <Text style={styles.instructionNumber}>3</Text>
+                  <Text style={styles.instructionText}>กดยืนยันตามขั้นตอนในหน้าคนขับ และอนุญาต GPS เมื่อระบบร้องขอ</Text>
+                </View>
+              </View>
+              <Text style={styles.versionText}>เวอร์ชันระบบ {TOMP_DRIVER_APP_VERSION}</Text>
               {outboxCount > 0 ? <Text style={styles.noteText}>รายการที่รอส่งซ้ำ: {outboxCount}</Text> : null}
               {syncLabel ? <Text style={styles.noteText}>{syncLabel}</Text> : null}
-              {/* iOS never prompts its way to background location: the driver
-                  has to pick "ตลอดเวลา" in Settings themselves, and until they
-                  do, tracking stops the moment the screen locks. Saying nothing
-                  on iOS — which is what this line used to do — leaves them with
-                  no way to know that. */}
-              <Text style={styles.noteText}>
-                {Platform.OS === "ios"
-                  ? "iOS: ต้องตั้งค่า > TOMP Driver > ตำแหน่ง เป็น “ตลอดเวลา” ไม่เช่นนั้นตำแหน่งจะหยุดส่งเมื่อล็อกหน้าจอ"
-                  : "Android: ตั้งค่าตำแหน่งเป็น “อนุญาตตลอดเวลา” เพื่อให้ส่งตำแหน่งต่อเนื่องขณะปิดหน้าจอ"}
-              </Text>
             </View>
           </ScrollView>
         )}
@@ -777,13 +776,50 @@ const styles = StyleSheet.create({
     borderColor: "#cce6e3",
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: 6,
-    padding: 14
+    gap: 12,
+    padding: 16
   },
   noteTitle: {
     color: colors.operationDeep,
     fontSize: 14,
     fontWeight: "900"
+  },
+  instructionList: {
+    gap: 10
+  },
+  instructionRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10
+  },
+  instructionNumber: {
+    backgroundColor: "#dff3f1",
+    borderRadius: radius.pill,
+    color: colors.operationDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    height: 24,
+    lineHeight: 24,
+    textAlign: "center",
+    width: 24
+  },
+  instructionText: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20
+  },
+  versionText: {
+    alignSelf: "flex-start",
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe5ee",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+    paddingHorizontal: 10,
+    paddingVertical: 5
   },
   noteText: {
     color: colors.muted,
