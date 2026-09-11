@@ -5,9 +5,8 @@ planned onto it, on top of the Call Sign restructure from `967`. Read `967`
 first for why the Call Sign is the crewed unit; this covers what was built and
 what is still open.
 
-**Nothing here is deployed.** It is committed on `main` locally and verified,
-but the owner asked to review on localhost before production. See *Deploying*
-below.
+**Deployed.** The owner reviewed on localhost, then approved the push; it has
+been live since 2026-09-11. Migrations `0031`–`0035` are applied on production.
 
 ---
 
@@ -88,7 +87,6 @@ scroll, and the states past the fold were the late ones. It now lives in
 
 **Needs the owner**
 
-- Review on localhost, then deploy (see below).
 - Rotate the FCM key — it went through a chat transcript (`966`).
 - Decide whether `google-services.json` stays in git (`966`).
 - `DRIVER_ACCESS_TOKEN_SECRET` differs between Vercel and `.env.local`, so a
@@ -108,7 +106,7 @@ scroll, and the states past the fold were the late ones. It now lives in
 
 ---
 
-### Closed since this note was written
+### Closed after this note was first written
 
 - The empty project resource list now explains itself, and says whether the
   library has anything to import.
@@ -122,8 +120,11 @@ scroll, and the states past the fold were the late ones. It now lives in
 
 ## Verifying
 
-`npm run lint && npm test && npm run build` — all green at the time of writing
-(182 tests). Migrations `0031`–`0035` are applied on production.
+`npm run lint && npm test && npm run build` — all green (188 across web and
+driver-core). The mobile driver's own suite is `npm run test:mobile` (19): it is
+an Expo app with its own lockfile rather than an npm workspace, so the root
+`npm ci` does not reach it and CI installs it as a separate step. Folding it into
+`npm test` breaks CI — that was tried and reverted.
 
 `scripts/verify-device-rebinding.mjs` (20 checks) still passes and is the
 end-to-end guard on the driver credential flow; point it at a seeded job only, as
@@ -131,7 +132,9 @@ it clears the token's binding and cooldown before it starts.
 
 ## Deploying
 
-`git push origin main` deploys to production through Vercel. The work is
-committed and verified but **deliberately unpushed** — the owner was reviewing on
-localhost and asked to hold. Confirm with them before pushing rather than
-assuming this note is permission.
+`git push origin main` deploys to production through Vercel, so a push is a
+release. The owner has approved these; ask before pushing anything new rather
+than assuming this note carries forward.
+
+To review before shipping: `node scripts/start-local-check.mjs` and open
+http://localhost:3100.
