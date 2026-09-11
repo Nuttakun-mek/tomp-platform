@@ -1,5 +1,8 @@
 # 971 — Findings from the three-device test
 
+> **Folded into `976`, which is the single handoff note.** Kept for history —
+> nothing here is required reading. Anything still live was moved, not summarised.
+
 Raised by the owner while running one native driver (USB) and two web drivers
 against production. Recorded now, to be worked after the test is closed and
 summarised.

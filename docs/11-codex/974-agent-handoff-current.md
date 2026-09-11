@@ -1,9 +1,7 @@
 # 974 — Handoff: what to do next, and what will bite you
 
-> **Superseded by `976`.** A day of live testing with real drivers changed the
-> task list and found four GPS bugs, three of them introduced while fixing the
-> previous one. The "things that will bite you" section below is unchanged and
-> still worth reading; for what to do next, start at `976`.
+> **Folded into `976`, which is the single handoff note.** Kept for history —
+> nothing here is required reading.
 
 `972` and `973` are still accurate about *why* things are the way they are, but
 `973`'s tasks are all done and `972`'s counts have moved.

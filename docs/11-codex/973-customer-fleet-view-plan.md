@@ -1,5 +1,8 @@
 # 973 — Plan: the customer fleet view, and the first bilingual page
 
+> **Folded into `976`, which is the single handoff note.** Kept for history —
+> nothing here is required reading. Anything still live was moved, not summarised.
+
 An executable plan. Written 2026-09-11 against `1f0b33f`; every file path, column
 and function named here was checked to exist (or checked not to).
 

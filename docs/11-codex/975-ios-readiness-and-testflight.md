@@ -1,5 +1,8 @@
 # 975 — iOS: what is actually needed, and how ten drivers get the app
 
+> **Folded into `976`, which is the single handoff note.** Kept for history —
+> nothing here is required reading. Anything still live was moved, not summarised.
+
 Written 2026-09-11. The target is concrete: **about ten drivers, five consecutive
 days of real operation.** Everything below is judged against that, not against
 "shipping to the App Store" in general.

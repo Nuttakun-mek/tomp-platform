@@ -1,5 +1,8 @@
 # 972 — Handoff: bilingual UI, and everything still open
 
+> **Folded into `976`, which is the single handoff note.** Kept for history —
+> nothing here is required reading. Anything still live was moved, not summarised.
+
 Written 2026-09-11 at the close of the three-device test, for whoever picks the
 work up next. Everything here is checked against the code as it stands at
 `c95193a`, so the counts and file names are real rather than remembered.
