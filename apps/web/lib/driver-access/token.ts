@@ -76,6 +76,25 @@ export function verifyDriverPin(pin: string, expectedHash: string): boolean {
   return timingSafeEqual(actual, expected);
 }
 
+export const OBSERVER_PIN_COOKIE_PREFIX = "opin_";
+
+export function generateObserverPin(): string {
+  return generateDriverPin();
+}
+
+export function hashObserverPin(pin: string): string {
+  const secret = driverTokenSecret();
+  return createHash("sha256").update(`observer-pin:${secret}:${pin.trim()}`).digest("hex");
+}
+
+export function verifyObserverPin(pin: string, expectedHash: string): boolean {
+  if (!pin.trim() || !expectedHash) return false;
+  const actual = Buffer.from(hashObserverPin(pin), "hex");
+  const expected = Buffer.from(expectedHash, "hex");
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(actual, expected);
+}
+
 
 // Device binding: one QR + PIN opens the job on exactly one device. The raw
 // device id lives in a cookie on that phone; only its hash is stored on the token
@@ -92,12 +111,16 @@ export function hashDriverDeviceId(deviceId: string): string {
 }
 
 export interface ObserverAccessTokenDraft {
-  callSignId: string;
+  projectId?: string | null;
+  callSignId?: string | null;
+  scope?: "call_sign" | "project";
   expiresAt?: string | null;
 }
 
 export function generateObserverAccessToken(input: ObserverAccessTokenDraft): string {
-  return `tomp_obs_${input.callSignId}_${randomBytes(32).toString("base64url")}`;
+  const scope = input.scope ?? (input.callSignId ? "call_sign" : "project");
+  const scopePart = scope === "project" ? input.projectId ?? "project" : input.callSignId ?? "call-sign";
+  return `tomp_obs_${scope}_${scopePart}_${randomBytes(32).toString("base64url")}`;
 }
 
 export function hashObserverAccessToken(token: string): string {

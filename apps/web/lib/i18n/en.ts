@@ -1,3 +1,6 @@
+import type { DictionaryShape } from "./keys";
+import type { th } from "./th";
+
 export const en = {
   app: {
     productName: "TOMP",
@@ -50,5 +53,49 @@ export const en = {
     published: "Published",
     ready: "Ready",
     warning: "Needs attention"
+  },
+  fleet: {
+    pageTitle: "Fleet tracking",
+    pageSubtitle: "Read-only vehicle location view for this project.",
+    readOnly: "Read only",
+    projectCode: "Project code",
+    vehiclesInProject: "Vehicles in this project",
+    liveMap: "Live map",
+    legend: "GPS status legend",
+    callSign: "Call Sign",
+    vehicle: "Vehicle",
+    vehicleType: "Vehicle type",
+    colour: "Colour",
+    capacity: "Capacity",
+    destination: "Destination",
+    lastUpdate: "Last update",
+    noPosition: "No position yet",
+    noDestination: "No destination specified",
+    noVehicle: "No vehicle assigned",
+    noUnits: "No vehicles are available for this link.",
+    contactControl: "Please contact the control room.",
+    accessDeniedTitle: "Unable to open this fleet link",
+    accessDeniedBody: "This link is unavailable, expired, or has been revoked.",
+    pinTitle: "Enter fleet access PIN",
+    pinBody: "This link is protected. Enter the PIN provided by the control room.",
+    pinLabel: "6-digit PIN",
+    pinSubmit: "Open fleet view",
+    pinWrong: "The PIN is incorrect.",
+    pinTooMany: "Too many failed attempts. Please wait and try again.",
+    pinRequired: "Please enter the 6-digit PIN.",
+    pinUnlocked: "PIN accepted.",
+    showCrew: "Crew visible",
+    crewHidden: "Driver names hidden",
+    driverName: "Driver",
+    driverHidden: "Hidden",
+    updatedAutomatically: "Updates automatically while this page is visible.",
+    language: "Language",
+    gps: {
+      live: "Live",
+      idle: "Parked",
+      slow: "Slow signal",
+      offline: "No update",
+      stopped: "Sharing off"
+    }
   }
-} as const;
+} satisfies DictionaryShape<typeof th>;

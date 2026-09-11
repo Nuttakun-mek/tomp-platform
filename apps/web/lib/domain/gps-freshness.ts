@@ -1,7 +1,8 @@
-// One definition of "how fresh is this GPS ping". The 35s/120s thresholds and
-// the age→bucket logic used to be copy-pasted into five components, so tuning
-// the window meant editing five files and hoping they stayed in sync.
+import type { LocaleCode } from "@/lib/i18n/locales";
 
+// One definition of "how fresh is this GPS ping". The thresholds are shared by
+// Mission Control, vehicle resources, observer tracking, and the customer fleet
+// view so every screen tells the same story.
 export type GpsFreshness = "live" | "idle" | "slow" | "offline" | "stopped";
 
 /** A ping newer than this reads as live. */
@@ -15,7 +16,7 @@ export const GPS_SLOW_SECONDS = 120;
 export const GPS_IDLE_SECONDS = 390;
 /**
  * How long past its promised cadence a device may go before it counts as
- * offline. One late POST — a tunnel, a retry — should not turn the card red.
+ * offline. One late POST should not turn the card red.
  */
 export const GPS_HEARTBEAT_SLACK_SECONDS = 60;
 
@@ -28,7 +29,7 @@ export function isIdlePing(metadata: unknown): boolean {
 
 /**
  * How often this device promised to report, in seconds, or null when it did not
- * say — a browser share, or an app build older than the cadence field.
+ * say, such as a browser share or an older app build.
  */
 export function pingCadenceSeconds(metadata: unknown): number | null {
   if (!metadata || typeof metadata !== "object") return null;
@@ -51,10 +52,6 @@ export function gpsFreshness(
   const idle = isIdlePing(metadata);
   const cadence = pingCadenceSeconds(metadata);
 
-  // When the device tells us how often it reports, judge it against its own
-  // promise. Measuring a 2-minute heartbeat against a 35s/120s scale tuned for
-  // browser GPS turns every parked driver red: the last ping before stopping is
-  // a *moving* one, and nothing follows it until the heartbeat comes due.
   if (cadence !== null) {
     if (ageSeconds <= cadence + GPS_HEARTBEAT_SLACK_SECONDS) return idle ? "idle" : "live";
     return "offline";
@@ -66,19 +63,29 @@ export function gpsFreshness(
   return "offline";
 }
 
-export function gpsFreshnessLabelTh(freshness: GpsFreshness): string {
-  switch (freshness) {
-    case "live":
-      return "GPS สด";
-    case "idle":
-      return "จอดอยู่";
-    case "slow":
-      return "สัญญาณช้า";
-    case "offline":
-      return "ขาดการอัปเดต";
-    case "stopped":
-      return "หยุดแชร์";
+const GPS_FRESHNESS_LABELS: Record<LocaleCode, Record<GpsFreshness, string>> = {
+  th: {
+    live: "GPS สด",
+    idle: "จอดอยู่",
+    slow: "สัญญาณช้า",
+    offline: "ขาดการอัปเดต",
+    stopped: "หยุดแชร์"
+  },
+  en: {
+    live: "Live",
+    idle: "Parked",
+    slow: "Slow signal",
+    offline: "No update",
+    stopped: "Sharing off"
   }
+};
+
+export function gpsFreshnessLabel(freshness: GpsFreshness, locale: LocaleCode): string {
+  return GPS_FRESHNESS_LABELS[locale][freshness];
+}
+
+export function gpsFreshnessLabelTh(freshness: GpsFreshness): string {
+  return gpsFreshnessLabel(freshness, "th");
 }
 
 export function gpsFreshnessTone(freshness: GpsFreshness): "success" | "warning" | "danger" | "neutral" {

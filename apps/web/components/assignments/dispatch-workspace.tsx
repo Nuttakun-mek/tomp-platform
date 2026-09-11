@@ -6,6 +6,7 @@ import { CallSignAccessPanel } from "./call-sign-access-panel";
 import { SetupStep } from "./setup-step";
 import { UnitSetupForm } from "./unit-setup-form";
 import type { UnitCredentials } from "./unit-credential-sheet";
+import type { ProjectObserverLink } from "@/lib/data/observer-access";
 
 // Holds the one thing the setup form and the unit list have to agree on: the
 // credentials just issued.
@@ -24,6 +25,7 @@ export function DispatchWorkspace({
   vehicles,
   assignments,
   observerLinks,
+  projectObserverLink,
   projectStartDate,
   projectEndDate,
   jobForm
@@ -37,6 +39,8 @@ export function DispatchWorkspace({
   assignments: Assignment[];
   /** Live passenger links per call sign, read on the server so the QR survives a reload. */
   observerLinks?: Record<string, string>;
+  /** Live customer fleet link for the whole project. */
+  projectObserverLink?: ProjectObserverLink | null;
   projectStartDate?: string | null;
   projectEndDate?: string | null;
   /** Step 2, rendered between the setup card and the unit list it feeds. */
@@ -105,6 +109,7 @@ export function DispatchWorkspace({
         vehicles={vehicles}
         issued={issued}
         observerLinks={observerLinks}
+        projectObserverLink={projectObserverLink}
         onIssued={rememberCredentials}
       />
     </>

@@ -9,7 +9,7 @@ import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";
-import { getObserverLinksByProjectId } from "@/lib/data/observer-access";
+import { getObserverLinksByProjectId, getProjectObserverLinkByProjectId } from "@/lib/data/observer-access";
 import { getProjects } from "@/lib/data/projects";
 import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
@@ -45,7 +45,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
     redirect("/projects");
   }
   const projectId = activeProject.id;
-  const [assignmentsResult, missionsResult, callSignsResult, drivers, vehicles, observerLinks] = await Promise.all([
+  const [assignmentsResult, missionsResult, callSignsResult, drivers, vehicles, observerLinks, projectObserverLink] = await Promise.all([
     getAssignmentsByProjectId(projectId),
     getMissionsByProjectId(projectId),
     getCallSignsByProjectId(projectId),
@@ -53,7 +53,8 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
     getProjectVehicles(projectId),
     // Read on the server so the passenger QR is on screen at load, not only in
     // the tab that issued it.
-    getObserverLinksByProjectId(projectId)
+    getObserverLinksByProjectId(projectId),
+    getProjectObserverLinkByProjectId(projectId)
   ]);
 
   const load = combineResults(assignmentsResult, missionsResult, callSignsResult);
@@ -86,6 +87,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
         vehicles={vehicles}
         assignments={assignments}
         observerLinks={observerLinks}
+        projectObserverLink={projectObserverLink}
         projectStartDate={activeProject.startDate}
         projectEndDate={activeProject.endDate}
         jobForm={

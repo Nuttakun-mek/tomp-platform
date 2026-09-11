@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-
-const PUBLIC_PREFIXES = ["/login", "/no-access", "/auth/callback", "/driver", "/api/driver", "/api/health", "/_next", "/favicon.ico"];
+import { isPublicPath } from "@/lib/auth/public-paths";
 
 // The Edge runtime cannot use lib/env's readCleanEnv (it touches the filesystem),
 // but it must sanitise identically: a stray quote or trailing space on a Vercel
@@ -41,10 +40,6 @@ function withLocaleCookie(request: NextRequest, response: NextResponse, locale: 
     });
   }
   return response;
-}
-
-function isPublicPath(pathname: string) {
-  return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 function isAuthConfigured() {

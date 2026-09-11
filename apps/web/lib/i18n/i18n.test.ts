@@ -56,4 +56,11 @@ describe("the two dictionaries stay in step", () => {
       expect(String(t("en", key)).length).toBeGreaterThan(0);
     }
   });
+
+  it("marks an unknown key loudly during development", () => {
+    const previous = process.env.NODE_ENV;
+    (process.env as Record<string, string>).NODE_ENV = "development";
+    expect(t("th", "fleet.doesNotExist" as I18nKey)).toBe("⟦fleet.doesNotExist⟧");
+    (process.env as Record<string, string>).NODE_ENV = previous ?? "test";
+  });
 });

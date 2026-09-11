@@ -1,42 +1,10 @@
 import { en } from "./en";
 import { th } from "./th";
+import type { DictionaryShape, I18nKey } from "./keys";
 import type { LocaleCode } from "./locales";
 
-export type I18nDictionary = {
-  app: Record<string, string>;
-  nav: {
-    sections: Record<string, string>;
-    projects: Record<string, string>;
-    resources: Record<string, string>;
-    portal: Record<string, string>;
-    superadmin: Record<string, string>;
-  };
-  status: Record<string, string>;
-};
-export type I18nKey =
-  | "app.productName"
-  | "app.productDescription"
-  | "app.workspaceLabel"
-  | "app.menu"
-  | "app.mainNav"
-  | "app.language"
-  | "app.thai"
-  | "app.english"
-  | "nav.sections.workspace"
-  | "nav.sections.coordination"
-  | "nav.sections.system"
-  | "nav.projects.label"
-  | "nav.projects.description"
-  | "nav.projects.help"
-  | "nav.resources.label"
-  | "nav.resources.description"
-  | "nav.resources.help"
-  | "nav.portal.label"
-  | "nav.portal.description"
-  | "nav.portal.help"
-  | "nav.superadmin.label"
-  | "nav.superadmin.description"
-  | "nav.superadmin.help";
+export type { I18nKey } from "./keys";
+export type I18nDictionary = DictionaryShape<typeof th>;
 
 const dictionaries: Record<LocaleCode, I18nDictionary> = { th, en };
 
@@ -50,5 +18,6 @@ export function t(locale: LocaleCode, key: I18nKey): string {
     if (!current || typeof current !== "object") return undefined;
     return (current as Record<string, unknown>)[part];
   }, dict);
-  return typeof value === "string" ? value : key;
+  if (typeof value === "string") return value;
+  return process.env.NODE_ENV === "production" ? key : `⟦${key}⟧`;
 }

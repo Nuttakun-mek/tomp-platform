@@ -311,6 +311,79 @@ export const getLatestDriverLocations = cache(async function getLatestDriverLoca
 
   return enrichLocationMetadata(client, Array.from(latestByAssignment.values()));
 });
+
+export interface LatestLocationByCallSign {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  recordedAt: string;
+  sharingEvent: DriverLocation["sharingEvent"];
+  metadata: Record<string, unknown>;
+}
+
+export const getLatestLocationsByCallSign = cache(async function getLatestLocationsByCallSign(
+  projectId: string
+): Promise<Record<string, LatestLocationByCallSign>> {
+  const { client } = await resolveReadClient();
+  if (!client) return getLatestLocationsByCallSignViaPostgres(projectId);
+
+  try {
+    const { data, error } = await withTimeout(
+      client
+        .from("gps_locations")
+        .select("call_sign_id, latitude, longitude, accuracy, recorded_at, sharing_event, source, metadata")
+        .eq("project_id", projectId)
+        .not("call_sign_id", "is", null)
+        .order("recorded_at", { ascending: false })
+        .limit(500),
+      6000,
+      "latest locations by call sign"
+    );
+    if (error || !data) return getLatestLocationsByCallSignViaPostgres(projectId);
+    return rowsToLatestLocationsByCallSign(data as LocationRow[]);
+  } catch {
+    return getLatestLocationsByCallSignViaPostgres(projectId);
+  }
+});
+
+function rowsToLatestLocationsByCallSign(rows: LocationRow[]): Record<string, LatestLocationByCallSign> {
+  const latest: Record<string, LatestLocationByCallSign> = {};
+  for (const row of rows) {
+    const callSignId = text(row, "call_sign_id");
+    const source = text(row, "source");
+    const latitude = numberValue(row, "latitude");
+    const longitude = numberValue(row, "longitude");
+    if (!callSignId || latest[callSignId]) continue;
+    if (["placeholder", "demo"].includes(source) || (latitude === 0 && longitude === 0)) continue;
+    latest[callSignId] = {
+      latitude,
+      longitude,
+      accuracy: row.accuracy == null ? null : numberValue(row, "accuracy"),
+      recordedAt: text(row, "recorded_at", text(row, "created_at", new Date().toISOString())),
+      sharingEvent: text(row, "sharing_event", "location_ping") as DriverLocation["sharingEvent"],
+      metadata: metadata(row)
+    };
+  }
+  return latest;
+}
+
+async function getLatestLocationsByCallSignViaPostgres(projectId: string): Promise<Record<string, LatestLocationByCallSign>> {
+  const sql = getPostgresClient();
+  if (!sql) return {};
+  try {
+    const rows = await sql<LocationRow[]>`
+      select call_sign_id, latitude, longitude, accuracy, recorded_at, sharing_event, source, metadata
+      from gps_locations
+      where project_id = ${projectId}
+        and call_sign_id is not null
+      order by recorded_at desc nulls last, created_at desc
+      limit 500
+    `;
+    return rowsToLatestLocationsByCallSign(rows);
+  } catch {
+    return {};
+  }
+}
 // cache(): one render often needs this list from several components; keep it to one query per request.
 export const getProjectIdWithLatestDriverLocation = cache(async function getProjectIdWithLatestDriverLocation(): Promise<string | null> {
   const { client } = await resolveReadClient();

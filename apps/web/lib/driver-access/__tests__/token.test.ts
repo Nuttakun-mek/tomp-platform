@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   driverTokenSecret,
   generateDriverAccessToken,
+  generateObserverPin,
   generateObserverAccessToken,
   hashDriverAccessToken,
+  hashObserverPin,
   hashObserverAccessToken,
   verifyDriverAccessTokenHash,
+  verifyObserverPin,
   verifyObserverAccessTokenHash
 } from "../token";
 
@@ -29,11 +32,27 @@ describe("driver access tokens", () => {
     const observerHash = hashObserverAccessToken(token);
     const driverHash = hashDriverAccessToken(token);
 
-    expect(token).toContain("tomp_obs_call-sign-1_");
+    expect(token).toContain("tomp_obs_call_sign_call-sign-1_");
     expect(observerHash).toHaveLength(64);
     expect(observerHash).not.toBe(driverHash);
     expect(verifyObserverAccessTokenHash(token, observerHash)).toBe(true);
     expect(verifyDriverAccessTokenHash(token, observerHash)).toBe(false);
+  });
+
+  it("generates project-scoped observer tokens", () => {
+    const token = generateObserverAccessToken({ scope: "project", projectId: "project-1" });
+    expect(token).toContain("tomp_obs_project_project-1_");
+  });
+
+  it("generates and verifies observer PINs separately from driver PINs", () => {
+    const pin = generateObserverPin();
+    const hash = hashObserverPin(pin);
+
+    expect(pin).toMatch(/^\d{6}$/);
+    expect(hash).toHaveLength(64);
+    expect(verifyObserverPin(pin, hash)).toBe(true);
+    expect(verifyObserverPin("", hash)).toBe(false);
+    expect(verifyObserverPin(String((Number(pin) + 1) % 1_000_000).padStart(6, "0"), hash)).toBe(false);
   });
 });
 

@@ -18,7 +18,7 @@ export interface TrackedPoint {
   accuracy: number | null;
 }
 
-const COLOR: Record<MarkerFreshness, string> = {
+export const TRACKING_MARKER_COLORS: Record<MarkerFreshness, string> = {
   live: "#10b981",
   // Parked and heartbeating — working, just not moving, so it must not read as
   // a warning colour.
@@ -76,10 +76,10 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
           trailsRef.current.set(p.id, trail);
         }
         if (trail.length > 1) {
-          L.polyline(trail, { color: COLOR[p.freshness], weight: 3, opacity: 0.5 }).addTo(layer);
+          L.polyline(trail, { color: TRACKING_MARKER_COLORS[p.freshness], weight: 3, opacity: 0.5 }).addTo(layer);
         }
 
-        const color = COLOR[p.freshness];
+        const color = TRACKING_MARKER_COLORS[p.freshness];
         L.circleMarker([p.latitude, p.longitude], {
           radius: 9,
           color: "#ffffff",

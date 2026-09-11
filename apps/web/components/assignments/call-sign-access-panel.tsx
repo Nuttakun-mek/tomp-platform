@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Eye, QrCode, RefreshCw, Trash2, Undo2 } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, Eye, LockKeyhole, QrCode, RefreshCw, Trash2, Undo2 } from "lucide-react";
 import type { Assignment, CallSign, Driver, Vehicle } from "@tomp/types/domain";
 import { deleteCallSignAction, revokeCallSignQrAction } from "@/app/actions/call-signs";
 import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
@@ -11,6 +11,7 @@ import { ActionFeedback } from "@/components/ui/action-feedback";
 import { UnitCredentialSheet, type UnitCredentials } from "./unit-credential-sheet";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { formatStatusTh } from "@/lib/i18n/status-th";
+import type { ProjectObserverLink } from "@/lib/data/observer-access";
 
 // Access is issued per crewed unit, not per job: one Call Sign is one driver in
 // one vehicle, and that is the thing a QR should name. Issuing per job was what
@@ -39,6 +40,172 @@ interface Unit {
 async function renderQr(url: string, width = 240) {
   const QRCode = await import("qrcode");
   return QRCode.toDataURL(url, { margin: 2, width, errorCorrectionLevel: "M" });
+}
+
+function ProjectFleetAccessCard({
+  projectId,
+  callSigns,
+  projectObserverLink
+}: {
+  projectId: string;
+  callSigns: CallSign[];
+  projectObserverLink?: ProjectObserverLink | null;
+}) {
+  const [withPin, setWithPin] = useState(false);
+  const [showCrew, setShowCrew] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [url, setUrl] = useState("");
+  const [pin, setPin] = useState<string | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!projectObserverLink?.token) return;
+    const nextUrl = `${window.location.origin}/fleet/${encodeURIComponent(projectObserverLink.token)}`;
+    setUrl(nextUrl);
+    renderQr(nextUrl, 220).then(setQr).catch(() => setQr(null));
+  }, [projectObserverLink?.token]);
+
+  function toggle(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function issueProjectLink(reissue = false) {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await createObserverAccessTokenAction({
+        projectId,
+        scope: "project",
+        withPin,
+        showCrew,
+        reissue,
+        callSignIds: selectedIds.size ? Array.from(selectedIds) : undefined,
+        label: "ลิงก์ติดตามทั้งโครงการ"
+      });
+
+      if (!result.success) {
+        setTone("danger");
+        setMessage(result.error || "สร้างลิงก์ติดตามทั้งโครงการไม่สำเร็จ");
+        return;
+      }
+
+      const data = result.data as { accessUrl?: string; pin?: string | null; reused?: boolean };
+      const nextUrl = data.accessUrl || "";
+      setUrl(nextUrl);
+      setPin(data.pin ?? null);
+      setQr(nextUrl ? await renderQr(nextUrl, 220).catch(() => null) : null);
+      setTone(data.reused ? "warning" : "success");
+      setMessage(
+        data.reused
+          ? "แสดงลิงก์ติดตามโครงการเดิมที่ยังใช้งานได้ หากต้องการเปลี่ยน PIN หรือขอบเขต ให้กดออกลิงก์ใหม่"
+          : "สร้างลิงก์ติดตามโครงการแล้ว ลิงก์นี้อ่านอย่างเดียวและไม่สามารถแก้ไขงานได้"
+      );
+    });
+  }
+
+  return (
+    <section className="rounded-card border border-teal-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="section-label">Fleet View</p>
+          <h3 className="mt-1 text-lg font-bold text-ink">ลิงก์ติดตามรถทั้งโครงการ</h3>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-soft">
+            ใช้สำหรับลูกค้าหรือผู้ติดตามภายนอก เปิดดูตำแหน่งรถที่ได้รับอนุญาตแบบอ่านอย่างเดียว ไม่แสดงเบอร์โทรคนขับ
+          </p>
+        </div>
+        {projectObserverLink ? (
+          <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">มีลิงก์ใช้งานอยู่</span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="grid gap-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
+              <input type="checkbox" checked={withPin} onChange={(event) => setWithPin(event.target.checked)} className="h-4 w-4 accent-teal-600" />
+              <LockKeyhole className="h-4 w-4" />
+              ใช้ PIN สำหรับลิงก์นี้
+            </label>
+            <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
+              <input type="checkbox" checked={showCrew} onChange={(event) => setShowCrew(event.target.checked)} className="h-4 w-4 accent-teal-600" />
+              แสดงชื่อคนขับ
+            </label>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-bold text-slate-500">จำกัดเฉพาะบาง Call Sign (ไม่เลือก = ทั้งโครงการ)</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {callSigns.filter((callSign) => callSign.status === "active").map((callSign) => (
+                <button
+                  key={callSign.id}
+                  type="button"
+                  onClick={() => toggle(callSign.id)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                    selectedIds.has(callSign.id) ? "bg-teal-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
+                  }`}
+                >
+                  {callSign.callSign}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {message ? <ActionFeedback tone={tone} message={message} /> : null}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => issueProjectLink(false)}
+              className="inline-flex min-h-10 items-center gap-2 rounded-command bg-operation px-4 text-sm font-bold text-white disabled:opacity-50"
+            >
+              <QrCode className="h-4 w-4" />
+              {projectObserverLink || url ? "แสดงลิงก์เดิม" : "สร้างลิงก์ติดตามโครงการ"}
+            </button>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => issueProjectLink(true)}
+              className="inline-flex min-h-10 items-center gap-2 rounded-command border border-slate-300 bg-white px-4 text-sm font-bold text-ink-soft disabled:opacity-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              ออกลิงก์ใหม่
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
+          {qr ? (
+            // eslint-disable-next-line @next/next/no-img-element -- QR is a generated data URL, not a remote image asset.
+            <img src={qr} alt="QR Fleet View" className="mx-auto h-44 w-44 rounded-xl bg-white p-2" />
+          ) : (
+            <div className="grid h-44 place-items-center rounded-xl bg-white text-sm font-semibold text-slate-400">ยังไม่มี QR</div>
+          )}
+          {pin ? <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">PIN: {pin}</p> : null}
+          {url ? (
+            <div className="mt-2 grid gap-2">
+              <p className="break-all rounded-xl bg-white px-3 py-2 text-[11px] text-slate-600">{url}</p>
+              <div className="flex justify-center gap-2">
+                <button type="button" className="rounded-full bg-white p-2 text-slate-600 ring-1 ring-slate-200" onClick={() => navigator.clipboard.writeText(url)}>
+                  <Copy className="h-4 w-4" />
+                </button>
+                <a className="rounded-full bg-white p-2 text-slate-600 ring-1 ring-slate-200" href={url} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 
@@ -97,6 +264,7 @@ export function CallSignAccessPanel({
   vehicles,
   issued = {},
   observerLinks = {},
+  projectObserverLink,
   onIssued
 }: {
   projectId: string;
@@ -115,6 +283,7 @@ export function CallSignAccessPanel({
    * why the passenger QR survives a refresh and the driver's does not.
    */
   observerLinks?: Record<string, string>;
+  projectObserverLink?: ProjectObserverLink | null;
   onIssued?: (credentials: UnitCredentials) => void;
 }) {
   const [message, setMessage] = useState<string | null>(null);
@@ -377,6 +546,10 @@ export function CallSignAccessPanel({
           <ActionFeedback tone={tone} message={message} />
         </div>
       ) : null}
+
+      <div className="mt-4">
+        <ProjectFleetAccessCard projectId={projectId} callSigns={callSigns} projectObserverLink={projectObserverLink} />
+      </div>
 
       <div className="mt-3 grid gap-2.5">
         {units.length === 0 ? (

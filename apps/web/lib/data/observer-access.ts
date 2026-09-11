@@ -38,6 +38,7 @@ export async function getObserverAccessView(token: string): Promise<ObserverAcce
       .from("observer_access_tokens")
       .select("id, project_id, call_sign_id, status, expires_at, usage_count")
       .eq("token_hash", tokenHash)
+      .eq("scope", "call_sign")
       .eq("status", "active")
       .maybeSingle();
     if (!tokenRow || (tokenRow.expires_at && new Date(String(tokenRow.expires_at)).getTime() <= Date.now())) return getObserverAccessViewViaPostgres(tokenHash);
@@ -88,6 +89,7 @@ async function getObserverAccessViewViaPostgres(tokenHash: string): Promise<Obse
     select id, project_id, call_sign_id, expires_at
     from observer_access_tokens
     where token_hash = ${tokenHash}
+      and scope = 'call_sign'
       and status = 'active'
     limit 1
   `;
@@ -190,6 +192,7 @@ export async function getObserverLinksByProjectId(projectId: string): Promise<Re
       .from("observer_access_tokens")
       .select("call_sign_id, token_plaintext, expires_at")
       .eq("project_id", projectId)
+      .eq("scope", "call_sign")
       .eq("status", "active")
       .order("created_at", { ascending: false });
 
@@ -209,7 +212,7 @@ export async function getObserverLinksByProjectId(projectId: string): Promise<Re
     const rows = await sql<Array<{ call_sign_id: string; token_plaintext: string | null; expires_at: string | null }>>`
       select call_sign_id, token_plaintext, expires_at
       from observer_access_tokens
-      where project_id = ${projectId} and status = 'active'
+      where project_id = ${projectId} and scope = 'call_sign' and status = 'active'
       order by created_at desc
     `;
     for (const row of rows) {
@@ -221,4 +224,73 @@ export async function getObserverLinksByProjectId(projectId: string): Promise<Re
     // A card with no link offers to issue one, which is the safe default.
   }
   return links;
+}
+
+export interface ProjectObserverLink {
+  tokenId: string;
+  token: string;
+  expiresAt: string | null;
+  hasPin: boolean;
+  showCrew: boolean;
+  label: string | null;
+}
+
+export async function getProjectObserverLinkByProjectId(projectId: string): Promise<ProjectObserverLink | null> {
+  if (!projectId) return null;
+  const nowIso = new Date().toISOString();
+
+  const { client } = getSupabaseWriteClient();
+  if (client) {
+    const { data } = await client
+      .from("observer_access_tokens")
+      .select("id, token_plaintext, expires_at, pin_hash, show_crew, label")
+      .eq("project_id", projectId)
+      .eq("scope", "project")
+      .eq("status", "active")
+      .is("call_sign_id", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    const token = typeof data.token_plaintext === "string" ? data.token_plaintext : "";
+    if (!token || (data.expires_at && String(data.expires_at) <= nowIso)) return null;
+    const row = data;
+    return {
+      tokenId: String(row.id),
+      token,
+      expiresAt: typeof row.expires_at === "string" ? row.expires_at : null,
+      hasPin: Boolean(row.pin_hash),
+      showCrew: Boolean(row.show_crew),
+      label: typeof row.label === "string" ? row.label : null
+    };
+  }
+
+  const sql = getPostgresClient();
+  if (!sql) return null;
+  try {
+    const rows = await sql<
+      Array<{ id: string; token_plaintext: string | null; expires_at: string | null; pin_hash: string | null; show_crew: boolean | null; label: string | null }>
+    >`
+      select id, token_plaintext, expires_at, pin_hash, show_crew, label
+      from observer_access_tokens
+      where project_id = ${projectId}
+        and scope = 'project'
+        and status = 'active'
+        and call_sign_id is null
+      order by created_at desc
+      limit 1
+    `;
+    const row = rows[0];
+    if (!row?.token_plaintext || (row.expires_at && row.expires_at <= nowIso)) return null;
+    return {
+      tokenId: row.id,
+      token: row.token_plaintext,
+      expiresAt: row.expires_at,
+      hasPin: Boolean(row.pin_hash),
+      showCrew: Boolean(row.show_crew),
+      label: row.label
+    };
+  } catch {
+    return null;
+  }
 }

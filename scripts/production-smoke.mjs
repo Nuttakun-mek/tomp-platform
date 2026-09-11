@@ -6,7 +6,7 @@
 
 const baseUrl = process.env.TOMP_SMOKE_BASE_URL || "https://tomp-platform.vercel.app";
 
-/** @type {{ path: string, expect: "public-200" | "redirect-login" | "health" | "not-found" }[]} */
+/** @type {{ path: string, expect: "public-200" | "redirect-login" | "health" | "not-found" | "gone" }[]} */
 const checks = [
   { path: "/login", expect: "public-200" },
   { path: "/api/health", expect: "health" },
@@ -21,6 +21,8 @@ const checks = [
   { path: "/resources", expect: "redirect-login" },
   // Driver entry with no token — should render its "no job" notice, not error.
   { path: "/driver", expect: "public-200" },
+  { path: "/track/not-a-real-token", expect: "public-200" },
+  { path: "/fleet/not-a-real-token", expect: "public-200" },
   // Retired legacy paths — must not serve content (404, or a compat redirect).
   { path: "/admin", expect: "gone" },
   { path: "/live-test", expect: "gone" }
