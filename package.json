@@ -16,7 +16,7 @@
     "lint": "npm run lint -w @tomp/web",
     "typecheck": "npm run typecheck -w @tomp/web",
     "typecheck:mobile": "npm --prefix apps/mobile-driver run typecheck",
-    "test": "npm run test -w @tomp/web && npm run test -w @tomp/driver-core && npm --prefix apps/mobile-driver run test",
+    "test": "npm run test -w @tomp/web && npm run test -w @tomp/driver-core",
     "test:mobile": "npm --prefix apps/mobile-driver run test",
     "test:watch": "npm run test:watch -w @tomp/web",
     "security:env": "node scripts/check-public-env.mjs",
