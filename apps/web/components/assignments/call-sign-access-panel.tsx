@@ -123,9 +123,9 @@ function ProjectFleetAccessCard({
   }
 
   return (
-    <section className="rounded-card border border-teal-200 bg-white p-4 shadow-sm">
+    <section className="rounded-card border border-teal-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="section-label">Fleet View</p>
           <h3 className="mt-1 text-lg font-bold text-ink">ลิงก์ติดตามรถทั้งโครงการ</h3>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-soft">
@@ -137,33 +137,33 @@ function ProjectFleetAccessCard({
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="grid gap-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
+      <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="grid min-w-0 content-start gap-3">
+          <div className="grid items-start gap-2 sm:grid-cols-2">
+            <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
               <input type="checkbox" checked={withPin} onChange={(event) => setWithPin(event.target.checked)} className="h-4 w-4 accent-teal-600" />
-              <LockKeyhole className="h-4 w-4" />
-              ใช้ PIN สำหรับลิงก์นี้
+              <LockKeyhole className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 leading-5">ใช้ PIN สำหรับลิงก์นี้</span>
             </label>
-            <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
+            <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
               <input type="checkbox" checked={showCrew} onChange={(event) => setShowCrew(event.target.checked)} className="h-4 w-4 accent-teal-600" />
-              แสดงชื่อคนขับ
+              <span className="min-w-0 leading-5">แสดงชื่อคนขับ</span>
             </label>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-bold text-slate-500">จำกัดเฉพาะบาง Call Sign (ไม่เลือก = ทั้งโครงการ)</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex max-h-24 flex-wrap gap-2 overflow-y-auto pr-1">
               {callSigns.filter((callSign) => callSign.status === "active").map((callSign) => (
                 <button
                   key={callSign.id}
                   type="button"
                   onClick={() => toggle(callSign.id)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  className={`inline-flex h-8 max-w-full shrink-0 items-center rounded-full px-3 text-xs font-bold transition ${
                     selectedIds.has(callSign.id) ? "bg-teal-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
                   }`}
                 >
-                  {callSign.callSign}
+                  <span className="truncate">{callSign.callSign}</span>
                 </button>
               ))}
             </div>
@@ -171,34 +171,36 @@ function ProjectFleetAccessCard({
 
           {message ? <ActionFeedback tone={tone} message={message} /> : null}
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={isPending}
               onClick={() => issueProjectLink(false)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-command bg-operation px-4 text-sm font-bold text-white disabled:opacity-50"
+              className="inline-flex h-10 max-w-full shrink-0 items-center justify-center gap-2 rounded-command bg-operation px-4 text-sm font-bold leading-none text-white disabled:opacity-50"
+              title={projectObserverLink || url ? "แสดงลิงก์ติดตามโครงการที่ยังใช้งานอยู่" : "สร้างลิงก์ติดตามโครงการ"}
             >
-              <QrCode className="h-4 w-4" />
-              {projectObserverLink || url ? "แสดงลิงก์เดิม" : "สร้างลิงก์ติดตามโครงการ"}
+              <QrCode className="h-4 w-4 shrink-0" />
+              <span className="truncate">{projectObserverLink || url ? "แสดงลิงก์เดิม" : "สร้างลิงก์ติดตามโครงการ"}</span>
             </button>
             <button
               type="button"
               disabled={isPending}
               onClick={() => issueProjectLink(true)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-command border border-slate-300 bg-white px-4 text-sm font-bold text-ink-soft disabled:opacity-50"
+              className="inline-flex h-10 max-w-full shrink-0 items-center justify-center gap-2 rounded-command border border-slate-300 bg-white px-4 text-sm font-bold leading-none text-ink-soft disabled:opacity-50"
+              title="ออกลิงก์ใหม่เมื่อจำเป็นเท่านั้น เพราะลิงก์เดิมจะถูกยกเลิก"
             >
-              <RefreshCw className="h-4 w-4" />
-              ออกลิงก์ใหม่
+              <RefreshCw className="h-4 w-4 shrink-0" />
+              <span className="truncate">ออกลิงก์ใหม่</span>
             </button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
+        <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 text-center xl:w-60">
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element -- QR is a generated data URL, not a remote image asset.
-            <img src={qr} alt="QR Fleet View" className="mx-auto h-44 w-44 rounded-xl bg-white p-2" />
+            <img src={qr} alt="QR Fleet View" className="mx-auto h-40 w-40 rounded-xl bg-white p-2 sm:h-44 sm:w-44" />
           ) : (
-            <div className="grid h-44 place-items-center rounded-xl bg-white text-sm font-semibold text-slate-400">ยังไม่มี QR</div>
+            <div className="grid h-40 place-items-center rounded-xl bg-white text-sm font-semibold text-slate-400 sm:h-44">ยังไม่มี QR</div>
           )}
           {pin ? (
             <div className="mt-2 rounded-xl border border-amber-400 bg-amber-50 px-3 py-2 text-left">
@@ -216,12 +218,12 @@ function ProjectFleetAccessCard({
           ) : null}
           {url ? (
             <div className="mt-2 grid gap-2">
-              <p className="break-all rounded-xl bg-white px-3 py-2 text-[11px] text-slate-600">{url}</p>
+              <p className="max-h-20 overflow-y-auto break-all rounded-xl bg-white px-3 py-2 text-left text-[11px] leading-4 text-slate-600">{url}</p>
               <div className="flex justify-center gap-2">
-                <button type="button" className="rounded-full bg-white p-2 text-slate-600 ring-1 ring-slate-200" onClick={() => navigator.clipboard.writeText(url)}>
+                <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-white text-slate-600 ring-1 ring-slate-200 transition hover:text-operation hover:ring-operation/30" onClick={() => navigator.clipboard.writeText(url)} title="คัดลอกลิงก์ติดตาม">
                   <Copy className="h-4 w-4" />
                 </button>
-                <a className="rounded-full bg-white p-2 text-slate-600 ring-1 ring-slate-200" href={url} target="_blank" rel="noreferrer">
+                <a className="grid h-9 w-9 place-items-center rounded-full bg-white text-slate-600 ring-1 ring-slate-200 transition hover:text-operation hover:ring-operation/30" href={url} target="_blank" rel="noreferrer" title="เปิดลิงก์ติดตาม">
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </div>

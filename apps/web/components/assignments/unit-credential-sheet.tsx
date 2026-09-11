@@ -159,8 +159,8 @@ function CredentialBlock({
   missingNote?: string;
 }) {
   return (
-    <div className={`grid gap-2 rounded-2xl border p-3 ${tone === "driver" ? "border-teal-300 bg-white" : "border-slate-300 bg-slate-50/70"}`}>
-      <div>
+    <div className={`grid min-w-0 content-start gap-2 rounded-xl border p-3 ${tone === "driver" ? "border-teal-300 bg-white" : "border-slate-300 bg-slate-50/70"}`}>
+      <div className="min-w-0">
         <p className={`text-[13px] font-bold ${tone === "driver" ? "text-teal-800" : "text-slate-700"}`}>{heading}</p>
         <p className="text-[12px] font-semibold text-ink">{who}</p>
         <p className="text-[11px] leading-4 text-ink-soft">{how}</p>
@@ -179,21 +179,27 @@ function CredentialBlock({
           <p className="text-[10px] leading-3 text-amber-800">ส่งคนละช่องทางกับ QR</p>
         </div>
       ) : null}
-      <div className="flex flex-wrap gap-1.5 print:hidden">
+      <p className="max-h-14 overflow-y-auto break-all rounded-lg bg-white/80 px-2 py-1 text-[10px] leading-4 text-ink-faint ring-1 ring-slate-200">
+        {url || "ยังไม่มีลิงก์"}
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5 print:hidden">
         <button
           type="button"
           onClick={() => void navigator.clipboard?.writeText(url)}
-          className="flex min-h-8 items-center gap-1 rounded-command border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-ink-soft"
+          disabled={!url}
+          className="inline-flex h-8 max-w-full shrink-0 items-center justify-center gap-1 rounded-command border border-slate-300 bg-white px-2.5 text-[11px] font-semibold leading-none text-ink-soft disabled:opacity-45"
+          title="คัดลอกลิงก์"
         >
-          <Copy className="h-3 w-3" /> คัดลอกลิงก์
+          <Copy className="h-3 w-3 shrink-0" /> <span className="truncate">คัดลอกลิงก์</span>
         </button>
         {qr ? (
           <button
             type="button"
             onClick={() => saveDataUrl(qr, filename)}
-            className="flex min-h-8 items-center gap-1 rounded-command border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-ink-soft"
+            className="inline-flex h-8 max-w-full shrink-0 items-center justify-center gap-1 rounded-command border border-slate-300 bg-white px-2.5 text-[11px] font-semibold leading-none text-ink-soft"
+            title="ดาวน์โหลดเฉพาะ QR นี้"
           >
-            <Download className="h-3 w-3" /> เฉพาะ QR นี้
+            <Download className="h-3 w-3 shrink-0" /> <span className="truncate">เฉพาะ QR นี้</span>
           </button>
         ) : null}
       </div>
@@ -231,7 +237,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
   return (
     <div className="grid gap-3 rounded-2xl border-2 border-teal-300 bg-teal-50/40 p-3 print:border-0 print:bg-white" data-credential-sheet>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold text-teal-700">
             {hasDriverHalf ? "หน่วยรถพร้อมใช้งาน — QR ออกครบทั้ง 2 ใบแล้ว" : "หน่วยรถพร้อมใช้งาน — แสดง QR ผู้โดยสารใบเดิม"}
           </p>
@@ -243,22 +249,24 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
             QR ผู้โดยสารดูซ้ำได้ทุกเมื่อ เพราะเป็นลิงก์อ่านอย่างเดียว — ส่วน QR คนขับกับรหัส PIN เก็บเป็นค่าเข้ารหัส จึงแสดงได้ครั้งเดียวเท่านั้น
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5 print:hidden">
+        <div className="flex flex-wrap items-center justify-end gap-1.5 print:hidden">
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
-            className="flex min-h-9 items-center gap-1.5 rounded-command border border-teal-300 bg-white px-3 text-[12px] font-semibold text-teal-800"
+            className="inline-flex h-9 max-w-full shrink-0 items-center justify-center gap-1.5 rounded-command border border-teal-300 bg-white px-3 text-[12px] font-semibold leading-none text-teal-800"
+            title={open ? "ซ่อนแผ่น QR โดยไม่ออก QR ใหม่" : "แสดงแผ่น QR เดิม"}
           >
             <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
-            {open ? "ซ่อนแผ่น QR" : "แสดงแผ่น QR เดิม"}
+            <span className="truncate">{open ? "ซ่อนแผ่น QR" : "แสดงแผ่น QR เดิม"}</span>
           </button>
           <button
             type="button"
             onClick={saveWholeSheet}
             disabled={busy}
-            className="flex min-h-9 items-center gap-1.5 rounded-command bg-operation px-3 text-[12px] font-semibold text-white disabled:opacity-50"
+            className="inline-flex h-9 max-w-full shrink-0 items-center justify-center gap-1.5 rounded-command bg-operation px-3 text-[12px] font-semibold leading-none text-white disabled:opacity-50"
+            title="ดาวน์โหลด QR คนขับและ QR ผู้ติดตามรวมเป็นภาพเดียว"
           >
-            <FileDown className="h-3.5 w-3.5" /> {busy ? "กำลังสร้าง..." : "ดาวน์โหลดรวมเป็นภาพ"}
+            <FileDown className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{busy ? "กำลังสร้าง..." : "ดาวน์โหลดรวมเป็นภาพ"}</span>
           </button>
           <button
             type="button"
@@ -266,9 +274,10 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
               setSaved(true);
               window.print();
             }}
-            className="flex min-h-9 items-center gap-1.5 rounded-command bg-ink px-3 text-[12px] font-semibold text-white"
+            className="inline-flex h-9 max-w-full shrink-0 items-center justify-center gap-1.5 rounded-command bg-ink px-3 text-[12px] font-semibold leading-none text-white"
+            title="พิมพ์หรือบันทึกเป็น PDF"
           >
-            <Printer className="h-3.5 w-3.5" /> พิมพ์ / บันทึก PDF
+            <Printer className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">พิมพ์ / บันทึก PDF</span>
           </button>
         </div>
       </div>
@@ -294,7 +303,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
       ) : null}
 
       {open ? (
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
         <CredentialBlock
           tone="driver"
           heading="① QR คนขับ"
