@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -76,6 +77,7 @@ export default function App() {
   const [currentToken, setCurrentToken] = useState("");
   const [webUrl, setWebUrl] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [qrLocked, setQrLocked] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [message, setMessage] = useState("สแกน QR หรือวาง URL งานที่ได้รับจากศูนย์ควบคุม");
@@ -420,7 +422,7 @@ export default function App() {
         <View style={styles.topbar}>
           <View style={styles.identity}>
             <Text style={styles.product}>TOMP Driver</Text>
-            <Text style={styles.title}>{mode === "web" ? mt(locale, "driverPage") : mt(locale, "openWithQr")}</Text>
+            {mode === "web" ? <Text style={styles.title}>{mt(locale, "driverPage")}</Text> : null}
           </View>
           <View style={styles.statusGroup}>
             <View style={styles.localeSwitch}>
@@ -430,7 +432,7 @@ export default function App() {
                 </Pressable>
               ))}
             </View>
-            <Text style={styles.statusPill}>{status}</Text>
+            {mode === "web" ? <Text style={styles.statusPill}>{status}</Text> : null}
             <Text style={styles.network}>{networkLabel}</Text>
             {outboxCount > 0 ? <Text style={styles.outboxText}>ค้างส่ง {outboxCount} รายการ</Text> : null}
             {syncLabel ? <Text style={styles.syncText}>{syncLabel}</Text> : null}
@@ -476,11 +478,13 @@ export default function App() {
             </View>
           </View>
         ) : (
-          <View style={styles.activation}>
+          <ScrollView style={styles.activationScroller} contentContainerStyle={styles.activation} keyboardShouldPersistTaps="handled">
             <View style={styles.heroCard}>
-              <Text style={styles.kicker}>สำหรับคนขับ</Text>
-              <Text style={styles.heroTitle}>สแกน QR เพื่อเปิดงาน</Text>
-              <Text style={styles.heroCopy}>แอปนี้ใช้สำหรับเปิดหน้าคนขับของ TOMP และเตรียม GPS เบื้องหลังสำหรับ Android</Text>
+              <Text style={styles.kicker}>พื้นที่ปฏิบัติงานคนขับ</Text>
+              <Text style={styles.heroTitle}>รับงานผ่าน QR จากศูนย์ควบคุม</Text>
+              <Text style={styles.heroCopy}>
+                สแกน QR ที่ได้รับจากเจ้าหน้าที่ เพื่อเปิดรายละเอียดงาน ยืนยันตัวตน และเริ่มส่งตำแหน่ง GPS ระหว่างปฏิบัติงาน
+              </Text>
             </View>
 
             {scannerOpen ? (
@@ -500,24 +504,34 @@ export default function App() {
               <Pressable style={styles.primaryButton} onPress={openScanner}>
                 <Text style={styles.primaryButtonText}>{scannerOpen ? mt(locale, "closeCamera") : mt(locale, "scanQr")}</Text>
               </Pressable>
-              <Text style={styles.orText}>{mt(locale, "pasteUrl")}</Text>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={setTokenInput}
-                placeholder="เช่น https://.../driver/..."
-                placeholderTextColor="#7d8b99"
-                style={styles.input}
-                value={tokenInput}
-              />
-              <Pressable style={styles.secondaryButton} onPress={() => openDriverLink(tokenInput)}>
-                <Text style={styles.secondaryButtonText}>{mt(locale, "openJob")}</Text>
+              <Pressable style={styles.manualToggle} onPress={() => setManualEntryOpen((value) => !value)}>
+                <Text style={styles.manualToggleText}>{manualEntryOpen ? mt(locale, "hideManualEntry") : mt(locale, "manualEntry")}</Text>
               </Pressable>
+              {manualEntryOpen ? (
+                <View style={styles.manualEntryBox}>
+                  <Text style={styles.orText}>{mt(locale, "pasteUrl")}</Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    onChangeText={setTokenInput}
+                    placeholder="เช่น https://.../driver/..."
+                    placeholderTextColor="#7d8b99"
+                    style={styles.input}
+                    value={tokenInput}
+                  />
+                  <Pressable style={styles.secondaryButton} onPress={() => openDriverLink(tokenInput)}>
+                    <Text style={styles.secondaryButtonText}>{mt(locale, "openJob")}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.noteCard}>
-              <Text style={styles.noteTitle}>{mt(locale, "systemStatus")}</Text>
-              <Text style={styles.noteText}>{message}</Text>
+              <Text style={styles.noteTitle}>แนวทางการใช้งาน</Text>
+              <Text style={styles.noteText}>1. เปิดแอปและสแกน QR จากศูนย์ควบคุมก่อนเริ่มงาน</Text>
+              <Text style={styles.noteText}>2. ตรวจสอบรายละเอียดงานและกดยืนยันตามขั้นตอนในหน้าคนขับ</Text>
+              <Text style={styles.noteText}>3. อนุญาตตำแหน่ง GPS เพื่อให้ศูนย์ควบคุมติดตามสถานะระหว่างปฏิบัติงาน</Text>
+              <Text style={styles.noteText}>สถานะล่าสุด: {message}</Text>
               <Text style={styles.noteText}>API: {TOMP_API_BASE_URL}</Text>
               <Text style={styles.noteText}>รุ่นแอป: {TOMP_DRIVER_APP_VERSION}</Text>
               {outboxCount > 0 ? <Text style={styles.noteText}>รายการที่รอส่งซ้ำ: {outboxCount}</Text> : null}
@@ -533,7 +547,7 @@ export default function App() {
                   : "Android: ตั้งค่าตำแหน่งเป็น “อนุญาตตลอดเวลา” เพื่อให้ส่งตำแหน่งต่อเนื่องขณะปิดหน้าจอ"}
               </Text>
             </View>
-          </View>
+          </ScrollView>
         )}
       </View>
     </SafeAreaView>
@@ -550,21 +564,24 @@ const styles = StyleSheet.create({
     flex: 1
   },
   topbar: {
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: colors.command,
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 18,
-    paddingVertical: 14
+    paddingBottom: 18,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 18 : 22
   },
   identity: {
     flex: 1,
-    gap: 2
+    gap: 3,
+    paddingTop: 4
   },
   product: {
     color: "#8be2da",
-    fontSize: 12,
-    fontWeight: "800"
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: 0.3
   },
   title: {
     color: "#ffffff",
@@ -573,7 +590,8 @@ const styles = StyleSheet.create({
   },
   statusGroup: {
     alignItems: "flex-end",
-    gap: 5
+    gap: 8,
+    paddingTop: 2
   },
   localeSwitch: {
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -609,7 +627,7 @@ const styles = StyleSheet.create({
   },
   network: {
     color: "#bdd1df",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700"
   },
   outboxText: {
@@ -624,16 +642,21 @@ const styles = StyleSheet.create({
     maxWidth: 180,
     textAlign: "right"
   },
+  activationScroller: {
+    flex: 1
+  },
   activation: {
     gap: 14,
-    padding: 16
+    paddingBottom: Platform.OS === "android" ? 46 : 28,
+    paddingHorizontal: 16,
+    paddingTop: 16
   },
   heroCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    padding: 20
+    padding: 18
   },
   kicker: {
     color: colors.operationDeep,
@@ -642,15 +665,15 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: colors.ink,
-    fontSize: 28,
+    fontSize: 25,
     fontWeight: "900",
-    lineHeight: 34,
+    lineHeight: 31,
     marginTop: 8
   },
   heroCopy: {
     color: colors.muted,
-    fontSize: 15,
-    lineHeight: 23,
+    fontSize: 14,
+    lineHeight: 22,
     marginTop: 8
   },
   formCard: {
@@ -658,7 +681,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: 12,
+    gap: 10,
     padding: 16
   },
   primaryButton: {
@@ -673,6 +696,19 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "900"
+  },
+  manualToggle: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 36
+  },
+  manualToggleText: {
+    color: colors.operationDeep,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  manualEntryBox: {
+    gap: 10
   },
   secondaryButton: {
     alignItems: "center",
@@ -741,7 +777,7 @@ const styles = StyleSheet.create({
     borderColor: "#cce6e3",
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: 5,
+    gap: 6,
     padding: 14
   },
   noteTitle: {
@@ -801,6 +837,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 10,
-    padding: 10
+    paddingBottom: Platform.OS === "android" ? 18 : 10,
+    paddingHorizontal: 10,
+    paddingTop: 10
   }
 });
