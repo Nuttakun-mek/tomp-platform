@@ -1,8 +1,9 @@
 # 976 — Handoff: after the GPS day
 
-**This replaces `974` as the entry point.** `974`'s pitfalls section still holds
-and is still worth reading; its task list has moved on. `975` covers iOS and is
-current.
+**Read this one. It is the whole handoff.** It replaces `974`, which has been
+emptied into it — there is nothing left there to open. `975` is still live and
+covers iOS on its own; `972` still holds the reasoning behind the bilingual
+rollout.
 
 Written 2026-09-11 at `e8d81a4`, at the end of a live test with real drivers.
 Every number here came from the pings, not from reading the code.
@@ -228,14 +229,161 @@ coarse to justify a "parked" reading are flagged.
 **Run it before theorising.** Every correct diagnosis today came from it, and
 every wrong one came from reasoning about the platform instead.
 
-## Still true from `974`
+## The bilingual rollout has not moved
 
-Its "things that will bite you" section is unchanged and still worth reading:
-green locally says nothing about CI, never put mobile paths in a root script,
-reproduce CI in a clean clone, a test outside `lib/` never runs, pushing does not
-deploy, WebFetch caches fifteen minutes, apply and mirror migrations before
-shipping code that needs them, and copy lives in `lib/i18n` or the page is not
-translated.
+**1,168 Thai literals across 114 `.tsx` files**, one page converted. `972` has
+the order and the reasoning for it.
 
-The bilingual rollout has not moved: **1,168 Thai literals across 114 `.tsx`
-files**, one page converted. `972` has the order and the reasoning.
+---
+
+# Things that will bite you
+
+Every one of these cost real time. They are not hypotheticals. Carried here from
+`974` so this note stands on its own — that is the last thing `974` had that this
+one did not.
+
+## Green locally means nothing about CI
+
+`npm run lint && npm test && npm run build` is **not** what CI runs. Verify also
+runs `typecheck`, `typecheck:mobile`, `test:mobile`, `security:env` and
+`db:check-mirror` — and the last two a local run never touches at all.
+
+The full sequence:
+
+```
+npm run typecheck && npm run lint && npm test && npm run build
+npm ci --prefix apps/mobile-driver && npm run typecheck:mobile && npm run test:mobile
+npm run security:env && npm run db:check-mirror
+```
+
+## Never put mobile into a root script
+
+`apps/mobile-driver` is an Expo app with its own lockfile, **not an npm
+workspace** (`workspaces` is `apps/web` + `packages/*`), so the root `npm ci`
+never installs its dependencies — CI installs them in a later step. Its tsconfig
+extends `expo/tsconfig.base`, which resolves *inside*
+`apps/mobile-driver/node_modules`, so both `tsc` and `vitest` fail before reading
+a line of code.
+
+This has caught three people: `5aa2110` folded the mobile tests into root `test`,
+`736dd1f` undid it, `4113f31` put back **both** that and the same for
+`typecheck`. Every time it passed locally, because a developer machine already
+has `apps/mobile-driver/node_modules` from the last time someone ran the app —
+**the one environment where the bug cannot reproduce is the one where the change
+gets written.**
+
+`apps/web/lib/ci/root-scripts.test.ts` now fails if anyone does it again.
+
+## Reproduce CI instead of guessing at it
+
+When something passes locally and fails on CI, stop editing and reproduce:
+
+```
+git clone --depth 1 file://<repo> /tmp/cirepro && cd /tmp/cirepro
+npm ci && npm run typecheck && npm test
+```
+
+This found the above in one run after a round of guessing had already burned a
+push.
+
+## A test outside `lib/` never runs
+
+`apps/web/vitest.config.ts` collects **`lib/**/*.test.ts` and nothing else**. A
+test written beside a component, an action, or the middleware does not fail — it
+is not collected, which is worse than having no test. Put the logic in `lib/` and
+test it there; `lib/auth/public-paths.ts` and `lib/fleet-access/pin-rate-limit.ts`
+exist precisely so middleware and action logic could be tested.
+
+After adding tests, **check the file count in the vitest output went up.**
+
+## Pushing does not deploy
+
+The Vercel project has **no Git connection** — verified by pushing and watching
+sixteen minutes produce no deployment. Deploy with:
+
+```
+vercel --prod --yes        # from the repo root; project rootDirectory is apps/web
+```
+
+Confirm with `npm run smoke:production`, not WebFetch — **WebFetch caches 15
+minutes per URL** and will happily show you the previous build and let you
+believe you shipped.
+
+## Apply the migration before deploying the code that needs it
+
+Code that writes a new column fails on every call until the column exists. Order
+is always: `node scripts/apply-migrations.mjs --dry-run`, then `--yes`, then
+deploy. Then **`node scripts/sync-supabase-migrations.mjs`** and commit the
+result — `supabase/migrations/` is a generated mirror and CI fails
+`db:check-mirror` when it drifts. Forgetting this broke run 90.
+
+Writing to the production database is gated by the permission classifier. If it
+refuses, ask the owner rather than routing around it.
+
+## Copy lives in `lib/i18n` or the page is not translated
+
+The fleet page first shipped with 42 dictionary keys written *and bypassed* —
+local `copy` tables in the components beside a finished dictionary, two sets of
+translations for one page, free to drift, with the dictionary looking complete to
+anyone reviewing it. `lib/fleet-access/no-actions.test.ts` now fails on any Thai
+character under `components/fleet-view/` or `app/fleet/`.
+
+**Extend that guard to each surface as you convert it.** A guard that grows with
+the work is the only thing that stops the next feature reintroducing literals.
+
+## Reading the code is not checking the behaviour
+
+Two bugs this session looked handled on inspection and were only found by
+building the state and opening it: a driver scanning a valid QR for a unit with
+no work yet was told the link was broken, and the control room's park button had
+no rendering component at all while the action behind it worked fine.
+
+If you are about to write "looks correct", open it instead.
+
+## Issuing a link twice must not invalidate the first
+
+Both link buttons originally minted a fresh token on every press, silently
+revoking the one already printed and in someone's hand. The ordinary press must
+**show** the live link; only an explicit reissue may replace it. This was fixed
+twice — once for the unit link, once for the project link where ticking "use a
+PIN" bypassed the check.
+
+## Rate limits key on the client, never on the token
+
+Counting failed PINs against the token itself lets anyone who has seen the QR
+lock the customer out by guessing badly on purpose. `pin-rate-limit.ts` keys on
+`(token_id, client_fingerprint)` and **never** revokes the token; a test asserts
+the token is still active after twenty failures. Keep it that way.
+
+## Environment
+
+- **`pkill` does not kill Windows processes.** Use PowerShell `Stop-Process`, or
+  a dead Metro holds port 8081 and `expo start` silently picks 8082.
+- **`next start` reads only `apps/web/.env.local`.** `scripts/start-local-check.mjs`
+  exists to load the root one.
+- **`DRIVER_ACCESS_TOKEN_SECRET` differs between Vercel and `.env.local`**, so a
+  locally seeded QR returns "ไม่พบงานสำหรับลิงก์นี้" against production. Issue
+  test QRs from the deployment you intend to open them on.
+- **`adb reverse` dies when the cable is unplugged** and the symptoms look like an
+  app failure. Re-run it before debugging anything else.
+- **Heredocs and Python `\\` escapes do not survive this toolchain** — generated
+  regexes came out as literal newlines twice. Use the Write tool for any file
+  containing escape sequences.
+
+---
+
+## Guards currently in place
+
+Do not delete these without understanding what each one caught:
+
+| Test | Stops |
+|---|---|
+| `lib/ci/root-scripts.test.ts` | mobile paths creeping back into root scripts |
+| `lib/fleet-access/no-actions.test.ts` | the customer page gaining a mutation, or a hardcoded Thai string |
+| `lib/auth/public-paths.test.ts` | `/fleet` and `/track` silently losing public access |
+| `lib/fleet-access/pin-rate-limit.test.ts` | a lockout that a stranger could trigger |
+| `lib/data/fleet-view.test.ts` | driver phone numbers reaching a customer |
+| `scripts/verify-one-unit-per-device.mjs` | one phone holding two units |
+| `scripts/verify-unit-without-work.mjs` | a valid QR reading as broken |
+| `scripts/verify-device-rebinding.mjs` | the PIN takeover path |
+
