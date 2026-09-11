@@ -1,8 +1,12 @@
 # 974 — Handoff: what to do next, and what will bite you
 
-**This is the current entry point.** `972` and `973` are still accurate about
-*why* things are the way they are, but `973`'s tasks are all done and `972`'s
-counts have moved. Start here.
+> **Superseded by `976`.** A day of live testing with real drivers changed the
+> task list and found four GPS bugs, three of them introduced while fixing the
+> previous one. The "things that will bite you" section below is unchanged and
+> still worth reading; for what to do next, start at `976`.
+
+`972` and `973` are still accurate about *why* things are the way they are, but
+`973`'s tasks are all done and `972`'s counts have moved.
 
 Written 2026-09-11 against `fb0fa30`. Every number below was measured, not
 remembered.
