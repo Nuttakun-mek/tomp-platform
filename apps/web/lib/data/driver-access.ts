@@ -1044,3 +1044,56 @@ export async function getDriverActivationState(token: string) {
     isFallback: false
   };
 }
+
+export interface DriverWaitingContext {
+  tokenId: string;
+  projectId: string;
+  projectName: string;
+  callSign: string;
+  driverName: string;
+  vehicleLabel: string;
+  pinRequired: boolean;
+  deviceBoundTo: string | null;
+}
+
+/**
+ * The unit is crewed and its QR is valid — there is simply no work on it yet.
+ *
+ * That is now the ordinary state of a brand new unit: crewing issues the QR
+ * immediately, so a driver can be holding a printed sheet before anyone has
+ * planned their day. Without this the page could only say "ไม่พบงานสำหรับ
+ * ลิงก์นี้", which reads as a broken QR and sends the driver back to the control
+ * room over something that is working correctly.
+ *
+ * Returns null when the token really is unusable, so the caller can still tell
+ * the two apart.
+ */
+export async function getDriverWaitingContext(token: string): Promise<DriverWaitingContext | null> {
+  const identity = await resolveDriverTokenIdentity(token);
+  if (!identity || !identity.callSignId) return null;
+
+  const { client } = getSupabaseWriteClient();
+  if (!client) return null;
+
+  const [{ data: project }, { data: callSign }, { data: driver }] = await Promise.all([
+    client.from("projects").select("project_name").eq("id", identity.projectId).maybeSingle(),
+    client.from("call_signs").select("call_sign, vehicle_id").eq("id", identity.callSignId).maybeSingle(),
+    client.from("drivers").select("full_name").eq("id", identity.driverId).maybeSingle()
+  ]);
+
+  const vehicleId = typeof callSign?.vehicle_id === "string" ? callSign.vehicle_id : null;
+  const { data: vehicle } = vehicleId
+    ? await client.from("vehicles").select("plate_number, vehicle_type").eq("id", vehicleId).maybeSingle()
+    : { data: null };
+
+  return {
+    tokenId: identity.tokenId,
+    projectId: identity.projectId,
+    projectName: text(project, "project_name", "โครงการ"),
+    callSign: text(callSign, "call_sign", "หน่วยรถ"),
+    driverName: text(driver, "full_name", "คนขับ"),
+    vehicleLabel: vehicle ? `${text(vehicle, "plate_number")} · ${text(vehicle, "vehicle_type")}` : "ยังไม่ผูกรถ",
+    pinRequired: identity.pinRequired,
+    deviceBoundTo: identity.deviceBoundTo
+  };
+}

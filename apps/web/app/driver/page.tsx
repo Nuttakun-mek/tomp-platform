@@ -3,7 +3,8 @@ import { DriverPinGate } from "@/components/driver/driver-pin-gate";
 import { DriverPreflight } from "@/components/driver/driver-preflight";
 import { DriverSessionGate } from "@/components/driver/driver-session-gate";
 import { DriverTaskView } from "@/components/driver/driver-task-view";
-import { getDriverAssignmentByToken } from "@/lib/data/driver-access";
+import { DriverWaitingView } from "@/components/driver/driver-waiting-view";
+import { getDriverAssignmentByToken, getDriverWaitingContext } from "@/lib/data/driver-access";
 import { DRIVER_DEVICE_COOKIE_PREFIX, DRIVER_PIN_COOKIE_PREFIX, hashDriverDeviceId } from "@/lib/driver-access/token";
 
 interface DriverPageProps {
@@ -25,6 +26,28 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
   const driverAccess = token ? await getDriverAssignmentByToken(token) : null;
 
   if (!driverAccess) {
+    // A crewed unit gets its QR the moment it is created, so a driver can scan a
+    // valid sheet before any work exists. That is not a broken link, and saying
+    // so sends them back to the control room over nothing.
+    const waiting = await getDriverWaitingContext(token);
+    if (waiting) {
+      const store = await cookies();
+      const deviceId = store.get(`${DRIVER_DEVICE_COOKIE_PREFIX}id`)?.value ?? "";
+      const deviceMatches = Boolean(
+        waiting.deviceBoundTo && deviceId && hashDriverDeviceId(deviceId) === waiting.deviceBoundTo
+      );
+      const otherDeviceHolds = Boolean(waiting.deviceBoundTo) && !deviceMatches;
+
+      // The PIN still guards it: waiting for work is not a reason to skip
+      // proving who is holding the QR.
+      if (waiting.pinRequired) {
+        const verified = store.get(`${DRIVER_PIN_COOKIE_PREFIX}${waiting.tokenId}`)?.value === "1";
+        if (!verified || otherDeviceHolds) return <DriverPinGate token={token} takeover={otherDeviceHolds} />;
+      }
+
+      return <DriverWaitingView context={waiting} />;
+    }
+
     return (
       <DriverNotice
         title="ไม่พบงานสำหรับลิงก์นี้"
