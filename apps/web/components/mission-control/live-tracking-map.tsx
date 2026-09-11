@@ -97,7 +97,7 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
           fillOpacity: 1
         })
           .bindPopup(
-            `<strong>${point.title}</strong><br/>${point.subtitle}<br/><span style="color:${color}">● ${point.ageLabel}</span>` +
+            `<strong>${point.title}</strong><br/>${point.subtitle}<br/><span style="color:${color}">● ล่าสุด ${point.ageLabel}</span>` +
               (point.accuracy ? `<br/>ความแม่นยำ ${Math.round(point.accuracy)} ม.` : "") +
               (spread.isOffset ? `<br/>พิกัดจริงซ้อนกับ ${spread.overlapCount} คัน จึงแยกหมุดบนแผนที่เพื่อให้อ่านง่าย` : "")
           )

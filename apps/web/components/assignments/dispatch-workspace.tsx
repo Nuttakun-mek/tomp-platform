@@ -7,6 +7,7 @@ import { SetupStep } from "./setup-step";
 import { UnitSetupForm } from "./unit-setup-form";
 import type { UnitCredentials } from "./unit-credential-sheet";
 import type { ProjectObserverLink } from "@/lib/data/observer-access";
+import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
 
 // Holds the one thing the setup form and the unit list have to agree on: the
 // credentials just issued.
@@ -26,6 +27,7 @@ export function DispatchWorkspace({
   assignments,
   observerLinks,
   projectObserverLink,
+  vehicleEvidence,
   projectStartDate,
   projectEndDate,
   jobForm
@@ -41,6 +43,7 @@ export function DispatchWorkspace({
   observerLinks?: Record<string, string>;
   /** Live customer fleet link for the whole project. */
   projectObserverLink?: ProjectObserverLink | null;
+  vehicleEvidence?: Record<string, VehicleEvidence>;
   projectStartDate?: string | null;
   projectEndDate?: string | null;
   /** Step 2, rendered between the setup card and the unit list it feeds. */
@@ -110,6 +113,7 @@ export function DispatchWorkspace({
         issued={issued}
         observerLinks={observerLinks}
         projectObserverLink={projectObserverLink}
+        vehicleEvidence={vehicleEvidence}
         onIssued={rememberCredentials}
       />
     </>

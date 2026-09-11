@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CarFront, Eye, Navigation } from "lucide-react";
 import type { FleetView as FleetViewData } from "@/lib/data/fleet-view";
@@ -8,6 +8,7 @@ import type { LocaleCode } from "@/lib/i18n/locales";
 import { t } from "@/lib/i18n";
 import { formatDateTime } from "@/lib/i18n/format";
 import { gpsFreshnessLabel } from "@/lib/domain/gps-freshness";
+import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { FleetLegend } from "./fleet-legend";
 import { LiveTrackingMap, type TrackedPoint } from "@/components/mission-control/live-tracking-map";
@@ -17,13 +18,22 @@ function formatTime(value: string | null, locale: LocaleCode) {
   return formatDateTime(value, locale);
 }
 
+function formatAge(value: string | null, locale: LocaleCode, now: number) {
+  if (!value) return t(locale, "fleet.noTime");
+  if (!now) return formatTime(value, locale);
+  if (locale === "th") return formatRelativeTh(value, now);
+  return formatTime(value, locale);
+}
 
 export function FleetView({ view, locale }: { view: FleetViewData; locale: LocaleCode }) {
   const router = useRouter();
   const tr = (key: Parameters<typeof t>[1]) => t(locale, key);
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
+    const clock = setInterval(() => setNow(Date.now()), 10_000);
+    setNow(Date.now());
     const start = () => {
       if (!timer && document.visibilityState === "visible") {
         timer = setInterval(() => router.refresh(), 30_000);
@@ -45,6 +55,7 @@ export function FleetView({ view, locale }: { view: FleetViewData; locale: Local
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       stop();
+      clearInterval(clock);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [router]);
@@ -60,10 +71,10 @@ export function FleetView({ view, locale }: { view: FleetViewData; locale: Local
           freshness: unit.freshness,
           title: unit.callSign,
           subtitle: `${unit.vehicle?.plateNumber ?? t(locale, "fleet.noVehicle")} · ${unit.destination ?? t(locale, "fleet.noDestination")}`,
-          ageLabel: gpsFreshnessLabel(unit.freshness, locale),
+          ageLabel: formatAge(unit.recordedAt, locale, now),
           accuracy: unit.accuracy
         })),
-    [locale, view.units]
+    [locale, now, view.units]
   );
 
   return (
@@ -142,7 +153,7 @@ export function FleetView({ view, locale }: { view: FleetViewData; locale: Local
                         {tr("fleet.destination")}: <span className="font-semibold">{unit.destination ?? tr("fleet.noDestination")}</span>
                       </p>
                       <p>
-                        {tr("fleet.lastUpdate")}: <span className="font-semibold">{formatTime(unit.recordedAt, locale)}</span>
+                        {tr("fleet.lastUpdate")}: <span className="font-semibold">{formatAge(unit.recordedAt, locale, now)}</span>
                       </p>
                       <p>{view.showCrew && unit.driverName ? `${tr("fleet.driverName")}: ${unit.driverName}` : tr("fleet.crewHidden")}</p>
                     </div>

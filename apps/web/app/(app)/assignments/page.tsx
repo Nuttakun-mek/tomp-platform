@@ -12,6 +12,7 @@ import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getObserverLinksByProjectId, getProjectObserverLinkByProjectId } from "@/lib/data/observer-access";
 import { getProjects } from "@/lib/data/projects";
 import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
+import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { DispatchWorkspace } from "@/components/assignments/dispatch-workspace";
 
@@ -45,7 +46,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
     redirect("/projects");
   }
   const projectId = activeProject.id;
-  const [assignmentsResult, missionsResult, callSignsResult, drivers, vehicles, observerLinks, projectObserverLink] = await Promise.all([
+  const [assignmentsResult, missionsResult, callSignsResult, drivers, vehicles, observerLinks, projectObserverLink, vehicleEvidence] = await Promise.all([
     getAssignmentsByProjectId(projectId),
     getMissionsByProjectId(projectId),
     getCallSignsByProjectId(projectId),
@@ -54,7 +55,8 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
     // Read on the server so the passenger QR is on screen at load, not only in
     // the tab that issued it.
     getObserverLinksByProjectId(projectId),
-    getProjectObserverLinkByProjectId(projectId)
+    getProjectObserverLinkByProjectId(projectId),
+    getVehicleEvidenceByProjectId(projectId)
   ]);
 
   const load = combineResults(assignmentsResult, missionsResult, callSignsResult);
@@ -88,6 +90,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
         assignments={assignments}
         observerLinks={observerLinks}
         projectObserverLink={projectObserverLink}
+        vehicleEvidence={vehicleEvidence}
         projectStartDate={activeProject.startDate}
         projectEndDate={activeProject.endDate}
         jobForm={

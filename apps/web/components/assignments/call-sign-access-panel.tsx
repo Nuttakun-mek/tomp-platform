@@ -10,8 +10,11 @@ import { createObserverAccessTokenAction } from "@/app/actions/observer-access";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { UnitCredentialSheet, type UnitCredentials } from "./unit-credential-sheet";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
+import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { formatStatusTh } from "@/lib/i18n/status-th";
+import { accentFor } from "@/lib/ui/unit-accent";
 import type { ProjectObserverLink } from "@/lib/data/observer-access";
+import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
 
 // Access is issued per crewed unit, not per job: one Call Sign is one driver in
 // one vehicle, and that is the thing a QR should name. Issuing per job was what
@@ -29,6 +32,7 @@ interface Unit {
   callSign: CallSign;
   driver?: Driver;
   vehicle?: Vehicle;
+  evidence?: VehicleEvidence;
   /** A job on this unit, needed because the token still records one for compatibility. */
   anchorAssignmentId: string | null;
   jobs: UnitJob[];
@@ -240,22 +244,6 @@ function clockRange(start?: string | null, end?: string | null) {
 }
 
 
-const UNIT_ACCENTS = [
-  { spine: "bg-teal-500", chip: "bg-teal-600" },
-  { spine: "bg-indigo-500", chip: "bg-indigo-600" },
-  { spine: "bg-amber-500", chip: "bg-amber-600" },
-  { spine: "bg-rose-500", chip: "bg-rose-600" },
-  { spine: "bg-sky-500", chip: "bg-sky-600" },
-  { spine: "bg-violet-500", chip: "bg-violet-600" }
-];
-
-/** Stable per call sign, so a unit keeps its colour across refreshes. */
-function accentFor(callSign: string) {
-  let hash = 0;
-  for (const char of callSign) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return UNIT_ACCENTS[hash % UNIT_ACCENTS.length];
-}
-
 /** What an operator needs to tell one vehicle from another, without opening it. */
 function detailRows(unit: Unit): Array<{ label: string; value: string }> {
   const vehicleMeta = (unit.vehicle?.metadata ?? {}) as Record<string, unknown>;
@@ -286,6 +274,7 @@ export function CallSignAccessPanel({
   issued = {},
   observerLinks = {},
   projectObserverLink,
+  vehicleEvidence = {},
   onIssued
 }: {
   projectId: string;
@@ -305,6 +294,7 @@ export function CallSignAccessPanel({
    */
   observerLinks?: Record<string, string>;
   projectObserverLink?: ProjectObserverLink | null;
+  vehicleEvidence?: Record<string, VehicleEvidence>;
   onIssued?: (credentials: UnitCredentials) => void;
 }) {
   const [message, setMessage] = useState<string | null>(null);
@@ -350,6 +340,7 @@ export function CallSignAccessPanel({
   const units = useMemo<Unit[]>(() => {
     const driverById = new Map(drivers.map((d) => [d.id, d]));
     const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
+    const evidenceByDriver = latestEvidenceByDriver(vehicleEvidence);
     const live = assignments.filter((a) => !["cancelled", "archived"].includes(a.status));
 
     return callSigns
@@ -376,10 +367,14 @@ export function CallSignAccessPanel({
           }))
         );
         const byId = new Map(jobs.map((a) => [a.id, a]));
+        const evidence =
+          (cs.driverId ? evidenceByDriver.get(cs.driverId) : undefined) ??
+          jobs.map((job) => vehicleEvidence[job.id]).find(Boolean);
         return {
           callSign: cs,
           driver: cs.driverId ? driverById.get(cs.driverId) : undefined,
           vehicle: cs.vehicleId ? vehicleById.get(cs.vehicleId) : undefined,
+          evidence,
           anchorAssignmentId: anchor?.id ?? null,
           retiredJobs,
           jobs: ordered.map((job) => {
@@ -397,7 +392,7 @@ export function CallSignAccessPanel({
         };
       })
       .sort((a, b) => a.callSign.callSign.localeCompare(b.callSign.callSign, "th"));
-  }, [assignments, callSigns, drivers, vehicles]);
+  }, [assignments, callSigns, drivers, vehicleEvidence, vehicles]);
 
   const ready = units.filter((u) => u.driver && u.vehicle);
 
@@ -643,6 +638,31 @@ export function CallSignAccessPanel({
                   </div>
                 ))}
               </dl>
+
+              {unit.evidence && (unit.evidence.vehiclePhotoUrl || unit.evidence.platePhotoUrl) ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-card border border-slate-200 bg-slate-50 p-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-bold text-ink">รูปตรวจรถล่าสุดจากคนขับ</p>
+                    <p className="text-[11px] text-ink-faint">
+                      บันทึกเมื่อ {new Date(unit.evidence.at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {unit.evidence.vehiclePhotoUrl ? (
+                      <a href={unit.evidence.vehiclePhotoUrl} target="_blank" rel="noreferrer" className="block">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL preview */}
+                        <img src={unit.evidence.vehiclePhotoUrl} alt="รูปรถล่าสุด" className="h-14 w-20 rounded-lg border border-white object-cover shadow-sm" />
+                      </a>
+                    ) : null}
+                    {unit.evidence.platePhotoUrl ? (
+                      <a href={unit.evidence.platePhotoUrl} target="_blank" rel="noreferrer" className="block">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL preview */}
+                        <img src={unit.evidence.platePhotoUrl} alt="รูปป้ายทะเบียนล่าสุด" className="h-14 w-20 rounded-lg border border-white object-cover shadow-sm" />
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               {sheet ? <UnitCredentialSheet credentials={sheet} /> : null}
 

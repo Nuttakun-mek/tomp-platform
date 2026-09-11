@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
 import { locationMetaText } from "@/lib/data/location-meta";
-import { gpsFreshness } from "@/lib/domain/gps-freshness";
+import { gpsFreshness, gpsFreshnessLabelTh, type GpsFreshness } from "@/lib/domain/gps-freshness";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
-import { LiveTrackingMap, toTrackedPoint } from "@/components/mission-control/live-tracking-map";
+import { LiveTrackingMap, toTrackedPoint, TRACKING_MARKER_COLORS } from "@/components/mission-control/live-tracking-map";
 import { useMissionControlFeedOptional } from "./mission-control-feed";
 
 interface LiveLocationMapProps {
@@ -25,6 +25,8 @@ interface MapData {
   lastError: string | null;
   now: number;
 }
+
+const LEGEND_STATES: GpsFreshness[] = ["live", "idle", "slow", "offline", "stopped"];
 
 function metadataText(location: DriverLocation, key: string, fallback: string) {
   return locationMetaText(location, key, fallback);
@@ -123,7 +125,7 @@ export function LiveLocationMap({ projectId, initialLocations = [], height = 620
   const { locations, connection, lastCheckedAt, lastError, now } = feed ?? standalone;
 
   const effectiveNow = now || initialClock(locations) || 0;
-  const liveCount = hydrated ? locations.filter((location) => getFreshness(location, effectiveNow) === "live").length : 0;
+  const liveCount = hydrated ? locations.filter((location) => ["live", "idle"].includes(getFreshness(location, effectiveNow))).length : 0;
   const issueCount = hydrated ? locations.filter((location) => ["slow", "offline", "stopped"].includes(getFreshness(location, effectiveNow))).length : 0;
 
   return (
@@ -133,7 +135,7 @@ export function LiveLocationMap({ projectId, initialLocations = [], height = 620
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full bg-white/10 px-2.5 py-1 font-semibold">ทั้งหมด {locations.length}</span>
-              <span className="rounded-full bg-emerald-400/90 px-2.5 py-1 font-semibold text-emerald-950">กำลังแชร์ {liveCount}</span>
+              <span className="rounded-full bg-emerald-400/90 px-2.5 py-1 font-semibold text-emerald-950">สัญญาณใช้งาน {liveCount}</span>
               <span className="rounded-full bg-amber-300/90 px-2.5 py-1 font-semibold text-amber-950">ต้องติดตาม {issueCount}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -176,9 +178,9 @@ export function LiveLocationMap({ projectId, initialLocations = [], height = 620
 
         <div className="grid gap-2 border-t border-slate-200 bg-white px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-            <LegendDot color="bg-emerald-500" label="กำลังแชร์ (< 35 วิ)" />
-            <LegendDot color="bg-amber-500" label="สัญญาณช้า (> 35 วิ)" />
-            <LegendDot color="bg-rose-500" label="ขาดการอัปเดต (> 2 นาที)" />
+            {LEGEND_STATES.map((state) => (
+              <LegendDot key={state} color={TRACKING_MARKER_COLORS[state]} label={gpsFreshnessLabelTh(state)} />
+            ))}
             <span className="text-slate-400">แตะหมุดเพื่อดูว่าเป็นคันไหน · รายละเอียดอยู่ที่การ์ด “ภาพรวมกองรถ”</span>
           </div>
           {lastError ? <p className="rounded-card border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{lastError}</p> : null}
@@ -191,9 +193,8 @@ export function LiveLocationMap({ projectId, initialLocations = [], height = 620
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       {label}
     </div>
   );
 }
-

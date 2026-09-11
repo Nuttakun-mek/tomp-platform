@@ -6,6 +6,7 @@ import type { Assignment, CallSign } from "@tomp/types/domain";
 import { sendDriverNotificationAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage, DriverOutboundMessage } from "@/lib/data/driver-comms";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
+import { accentFor } from "@/lib/ui/unit-accent";
 import { useMissionControlFeed } from "./mission-control-feed";
 
 interface CommsConsoleProps {
@@ -27,9 +28,9 @@ type FeedItem =
   | ({ direction: "out" } & DriverOutboundMessage);
 
 function severityClass(severity: string) {
-  if (severity === "critical" || severity === "urgent") return "border-rose-200 bg-rose-50 text-rose-900";
-  if (severity === "warning") return "border-amber-200 bg-amber-50 text-amber-900";
-  return "border-slate-200 bg-slate-50 text-slate-800";
+  if (severity === "critical" || severity === "urgent") return "border-r-rose-400";
+  if (severity === "warning") return "border-r-amber-400";
+  return "border-r-slate-200";
 }
 
 export function CommsConsole({ projectId, assignments, callSigns }: CommsConsoleProps) {
@@ -82,11 +83,13 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
     return [...byUnit.values()].sort((a, b) => a.label.localeCompare(b.label, "th"));
   }, [assignments, callSignById]);
   const assignmentInfo = useMemo(() => {
-    const map = new Map<string, { label: string; driverId: string | null }>();
+    const map = new Map<string, { label: string; driverId: string | null; accent: ReturnType<typeof accentFor> }>();
     for (const assignment of assignments) {
+      const label = callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`;
       map.set(assignment.id, {
-        label: callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`,
-        driverId: assignment.driverId ?? null
+        label,
+        driverId: assignment.driverId ?? null,
+        accent: accentFor(label)
       });
     }
     return map;
@@ -238,13 +241,17 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
                 </button>
               ) : null}
               {feed.map((item) => {
-                const label = assignmentInfo.get(item.assignmentId)?.label ?? `งาน ${item.assignmentId.slice(0, 8)}`;
+                const info = assignmentInfo.get(item.assignmentId);
+                const label = info?.label ?? `งาน ${item.assignmentId.slice(0, 8)}`;
+                const accent = info?.accent ?? accentFor(label);
                 if (item.direction === "in") {
                   return (
-                    <article key={`in-${item.id}`} className={`rounded-2xl border p-3 text-sm ${severityClass(item.severity)}`}>
+                    <article key={`in-${item.id}`} className={`rounded-2xl border border-l-4 border-r-4 border-slate-200 bg-white p-3 text-sm text-slate-800 shadow-sm ${accent.border} ${severityClass(item.severity)}`}>
                       <div className="flex items-center justify-between gap-2 text-xs font-semibold">
                         <span className="inline-flex items-center gap-1">
-                          <ArrowDownLeft className="h-3.5 w-3.5" /> {label} · คนขับ
+                          <ArrowDownLeft className="h-3.5 w-3.5" />
+                          <span className={`rounded-full px-2 py-0.5 ${accent.soft}`}>{label}</span>
+                          <span className="text-slate-500">คนขับ</span>
                         </span>
                         <span className="opacity-70">{formatRelativeTh(item.at, now)}</span>
                       </div>
@@ -256,10 +263,12 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
                   );
                 }
                 return (
-                  <article key={`out-${item.id}`} className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+                  <article key={`out-${item.id}`} className={`rounded-2xl border border-l-4 border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 shadow-sm ${accent.border}`}>
                     <div className="flex items-center justify-between gap-2 text-xs font-semibold">
                       <span className="inline-flex items-center gap-1">
-                        <ArrowUpRight className="h-3.5 w-3.5" /> {label} · ศูนย์
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                        <span className={`rounded-full px-2 py-0.5 ${accent.soft}`}>{label}</span>
+                        <span className="text-slate-500">ศูนย์ควบคุม</span>
                       </span>
                       <span className="opacity-70">{formatRelativeTh(item.at, now)}</span>
                     </div>
