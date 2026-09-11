@@ -42,11 +42,21 @@ jobs:
         run: npm run build
 
       # apps/mobile-driver is an Expo app with its own lockfile, not an npm
-      # workspace, so the root `npm ci` never reaches it. Without these two steps
-      # its suite is invisible to CI — which is how driver-link was changed under
-      # a green build.
+      # workspace, so the root `npm ci` never reaches it. Without these steps its
+      # suite is invisible to CI — which is how driver-link was changed under a
+      # green build.
+      #
+      # Everything that needs those dependencies therefore has to run *after*
+      # this install, and must not be folded into a root script that runs before
+      # it. That has now been got wrong twice — once with `test`, once with
+      # `typecheck` — and both times it passed on a developer machine, where
+      # apps/mobile-driver/node_modules is already sitting there from the last
+      # time someone ran the app.
       - name: Mobile driver deps
         run: npm ci --prefix apps/mobile-driver
+
+      - name: Mobile driver typecheck
+        run: npm run typecheck:mobile
 
       - name: Mobile driver tests
         run: npm run test:mobile
