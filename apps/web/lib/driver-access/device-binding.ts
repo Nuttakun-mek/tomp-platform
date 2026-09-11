@@ -99,3 +99,63 @@ export async function revokeMobileSessionsForOtherDevices(tokenId: string, keepD
     // The per-call device check below still turns the old phone away.
   }
 }
+
+/**
+ * A phone is in one vehicle at a time, so it holds one unit at a time.
+ *
+ * The binding was checked per token — "does this device hold *this* unit" — and
+ * nothing ever asked whether it already held a different one. So a device could
+ * accumulate units: each page still opened, each kept its own PIN cookie, and
+ * the driver saw two live jobs. Only one of them actually worked, because
+ * `dsess` is a single cookie and the newer session overwrote the older, and
+ * which one worked depended on the last page visited.
+ *
+ * Claiming a unit therefore releases this device from every other unit in the
+ * project: the binding is cleared, the stale PIN cookie is dropped so the old
+ * page shows the takeover gate immediately rather than a job that cannot act,
+ * and any native session on that device is revoked.
+ *
+ * Releasing rather than refusing, because the common reason to scan a second QR
+ * is a real vehicle change mid-shift. The released unit goes back to unclaimed,
+ * which is where a unit sits before anyone scans it.
+ */
+export async function releaseDeviceFromOtherUnits(
+  projectId: string,
+  keepTokenId: string,
+  deviceHash: string
+): Promise<string[]> {
+  if (!projectId || !deviceHash) return [];
+
+  const { client } = getSupabaseWriteClient();
+  if (!client) return [];
+
+  const { data: others } = await client
+    .from("driver_access_tokens")
+    .select("id, metadata")
+    .eq("project_id", projectId)
+    .eq("status", "active")
+    .neq("id", keepTokenId);
+
+  const released: string[] = [];
+  for (const row of others ?? []) {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
+    if (meta.deviceHash !== deviceHash) continue;
+
+    const next = { ...meta };
+    delete next.deviceHash;
+    await client.from("driver_access_tokens").update({ metadata: next }).eq("id", row.id);
+    released.push(String(row.id));
+  }
+
+  if (released.length) {
+    const revokedAt = new Date().toISOString();
+    await client
+      .from("driver_mobile_sessions")
+      .update({ status: "revoked", revoked_at: revokedAt, updated_at: revokedAt })
+      .in("token_id", released)
+      .eq("device_hash", deviceHash)
+      .is("revoked_at", null);
+  }
+
+  return released;
+}

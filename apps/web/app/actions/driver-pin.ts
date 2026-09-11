@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { resolveDriverTokenIdentity } from "@/lib/data/driver-access";
-import { revokeMobileSessionsForOtherDevices } from "@/lib/driver-access/device-binding";
+import { releaseDeviceFromOtherUnits, revokeMobileSessionsForOtherDevices } from "@/lib/driver-access/device-binding";
 import { getPostgresClient } from "@/lib/db/postgres";
 import {
   deviceBindPatch,
@@ -44,7 +44,7 @@ export async function verifyDriverPinAction(input: unknown): Promise<ActionResul
 
   const { data: row } = await client
     .from("driver_access_tokens")
-    .select("id, status, expires_at, metadata")
+    .select("id, project_id, status, expires_at, metadata")
     .eq("token_hash", hashDriverAccessToken(token))
     .maybeSingle();
 
@@ -98,6 +98,8 @@ export async function verifyDriverPinAction(input: unknown): Promise<ActionResul
   // for hours. Cut its native session off here; resolveDriverSession turns away
   // the cookie.
   if (bind.rebound) await revokeMobileSessionsForOtherDevices(String(row.id), deviceHash);
+  // One phone, one unit: claiming this one lets go of any other it was holding.
+  await dropPinCookies(await releaseDeviceFromOtherUnits(String(row.project_id ?? ""), String(row.id), deviceHash));
   await setPinCookie(String(row.id));
   return actionSuccess({ verified: true, rebound: bind.rebound });
 }
@@ -152,8 +154,8 @@ async function verifyDriverPinViaPostgres(token: string, pin: string): Promise<A
   const sql = getPostgresClient();
   if (!sql) return actionFailure("ระบบยังไม่พร้อมใช้งาน กรุณาตรวจการเชื่อมต่อฐานข้อมูล");
 
-  const rows = await sql<Array<{ id: string; status: string; expires_at: string | null; metadata: Record<string, unknown> | null }>>`
-    select id, status, expires_at, metadata
+  const rows = await sql<Array<{ id: string; project_id: string; status: string; expires_at: string | null; metadata: Record<string, unknown> | null }>>`
+    select id, project_id, status, expires_at, metadata
     from driver_access_tokens
     where token_hash = ${hashDriverAccessToken(token)}
     limit 1
@@ -200,6 +202,7 @@ async function verifyDriverPinViaPostgres(token: string, pin: string): Promise<A
   });
   await sql`update driver_access_tokens set metadata = ${resetMeta}::jsonb where id = ${row.id}`;
   if (bind.rebound) await revokeMobileSessionsForOtherDevices(row.id, deviceHash);
+  await dropPinCookies(await releaseDeviceFromOtherUnits(String(row.project_id ?? ""), row.id, deviceHash));
   await setPinCookie(row.id);
   return actionSuccess({ verified: true, rebound: bind.rebound });
 }
@@ -224,6 +227,22 @@ async function resolveDeviceId(): Promise<string> {
     maxAge: 60 * 60 * 24 * 180
   });
   return fresh;
+}
+
+/**
+ * Forget the PIN for units this device just let go of.
+ *
+ * Without this the released unit's page still finds a PIN cookie and renders the
+ * job, even though the device no longer holds it — a screen that looks live and
+ * cannot act. Dropping it sends that page to the takeover gate, which is the
+ * truth.
+ */
+async function dropPinCookies(tokenIds: string[]) {
+  if (!tokenIds.length) return;
+  const store = await cookies();
+  for (const tokenId of tokenIds) {
+    store.set(`${DRIVER_PIN_COOKIE_PREFIX}${tokenId}`, "", { path: "/driver", maxAge: 0 });
+  }
 }
 
 async function setPinCookie(tokenId: string) {
