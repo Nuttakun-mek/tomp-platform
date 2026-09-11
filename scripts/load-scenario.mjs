@@ -77,7 +77,11 @@ try {
     call_sign_id: callSigns[i % VEHICLES].id,
     driver_id: drivers[i % DRIVERS].id,
     vehicle_id: vehicles[i % VEHICLES].id,
-    status: i < 200 ? "active" : "planned",
+    // 0032 allows one active job per call sign, which is the real operating
+    // rule: a vehicle does one thing at a time. The first pass round the call
+    // signs is the live work; everything after it is queued behind it, which is
+    // also the shape a real project has.
+    status: i < VEHICLES ? "active" : "planned",
     start_time: new Date(Date.now() + (i % 24) * 3600_000).toISOString()
   }));
   const assignments = await sql`insert into assignments ${sql(assignmentRows)} returning id`;

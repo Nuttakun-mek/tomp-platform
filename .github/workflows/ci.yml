@@ -41,6 +41,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      # apps/mobile-driver is an Expo app with its own lockfile, not an npm
+      # workspace, so the root `npm ci` never reaches it. Without these two steps
+      # its suite is invisible to CI — which is how driver-link was changed under
+      # a green build.
+      - name: Mobile driver deps
+        run: npm ci --prefix apps/mobile-driver
+
+      - name: Mobile driver tests
+        run: npm run test:mobile
+
       - name: Public env safety
         run: npm run security:env
 
