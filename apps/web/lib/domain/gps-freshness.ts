@@ -19,6 +19,23 @@ export const GPS_IDLE_SECONDS = 390;
  * offline. One late POST should not turn the card red.
  */
 export const GPS_HEARTBEAT_SLACK_SECONDS = 60;
+/**
+ * The same allowance for a device that says it is standing still.
+ *
+ * A parked phone cannot keep the cadence it promised, and the reason is the
+ * reason it is parked: Android defers background work once the device stops
+ * moving and the screen goes off, foreground service or not. Measured on a real
+ * driver on 2026-09-11 — while moving the pings arrived every 32s like clockwork,
+ * and the moment the vehicle stopped the gaps went 175s, then 401s, against a
+ * 180s limit. The control room watched a driver standing exactly where they were
+ * told to wait turn red.
+ *
+ * So a stationary device is judged more loosely than a moving one. The cost is
+ * that a phone which genuinely dies while parked takes longer to show red; that
+ * is the right trade, because a driver who parks is common and a driver whose
+ * phone dies is rare, and the false red was arriving several times an hour.
+ */
+export const GPS_IDLE_HEARTBEAT_SLACK_SECONDS = 300;
 
 type Recorded = string | number | Date | null | undefined;
 
@@ -53,7 +70,8 @@ export function gpsFreshness(
   const cadence = pingCadenceSeconds(metadata);
 
   if (cadence !== null) {
-    if (ageSeconds <= cadence + GPS_HEARTBEAT_SLACK_SECONDS) return idle ? "idle" : "live";
+    const slack = idle ? GPS_IDLE_HEARTBEAT_SLACK_SECONDS : GPS_HEARTBEAT_SLACK_SECONDS;
+    if (ageSeconds <= cadence + slack) return idle ? "idle" : "live";
     return "offline";
   }
 

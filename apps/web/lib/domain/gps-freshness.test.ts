@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   GPS_HEARTBEAT_SLACK_SECONDS,
+  GPS_IDLE_HEARTBEAT_SLACK_SECONDS,
   GPS_IDLE_SECONDS,
   gpsFreshness,
   gpsFreshnessLabel,
@@ -89,15 +90,34 @@ describe("a device that reports its own cadence", () => {
     expect(gpsFreshness(agoFrom(180), "location_ping", now)).toBe("offline");
   });
 
+  // These two numbers are not invented. They were measured from one driver on
+  // 2026-09-11: pings every 32s while the vehicle moved, then 175s and 401s once
+  // it stopped, because Android defers background work exactly when the device
+  // stops moving. Against the old 180s limit the 401s gap turned a parked driver
+  // red, which is what the control room reported.
+  it("survives the gaps Android actually produces once a vehicle parks", () => {
+    expect(gpsFreshness(agoFrom(175), "location_ping", now, app({ idle: true }))).toBe("idle");
+    expect(gpsFreshness(agoFrom(401), "location_ping", now, app({ idle: true }))).toBe("idle");
+  });
+
+  // A moving driver gets no such allowance: their pings arrive on time, so a
+  // long gap really does mean something is wrong.
+  it("still calls a moving driver offline on the tighter window", () => {
+    expect(gpsFreshness(agoFrom(401), "location_ping", now, app())).toBe("offline");
+  });
+
   it("counts a device as offline once it is past its cadence plus slack", () => {
     expect(gpsFreshness(agoFrom(120 + GPS_HEARTBEAT_SLACK_SECONDS), "location_ping", now, app())).toBe("live");
     expect(gpsFreshness(agoFrom(120 + GPS_HEARTBEAT_SLACK_SECONDS + 1), "location_ping", now, app())).toBe("offline");
+    // and a parked one, on its own longer allowance
+    expect(gpsFreshness(agoFrom(120 + GPS_IDLE_HEARTBEAT_SLACK_SECONDS), "location_ping", now, app({ idle: true }))).toBe("idle");
+    expect(gpsFreshness(agoFrom(120 + GPS_IDLE_HEARTBEAT_SLACK_SECONDS + 1), "location_ping", now, app({ idle: true }))).toBe("offline");
   });
 
   it("keeps a parked driver parked for the whole window", () => {
     expect(gpsFreshness(agoFrom(5), "location_ping", now, app({ idle: true }))).toBe("idle");
     expect(gpsFreshness(agoFrom(170), "location_ping", now, app({ idle: true }))).toBe("idle");
-    expect(gpsFreshness(agoFrom(200), "location_ping", now, app({ idle: true }))).toBe("offline");
+    expect(gpsFreshness(agoFrom(200), "location_ping", now, app({ idle: true }))).toBe("idle");
   });
 
   it("never shows the amber warning for a device on a known cadence", () => {
