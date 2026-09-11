@@ -50,36 +50,43 @@ let lastSent: LastSentFix | null = null;
 // already arrive; on iOS it is the only thing keeping a parked driver alive.
 const HEARTBEAT_TICK_MS = 30_000;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-let lastKnownFix: { latitude: number; longitude: number; accuracy: number | null } | null = null;
 
 export function resetLocationThrottle() {
   lastSent = null;
-  lastKnownFix = null;
-}
-
-function rememberFix(location: Location.LocationObject) {
-  lastKnownFix = {
-    latitude: location.coords.latitude,
-    longitude: location.coords.longitude,
-    accuracy: location.coords.accuracy
-  };
 }
 
 function startHeartbeat() {
   if (heartbeatTimer) return;
   heartbeatTimer = setInterval(() => {
-    if (!lastKnownFix) return;
-    // `recordedAt` is now, not the time of the fix being reused. A heartbeat
-    // says "still here, as of this moment" — stamping it with the old fix time
-    // would make it arrive already stale and defeat the point of sending it.
-    void submitOrQueueLocation({
-      latitude: lastKnownFix.latitude,
-      longitude: lastKnownFix.longitude,
-      accuracy: lastKnownFix.accuracy,
-      recordedAt: new Date().toISOString(),
-      trackingEvent: "location_ping",
-      metadata: { platform: "mobile_driver", mode: "heartbeat" }
-    });
+    void (async () => {
+      // Only when one is actually due. The watcher covers everything else, and
+      // asking the GPS for a fix is not free.
+      if (!lastSent || Date.now() - lastSent.at < LOCATION_HEARTBEAT_MS) return;
+
+      // Ask where the vehicle is *now*.
+      //
+      // The first version of this kept the last fix the OS had delivered and
+      // re-sent it stamped with the current time. That is a lie the moment the
+      // vehicle moves, and it was measured lying: a heartbeat placed the unit at
+      // 13.880906,100.539708 and three seconds later the real fix came in at
+      // 13.875365,100.536094 — six hundred metres away — while the marker sat
+      // still, flagged as parked, on a driver who was driving.
+      //
+      // A heartbeat that cannot get a fresh position sends nothing. Silence is
+      // read as a slow signal and says so on the board; a stale position dressed
+      // as a current one says the opposite of the truth.
+      const fix = await getCurrentLocation().catch(() => null);
+      if (!fix) return;
+
+      await submitOrQueueLocation({
+        latitude: fix.coords.latitude,
+        longitude: fix.coords.longitude,
+        accuracy: fix.coords.accuracy,
+        recordedAt: new Date(fix.timestamp).toISOString(),
+        trackingEvent: "location_ping",
+        metadata: { platform: "mobile_driver", mode: "heartbeat" }
+      });
+    })();
   }, HEARTBEAT_TICK_MS);
 }
 
@@ -107,7 +114,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     const payload = data as { locations?: Location.LocationObject[] } | undefined;
     const latest = payload?.locations?.[0];
     if (!latest) return;
-    rememberFix(latest);
     const mobileSession = await getMobileDriverSession();
     if (!mobileSession) return;
 
@@ -270,7 +276,6 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
       timeInterval: 10000
     },
     (location) => {
-      rememberFix(location);
       onLocation(location);
       void submitOrQueueLocation({
         latitude: location.coords.latitude,
@@ -326,11 +331,10 @@ export async function startBackgroundLocationSharing() {
       // which is the failure it exists to prevent. A continuous stream is what
       // keeps the runtime awake.
       //
-      // The cost is bounded by `Accuracy.Balanced`, which resolves from cell and
-      // wifi rather than holding the GPS radio open, and by the send rule, which
-      // still forwards at most one ping per heartbeat while standing still. The
-      // OS talking to us often is cheap; us talking to the server often is not,
-      // and that is throttled elsewhere.
+      // The cost is bounded by the send rule rather than by the accuracy: the
+      // OS may hand us a fix every thirty seconds, but at most one per heartbeat
+      // reaches the server while the vehicle stands still. The OS talking to us
+      // often is cheap; us talking to the server often is not.
       distanceInterval: 0,
       timeInterval: 30000,
       // iOS only. Tells CoreLocation this is a vehicle rather than the default
