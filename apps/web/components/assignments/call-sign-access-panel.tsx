@@ -51,8 +51,11 @@ function ProjectFleetAccessCard({
   callSigns: CallSign[];
   projectObserverLink?: ProjectObserverLink | null;
 }) {
-  const [withPin, setWithPin] = useState(false);
-  const [showCrew, setShowCrew] = useState(false);
+  // Seeded from the live link, so the card describes the link that exists rather
+  // than an empty form beside it. Changing a box and pressing the ordinary button
+  // does nothing to the live link — only "ออกลิงก์ใหม่" applies it.
+  const [withPin, setWithPin] = useState(Boolean(projectObserverLink?.hasPin));
+  const [showCrew, setShowCrew] = useState(Boolean(projectObserverLink?.showCrew));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [url, setUrl] = useState("");
   const [pin, setPin] = useState<string | null>(null);
@@ -60,6 +63,11 @@ function ProjectFleetAccessCard({
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setWithPin(Boolean(projectObserverLink?.hasPin));
+    setShowCrew(Boolean(projectObserverLink?.showCrew));
+  }, [projectObserverLink?.hasPin, projectObserverLink?.showCrew]);
 
   useEffect(() => {
     if (!projectObserverLink?.token) return;
@@ -188,7 +196,20 @@ function ProjectFleetAccessCard({
           ) : (
             <div className="grid h-44 place-items-center rounded-xl bg-white text-sm font-semibold text-slate-400">ยังไม่มี QR</div>
           )}
-          {pin ? <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">PIN: {pin}</p> : null}
+          {pin ? (
+            <div className="mt-2 rounded-xl border border-amber-400 bg-amber-50 px-3 py-2 text-left">
+              <p className="text-[10px] font-bold text-amber-900">รหัส PIN ของลิงก์นี้ (แสดงครั้งเดียว)</p>
+              <p className="text-center text-2xl font-bold leading-tight tracking-[0.25em] text-amber-900">{pin}</p>
+              <p className="mt-1 text-[10px] leading-4 text-amber-800">
+                บันทึกหรือจดเดี๋ยวนี้ ก่อนปิดหรือรีเฟรชหน้านี้ — รหัสนี้เก็บเป็นค่าเข้ารหัสและจะไม่แสดงอีก ถ้าพลาดต้องกด “ออกลิงก์ใหม่” ซึ่งลิงก์เดิมจะใช้ไม่ได้ทันที · ส่งรหัสคนละช่องทางกับ QR
+              </p>
+            </div>
+          ) : null}
+          {!pin && projectObserverLink?.hasPin ? (
+            <p className="mt-2 rounded-xl bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-600">
+              ลิงก์นี้มี PIN อยู่แล้ว แต่แสดงซ้ำไม่ได้ — ถ้าลืม ให้กด “ออกลิงก์ใหม่”
+            </p>
+          ) : null}
           {url ? (
             <div className="mt-2 grid gap-2">
               <p className="break-all rounded-xl bg-white px-3 py-2 text-[11px] text-slate-600">{url}</p>

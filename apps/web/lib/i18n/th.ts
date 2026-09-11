@@ -66,6 +66,7 @@ export const th = {
     capacity: "จำนวนที่นั่ง",
     destination: "ปลายทาง",
     lastUpdate: "อัปเดตล่าสุด",
+    noTime: "ยังไม่ระบุเวลา",
     noPosition: "ยังไม่มีตำแหน่ง",
     noDestination: "ยังไม่ระบุปลายทาง",
     noVehicle: "ยังไม่ได้ผูกรถ",

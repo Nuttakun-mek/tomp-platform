@@ -6,35 +6,21 @@ import { LockKeyhole } from "lucide-react";
 import { verifyFleetPinAction } from "@/app/actions/fleet-pin";
 import { Button } from "@/components/ui/button";
 import type { LocaleCode } from "@/lib/i18n/locales";
+import { t } from "@/lib/i18n";
 
-const copy = {
-  th: {
-    title: "ยืนยันรหัส PIN",
-    body: "ลิงก์นี้ถูกป้องกันด้วยรหัส PIN กรุณากรอกรหัส 6 หลักที่ได้รับจากศูนย์ควบคุม",
-    label: "รหัส PIN",
-    submit: "เปิดหน้าติดตามรถ",
-    required: "กรุณากรอกรหัส PIN",
-    wrong: "รหัส PIN ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง",
-    tooMany: "กรอกรหัสผิดหลายครั้ง กรุณารอสักครู่แล้วลองใหม่",
-    unlocked: "ยืนยันสำเร็จ กำลังเปิดหน้าติดตาม"
-  },
-  en: {
-    title: "Verify PIN",
-    body: "This link is protected. Enter the 6-digit PIN from the control centre.",
-    label: "PIN",
-    submit: "Open Fleet View",
-    required: "Please enter the PIN.",
-    wrong: "The PIN is not correct.",
-    tooMany: "Too many failed attempts. Please wait and try again.",
-    unlocked: "Verified. Opening fleet view."
-  }
-} as const;
+
+// The action answers with a code rather than a sentence, so the message can be
+// resolved in the reader's language here instead of the server guessing it.
+const MESSAGE_KEY = {
+  "fleet.pin.tooMany": "fleet.pinTooMany",
+  "fleet.pin.required": "fleet.pinRequired",
+  "fleet.pin.unlocked": "fleet.pinUnlocked",
+  "fleet.pin.wrong": "fleet.pinWrong"
+} as const satisfies Record<string, Parameters<typeof t>[1]>;
 
 function messageFor(locale: LocaleCode, code: string) {
-  if (code === "fleet.pin.tooMany") return copy[locale].tooMany;
-  if (code === "fleet.pin.required") return copy[locale].required;
-  if (code === "fleet.pin.unlocked") return copy[locale].unlocked;
-  return copy[locale].wrong;
+  const key = MESSAGE_KEY[code as keyof typeof MESSAGE_KEY] ?? "fleet.pinWrong";
+  return t(locale, key);
 }
 
 export function FleetPinGate({ token, locale }: { token: string; locale: LocaleCode }) {
@@ -43,7 +29,7 @@ export function FleetPinGate({ token, locale }: { token: string; locale: LocaleC
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "danger">("danger");
   const [isPending, startTransition] = useTransition();
-  const c = copy[locale];
+  const tr = (key: Parameters<typeof t>[1]) => t(locale, key);
 
   function submit() {
     startTransition(async () => {
@@ -61,10 +47,10 @@ export function FleetPinGate({ token, locale }: { token: string; locale: LocaleC
         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-teal-50 text-teal-700">
           <LockKeyhole className="h-6 w-6" />
         </div>
-        <h1 className="mt-5 text-2xl font-bold">{c.title}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">{c.body}</p>
+        <h1 className="mt-5 text-2xl font-bold">{tr("fleet.pinTitle")}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{tr("fleet.pinBody")}</p>
         <label className="mt-6 text-sm font-semibold text-slate-700" htmlFor="fleet-pin">
-          {c.label}
+          {tr("fleet.pinLabel")}
         </label>
         <input
           id="fleet-pin"
@@ -81,7 +67,7 @@ export function FleetPinGate({ token, locale }: { token: string; locale: LocaleC
           </p>
         ) : null}
         <Button className="mt-5 h-12 rounded-2xl" disabled={isPending || pin.length < 6} onClick={submit}>
-          {isPending ? "..." : c.submit}
+          {isPending ? "..." : tr("fleet.pinSubmit")}
         </Button>
       </section>
     </main>

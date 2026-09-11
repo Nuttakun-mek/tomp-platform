@@ -104,7 +104,12 @@ export async function createObserverAccessTokenAction(input: unknown): Promise<A
   const { data: liveTokens } = await liveTokenQuery(client, projectId, scope, callSignId);
   const usable = (liveTokens ?? []).filter((row) => !row.expires_at || String(row.expires_at) > nowIso);
 
-  if (!data.reissue && !data.withPin) {
+  // Only an explicit reissue may replace a live link. Keying this off withPin as
+  // well meant an operator who had ticked "use a PIN" silently minted a new token
+  // — and revoked the one already printed — every time they pressed the ordinary
+  // button to look at the link again. Changing the PIN or the scope is what
+  // "ออกลิงก์ใหม่" is for, and it says so.
+  if (!data.reissue) {
     const existing = usable.find((row) => typeof row.token_plaintext === "string" && row.token_plaintext);
     if (existing) {
       const accessPath = scope === "project" ? "fleet" : "track";

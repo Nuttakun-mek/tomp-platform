@@ -69,6 +69,7 @@ export const en = {
     capacity: "Capacity",
     destination: "Destination",
     lastUpdate: "Last update",
+    noTime: "Not reported yet",
     noPosition: "No position yet",
     noDestination: "No destination specified",
     noVehicle: "No vehicle assigned",
