@@ -19,6 +19,8 @@ import {
   type LucideIcon
 } from "lucide-react";
 import type { NavSection } from "@/lib/auth/nav-model";
+import { t } from "@/lib/i18n";
+import type { LocaleCode } from "@/lib/i18n/locales";
 
 const ICONS: Record<string, LucideIcon> = {
   Gauge,
@@ -33,7 +35,7 @@ const ICONS: Record<string, LucideIcon> = {
   ShieldAlert
 };
 
-export function AppNav({ sections }: { sections: NavSection[] }) {
+export function AppNav({ sections, locale }: { sections: NavSection[]; locale: LocaleCode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -44,18 +46,20 @@ export function AppNav({ sections }: { sections: NavSection[] }) {
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        <span>เมนูระบบ</span>
+        <span>{t(locale, "app.menu")}</span>
         {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </button>
 
-      <nav className={`${open ? "grid" : "hidden"} gap-4 lg:grid`} aria-label="เมนูหลัก">
+      <nav className={`${open ? "grid" : "hidden"} gap-4 lg:grid`} aria-label={t(locale, "app.mainNav")}>
         {sections.map((section) => (
-          <section key={section.title} className="grid gap-1">
-            <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:text-slate-500">{section.title}</p>
+          <section key={section.titleKey} className="grid gap-1">
+            <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:text-slate-500">{t(locale, section.titleKey)}</p>
             <div className="grid gap-0.5">
               {section.items.map((item) => {
                 const Icon = ICONS[item.icon] ?? Gauge;
                 const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const label = t(locale, item.labelKey);
+                const description = t(locale, item.descriptionKey);
 
                 return (
                   <Link
@@ -63,7 +67,7 @@ export function AppNav({ sections }: { sections: NavSection[] }) {
                     href={item.href}
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
-                    title={item.help}
+                    title={t(locale, item.helpKey)}
                     className={`group flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-colors ${
                       active
                         ? "border-teal-300/50 bg-white text-ink lg:bg-white/[0.12] lg:text-white"
@@ -80,9 +84,9 @@ export function AppNav({ sections }: { sections: NavSection[] }) {
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold leading-5">{item.label}</span>
+                      <span className="block truncate text-[13px] font-semibold leading-5">{label}</span>
                       {active ? (
-                        <span className="block truncate text-[11px] leading-4 text-slate-500 lg:text-slate-300">{item.description}</span>
+                        <span className="block truncate text-[11px] leading-4 text-slate-500 lg:text-slate-300">{description}</span>
                       ) : null}
                     </span>
                   </Link>

@@ -15,7 +15,14 @@ describe("driver link parser", () => {
   });
 
   it("builds a canonical web URL for the WebView", () => {
-    expect(parseDriverLink("tomp_live_123")?.webUrl).toBe("https://tomp-platform.vercel.app/driver/tomp_live_123");
+    expect(parseDriverLink("tomp_live_123")?.webUrl).toBe("https://tomp-platform.vercel.app/driver/tomp_live_123?lang=th");
+  });
+
+  it("preserves a supported language hint without changing the token", () => {
+    const result = parseDriverLink("https://tomp-platform.vercel.app/driver/tomp_live_abc?lang=en");
+    expect(result?.token).toBe("tomp_live_abc");
+    expect(result?.locale).toBe("en");
+    expect(result?.webUrl).toBe("https://tomp-platform.vercel.app/driver/tomp_live_abc?lang=en");
   });
 
   it("recognizes allowed TOMP driver web paths", () => {

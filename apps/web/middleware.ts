@@ -22,6 +22,26 @@ function cleanEnv(...keys: string[]): string | undefined {
 
 const SUPABASE_URL_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL"] as const;
 const SUPABASE_ANON_KEYS = ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY"] as const;
+const LOCALE_COOKIE = "tomp_locale";
+const SUPPORTED_LOCALES = new Set(["th", "en"]);
+
+function requestLocale(request: NextRequest): "th" | "en" | null {
+  const value = request.nextUrl.searchParams.get("lang");
+  return SUPPORTED_LOCALES.has(value || "") ? (value as "th" | "en") : null;
+}
+
+function withLocaleCookie(request: NextRequest, response: NextResponse, locale: "th" | "en" | null) {
+  if (locale) {
+    response.cookies.set(LOCALE_COOKIE, locale, {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production" && request.nextUrl.protocol === "https:",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/"
+    });
+  }
+  return response;
+}
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -32,19 +52,23 @@ function isAuthConfigured() {
 }
 
 export async function middleware(request: NextRequest) {
+  const locale = requestLocale(request);
+  const requestHeaders = new Headers(request.headers);
+  if (locale) requestHeaders.set("x-tomp-locale", locale);
+
   if (isPublicPath(request.nextUrl.pathname)) {
-    return NextResponse.next();
+    return withLocaleCookie(request, NextResponse.next({ request: { headers: requestHeaders } }), locale);
   }
 
   if (!isAuthConfigured()) {
-    if (process.env.NODE_ENV !== "production") return NextResponse.next();
+    if (process.env.NODE_ENV !== "production") return withLocaleCookie(request, NextResponse.next({ request: { headers: requestHeaders } }), locale);
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("reason", "missing-auth-config");
-    return NextResponse.redirect(url);
+    return withLocaleCookie(request, NextResponse.redirect(url), locale);
   }
 
-  let response = NextResponse.next({ request });
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
   const supabase = createServerClient(cleanEnv(...SUPABASE_URL_KEYS)!, cleanEnv(...SUPABASE_ANON_KEYS)!, {
     cookies: {
       getAll() {
@@ -52,7 +76,7 @@ export async function middleware(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = NextResponse.next({ request: { headers: requestHeaders } });
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       }
     }
@@ -69,10 +93,10 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
-    return NextResponse.redirect(url);
+    return withLocaleCookie(request, NextResponse.redirect(url), locale);
   }
 
-  return response;
+  return withLocaleCookie(request, response, locale);
 }
 
 export const config = {

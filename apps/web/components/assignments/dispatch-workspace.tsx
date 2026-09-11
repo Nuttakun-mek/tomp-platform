@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { CallSignAccessPanel } from "./call-sign-access-panel";
 import { SetupStep } from "./setup-step";
@@ -39,7 +39,31 @@ export function DispatchWorkspace({
   /** Step 2, rendered between the setup card and the unit list it feeds. */
   jobForm: React.ReactNode;
 }) {
+  const storageKey = useMemo(() => `tomp.unitCredentials.${projectId}`, [projectId]);
   const [issued, setIssued] = useState<Record<string, UnitCredentials>>({});
+
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, UnitCredentials>;
+      if (parsed && typeof parsed === "object") setIssued(parsed);
+    } catch {
+      window.sessionStorage.removeItem(storageKey);
+    }
+  }, [storageKey]);
+
+  function rememberCredentials(credentials: UnitCredentials) {
+    setIssued((current) => {
+      const next = { ...current, [credentials.callSignId]: credentials };
+      try {
+        window.sessionStorage.setItem(storageKey, JSON.stringify(next));
+      } catch {
+        // The sheet stays in memory even if the browser refuses session storage.
+      }
+      return next;
+    });
+  }
 
   return (
     <>
@@ -57,7 +81,7 @@ export function DispatchWorkspace({
           vehicles={vehicles}
           projectStartDate={projectStartDate}
           projectEndDate={projectEndDate}
-          onIssued={(credentials) => setIssued((current) => ({ ...current, [credentials.callSignId]: credentials }))}
+          onIssued={rememberCredentials}
         />
       </SetupStep>
 
@@ -77,7 +101,7 @@ export function DispatchWorkspace({
         drivers={drivers}
         vehicles={vehicles}
         issued={issued}
-        onIssued={(credentials) => setIssued((current) => ({ ...current, [credentials.callSignId]: credentials }))}
+        onIssued={rememberCredentials}
       />
     </>
   );

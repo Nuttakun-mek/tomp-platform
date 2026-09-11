@@ -26,6 +26,6 @@ export const LOCATION_TASK_NAME = "tomp-driver-background-location";
 // Mirrors expo.extra.eas.projectId in app.json.
 export const EAS_PROJECT_ID = "ea9c91b8-049d-4287-bfcd-dad4ecc7981b";
 
-export function buildDriverWebUrl(token: string) {
-  return `${TOMP_WEB_ORIGIN}/driver/${encodeURIComponent(token)}`;
+export function buildDriverWebUrl(token: string, locale: "th" | "en" = "th") {
+  return `${TOMP_WEB_ORIGIN}/driver/${encodeURIComponent(token)}?lang=${locale}`;
 }

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
+import { getRequestLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
 const notoSansThai = Noto_Sans_Thai({
@@ -21,13 +22,15 @@ export const viewport: Viewport = {
   themeColor: "#0f766e"
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getRequestLocale();
+
   return (
-    <html lang="th">
+    <html lang={locale}>
       <body className={notoSansThai.variable}>{children}</body>
     </html>
   );

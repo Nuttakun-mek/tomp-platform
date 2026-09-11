@@ -130,6 +130,7 @@ export function LiveGpsTestPanel() {
           </div>
 
           <button
+            data-testid="live-gps-start"
             className="min-h-12 rounded-panel bg-operation px-6 text-[15px] font-semibold text-white shadow-sm transition hover:bg-operation-deep disabled:cursor-not-allowed disabled:bg-slate-300"
             disabled={isPending}
             type="button"
@@ -139,7 +140,12 @@ export function LiveGpsTestPanel() {
           </button>
 
           {message ? (
-            <p className={`rounded-panel p-4 text-sm font-medium ${result ? "bg-operation-soft text-operation-deep" : "bg-route-soft text-route"}`}>{message}</p>
+            <p
+              className={`rounded-panel p-4 text-sm font-medium ${result ? "bg-operation-soft text-operation-deep" : "bg-route-soft text-route"}`}
+              data-testid="live-gps-message"
+            >
+              {message}
+            </p>
           ) : null}
 
           {checkResult ? (
@@ -166,7 +172,7 @@ export function LiveGpsTestPanel() {
       {result ? (
         <section className="enterprise-panel grid gap-4 p-4 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
           <div className="flex h-60 w-full items-center justify-center rounded-panel border border-border bg-white p-4 shadow-sm sm:w-60">
-            {qrDataUrl ? <Image alt="QR สำหรับคนขับ" className="h-full w-full" height={240} src={qrDataUrl} unoptimized width={240} /> : <span className="text-sm font-semibold text-operation">กำลังสร้าง QR...</span>}
+            {qrDataUrl ? <Image alt="QR สำหรับคนขับ" className="h-full w-full" data-testid="live-gps-qr" height={240} src={qrDataUrl} unoptimized width={240} /> : <span className="text-sm font-semibold text-operation">กำลังสร้าง QR...</span>}
           </div>
           <div className="grid min-w-0 content-start gap-4">
             <div>
@@ -174,7 +180,13 @@ export function LiveGpsTestPanel() {
               <h3 className="section-title mt-1">เปิดลิงก์นี้บนมือถือคนขับ</h3>
               <p className="section-description mt-1.5">หลังเปิดแล้วให้กด “เริ่มแชร์ตำแหน่ง” และอนุญาต GPS ใน browser จากนั้นกลับมาดู Mission Control</p>
             </div>
-            <a className="break-all rounded-panel border border-route/30 bg-route-soft p-3 text-sm font-semibold text-route" href={result.accessUrl} target="_blank" rel="noreferrer">
+            <a
+              className="break-all rounded-panel border border-route/30 bg-route-soft p-3 text-sm font-semibold text-route"
+              data-testid="live-gps-driver-url"
+              href={result.accessUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
               {result.accessUrl}
             </a>
             {result.pin ? (

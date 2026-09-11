@@ -224,6 +224,9 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
           <p className="text-[12px] text-ink-soft">
             คนขับ {credentials.driverName} · รถ {credentials.vehicleLabel}
           </p>
+          <p className="mt-1 text-[11px] leading-4 text-teal-800">
+            แผ่น QR นี้จะค้างอยู่ในแท็บนี้ แม้กดซ่อนหรือรีเฟรชหน้าเบา ๆ และจะออกใบใหม่เฉพาะเมื่อกด “ออก QR ใหม่” จากการ์ดหน่วยรถเท่านั้น
+          </p>
         </div>
         <div className="flex flex-wrap gap-1.5 print:hidden">
           <button
@@ -232,7 +235,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
             className="flex min-h-9 items-center gap-1.5 rounded-command border border-teal-300 bg-white px-3 text-[12px] font-semibold text-teal-800"
           >
             <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
-            {open ? "ย่อ QR" : "แสดง QR"}
+            {open ? "ซ่อนแผ่น QR" : "แสดงแผ่น QR เดิม"}
           </button>
           <button
             type="button"

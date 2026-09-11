@@ -43,6 +43,8 @@ import { flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-
 import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
 import { parseDriverLink } from "./src/services/driver-link";
 import { decideWebViewNavigation } from "./src/services/webview-navigation";
+import { mt, type MobileLocale } from "./src/i18n";
+import { getMobileLocale, saveMobileLocale } from "./src/services/locale-store";
 
 const DriverWebView = WebView as unknown as ComponentType<WebViewProps & RefAttributes<WebView>>;
 
@@ -77,13 +79,22 @@ export default function App() {
   const [qrLocked, setQrLocked] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [message, setMessage] = useState("สแกน QR หรือวาง URL งานที่ได้รับจากศูนย์ควบคุม");
+  const [locale, setLocale] = useState<MobileLocale>("th");
+  const localeRef = useRef<MobileLocale>("th");
   const [sessionReady, setSessionReady] = useState(false);
   const [networkLabel, setNetworkLabel] = useState("กำลังตรวจสอบสัญญาณ");
   const [canGoBack, setCanGoBack] = useState(false);
   const [outboxCount, setOutboxCount] = useState(0);
   const [syncLabel, setSyncLabel] = useState("");
 
-  const effectiveWebUrl = useMemo(() => webUrl || (currentToken ? buildDriverWebUrl(currentToken) : ""), [currentToken, webUrl]);
+  const effectiveWebUrl = useMemo(() => webUrl || (currentToken ? buildDriverWebUrl(currentToken, locale) : ""), [currentToken, locale, webUrl]);
+
+  const changeLocale = useCallback((nextLocale: MobileLocale) => {
+    localeRef.current = nextLocale;
+    setLocale(nextLocale);
+    void saveMobileLocale(nextLocale);
+    if (currentToken) setWebUrl(buildDriverWebUrl(currentToken, nextLocale));
+  }, [currentToken]);
 
   const postStatusToWeb = useCallback((nativeStatus: Parameters<typeof buildNativeStatusMessage>[0], text: string, detail?: Record<string, unknown>) => {
     const payload = buildNativeStatusMessage(nativeStatus, text, detail);
@@ -122,7 +133,7 @@ export default function App() {
 
   const openDriverLink = useCallback(
     async (rawValue: string) => {
-      const parsed = parseDriverLink(rawValue);
+      const parsed = parseDriverLink(rawValue, localeRef.current);
       if (!parsed) {
         setStatus("ต้องตรวจสอบ");
         setMessage("ไม่พบ token หรือ URL งาน กรุณาตรวจสอบ QR อีกครั้ง");
@@ -130,6 +141,9 @@ export default function App() {
       }
 
       await saveDriverToken(parsed.token);
+      localeRef.current = parsed.locale;
+      setLocale(parsed.locale);
+      void saveMobileLocale(parsed.locale);
       setCurrentToken(parsed.token);
       setTokenInput(parsed.token);
       setWebUrl(parsed.webUrl);
@@ -307,8 +321,13 @@ export default function App() {
     // driver only ever sees a white screen.
     void stopStaleBackgroundLocationTask();
 
-    getSavedDriverToken().then((savedToken) => {
-      if (savedToken) void openDriverLink(savedToken);
+    getMobileLocale().then((savedLocale) => {
+      localeRef.current = savedLocale;
+      setLocale(savedLocale);
+      setMessage(mt(savedLocale, "scanInstruction"));
+      getSavedDriverToken().then((savedToken) => {
+        if (savedToken) void openDriverLink(savedToken);
+      });
     });
     // Push registration used to happen only when a session was minted. A driver
     // returning with a session already in SecureStore never got a token, so
@@ -394,9 +413,16 @@ export default function App() {
         <View style={styles.topbar}>
           <View style={styles.identity}>
             <Text style={styles.product}>TOMP Driver</Text>
-            <Text style={styles.title}>{mode === "web" ? "หน้าคนขับ" : "เปิดงานด้วย QR"}</Text>
+            <Text style={styles.title}>{mode === "web" ? mt(locale, "driverPage") : mt(locale, "openWithQr")}</Text>
           </View>
           <View style={styles.statusGroup}>
+            <View style={styles.localeSwitch}>
+              {(["th", "en"] as const).map((item) => (
+                <Pressable key={item} onPress={() => changeLocale(item)} style={[styles.localeButton, locale === item && styles.localeButtonActive]}>
+                  <Text style={[styles.localeButtonText, locale === item && styles.localeButtonTextActive]}>{item.toUpperCase()}</Text>
+                </Pressable>
+              ))}
+            </View>
             <Text style={styles.statusPill}>{status}</Text>
             <Text style={styles.network}>{networkLabel}</Text>
             {outboxCount > 0 ? <Text style={styles.outboxText}>ค้างส่ง {outboxCount} รายการ</Text> : null}
@@ -435,10 +461,10 @@ export default function App() {
             />
             <View style={styles.bottomBar}>
               <Pressable style={styles.secondaryButton} onPress={resetAssignment}>
-                <Text style={styles.secondaryButtonText}>ออกจากงาน</Text>
+                <Text style={styles.secondaryButtonText}>{mt(locale, "logoutJob")}</Text>
               </Pressable>
               <Pressable style={styles.primaryButton} onPress={() => webViewRef.current?.reload()}>
-                <Text style={styles.primaryButtonText}>รีเฟรช</Text>
+                <Text style={styles.primaryButtonText}>{mt(locale, "reload")}</Text>
               </Pressable>
             </View>
           </View>
@@ -465,9 +491,9 @@ export default function App() {
 
             <View style={styles.formCard}>
               <Pressable style={styles.primaryButton} onPress={openScanner}>
-                <Text style={styles.primaryButtonText}>{scannerOpen ? "ปิดกล้อง" : "สแกน QR"}</Text>
+                <Text style={styles.primaryButtonText}>{scannerOpen ? mt(locale, "closeCamera") : mt(locale, "scanQr")}</Text>
               </Pressable>
-              <Text style={styles.orText}>หรือวาง URL/token จากศูนย์ควบคุม</Text>
+              <Text style={styles.orText}>{mt(locale, "pasteUrl")}</Text>
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -478,12 +504,12 @@ export default function App() {
                 value={tokenInput}
               />
               <Pressable style={styles.secondaryButton} onPress={() => openDriverLink(tokenInput)}>
-                <Text style={styles.secondaryButtonText}>เปิดงาน</Text>
+                <Text style={styles.secondaryButtonText}>{mt(locale, "openJob")}</Text>
               </Pressable>
             </View>
 
             <View style={styles.noteCard}>
-              <Text style={styles.noteTitle}>สถานะระบบ</Text>
+              <Text style={styles.noteTitle}>{mt(locale, "systemStatus")}</Text>
               <Text style={styles.noteText}>{message}</Text>
               <Text style={styles.noteText}>API: {TOMP_API_BASE_URL}</Text>
               <Text style={styles.noteText}>รุ่นแอป: {TOMP_DRIVER_APP_VERSION}</Text>
@@ -532,6 +558,29 @@ const styles = StyleSheet.create({
   statusGroup: {
     alignItems: "flex-end",
     gap: 5
+  },
+  localeSwitch: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: radius.pill,
+    flexDirection: "row",
+    gap: 2,
+    padding: 2
+  },
+  localeButton: {
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  localeButtonActive: {
+    backgroundColor: "#8be2da"
+  },
+  localeButtonText: {
+    color: "#bdd1df",
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  localeButtonTextActive: {
+    color: colors.command
   },
   statusPill: {
     backgroundColor: "rgba(255,255,255,0.12)",

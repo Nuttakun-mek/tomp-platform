@@ -1,64 +1,66 @@
+import type { I18nKey } from "@/lib/i18n";
+
 export interface NavItem {
   href: string;
-  label: string;
-  description: string;
+  labelKey: I18nKey;
+  descriptionKey: I18nKey;
   icon: string; // ชื่อ lucide icon — map เป็น component ใน app-nav.tsx
-  help: string;
+  helpKey: I18nKey;
   anyPermission?: string[]; // มีอย่างน้อย 1 ใน list นี้
   anyRole?: string[]; // หรือมี role นี้
 }
 
 export interface NavSection {
-  title: string;
+  titleKey: I18nKey;
   items: NavItem[];
 }
 
 export const NAV_SECTIONS: NavSection[] = [
   {
-    title: "พื้นที่ทำงาน",
+    titleKey: "nav.sections.workspace",
     items: [
       {
         href: "/projects",
-        label: "โครงการ",
-        description: "เลือกโครงการเพื่อเข้าทำงาน",
+        labelKey: "nav.projects.label",
+        descriptionKey: "nav.projects.description",
         icon: "FolderKanban",
-        help: "โครงการคือพื้นที่หลัก — เข้าโครงการแล้วจะเจอจัดงาน ศูนย์ควบคุม ทรัพยากร และตั้งค่าของโครงการนั้น",
+        helpKey: "nav.projects.help",
         anyPermission: ["project.read"]
       },
       {
         // The library sits outside any project on purpose: it is what survives
         // between them, and there was no way to reach it at all.
         href: "/resources",
-        label: "ทรัพยากรกลาง",
-        description: "คลังคนขับและรถขององค์กร",
+        labelKey: "nav.resources.label",
+        descriptionKey: "nav.resources.description",
         icon: "Library",
-        help: "ที่เก็บถาวรของคนขับและรถ ใช้ข้ามโครงการ — เปิดโครงการใหม่แล้วนำเข้าจากที่นี่ โครงการจะได้สำเนาของตัวเอง แก้หรือลบในโครงการไม่กระทบต้นทาง",
+        helpKey: "nav.resources.help",
         anyPermission: ["driver.create", "vehicle.create"]
       }
     ]
   },
   {
-    title: "ประสานงาน",
+    titleKey: "nav.sections.coordination",
     items: [
       {
         href: "/portal",
-        label: "มุมมองลูกค้า",
-        description: "หน้าที่ลูกค้า/ผู้จัดงานเห็น",
+        labelKey: "nav.portal.label",
+        descriptionKey: "nav.portal.description",
         icon: "PanelsTopLeft",
-        help: "หน้าอ่านอย่างเดียวสำหรับลูกค้าหรือผู้จัดงาน — เห็นสถานะภารกิจของโครงการที่ตนเกี่ยวข้อง และส่งคำขอเปลี่ยนแปลงเข้ามา แก้ไขแผนเองไม่ได้",
+        helpKey: "nav.portal.help",
         anyRole: ["customer_viewer"]
       }
     ]
   },
   {
-    title: "ระบบ",
+    titleKey: "nav.sections.system",
     items: [
       {
         href: "/superadmin",
-        label: "เครื่องมือระบบ",
-        description: "ผู้ใช้ สิทธิ์ และเครื่องมือแพลตฟอร์ม",
+        labelKey: "nav.superadmin.label",
+        descriptionKey: "nav.superadmin.description",
         icon: "ShieldAlert",
-        help: "จัดการผู้ใช้และบทบาท ตรวจสอบระบบ และเครื่องมือพัฒนา — เฉพาะทีมแพลตฟอร์ม",
+        helpKey: "nav.superadmin.help",
         anyPermission: ["superadmin.access"],
         anyRole: ["super_admin"]
       }

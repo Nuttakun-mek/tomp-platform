@@ -13,7 +13,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ className = "", variant = "primary", ...props }: ButtonProps) {
-  return <button className={`inline-flex min-h-11 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold transition duration-200 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-55 ${variants[variant]} ${className}`} {...props} />;
+  return <button className={`inline-flex min-h-10 items-center justify-center rounded-command px-3.5 py-2 text-sm font-semibold transition duration-200 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-55 ${variants[variant]} ${className}`} {...props} />;
 }
 
 interface ButtonLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
@@ -23,5 +23,5 @@ interface ButtonLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
 }
 
 export function ButtonLink({ className = "", href, children, variant = "primary", ...props }: ButtonLinkProps) {
-  return <Link className={`inline-flex min-h-11 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold transition duration-200 outline-none focus-visible:ring-2 ${variants[variant]} ${className}`} href={href} {...props}>{children}</Link>;
+  return <Link className={`inline-flex min-h-10 items-center justify-center rounded-command px-3.5 py-2 text-sm font-semibold transition duration-200 outline-none focus-visible:ring-2 ${variants[variant]} ${className}`} href={href} {...props}>{children}</Link>;
 }

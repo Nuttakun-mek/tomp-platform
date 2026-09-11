@@ -1,8 +1,10 @@
 import { buildDriverWebUrl, originOf, TOMP_WEB_ORIGIN } from "../config";
+import { normalizeMobileLocale, type MobileLocale } from "../i18n";
 
 export interface DriverLinkParseResult {
   token: string;
   webUrl: string;
+  locale: MobileLocale;
   source: "raw-token" | "web-url" | "deep-link";
 }
 
@@ -29,21 +31,24 @@ export function extractDriverToken(value: string): string {
   }
 }
 
-export function parseDriverLink(value: string): DriverLinkParseResult | null {
+export function parseDriverLink(value: string, fallbackLocale: MobileLocale = "th"): DriverLinkParseResult | null {
   const token = extractDriverToken(value);
   if (!token) return null;
 
   let source: DriverLinkParseResult["source"] = "raw-token";
+  let locale: MobileLocale = fallbackLocale;
   try {
     const url = new URL(value.trim());
     source = url.protocol === "tompdriver:" ? "deep-link" : "web-url";
+    locale = normalizeMobileLocale(url.searchParams.get("lang"));
   } catch {
     source = "raw-token";
   }
 
   return {
     token,
-    webUrl: buildDriverWebUrl(token),
+    webUrl: buildDriverWebUrl(token, locale),
+    locale,
     source
   };
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Drives the /live-test page end to end with a real browser:
+// Drives the /superadmin/dev-tools/live-test page end to end with a real browser:
 //   check infrastructure -> create Project/Mission/Assignment -> render QR.
 // Prints the driver access URL and saves the QR PNG.
 //
@@ -46,7 +46,9 @@ if (!chromePath) {
 }
 
 console.log(`Browser : ${chromePath}`);
-console.log(`Target  : ${baseUrl}/live-test\n`);
+const liveTestPath = "/superadmin/dev-tools/live-test";
+
+console.log(`Target  : ${baseUrl}${liveTestPath}\n`);
 
 const browser = await puppeteer.launch({
   executablePath: chromePath,
@@ -62,19 +64,19 @@ try {
     if (msg.type() === "error") console.log(`  [browser error] ${msg.text()}`);
   });
 
-  await page.goto(`${baseUrl}/live-test`, { waitUntil: "networkidle2" });
+  await page.goto(`${baseUrl}${liveTestPath}`, { waitUntil: "networkidle2" });
 
-  const startButton = await page.waitForSelector("button::-p-text(เริ่มทดสอบระบบ)", { timeout: 20000 });
+  const startButton = await page.waitForSelector('[data-testid="live-gps-start"]', { timeout: 20000 });
   // Give React a moment to hydrate before clicking.
   await new Promise((r) => setTimeout(r, 1500));
-  console.log("Clicking 'เริ่มทดสอบระบบ' ...");
+  console.log("Clicking live GPS start button ...");
   await startButton.click();
 
   // Wait until either the QR result URL appears or a terminal status message.
   let lastMsg = "";
   await page.waitForFunction(
     () => {
-      const link = document.querySelector('a[href*="/driver?token="]');
+      const link = document.querySelector('[data-testid="live-gps-driver-url"]');
       if (link) return true;
       const msg = document.body.innerText;
       return /ไม่สำเร็จ|ไม่พร้อม|เกินกำหนด|ตรวจระบบไม่สำเร็จ/.test(msg);
@@ -86,10 +88,10 @@ try {
   });
 
   const result = await page.evaluate(() => {
-    const link = document.querySelector('a[href*="/driver?token="]');
+    const link = document.querySelector('[data-testid="live-gps-driver-url"]');
     const text = document.body.innerText;
     const grab = (re) => (text.match(re)?.[1] ?? null);
-    const img = document.querySelector('img[alt="QR สำหรับคนขับ"]');
+    const img = document.querySelector('[data-testid="live-gps-qr"]');
     return {
       accessUrl: link?.getAttribute("href") ?? null,
       projectId: grab(/Project ID:\s*([0-9a-f-]{36})/i),

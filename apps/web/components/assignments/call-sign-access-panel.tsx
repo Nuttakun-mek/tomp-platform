@@ -313,6 +313,7 @@ export function CallSignAccessPanel({
         {units.map((unit) => {
           const crewed = Boolean(unit.driver && unit.vehicle);
           const needsConfirm = confirmReissue === unit.callSign.id;
+          const hasIssuedSheet = Boolean(issued[unit.callSign.id]);
           const open = expanded.has(unit.callSign.id);
           const accent = accentFor(unit.callSign.callSign);
 
@@ -381,11 +382,11 @@ export function CallSignAccessPanel({
                     disabled={isPending || !crewed}
                     onClick={() => issue(unit, needsConfirm)}
                     className={`flex min-h-9 items-center gap-1.5 rounded-command px-3 text-[12px] font-semibold text-white disabled:opacity-40 ${
-                      needsConfirm ? "bg-amber-600" : "bg-route"
+                      needsConfirm || hasIssuedSheet ? "bg-amber-600" : "bg-route"
                     }`}
                   >
                     {needsConfirm ? <RefreshCw className="h-3.5 w-3.5" /> : <QrCode className="h-3.5 w-3.5" />}
-                    {needsConfirm ? "ยืนยันออกใบใหม่" : "ออก QR"}
+                    {needsConfirm ? "ยืนยันออก QR ใหม่" : hasIssuedSheet ? "ออก QR ใหม่" : "ออก QR"}
                   </button>
                   <button
                     type="button"
