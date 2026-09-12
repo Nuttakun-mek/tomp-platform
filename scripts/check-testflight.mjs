@@ -58,20 +58,18 @@ const REVIEW_STATE = {
 };
 
 const builds = await asc(
-  `/v1/builds?filter[app]=${APP_ID}&limit=4&sort=-version` +
-    `&fields[builds]=version,processingState,uploadedDate,expired` +
-    `&include=betaAppReviewSubmission&fields[betaAppReviewSubmissions]=betaReviewState`
-);
-
-const submissions = new Map(
-  (builds.included ?? []).map((item) => [item.id, item.attributes.betaReviewState])
+  `/v1/builds?filter[app]=${APP_ID}&limit=4&sort=-version&fields[builds]=version,processingState,uploadedDate,expired`
 );
 
 console.log("BUILDS");
 for (const build of builds.data) {
   const { version, processingState, expired } = build.attributes;
-  const submissionId = build.relationships?.betaAppReviewSubmission?.data?.id;
-  const state = submissionId ? submissions.get(submissionId) : null;
+  // Asked for per build rather than through `include` on the list above: the
+  // list returns the relationship empty even for a build that has just been
+  // submitted, which read as "not submitted" for a review already in Apple's
+  // queue — the one answer this script exists to give.
+  const submission = await asc(`/v1/builds/${build.id}/betaAppReviewSubmission`).catch(() => null);
+  const state = submission?.data?.attributes?.betaReviewState ?? null;
   const review = state ? `${state} — ${REVIEW_STATE[state] ?? ""}` : "not submitted for external review";
   console.log(`  build ${String(version).padEnd(4)} ${String(processingState).padEnd(11)} ${expired ? "EXPIRED " : ""}${review}`);
 }
