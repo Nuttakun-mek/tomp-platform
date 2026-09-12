@@ -371,7 +371,23 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   );
 
   const statusLabel =
-    state === "sharing" ? "กำลังส่ง" : state === "requesting" ? "กำลังขอสิทธิ์" : state === "stale" ? "ขาดช่วง" : state === "error" ? "ต้องตรวจสอบ" : "ยังไม่ได้ส่ง";
+    state === "sharing"
+      ? "กำลังส่ง GPS"
+      : state === "requesting"
+        ? "รออนุญาต GPS"
+        : state === "stale"
+          ? "สัญญาณขาดช่วง"
+          : state === "error"
+            ? "ต้องตรวจสอบ"
+            : "ยังไม่ส่ง GPS";
+  const primaryActionLabel =
+    state === "requesting"
+      ? "กำลังเริ่มส่งตำแหน่ง GPS"
+      : isSharing
+        ? "กำลังส่งตำแหน่ง GPS"
+        : canResume
+          ? "เริ่มส่งตำแหน่ง GPS อีกครั้ง"
+          : "เริ่มส่งตำแหน่ง GPS";
 
   const mapPoint: TrackedPoint | null = lastLocation
     ? {
@@ -387,20 +403,20 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
     : null;
 
   return (
-    <section className="rounded-card border border-border bg-white">
-      {/* Whole card collapses — sharing keeps running while it is closed. */}
+    <section className="overflow-hidden rounded-[1.25rem] border border-border/70 bg-white/95 shadow-[0_12px_30px_rgba(16,32,51,0.07)]">
+      {/* Whole card collapses while the sharing process continues. */}
       <button
         type="button"
         onClick={() => setCardOpen((value) => !value)}
         aria-expanded={cardOpen}
-        className="flex w-full items-start justify-between gap-2 p-3.5 text-left"
+        className="flex w-full items-start justify-between gap-2 p-3.5 text-left transition active:bg-canvas/60"
       >
         <span className="min-w-0">
-          <span className="block text-[13px] font-bold text-ink">ส่งตำแหน่ง GPS</span>
+          <span className="block text-[13px] font-bold text-ink">การส่งตำแหน่ง GPS</span>
           <span className="block text-[12px] leading-5 text-ink-faint">{cardOpen ? message : statusLabel}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
             state === "sharing" ? "bg-emerald-100 text-emerald-800" : state === "stale" ? "bg-amber-100 text-amber-800" : state === "error" ? "bg-rose-100 text-rose-700" : "bg-canvas text-ink-soft"
           }`}>
             {statusLabel}
@@ -410,37 +426,44 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       </button>
 
       {cardOpen ? (
-      <div className="grid gap-3 border-t border-border p-3.5">
+      <div className="grid gap-3 border-t border-border/70 p-3.5">
       {lastLocation ? (
         <p className="text-[12px] text-ink-soft">
           ล่าสุด {formatTime(lastLocation.sentAt)} / ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} ม. / {health.message}
         </p>
       ) : null}
 
-      <div className="rounded-card bg-blue-50 px-3 py-2 text-[12px] leading-5 text-blue-800">
-        หน้าเว็บส่ง GPS ได้เมื่อหน้านี้ยังทำงานอยู่ หากต้องการต่อเนื่องตอนปิดจอหรือสลับแอป ควรใช้แอป TOMP Driver ในขั้นถัดไป
+      <div className="rounded-[1rem] border border-blue-100 bg-blue-50 px-3 py-2 text-[12px] leading-5 text-blue-800">
+        เมื่อใช้งานผ่านเว็บเบราว์เซอร์ การส่งตำแหน่งจะต่อเนื่องเฉพาะขณะเปิดหน้านี้ หากต้องการทำงานหลังปิดจอให้เปิดผ่านแอป TOMP Driver
       </div>
 
       <div className="grid gap-2">
         <button
           type="button"
-          disabled={state === "requesting"}
+          disabled={isSharing}
           onClick={() => void startSharing()}
-          className="min-h-13 rounded-command bg-route px-4 text-[15px] font-bold text-white disabled:opacity-50"
+          className={`min-h-13 rounded-[1rem] px-4 text-[15px] font-bold text-white shadow-[0_10px_20px_rgba(16,32,51,0.12)] transition active:scale-[0.99] disabled:opacity-100 ${
+            isSharing ? "bg-emerald-600" : "bg-route"
+          }`}
         >
-          {isSharing ? "ส่งตำแหน่ง GPS ต่อ" : canResume ? "ส่งตำแหน่ง GPS ต่อ" : "เริ่มส่งตำแหน่ง GPS"}
+          {primaryActionLabel}
         </button>
+        {isSharing ? (
+          <p className="rounded-[1rem] border border-emerald-100 bg-emerald-50 px-3 py-2 text-center text-[12px] font-bold leading-5 text-emerald-800">
+            ระบบกำลังส่งตำแหน่งให้ศูนย์ควบคุม ไม่จำเป็นต้องกดปุ่มนี้ซ้ำ
+          </p>
+        ) : null}
         {isSharing && !confirmStop ? (
           <button
             type="button"
             onClick={() => setConfirmStop(true)}
-            className="min-h-11 rounded-command border border-border bg-white px-4 text-[13px] font-semibold text-ink-soft"
+            className="min-h-11 rounded-[1rem] border border-border/80 bg-white px-4 text-[13px] font-semibold text-ink-soft shadow-sm transition active:scale-[0.99]"
           >
             ขอหยุดส่งตำแหน่ง
           </button>
         ) : null}
         {isSharing && confirmStop ? (
-          <div className="grid gap-2 rounded-card border border-amber-300 bg-amber-50 p-3">
+          <div className="grid gap-2 rounded-[1rem] border border-amber-300 bg-amber-50 p-3">
             <p className="text-[12px] font-semibold leading-5 text-amber-900">
               ยืนยันอีกครั้งก่อนหยุดส่ง GPS เพื่อป้องกันการกดผิดระหว่างปฏิบัติงาน
             </p>
@@ -448,14 +471,14 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
               <button
                 type="button"
                 onClick={() => setConfirmStop(false)}
-                className="min-h-11 rounded-command border border-amber-300 bg-white px-3 text-[13px] font-semibold text-ink"
+                className="min-h-11 rounded-[1rem] border border-amber-300 bg-white px-3 text-[13px] font-semibold text-ink"
               >
                 ยกเลิก
               </button>
               <button
                 type="button"
                 onClick={() => void stopSharing()}
-                className="min-h-11 rounded-command bg-amber-600 px-3 text-[13px] font-bold text-white"
+                className="min-h-11 rounded-[1rem] bg-amber-600 px-3 text-[13px] font-bold text-white"
               >
                 ยืนยันหยุดส่ง
               </button>
@@ -469,13 +492,13 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
           <button
             type="button"
             onClick={() => setMapOpen((value) => !value)}
-            className="flex items-center justify-between rounded-card border border-border bg-canvas px-3 py-2 text-[12px] font-semibold text-ink-soft"
+             className="flex items-center justify-between rounded-[1rem] border border-border/80 bg-canvas/80 px-3 py-2 text-[12px] font-semibold text-ink-soft"
           >
             <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> ตำแหน่งของฉันบนแผนที่</span>
             <ChevronDown className={`h-4 w-4 transition ${mapOpen ? "rotate-180" : ""}`} />
           </button>
           {mapOpen ? (
-            <div className="overflow-hidden rounded-card border border-border">
+             <div className="overflow-hidden rounded-[1rem] border border-border">
               <LiveTrackingMap points={[mapPoint]} height={220} />
             </div>
           ) : null}

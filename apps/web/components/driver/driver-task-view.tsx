@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { CheckCircle2, ChevronDown, MapPin, MessageSquare, Navigation, Phone, RotateCcw, TriangleAlert } from "lucide-react";
+import { CheckCircle2, ChevronDown, MapPin, Navigation, Phone, RotateCcw, TriangleAlert } from "lucide-react";
 import { assignmentStatusUpdateAction, driverIssueReportAction } from "@/app/actions/driver";
 import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
@@ -42,7 +42,7 @@ function stepFromStatus(status?: string | null) {
 }
 
 function jobTimeLabel(start?: string | null, end?: string | null) {
-  const fmt = (iso: string) => new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  const fmt = (iso: string) => new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(iso));
   if (start && end) return `${fmt(start)} – ${fmt(end)}`;
   if (start) return `เริ่ม ${fmt(start)}`;
   return "ยังไม่ระบุเวลา";
@@ -72,7 +72,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const [banner, setBanner] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [issueOpen, setIssueOpen] = useState(false);
-  const [identityOpen, setIdentityOpen] = useState(true);
+  const [identityOpen, setIdentityOpen] = useState(false);
   const [nextStepsOpen, setNextStepsOpen] = useState(false);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<DriverNotification[]>(driverAccess.notifications);
@@ -242,39 +242,40 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const currentStep = TRIP_STEPS[tripStep];
   const doneSteps = TRIP_STEPS.slice(0, tripStep);
   const laterSteps = TRIP_STEPS.slice(tripStep + 1);
-  const showTask = view === "home" || view === "next";
-  const showGps = view === "home" || view === "gps";
-  const showAssignments = view === "home" || view === "next";
-  const showComms = view === "home" || view === "messages";
+  const upcomingAssignments = dayAssignments.filter((item) => !item.isCurrent && item.status !== "completed" && item.status !== "cancelled");
+  const showTask = view === "home";
+  const showGps = view === "gps";
+  const showAssignments = view === "next";
+  const showComms = view === "messages";
   const viewTitle =
     view === "next"
-      ? "ลำดับภารกิจตามแผน"
+      ? "ลำดับงานถัดไป"
       : view === "messages"
-        ? "การสื่อสารกับศูนย์ควบคุม"
+        ? "ข้อความจากศูนย์ควบคุม"
         : view === "gps"
           ? "การส่งตำแหน่ง GPS"
-          : "ภารกิจปัจจุบัน";
+          : "รายการปฏิบัติงาน";
 
   return (
     <div id="driver-home" className="grid gap-3 pb-6">
-      <header className="grid gap-2">
+      <header className="grid gap-3 rounded-[1.35rem] bg-[linear-gradient(145deg,#0d344c_0%,#0b2538_58%,#071827_100%)] p-4 text-white shadow-[0_16px_38px_rgba(7,24,39,0.2)]">
         <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[11px] font-bold uppercase tracking-[0.16em] text-operation">{driverAccess.project.projectName}</p>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">
+          <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.16em] text-teal-100">{driverAccess.project.projectName}</p>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80">
             <span className={`h-2 w-2 rounded-full ${gpsDot}`} />
             {gpsLabel}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <h1 className="min-w-0 truncate text-2xl font-bold text-ink">Call Sign {driverAccess.callSign.callSign}</h1>
-          <span className="shrink-0 rounded-full bg-operation-soft px-2.5 py-1 text-[11px] font-semibold text-operation">
+          <h1 className="min-w-0 truncate text-[1.75rem] font-black leading-tight tracking-normal text-white">Call Sign {driverAccess.callSign.callSign}</h1>
+          <span className="shrink-0 rounded-full bg-teal-300/15 px-2.5 py-1 text-[11px] font-bold text-teal-100">
             {formatStatusTh(driverAccess.assignment.status)}
           </span>
         </div>
-        <p className="text-[13px] font-semibold text-ink-soft">{viewTitle}</p>
+        <p className="text-[13px] font-semibold text-white/75">{viewTitle}</p>
       </header>
 
-      <section className="rounded-card border border-border bg-white">
+      <section className="rounded-[1.1rem] border border-border/70 bg-white/95 shadow-[0_8px_20px_rgba(16,32,51,0.055)]">
         <button
           type="button"
           onClick={() => setIdentityOpen((value) => !value)}
@@ -312,10 +313,9 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         </button>
       ) : null}
 
-      {/* Card: the job to do now — route, target time, and progress steps together. */}
-      {showTask ? <section id="driver-current-task" className="smart-card grid gap-2.5 scroll-mt-3">
-        <p className="text-[13px] font-bold text-ink">ภารกิจปัจจุบัน</p>
-        <div className="grid gap-2">
+      {showTask ? <section id="driver-current-task" className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-white/95 p-3.5 shadow-[0_12px_30px_rgba(16,32,51,0.07)] scroll-mt-3">
+        <p className="text-[13px] font-bold text-ink">รายการปฏิบัติงาน</p>
+        <div className="grid gap-2 rounded-[1rem] bg-canvas/70 p-3">
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-operation" />
             <span className="text-[13px]"><span className="font-semibold text-ink">จุดรับ</span> / {pickup}</span>
@@ -330,7 +330,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           href={mapsUrl}
           target="_blank"
           rel="noreferrer"
-          className="flex min-h-12 items-center justify-center gap-2 rounded-command bg-route px-4 text-[15px] font-semibold text-white"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-[1rem] bg-route px-4 text-[15px] font-bold text-white shadow-[0_10px_20px_rgba(37,99,235,0.22)] transition active:scale-[0.99]"
         >
           <Navigation className="h-4 w-4" /> เปิด Google Maps
         </a>
@@ -352,7 +352,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
               type="button"
               disabled={isPending}
               onClick={() => advanceTrip(currentStep.status, tripStep + 1)}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-command bg-operation px-4 text-[16px] font-bold text-white disabled:opacity-60"
+              className="flex min-h-14 items-center justify-center gap-2 rounded-[1rem] bg-operation px-4 text-[16px] font-bold text-white shadow-[0_10px_20px_rgba(8,123,115,0.22)] transition active:scale-[0.99] disabled:opacity-60"
             >
               {currentStep.label}
             </button>
@@ -383,8 +383,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         )}
       </section> : null}
 
-      {/* Card: location sharing — its own card so it can be hidden whole while sharing runs. */}
-      {showGps ? <section id="driver-gps" className="smart-card grid gap-3 scroll-mt-3">
+      {showGps ? <section id="driver-gps" className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-white/95 p-3.5 shadow-[0_12px_30px_rgba(16,32,51,0.07)] scroll-mt-3">
         <a
           href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
           className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
@@ -394,36 +393,29 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} />
       </section> : null}
 
-      {showAssignments && (view === "next" || dayAssignments.length > 1) ? (
-        <section className="smart-card grid gap-2.5">
+      {showAssignments ? (
+        <section className="grid gap-2.5 rounded-[1.25rem] border border-border/70 bg-white/95 p-3.5 shadow-[0_12px_30px_rgba(16,32,51,0.07)]">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[13px] font-bold text-ink">ลำดับงานวันนี้</p>
-              <p className="text-[12px] text-ink-faint">เรียงตามลำดับปฏิบัติงาน · แตะเพื่อดูรายละเอียด</p>
+              <p className="text-[13px] font-bold text-ink">ลำดับงานที่ต้องดำเนินการถัดไป</p>
+              <p className="text-[12px] text-ink-faint">แสดงเฉพาะรายการที่ต้องดำเนินการหลังจากงานปัจจุบัน</p>
             </div>
-            <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">{dayAssignments.length} งาน</span>
+            <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">{upcomingAssignments.length} งาน</span>
           </div>
-          {!dayAssignments.length ? (
-            <p className="rounded-card border border-dashed border-border bg-canvas px-3 py-5 text-center text-[13px] font-semibold text-ink-soft">
-              ยังไม่มีงานถัดไปในลำดับงานวันนี้
-            </p>
+          {!upcomingAssignments.length ? (
+            <div className="rounded-[1rem] border border-dashed border-border bg-canvas/80 px-4 py-8 text-center">
+              <p className="text-[15px] font-bold text-ink">ยังไม่มีงานถัดไปในขณะนี้</p>
+              <p className="mt-1 text-[12px] leading-5 text-ink-faint">เมื่อศูนย์ควบคุมเพิ่มงานใหม่ ระบบจะแสดงในหน้านี้โดยอัตโนมัติ</p>
+            </div>
           ) : null}
           <div className="grid gap-2">
-            {dayAssignments.map((item) => {
+            {upcomingAssignments.map((item) => {
               const open = openJobId === item.assignmentId;
-              const done = item.status === "completed" || item.status === "cancelled";
-              const jobMapsUrl = buildGoogleMapsDirectionsUrl(item.dropoff, item.pickup);
               return (
                 <article
                   key={item.assignmentId}
-                  className={`overflow-hidden rounded-card border ${
-                    item.isCurrent
-                      ? "border-operation/40 bg-operation-soft"
-                      : item.urgent
-                        ? "border-amber-300 bg-amber-50"
-                        : done
-                          ? "border-emerald-200 bg-emerald-50"
-                          : "border-border bg-white"
+                  className={`overflow-hidden rounded-[1rem] border shadow-sm ${
+                    item.urgent ? "border-amber-300 bg-amber-50" : "border-border bg-white"
                   }`}
                 >
                   <button
@@ -442,7 +434,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
                     </div>
                     <span className="flex shrink-0 items-center gap-1">
                       <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                        {item.isCurrent ? "งานปัจจุบัน" : formatStatusTh(item.status)}
+                        {formatStatusTh(item.status)}
                       </span>
                       <ChevronDown className={`h-4 w-4 text-ink-faint transition ${open ? "rotate-180" : ""}`} />
                     </span>
@@ -452,14 +444,6 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
                       <p><span className="font-semibold text-ink">จุดรับ</span> / {item.pickup}</p>
                       <p><span className="font-semibold text-ink">จุดส่ง</span> / {item.dropoff}</p>
                       <p><span className="font-semibold text-ink">เวลา</span> / {jobTimeLabel(item.startTime, item.endTime)}</p>
-                      <a
-                        href={jobMapsUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 flex min-h-10 items-center justify-center gap-2 rounded-command bg-route px-4 text-[13px] font-semibold text-white"
-                      >
-                        <Navigation className="h-3.5 w-3.5" /> เส้นทางงานนี้
-                      </a>
                     </div>
                   ) : null}
                 </article>
@@ -469,40 +453,27 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         </section>
       ) : null}
 
-      {view === "messages" ? (
-        <section className="smart-card grid gap-1.5">
-          <p className="text-[13px] font-bold text-ink">ศูนย์การสื่อสาร</p>
-          <p className="text-[12px] leading-5 text-ink-faint">
-            ใช้สำหรับส่งข้อความ แจ้งเหตุขัดข้อง หรือโทรติดต่อศูนย์ควบคุมระหว่างปฏิบัติงาน
-          </p>
-        </section>
-      ) : null}
+      {showComms ? <DriverChatThread messages={messages} notifications={notifications} onSend={sendMessage} sending={isPending} /> : null}
 
-      {showComms ? <div className="grid grid-cols-3 gap-2">
+      {showComms ? <div className="grid grid-cols-2 gap-2">
         {coordinatorPhone ? (
           <a
             href={telHref(coordinatorPhone) ?? "#"}
-            className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command bg-operation px-2 text-[12px] font-semibold text-white"
+            className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[1rem] bg-operation px-2 text-[12px] font-bold text-white shadow-sm transition active:scale-[0.99]"
           >
-            <Phone className="h-4 w-4" /> โทรศูนย์
+            <Phone className="h-4 w-4" /> โทรศูนย์ควบคุม
           </a>
         ) : (
           <span className="flex min-h-12 items-center justify-center rounded-command border border-border bg-white px-2 text-[11px] text-ink-faint">
             ยังไม่มีเบอร์
           </span>
         )}
-        <a
-          href="#driver-chat"
-          className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command border border-border bg-white px-2 text-[12px] font-semibold text-ink"
-        >
-          <MessageSquare className="h-4 w-4" /> ข้อความ
-        </a>
         <button
           type="button"
           onClick={() => setIssueOpen((value) => !value)}
-          className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-command border border-amber-300 bg-amber-50 px-2 text-[12px] font-semibold text-amber-800"
+          className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[1rem] border border-amber-300 bg-amber-50 px-2 text-[12px] font-bold text-amber-800 shadow-sm transition active:scale-[0.99]"
         >
-          <TriangleAlert className="h-4 w-4" /> แจ้งปัญหา
+          <TriangleAlert className="h-4 w-4" /> แจ้งเหตุขัดข้อง
         </button>
       </div> : null}
 
@@ -524,8 +495,6 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           </div>
         </section>
       ) : null}
-
-      {showComms ? <DriverChatThread messages={messages} notifications={notifications} onSend={sendMessage} sending={isPending} /> : null}
     </div>
   );
 }

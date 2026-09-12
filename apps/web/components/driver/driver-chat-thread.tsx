@@ -52,10 +52,16 @@ export function DriverChatThread({
   sending: boolean;
 }) {
   const [text, setText] = useState("");
+  const [now, setNow] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bubbles = useMemo(() => buildBubbles(messages, notifications), [messages, notifications]);
-  const now = Date.now();
+
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
@@ -77,15 +83,46 @@ export function DriverChatThread({
   }
 
   return (
-    <section id="driver-chat" className="grid gap-2 rounded-card border border-border bg-white p-3">
-      <p className="text-[13px] font-bold text-ink">การสื่อสารกับศูนย์ควบคุม</p>
+    <section id="driver-chat" className="grid gap-2.5 rounded-[1.25rem] border border-border/70 bg-white/95 p-3 shadow-[0_10px_28px_rgba(16,32,51,0.07)]">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] font-bold text-ink">ข้อความจากศูนย์ควบคุม</p>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">พร้อมส่งข้อความ</span>
+      </div>
 
-      <div className="grid max-h-64 gap-1.5 overflow-y-auto rounded-card bg-canvas p-2">
+      <div className="sticky top-0 z-10 grid gap-2 rounded-[1rem] border border-border/80 bg-white p-2 shadow-sm">
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            className="field-input min-h-11 flex-1 resize-none overflow-y-auto rounded-[0.9rem] border-border/80 bg-canvas/70 text-[13px]"
+            rows={1}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder="พิมพ์ข้อความถึงศูนย์ควบคุม"
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={sending || !text.trim()}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-[0.95rem] bg-operation text-white shadow-sm transition active:scale-[0.98] disabled:opacity-50"
+            aria-label="ส่งข้อความ"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid max-h-[52dvh] gap-1.5 overflow-y-auto rounded-[1rem] bg-canvas/80 p-2">
         {bubbles.length ? (
           bubbles.map((b) => (
             <div key={b.id} className={`flex ${b.from === "driver" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[80%] rounded-2xl px-3 py-1.5 text-[13px] leading-5 ${
+                className={`max-w-[82%] rounded-2xl px-3 py-2 text-[13px] leading-5 shadow-sm ${
                   b.from === "driver"
                     ? "bg-operation text-white"
                     : b.tone === "critical"
@@ -95,12 +132,14 @@ export function DriverChatThread({
               >
                 {b.tone === "issue" && b.from === "driver" ? <span className="font-semibold">[แจ้งปัญหา] </span> : null}
                 {b.text}
-                <span className={`mt-0.5 block text-[10px] ${b.from === "driver" ? "text-white/70" : "text-ink-faint"}`}>{formatRelativeTh(b.at, now)}</span>
+                <span className={`mt-0.5 block text-[10px] ${b.from === "driver" ? "text-white/70" : "text-ink-faint"}`}>
+                  {now ? formatRelativeTh(b.at, now) : "กำลังเตรียมเวลา"}
+                </span>
               </div>
             </div>
           ))
         ) : (
-          <p className="px-2 py-5 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ สามารถส่งข้อความถึงศูนย์ควบคุมได้จากช่องด้านล่าง</p>
+          <p className="px-2 py-5 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ สามารถส่งข้อความถึงศูนย์ควบคุมได้จากช่องด้านบน</p>
         )}
         <div ref={endRef} />
       </div>
@@ -111,37 +150,11 @@ export function DriverChatThread({
             key={phrase}
             type="button"
             onClick={() => setText(phrase)}
-            className="rounded-full border border-border bg-white px-2.5 py-1 text-[12px] font-medium text-ink-soft"
+            className="rounded-full border border-border/80 bg-white px-2.5 py-1 text-[12px] font-semibold text-ink-soft shadow-sm transition active:scale-[0.98]"
           >
             {phrase}
           </button>
         ))}
-      </div>
-
-      <div className="flex items-end gap-2">
-        <textarea
-          ref={inputRef}
-          className="field-input min-h-11 flex-1 resize-none overflow-y-auto"
-          rows={1}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          placeholder="พิมพ์ข้อความ…"
-        />
-        <button
-          type="button"
-          onClick={submit}
-          disabled={sending || !text.trim()}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-command bg-operation text-white disabled:opacity-50"
-          aria-label="ส่งข้อความ"
-        >
-          <Send className="h-4 w-4" />
-        </button>
       </div>
     </section>
   );

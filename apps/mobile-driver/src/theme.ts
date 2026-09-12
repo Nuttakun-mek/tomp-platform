@@ -1,21 +1,21 @@
 export const colors = {
-  ink: "#102033",
-  muted: "#52657a",
-  canvas: "#eef4f7",
+  ink: "#102034",
+  muted: "#5c6f84",
+  canvas: "#edf4f7",
   surface: "#ffffff",
-  line: "#dbe5ee",
-  operation: "#007a73",
-  operationDeep: "#005f59",
+  line: "#d7e3ed",
+  operation: "#087f73",
+  operationDeep: "#05645e",
   route: "#2563eb",
-  success: "#14835b",
-  warning: "#b66a00",
-  danger: "#ba2f2a",
-  command: "#0e2538"
+  success: "#16a34a",
+  warning: "#b7791f",
+  danger: "#dc2626",
+  command: "#0b2538"
 };
 
 export const radius = {
-  md: 14,
-  lg: 18,
-  xl: 24,
+  md: 16,
+  lg: 20,
+  xl: 26,
   pill: 999
 };

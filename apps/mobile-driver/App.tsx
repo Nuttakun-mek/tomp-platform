@@ -67,11 +67,13 @@ type ShellMode = "activation" | "web";
 type ShellStatus = "รอรับงาน" | "กำลังเปิดข้อมูล" | "อยู่ระหว่างปฏิบัติงาน" | "ต้องตรวจสอบ";
 type DriverMenuKey = "home" | "next" | "messages" | "location";
 
+const ANDROID_NAVIGATION_BAR_GUARD = Platform.OS === "android" ? 54 : 0;
+
 const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; view?: DriverWebViewKey }> = [
-  { key: "home", label: "ภารกิจ", view: "home" },
-  { key: "next", label: "แผนงาน", view: "next" },
+  { key: "home", label: "ปฏิบัติงาน", view: "home" },
+  { key: "next", label: "ลำดับงาน", view: "next" },
   { key: "messages", label: "ข้อความ", view: "messages" },
-  { key: "location", label: "ตั้งค่า GPS", view: "gps" }
+  { key: "location", label: "ตำแหน่ง", view: "gps" }
 ];
 
 const bridgeBootstrap = `
@@ -101,7 +103,7 @@ export default function App() {
   });
   const webViewRef = useRef<WebView>(null);
   const [mode, setMode] = useState<ShellMode>("activation");
-  const [status, setStatus] = useState<ShellStatus>("รอรับงาน");
+  const [, setStatus] = useState<ShellStatus>("รอรับงาน");
   const [tokenInput, setTokenInput] = useState("");
   const [currentToken, setCurrentToken] = useState("");
   const [webUrl, setWebUrl] = useState("");
@@ -131,6 +133,9 @@ export default function App() {
   const networkTone = locationSharingActive ? "live" : networkConnected === false ? "offline" : "idle";
   const networkDisplayLabel =
     networkConnected === false ? "ออฟไลน์" : locationSharingActive ? "ออนไลน์ · กำลังส่ง GPS" : "ออนไลน์ · ยังไม่ได้ส่ง GPS";
+  const currentScreenLabel = mode === "web"
+    ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
+    : `เวอร์ชัน ${TOMP_DRIVER_APP_VERSION}`;
   const effectiveWebUrl = useMemo(
     () => webUrl || (currentToken ? buildDriverWebUrl(currentToken, locale, activeWebView) : ""),
     [activeWebView, currentToken, locale, webUrl]
@@ -534,7 +539,7 @@ export default function App() {
         <View style={styles.topbar}>
           <View style={styles.identity}>
             <Text style={styles.product}>TOMP Driver</Text>
-            {mode === "web" ? <Text style={styles.title}>{mt(locale, "driverPage")}</Text> : null}
+            <Text style={styles.title}>{currentScreenLabel}</Text>
           </View>
           <View style={styles.statusGroup}>
             <View style={styles.localeSwitch}>
@@ -544,7 +549,6 @@ export default function App() {
                 </Pressable>
               ))}
             </View>
-            {mode === "web" ? <Text style={styles.statusPill}>{status}</Text> : null}
             <Text
               style={[
                 styles.network,
@@ -553,8 +557,6 @@ export default function App() {
             >
               {networkDisplayLabel || networkLabel}
             </Text>
-            {outboxCount > 0 ? <Text style={styles.outboxText}>ค้างส่ง {outboxCount} รายการ</Text> : null}
-            {syncLabel ? <Text style={styles.syncText}>{syncLabel}</Text> : null}
           </View>
         </View>
 
@@ -564,10 +566,7 @@ export default function App() {
               <View style={styles.operationStatusItem}>
                 <View style={[styles.statusDot, sessionReady ? styles.statusDotOk : styles.statusDotPending]} />
                 <View style={styles.operationStatusCopy}>
-                  <Text style={styles.operationStatusTitle}>{sessionReady ? "เชื่อมต่อศูนย์ควบคุมแล้ว" : "กำลังเตรียมการเชื่อมต่อ"}</Text>
-                  <Text style={styles.operationStatusText}>
-                    {sessionReady ? "พร้อมส่งสถานะและตำแหน่งระหว่างปฏิบัติงาน" : "กรุณายืนยันงานในหน้าคนขับเพื่อเปิดการส่งข้อมูล"}
-                  </Text>
+                  <Text style={styles.operationStatusTitle}>{sessionReady ? "พร้อมส่งข้อมูลให้ศูนย์ควบคุม" : "รอการยืนยันงาน"}</Text>
                 </View>
               </View>
               <Text style={styles.webVersionText}>เวอร์ชัน {TOMP_DRIVER_APP_VERSION}</Text>
@@ -630,12 +629,16 @@ export default function App() {
             </View>
           </View>
         ) : (
-          <ScrollView style={styles.activationScroller} contentContainerStyle={styles.activation} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={styles.activationScroller}
+            contentContainerStyle={[styles.activation, { paddingBottom: 28 + ANDROID_NAVIGATION_BAR_GUARD }]}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.heroCard}>
               <Text style={styles.kicker}>พื้นที่ปฏิบัติงานคนขับ</Text>
-              <Text style={styles.heroTitle}>รับงานผ่าน QR จากศูนย์ควบคุม</Text>
+              <Text style={styles.heroTitle}>สแกน QR เพื่อรับงาน</Text>
               <Text style={styles.heroCopy}>
-                สแกน QR ที่ได้รับจากเจ้าหน้าที่ เพื่อเปิดรายละเอียดงาน ยืนยันตัวตน และเริ่มส่งตำแหน่ง GPS ระหว่างปฏิบัติงาน
+                ใช้ QR ที่ได้รับจากศูนย์ควบคุมเพื่อเปิดรายละเอียดงาน ยืนยันความพร้อม และส่งตำแหน่ง GPS ระหว่างปฏิบัติงาน
               </Text>
             </View>
 
@@ -721,36 +724,36 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   topbar: {
-    alignItems: "flex-start",
+    alignItems: "center",
     backgroundColor: colors.command,
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 18,
-    paddingBottom: 20,
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 28 : 34
+    paddingBottom: 12,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 14 : 18
   },
   identity: {
     flex: 1,
-    gap: 3,
-    paddingTop: 4
+    gap: 1,
+    minWidth: 0
   },
   product: {
     color: "#8be2da",
     fontFamily: "NotoSansThai_900Black",
     fontSize: 24,
     fontWeight: "900",
-    letterSpacing: 0.3
+    letterSpacing: 0
   },
   title: {
-    color: "#ffffff",
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 18,
-    fontWeight: "900"
+    color: "#d6e5ee",
+    fontFamily: "NotoSansThai_700Bold",
+    fontSize: 13,
+    fontWeight: "800"
   },
   statusGroup: {
     alignItems: "flex-end",
-    gap: 8,
-    paddingTop: 10
+    flexShrink: 0,
+    gap: 5
   },
   localeSwitch: {
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -761,8 +764,8 @@ const styles = StyleSheet.create({
   },
   localeButton: {
     borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 4
+    paddingHorizontal: 9,
+    paddingVertical: 5
   },
   localeButtonActive: {
     backgroundColor: "#8be2da"
@@ -770,7 +773,7 @@ const styles = StyleSheet.create({
   localeButtonText: {
     color: "#bdd1df",
     fontFamily: "NotoSansThai_900Black",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900"
   },
   localeButtonTextActive: {
@@ -790,10 +793,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     color: "#bdd1df",
     fontFamily: "NotoSansThai_700Bold",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     overflow: "hidden",
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     paddingVertical: 4
   },
   networkLive: {
@@ -827,16 +830,20 @@ const styles = StyleSheet.create({
   },
   activation: {
     gap: 14,
-    paddingBottom: Platform.OS === "android" ? 46 : 28,
     paddingHorizontal: 16,
     paddingTop: 16
   },
   heroCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    padding: 18
+    elevation: 3,
+    padding: 18,
+    shadowColor: "#102034",
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.07,
+    shadowRadius: 18
   },
   kicker: {
     color: colors.operationDeep,
@@ -847,9 +854,9 @@ const styles = StyleSheet.create({
   heroTitle: {
     color: colors.ink,
     fontFamily: "NotoSansThai_900Black",
-    fontSize: 25,
+    fontSize: 26,
     fontWeight: "900",
-    lineHeight: 31,
+    lineHeight: 33,
     marginTop: 8
   },
   heroCopy: {
@@ -862,18 +869,28 @@ const styles = StyleSheet.create({
   formCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
+    elevation: 2,
     gap: 10,
-    padding: 16
+    padding: 16,
+    shadowColor: "#102034",
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14
   },
   primaryButton: {
     alignItems: "center",
     backgroundColor: colors.operation,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    elevation: 3,
     justifyContent: "center",
     minHeight: 52,
-    paddingHorizontal: 18
+    paddingHorizontal: 18,
+    shadowColor: colors.operation,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14
   },
   primaryButtonText: {
     color: "#ffffff",
@@ -899,7 +916,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#ffffff",
     borderColor: colors.line,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 48,
@@ -920,7 +937,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "#f8fbfd",
     borderColor: "#cbd7e3",
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.ink,
     fontFamily: "NotoSansThai_400Regular",
@@ -962,12 +979,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   noteCard: {
-    backgroundColor: "#f6faf9",
+    backgroundColor: "#f8fbfb",
     borderColor: "#cce6e3",
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
+    elevation: 1,
     gap: 12,
-    padding: 16
+    padding: 16,
+    shadowColor: "#102034",
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12
   },
   noteTitle: {
     color: colors.operationDeep,
@@ -1027,14 +1049,14 @@ const styles = StyleSheet.create({
   },
   operationStrip: {
     alignItems: "center",
-    backgroundColor: "#f7fbfc",
+    backgroundColor: "#fbfdfe",
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 10
+    paddingHorizontal: 12,
+    paddingVertical: 7
   },
   operationStatusItem: {
     alignItems: "center",
@@ -1059,7 +1081,7 @@ const styles = StyleSheet.create({
   operationStatusTitle: {
     color: colors.ink,
     fontFamily: "NotoSansThai_900Black",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "900"
   },
   operationStatusText: {
@@ -1099,7 +1121,7 @@ const styles = StyleSheet.create({
   },
   locationAssist: {
     alignItems: "center",
-    backgroundColor: "#eefaf8",
+    backgroundColor: "#edf9f7",
     borderBottomColor: "#cce6e3",
     borderBottomWidth: 1,
     flexDirection: "row",
@@ -1164,15 +1186,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderTopColor: colors.line,
     borderTopWidth: 1,
+    elevation: 14,
     flexDirection: "row",
-    gap: 6,
-    paddingBottom: Platform.OS === "android" ? 30 : 12,
+    gap: 5,
+    paddingBottom: 12 + ANDROID_NAVIGATION_BAR_GUARD,
     paddingHorizontal: 8,
-    paddingTop: 10
+    paddingTop: 10,
+    shadowColor: "#071827",
+    shadowOffset: { height: -4, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12
   },
   menuButton: {
     alignItems: "center",
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     flex: 1,
     justifyContent: "center",
     minHeight: 44,
@@ -1190,7 +1217,7 @@ const styles = StyleSheet.create({
   menuButtonText: {
     color: colors.muted,
     fontFamily: "NotoSansThai_700Bold",
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "900",
     textAlign: "center"
   },
