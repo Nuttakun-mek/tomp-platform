@@ -20,7 +20,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "TOMP ใช้ตำแหน่งเบื้องหลังเมื่อคนขับอนุญาต เพื่อให้ศูนย์ควบคุมติดตามงานได้ต่อเนื่อง",
         "NSCameraUsageDescription": "TOMP ใช้กล้องสำหรับสแกน QR และถ่ายหลักฐานงานในรุ่นถัดไป"
       },
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
       "package": "com.tomp.driver",
