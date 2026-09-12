@@ -92,3 +92,27 @@ export function decideLocationSend(
   if (now - lastSent.at >= LOCATION_HEARTBEAT_MS) return { send: true, idle: !tooCoarseToTell };
   return { send: false, idle: !tooCoarseToTell };
 }
+
+/**
+ * How long one diagnostic reason stays silent after it has been reported once.
+ *
+ * Every early exit in the background location task fires on *every* callback,
+ * and that task deliberately asks for `distanceInterval: 0` — so a driver whose
+ * session cannot be read would post one diagnostic per fix, roughly one a second
+ * in a moving vehicle. The flood would bury the signal it exists to produce, and
+ * with no session to send it under, each one lands in the offline queue instead.
+ *
+ * The first occurrence is what identifies the fault; a repeat five minutes later
+ * is what says it is still happening.
+ */
+export const DIAGNOSTIC_REPORT_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * Whether a background diagnostic for `reason` should be reported now, given
+ * when that same reason was last reported. Reasons are throttled independently,
+ * so a session failure never masks a TaskManager error.
+ */
+export function shouldReportDiagnostic(lastReportedAt: number | null | undefined, now = Date.now()): boolean {
+  if (lastReportedAt === null || lastReportedAt === undefined) return true;
+  return now - lastReportedAt >= DIAGNOSTIC_REPORT_INTERVAL_MS;
+}

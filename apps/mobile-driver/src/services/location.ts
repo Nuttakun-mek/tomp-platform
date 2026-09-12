@@ -2,7 +2,13 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
 import type { DriverLocationUpdateInput } from "@tomp/types/schemas";
-import { decideLocationSend, LOCATION_HEARTBEAT_MS, LOCATION_MOVED_METERS, type LastSentFix } from "@tomp/driver-core";
+import {
+  decideLocationSend,
+  LOCATION_HEARTBEAT_MS,
+  LOCATION_MOVED_METERS,
+  shouldReportDiagnostic,
+  type LastSentFix
+} from "@tomp/driver-core";
 import { BACKGROUND_GPS_ENABLED, LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
 import { enqueueOfflineAction } from "./offline-queue";
@@ -144,6 +150,22 @@ async function getDiagnosticLocation(fallback?: Location.LocationObject | null) 
   return Location.getLastKnownPositionAsync().catch(() => null);
 }
 
+// When each reason was last reported, so a fault that fires on every callback
+// says so once rather than a thousand times. Kept per reason, so a session
+// failure never masks a TaskManager error. The rule itself lives in
+// driver-core, where it is tested; this module cannot be unit-tested because it
+// imports the native layer at module scope.
+const lastDiagnosticAt = new Map<string, number>();
+
+function claimDiagnosticSlot(reason: string, now = Date.now()) {
+  if (!shouldReportDiagnostic(lastDiagnosticAt.get(reason), now)) return false;
+  // Claim before the awaits below, not after them — two callbacks can reach
+  // here before either has finished sending, which is the same race that once
+  // made every heartbeat write two identical rows.
+  lastDiagnosticAt.set(reason, now);
+  return true;
+}
+
 async function reportBackgroundTaskDiagnostic({
   reason,
   message,
@@ -157,6 +179,8 @@ async function reportBackgroundTaskDiagnostic({
   mobileSession?: MobileDriverSession | null;
   readSession?: boolean;
 }) {
+  if (!claimDiagnosticSlot(reason)) return;
+
   const fix = await getDiagnosticLocation(location);
   if (!fix) {
     console.warn("TOMP background GPS diagnostic dropped without a location", { reason, message });

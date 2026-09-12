@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildLocationPingPayload,
   decideLocationSend,
+  DIAGNOSTIC_REPORT_INTERVAL_MS,
+  shouldReportDiagnostic,
   evaluateLocationHealth,
   getLocationWarningMessage,
   LOCATION_HEARTBEAT_MS
@@ -93,5 +95,25 @@ describe("a fix too vague to prove anything", () => {
     const decision = decideLocationSend(here, 13.8545, 100.55, "location_ping", Date.now(), 100);
     expect(decision.send).toBe(true);
     expect(decision.idle).toBe(false);
+  });
+});
+
+describe("shouldReportDiagnostic", () => {
+  it("reports a reason that has never been seen", () => {
+    expect(shouldReportDiagnostic(null)).toBe(true);
+    expect(shouldReportDiagnostic(undefined)).toBe(true);
+  });
+
+  it("stays silent while the same reason repeats", () => {
+    const now = 1_000_000;
+    // The flood case: a background callback a second apart, each hitting the
+    // same early exit.
+    expect(shouldReportDiagnostic(now, now + 1_000)).toBe(false);
+    expect(shouldReportDiagnostic(now, now + DIAGNOSTIC_REPORT_INTERVAL_MS - 1)).toBe(false);
+  });
+
+  it("reports again once the window has passed, so a lasting fault keeps saying so", () => {
+    const now = 1_000_000;
+    expect(shouldReportDiagnostic(now, now + DIAGNOSTIC_REPORT_INTERVAL_MS)).toBe(true);
   });
 });
