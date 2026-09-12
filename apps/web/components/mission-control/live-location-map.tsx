@@ -169,7 +169,7 @@ export function LiveLocationMap({ projectId, initialLocations = [], height = 620
               <div>
                 <p className="font-semibold text-ink">รอตำแหน่ง GPS จากคนขับ</p>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  เมื่อคนขับเปิด QR และกดแชร์ GPS หมุดรถจะแสดงบนแผนที่นี้ พร้อมเส้นทางและสีตามสถานะสัญญาณ
+                  เมื่อคนขับเปิด QR และเริ่มส่งตำแหน่ง GPS หมุดรถจะแสดงบนแผนที่นี้ พร้อมเส้นทางและสีตามสถานะสัญญาณ
                 </p>
               </div>
             </div>

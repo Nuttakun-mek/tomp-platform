@@ -93,7 +93,7 @@ export const th = {
       idle: "จอดอยู่",
       slow: "สัญญาณช้า",
       offline: "ขาดการอัปเดต",
-      stopped: "หยุดแชร์"
+      stopped: "หยุดส่ง GPS"
     }
   }
 } as const;

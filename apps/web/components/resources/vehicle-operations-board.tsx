@@ -51,7 +51,7 @@ export function VehicleOperationsBoard({ profiles }: { profiles: VehicleOperatio
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge label={formatStatusTh(profile.vehicle.status)} tone={profile.vehicle.status === "available" ? "success" : profile.vehicle.status === "out_of_service" ? "danger" : "info"} />
-                    <Tooltip content="สี GPS อ้างอิงเวลาที่คนขับแชร์ตำแหน่งล่าสุดในงานที่ผูกกับรถคันนี้">
+                    <Tooltip content="สี GPS อ้างอิงเวลาที่คนขับส่งตำแหน่งล่าสุดในงานที่ผูกกับรถคันนี้">
                       <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
                         <MapPinned className="h-3.5 w-3.5" />
                         {gpsLabel(profile)}

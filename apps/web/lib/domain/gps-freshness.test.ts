@@ -40,7 +40,7 @@ describe("gpsFreshness", () => {
 describe("labels and tones", () => {
   it("maps every state to a Thai label and a tone", () => {
     expect(gpsFreshnessLabelTh("live")).toBe("GPS สด");
-    expect(gpsFreshnessLabelTh("stopped")).toBe("หยุดแชร์");
+    expect(gpsFreshnessLabelTh("stopped")).toBe("หยุดส่ง GPS");
     expect(gpsFreshnessTone("live")).toBe("success");
     expect(gpsFreshnessTone("slow")).toBe("warning");
     expect(gpsFreshnessTone("offline")).toBe("danger");

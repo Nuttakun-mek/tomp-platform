@@ -19,8 +19,8 @@ const TIMELINE_EVENT_LABELS_TH: Record<string, string> = {
   DRIVER_ACCESS_TOKEN_CREATED: "สร้างลิงก์ QR ให้คนขับ",
   DRIVER_ACCESS_TOKEN_REVOKED: "ยกเลิกลิงก์ QR",
   DRIVER_ACCESS_TOKEN_USED: "คนขับเปิดลิงก์ QR",
-  DRIVER_LOCATION_SHARING_STARTED: "คนขับเริ่มแชร์ตำแหน่ง",
-  DRIVER_LOCATION_SHARING_STOPPED: "คนขับหยุดแชร์ตำแหน่ง",
+  DRIVER_LOCATION_SHARING_STARTED: "คนขับเริ่มส่งตำแหน่ง GPS",
+  DRIVER_LOCATION_SHARING_STOPPED: "คนขับหยุดส่งตำแหน่ง GPS",
   DIRECT_EDIT_BLOCKED: "บล็อกการแก้ไขโดยตรง",
   ASSIGNMENT_CANCELLED: "ยกเลิกงานที่จัดสรร"
 };

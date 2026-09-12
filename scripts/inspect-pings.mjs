@@ -58,7 +58,9 @@ try {
     const rows = await sql`
       select g.recorded_at, g.latitude, g.longitude, g.accuracy, g.sharing_event,
              g.metadata->>'platform' as platform, g.metadata->>'mode' as mode,
-             g.metadata->>'heartbeatMs' as heartbeat_ms, g.metadata->>'idle' as idle
+             g.metadata->>'heartbeatMs' as heartbeat_ms, g.metadata->>'idle' as idle,
+             g.metadata->>'diagnosticReason' as diagnostic_reason,
+             g.metadata->>'diagnosticMessage' as diagnostic_message
       from gps_locations g
       join call_signs c on c.id = g.call_sign_id
       where c.call_sign = ${callSign}
@@ -74,10 +76,11 @@ try {
       // A fix vaguer than the 30m movement threshold cannot prove the vehicle
       // stayed put, which is what made a moving vehicle read as parked.
       const coarse = row.accuracy !== null && Number(row.accuracy) > 30 ? " ← too coarse to judge movement" : "";
+      const diagnostic = row.diagnostic_reason ? `  diagnostic=${row.diagnostic_reason}${row.diagnostic_message ? ` (${row.diagnostic_message})` : ""}` : "";
       console.log(
         `${at.toISOString().slice(11, 19)}  +${String(gap).padStart(4)}s  ` +
           `${Number(row.latitude).toFixed(6)},${Number(row.longitude).toFixed(6)}  ` +
-          `acc=${accuracy}m  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}  ${row.sharing_event}${coarse}`
+          `acc=${accuracy}m  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}  ${row.sharing_event}${coarse}${diagnostic}`
       );
       previous = at;
     }
@@ -91,7 +94,8 @@ try {
     const rows = await sql`
       select distinct on (g.call_sign_id)
         c.call_sign, g.recorded_at, g.latitude, g.longitude, g.accuracy,
-        g.metadata->>'mode' as mode, g.metadata->>'idle' as idle
+        g.metadata->>'mode' as mode, g.metadata->>'idle' as idle,
+        g.metadata->>'diagnosticReason' as diagnostic_reason
       from gps_locations g
       join call_signs c on c.id = g.call_sign_id
       where g.recorded_at > now() - (${`${hours} hours`}::interval)
@@ -103,7 +107,7 @@ try {
       console.log(`${String(row.call_sign).padEnd(24)} ${String(age).padStart(5)}s ago   ${band(age)}`);
       console.log(
         `  ${Number(row.latitude).toFixed(6)},${Number(row.longitude).toFixed(6)}  ` +
-          `acc=${row.accuracy === null ? "-" : Math.round(Number(row.accuracy))}m  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}`
+          `acc=${row.accuracy === null ? "-" : Math.round(Number(row.accuracy))}m  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}${row.diagnostic_reason ? `  diagnostic=${row.diagnostic_reason}` : ""}`
       );
     }
     console.log(`\nOne unit, ping by ping:  node scripts/inspect-pings.mjs "<call sign>"`);

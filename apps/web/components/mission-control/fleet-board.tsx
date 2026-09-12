@@ -41,8 +41,8 @@ const FRESH_LABEL: Record<Freshness, string> = {
   idle: "จอดอยู่",
   slow: "สัญญาณช้า",
   offline: "ขาดการอัปเดต",
-  stopped: "หยุดแชร์",
-  none: "ยังไม่แชร์ GPS"
+  stopped: "หยุดส่ง GPS",
+  none: "ยังไม่ได้ส่ง GPS"
 };
 
 const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, stopped: 1, slow: 2, idle: 3, live: 3 };
@@ -243,7 +243,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
             <MetricChip label="GPS สด" value={liveCount} tone="success" />
             <MetricChip label="ต้องติดตาม" value={needsAttention} tone="warning" />
             <MetricChip label="มีข้อความใหม่" value={alertCount} tone={alertCount ? "warning" : "neutral"} />
-            <Tooltip content="รายการที่ต้องติดตามรวมรถที่ไม่มี GPS สด รถที่ยังไม่แชร์ตำแหน่ง และรถที่มีข้อความยังไม่รับทราบ">
+            <Tooltip content="รายการที่ต้องติดตามรวมรถที่ไม่มี GPS สด รถที่ยังไม่ได้ส่งตำแหน่ง GPS และรถที่มีข้อความยังไม่รับทราบ">
               <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-300 text-xs font-semibold text-slate-500">?</span>
             </Tooltip>
           </div>

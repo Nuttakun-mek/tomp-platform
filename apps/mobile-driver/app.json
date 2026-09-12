@@ -7,6 +7,7 @@
     "version": "0.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -23,6 +24,11 @@
     },
     "android": {
       "package": "com.tomp.driver",
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#d9effd"
+      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -53,11 +59,24 @@
       [
         "expo-notifications",
         {
+          "icon": "./assets/notification-icon.png",
           "color": "#007a73",
           "defaultChannel": "driver-alerts"
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
       ]
     ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "extra": {
       "tompApiBaseUrl": "https://tomp-platform.vercel.app",
       "eas": {

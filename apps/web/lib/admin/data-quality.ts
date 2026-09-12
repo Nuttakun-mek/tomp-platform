@@ -171,7 +171,7 @@ export async function getDataQualityReport(): Promise<DataQualityReport> {
       severity: "warning",
       area: "ตำแหน่ง GPS",
       title: "ยังไม่มีตำแหน่ง GPS จากคนขับ",
-      detail: "ต้องเปิดลิงก์คนขับบนมือถือ กดเริ่มแชร์ และอนุญาตตำแหน่งใน browser"
+      detail: "ต้องเปิดลิงก์คนขับบนมือถือ กดเริ่มส่งตำแหน่ง GPS และอนุญาตตำแหน่งใน browser"
     });
   }
 

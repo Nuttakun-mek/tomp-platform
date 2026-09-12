@@ -212,7 +212,7 @@ try {
       detail: {
         namespace: "tomp.driver", version: 1, type: "native.status",
         payload: {
-          status: "gps_sharing", message: "กำลังแชร์ตำแหน่งจากแอป", canBackgroundLocation: true,
+          status: "gps_sharing", message: "กำลังส่งตำแหน่ง GPS จากแอป", canBackgroundLocation: true,
           recordedAt: new Date().toISOString(),
           detail: { latitude: 13.7563, longitude: 100.5018, accuracy: 12, recordedAt: new Date().toISOString() }
         }
@@ -221,7 +221,7 @@ try {
   });
   await page.waitForTimeout(800);
   const afterStatus = await page.textContent("body");
-  check("web reacts to the native gps_sharing status", afterStatus.includes("กำลังแชร์ตำแหน่งจากแอป") || afterStatus.includes("ส่งตำแหน่งล่าสุด"));
+  check("web reacts to the native gps_sharing status", afterStatus.includes("กำลังส่งตำแหน่ง GPS จากแอป") || afterStatus.includes("ส่งตำแหน่งล่าสุด"));
 
   // 9. Mission Control sees the ping
   const mc = await fetch(`${baseUrl}/api/mission-control/locations`);

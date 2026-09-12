@@ -338,15 +338,14 @@ export default function App() {
       if (!(await hasBackgroundLocationPermission())) {
         await requestBackgroundLocationPermission();
       }
-      const backgroundStarted = await startBackgroundLocationSharing();
+      const backgroundResult = await startBackgroundLocationSharing();
       // Ask once, and only now: the driver has just chosen to share, so the
       // reason for the exemption is obvious to them.
-      if (backgroundStarted) void promptBatteryExemptionOnce();
+      if (backgroundResult.started) void promptBatteryExemptionOnce();
       postStatusToWeb(
         "gps_sharing",
-        backgroundStarted
-          ? "เปิด GPS เบื้องหลังแล้ว"
-          : "ส่งตำแหน่ง GPS ขณะเปิดแอปแล้ว หากต้องการส่งต่อเนื่องเมื่อปิดจอ ให้ตั้งค่าสิทธิ์ตำแหน่งเป็น อนุญาตตลอดเวลา"
+        backgroundResult.message,
+        { backgroundGps: backgroundResult }
       );
     },
     [flushOutbox, postStatusToWeb]

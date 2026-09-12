@@ -82,7 +82,7 @@ export function DriverPreflight({ driverAccess }: { driverAccess: DriverAccessAs
           <ShieldCheck className="h-6 w-6" />
         </span>
         <h1 className="mt-1 text-lg font-bold text-ink">ตรวจสอบก่อนเริ่มงาน</h1>
-        <p className="text-[12px] text-ink-soft">ยืนยันข้อมูลและถ่ายรูปหลักฐาน จากนั้นจึงเข้าสู่หน้างาน</p>
+        <p className="text-[12px] text-ink-soft">ยืนยันข้อมูลและถ่ายรูปหลักฐาน จากนั้นจึงเข้าสู่หน้าปฏิบัติงาน</p>
       </header>
 
       {/* your vehicle */}

@@ -159,7 +159,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
       <div className="border-b border-slate-200 px-5 py-4">
         <p className="text-xs font-semibold tracking-[0.16em] text-operation">การสื่อสารกับคนขับ</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">ข้อความสองทาง ศูนย์ ↔ คนขับ</h2>
-        <p className="mt-1 text-xs text-slate-500">คนขับส่งมาจากหน้างาน (QR) · ศูนย์ตอบกลับได้ที่นี่ · รีเฟรชอัตโนมัติทุก 10 วินาที</p>
+        <p className="mt-1 text-xs text-slate-500">ข้อความจากคนขับผ่าน QR · ศูนย์ตอบกลับได้ที่นี่ · รีเฟรชอัตโนมัติทุก 10 วินาที</p>
       </div>
 
       <div className="grid gap-4 p-4 sm:p-4 lg:grid-cols-[0.9fr_1.1fr]">
@@ -282,7 +282,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">
               <MessageSquare className="mx-auto h-5 w-5 text-slate-400" />
-              <p className="mt-2">ยังไม่มีข้อความ เมื่อคนขับส่งข้อความจากหน้างาน หรือศูนย์ส่งข้อความออกไป จะแสดงที่นี่</p>
+              <p className="mt-2">ยังไม่มีข้อความ เมื่อคนขับส่งข้อความผ่าน QR หรือศูนย์ส่งข้อความออกไป จะแสดงที่นี่</p>
             </div>
           )}
         </div>

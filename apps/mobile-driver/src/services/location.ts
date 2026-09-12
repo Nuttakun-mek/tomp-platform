@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
+import type { DriverLocationUpdateInput } from "@tomp/types/schemas";
 import { decideLocationSend, LOCATION_HEARTBEAT_MS, LOCATION_MOVED_METERS, type LastSentFix } from "@tomp/driver-core";
 import { BACKGROUND_GPS_ENABLED, LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
@@ -8,6 +9,20 @@ import { enqueueOfflineAction } from "./offline-queue";
 import { getMobileDriverSession, type MobileDriverSession } from "./mobile-session-store";
 
 type LocationCallback = (location: Location.LocationObject) => void;
+
+export type BackgroundLocationStartReason =
+  | "disabled"
+  | "missing_session"
+  | "permission_denied"
+  | "already_started"
+  | "started"
+  | "native_error";
+
+export interface BackgroundLocationStartResult {
+  started: boolean;
+  reason: BackgroundLocationStartReason;
+  message: string;
+}
 
 // The foreground watcher is owned here, not by the caller. It used to be
 // returned and dropped on the floor, and stopLocationSharing() only stopped the
@@ -105,33 +120,142 @@ export function isForegroundSharing() {
   return foregroundWatch !== null;
 }
 
+function backgroundLocationPayload(
+  location: Location.LocationObject,
+  mode: "background" | "background_diagnostic",
+  metadata: Record<string, unknown> = {}
+): DriverLocationUpdateInput {
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    accuracy: location.coords.accuracy,
+    recordedAt: new Date(location.timestamp).toISOString(),
+    trackingEvent: "location_ping",
+    metadata: {
+      platform: "mobile_driver",
+      mode,
+      ...metadata
+    }
+  };
+}
+
+async function getDiagnosticLocation(fallback?: Location.LocationObject | null) {
+  if (fallback) return fallback;
+  return Location.getLastKnownPositionAsync().catch(() => null);
+}
+
+async function reportBackgroundTaskDiagnostic({
+  reason,
+  message,
+  location,
+  mobileSession,
+  readSession = true
+}: {
+  reason: string;
+  message: string;
+  location?: Location.LocationObject | null;
+  mobileSession?: MobileDriverSession | null;
+  readSession?: boolean;
+}) {
+  const fix = await getDiagnosticLocation(location);
+  if (!fix) {
+    console.warn("TOMP background GPS diagnostic dropped without a location", { reason, message });
+    return;
+  }
+
+  const payload = backgroundLocationPayload(fix, "background_diagnostic", {
+    diagnostic: true,
+    diagnosticReason: reason,
+    diagnosticMessage: message
+  });
+
+  let session = mobileSession;
+  if (session === undefined && readSession) {
+    session = await getMobileDriverSession().catch((error) => {
+      console.warn("TOMP background GPS diagnostic could not read session", {
+        reason,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    });
+  }
+
+  if (session) {
+    await submitOrQueueLocation(payload, session, { force: true }).catch((error) => {
+      console.warn("TOMP background GPS diagnostic could not be sent", {
+        reason,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+    return;
+  }
+
+  await enqueueOfflineAction("location", payload).catch((error) => {
+    console.warn("TOMP background GPS diagnostic could not be queued", {
+      reason,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
+}
+
 // Runs in a headless JS context that Android restores after a reboot or a
 // process kill. Anything that escapes here takes the whole app down on start,
 // so the entire body is guarded — SecureStore and SQLite both live in here.
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+  let latest: Location.LocationObject | null = null;
   try {
-    if (error) return;
+    if (error) {
+      await reportBackgroundTaskDiagnostic({
+        reason: "task_manager_error",
+        message: error.message || "TaskManager ส่ง error กลับจาก background location"
+      });
+      return;
+    }
     const payload = data as { locations?: Location.LocationObject[] } | undefined;
-    const latest = payload?.locations?.[0];
-    if (!latest) return;
-    const mobileSession = await getMobileDriverSession();
-    if (!mobileSession) return;
+    latest = payload?.locations?.[0] ?? null;
+    if (!latest) {
+      await reportBackgroundTaskDiagnostic({
+        reason: "missing_location_payload",
+        message: "background task ทำงานแต่ไม่มีพิกัดส่งมาจากระบบปฏิบัติการ"
+      });
+      return;
+    }
+
+    let mobileSession: MobileDriverSession | null = null;
+    try {
+      mobileSession = await getMobileDriverSession();
+    } catch (sessionError) {
+      await reportBackgroundTaskDiagnostic({
+        reason: "session_read_error",
+        message: sessionError instanceof Error ? sessionError.message : "อ่าน mobile session ไม่สำเร็จ",
+        location: latest,
+        mobileSession: null,
+        readSession: false
+      });
+      return;
+    }
+
+    if (!mobileSession) {
+      await reportBackgroundTaskDiagnostic({
+        reason: "session_missing",
+        message: "background task ทำงานแต่ไม่พบ mobile session",
+        location: latest,
+        mobileSession: null,
+        readSession: false
+      });
+      return;
+    }
 
     await submitOrQueueLocation(
-      {
-        latitude: latest.coords.latitude,
-        longitude: latest.coords.longitude,
-        accuracy: latest.coords.accuracy,
-        recordedAt: new Date(latest.timestamp).toISOString(),
-        trackingEvent: "location_ping",
-        metadata: {
-          platform: "mobile_driver",
-          mode: "background"
-        }
-      },
+      backgroundLocationPayload(latest, "background"),
       mobileSession
     );
-  } catch {
+  } catch (taskError) {
+    await reportBackgroundTaskDiagnostic({
+      reason: "task_unhandled_error",
+      message: taskError instanceof Error ? taskError.message : "background task ล้มเหลวโดยไม่ทราบสาเหตุ",
+      location: latest
+    });
     // A dropped background ping must never crash the app.
   }
 });
@@ -192,15 +316,17 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
   return Location.getLastKnownPositionAsync().catch(() => null);
 }
 
-async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0], mobileSession?: MobileDriverSession | null) {
-  const { send, idle } = decideLocationSend(
-    lastSent,
-    input.latitude,
-    input.longitude,
-    input.trackingEvent ?? "location_ping",
-    Date.now(),
-    input.accuracy
-  );
+async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0], mobileSession?: MobileDriverSession | null, options: { force?: boolean } = {}) {
+  const { send, idle } = options.force
+    ? { send: true, idle: false }
+    : decideLocationSend(
+        lastSent,
+        input.latitude,
+        input.longitude,
+        input.trackingEvent ?? "location_ping",
+        Date.now(),
+        input.accuracy
+      );
   if (!send) return { success: true, skipped: true } as const;
 
   const payload = {
@@ -294,20 +420,44 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
   return foregroundWatch;
 }
 
-export async function startBackgroundLocationSharing() {
-  if (!BACKGROUND_GPS_ENABLED) return false;
+export async function startBackgroundLocationSharing(): Promise<BackgroundLocationStartResult> {
+  if (!BACKGROUND_GPS_ENABLED) {
+    return {
+      started: false,
+      reason: "disabled",
+      message: "ระบบส่งตำแหน่ง GPS เบื้องหลังยังไม่ได้เปิดใช้งานในแอปเวอร์ชันนี้"
+    };
+  }
 
   const mobileSession = await getMobileDriverSession();
-  if (!mobileSession) return false;
+  if (!mobileSession) {
+    return {
+      started: false,
+      reason: "missing_session",
+      message: "ยังไม่พบสิทธิ์งานสำหรับส่งตำแหน่ง GPS เบื้องหลัง"
+    };
+  }
 
   // Android throws (natively — a JS catch cannot save the app) when a
   // location-typed foreground service starts without background permission
   // actually granted. Check the live grant, never the request result.
-  if (!(await hasBackgroundLocationPermission())) return false;
+  if (!(await hasBackgroundLocationPermission())) {
+    return {
+      started: false,
+      reason: "permission_denied",
+      message: "ส่งตำแหน่ง GPS ขณะเปิดแอปแล้ว หากต้องการส่งต่อเนื่องเมื่อปิดจอ ให้ตั้งค่าสิทธิ์ตำแหน่งเป็น อนุญาตตลอดเวลา"
+    };
+  }
 
   try {
     const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-    if (alreadyStarted) return true;
+    if (alreadyStarted) {
+      return {
+        started: true,
+        reason: "already_started",
+        message: "เปิด GPS เบื้องหลังไว้แล้ว"
+      };
+    }
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       // High, not Balanced. Balanced resolves from cell towers and wifi, which
       // on a real shift produced fixes accurate to 100 metres — and worse than
@@ -349,9 +499,19 @@ export async function startBackgroundLocationSharing() {
         notificationColor: "#007a73"
       }
     });
-    return true;
-  } catch {
-    return false;
+    return {
+      started: true,
+      reason: "started",
+      message: "เปิด GPS เบื้องหลังแล้ว"
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("TOMP background GPS start failed", { reason: "native_error", message });
+    return {
+      started: false,
+      reason: "native_error",
+      message: "ส่งตำแหน่ง GPS ขณะเปิดแอปแล้ว แต่ยังเปิด GPS เบื้องหลังไม่สำเร็จ โปรดตรวจสิทธิ์ตำแหน่งและการประหยัดแบตเตอรี่ของเครื่อง"
+    };
   }
 }
 

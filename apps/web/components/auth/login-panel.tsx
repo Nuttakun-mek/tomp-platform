@@ -69,7 +69,7 @@ export function LoginPanel() {
         </div>
         <ul className="grid gap-2.5 text-[13px] leading-6 text-slate-600">
           <li className="flex gap-2"><span className="text-operation">•</span> วางแผนโครงการ ภารกิจ และงานที่จัดสรรให้รถกับคนขับ</li>
-          <li className="flex gap-2"><span className="text-operation">•</span> สร้าง QR เฉพาะงาน ให้คนขับเปิดงานและแชร์ตำแหน่ง</li>
+          <li className="flex gap-2"><span className="text-operation">•</span> สร้าง QR เฉพาะงาน ให้คนขับเปิดงานและส่งตำแหน่ง GPS</li>
           <li className="flex gap-2"><span className="text-operation">•</span> ศูนย์ควบคุมเห็นสถานะ ตำแหน่ง และรายการที่ต้องตัดสินใจแบบสด</li>
         </ul>
         <p className="text-[12px] text-slate-400">คนขับไม่ต้องเข้าจากหน้านี้ — เปิดงานจากลิงก์ QR ที่ศูนย์ควบคุมส่งให้</p>

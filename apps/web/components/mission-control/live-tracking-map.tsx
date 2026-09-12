@@ -27,6 +27,15 @@ export const TRACKING_MARKER_COLORS: Record<MarkerFreshness, string> = {
   stopped: "#64748b"
 };
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint[]; height?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -89,6 +98,11 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
           ).addTo(layer);
         }
 
+        const popup =
+          `<strong>${escapeHtml(point.title)}</strong><br/>${escapeHtml(point.subtitle)}<br/><span style="color:${color}">● ล่าสุด ${escapeHtml(point.ageLabel)}</span>` +
+          (point.accuracy ? `<br/>ความแม่นยำ ${Math.round(point.accuracy)} ม.` : "") +
+          (spread.isOffset ? `<br/>พิกัดจริงซ้อนกับ ${spread.overlapCount} คัน จึงแยกหมุดบนแผนที่เพื่อให้อ่านง่าย` : "");
+
         L.circleMarker([spread.displayLatitude, spread.displayLongitude], {
           radius: 9,
           color: "#ffffff",
@@ -96,11 +110,7 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
           fillColor: color,
           fillOpacity: 1
         })
-          .bindPopup(
-            `<strong>${point.title}</strong><br/>${point.subtitle}<br/><span style="color:${color}">● ล่าสุด ${point.ageLabel}</span>` +
-              (point.accuracy ? `<br/>ความแม่นยำ ${Math.round(point.accuracy)} ม.` : "") +
-              (spread.isOffset ? `<br/>พิกัดจริงซ้อนกับ ${spread.overlapCount} คัน จึงแยกหมุดบนแผนที่เพื่อให้อ่านง่าย` : "")
-          )
+          .bindPopup(popup)
           .addTo(layer);
       }
 

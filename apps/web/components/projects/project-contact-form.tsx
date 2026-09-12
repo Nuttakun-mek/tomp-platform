@@ -38,7 +38,7 @@ export function ProjectContactForm({
         operationPhone: operation.trim()
       });
       if (result.success) {
-        setMsg({ tone: "ok", text: "บันทึกเบอร์ติดต่อแล้ว คนขับจะเห็นปุ่มโทรในหน้างาน" });
+        setMsg({ tone: "ok", text: "บันทึกเบอร์ติดต่อแล้ว คนขับจะเห็นปุ่มโทรในหน้าปฏิบัติงาน" });
         router.refresh();
       } else {
         setMsg({ tone: "err", text: result.error || "บันทึกไม่สำเร็จ" });
@@ -52,7 +52,7 @@ export function ProjectContactForm({
         <Phone className="h-3.5 w-3.5" /> เบอร์ติดต่อสำหรับคนขับ
       </label>
       <p className="text-xs leading-5 text-slate-500">
-        คนขับกดโทรได้จากหน้างาน ตั้งครั้งเดียวใช้ทุกงานในโครงการนี้ ถ้างานไหนมีผู้ประสานเฉพาะ ตั้งทับได้ที่งานนั้น
+        คนขับกดโทรได้จากหน้าปฏิบัติงาน ตั้งครั้งเดียวใช้ทุกงานในโครงการนี้ หากงานใดมีผู้ประสานเฉพาะ สามารถตั้งค่าทับได้ที่งานนั้น
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="grid gap-1">

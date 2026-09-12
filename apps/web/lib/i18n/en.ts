@@ -96,7 +96,7 @@ export const en = {
       idle: "Parked",
       slow: "Slow signal",
       offline: "No update",
-      stopped: "Sharing off"
+      stopped: "GPS off"
     }
   }
 } satisfies DictionaryShape<typeof th>;

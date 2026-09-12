@@ -97,14 +97,14 @@ const GPS_FRESHNESS_LABELS: Record<LocaleCode, Record<GpsFreshness, string>> = {
     idle: "จอดอยู่",
     slow: "สัญญาณช้า",
     offline: "ขาดการอัปเดต",
-    stopped: "หยุดแชร์"
+    stopped: "หยุดส่ง GPS"
   },
   en: {
     live: "Live",
     idle: "Parked",
     slow: "Slow signal",
     offline: "No update",
-    stopped: "Sharing off"
+    stopped: "GPS off"
   }
 };
 

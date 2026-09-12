@@ -16,9 +16,9 @@ export default async function PilotChecklistPage() {
     { title: "สร้างโครงการ", detail: "ตั้งชื่อ รหัส วันที่ และพื้นที่ปฏิบัติการ", href: "/projects/new" },
     { title: "เพิ่มภารกิจ", detail: "กำหนดจุดรับ จุดส่ง เวลา และข้อผูกพันด้านบริการ", href: projectDetailHref },
     { title: "จัดสรรรถและคนขับ", detail: "เชื่อมภารกิจ Call Sign คนขับ รถ และช่วงเวลา", href: assignmentsHref },
-    { title: "สร้าง QR", detail: "สร้างลิงก์เข้าหน้างานสำหรับคนขับแบบ assignment-scoped", href: assignmentsHref },
+    { title: "สร้าง QR", detail: "สร้างลิงก์เข้าหน้าปฏิบัติงานสำหรับคนขับแบบ assignment-scoped", href: assignmentsHref },
     { title: "คนขับยืนยันความพร้อม", detail: "เปิดหน้าคนขับ ยืนยันข้อมูล และพร้อมเริ่มงาน", href: "/driver" },
-    { title: "แชร์ GPS", detail: "คนขับกดเริ่มแชร์ตำแหน่งจาก web app", href: "/superadmin/dev-tools/live-test" },
+    { title: "ส่งตำแหน่ง GPS", detail: "คนขับกดเริ่มส่งตำแหน่ง GPS จาก web app", href: "/superadmin/dev-tools/live-test" },
     { title: "ศูนย์ควบคุมติดตามสถานะ", detail: "ดูหมุด สีสัญญาณ ความเสี่ยง และรายการที่ต้องติดตาม", href: `/mission-control?projectId=${activeProject.id}` },
     { title: "ตรวจ Timeline", detail: "ยืนยันว่าลำดับเหตุการณ์สำคัญถูกบันทึก", href: `/mission-control?projectId=${activeProject.id}` },
     { title: "สรุปข้อสังเกต", detail: "บันทึกสิ่งที่ต้องแก้ก่อน pilot รอบถัดไป", href: "/superadmin/dev-tools/pilot-checklist" }
@@ -32,7 +32,7 @@ export default async function PilotChecklistPage() {
         <aside className="grid content-start gap-4">
           <PilotRoleCard role="Operation Manager" responsibility="ดูภาพรวม ตัดสินใจเมื่อมีความเสี่ยง และยืนยันว่า flow พร้อมทดสอบ" />
           <PilotRoleCard role="Dispatcher" responsibility="จัดสรรภารกิจ คนขับ รถ Call Sign และ QR สำหรับคนขับ" />
-          <PilotRoleCard role="Driver" responsibility="เปิด QR ยืนยันความพร้อม แชร์ GPS และอัปเดตสถานะงาน" />
+          <PilotRoleCard role="Driver" responsibility="เปิด QR ยืนยันความพร้อม ส่งตำแหน่ง GPS และอัปเดตสถานะงาน" />
           <PilotTestResultPanel />
         </aside>
       </div>

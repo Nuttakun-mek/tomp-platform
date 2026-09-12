@@ -308,7 +308,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
           tone="driver"
           heading="① QR คนขับ"
           who="สำหรับคนขับของหน่วยนี้เท่านั้น"
-          how="สแกนแล้วกรอกรหัส 6 หลักในกล่องนี้ เพื่อเปิดงานและแชร์ตำแหน่ง"
+          how="สแกนแล้วกรอกรหัส 6 หลักในกล่องนี้ เพื่อเปิดงานและส่งตำแหน่ง GPS"
           qr={credentials.driverQr}
           url={credentials.driverUrl}
           filename={`QR-คนขับ-${safeName}.png`}

@@ -90,7 +90,7 @@ export function LiveGpsTestPanel() {
 
         setResult(response.data as LiveGpsResult);
         setCurrentStep(3);
-        setMessage("สร้างชุดทดสอบสำเร็จ เปิด QR บนมือถือแล้วกดเริ่มแชร์ GPS");
+        setMessage("สร้างชุดทดสอบสำเร็จ เปิด QR บนมือถือแล้วกดเริ่มส่งตำแหน่ง GPS");
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "ระบบตอบกลับช้าเกินไป กรุณาตรวจ Supabase และลองใหม่");
       }
@@ -105,7 +105,7 @@ export function LiveGpsTestPanel() {
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-teal-200">เส้นทางหลักสำหรับทดสอบระบบ</p>
             <h2 className="display-title mt-3 max-w-lg text-white">ทดสอบ QR คนขับและ GPS สดให้จบในหน้าเดียว</h2>
             <p className="mt-3 max-w-md text-[13px] leading-7 text-slate-300 sm:text-sm">
-              ตรวจ Supabase สร้างข้อมูลทดสอบจริง สร้าง QR สำหรับคนขับ และพาไป Mission Control เพื่อดูตำแหน่งที่แชร์เข้ามา
+              ตรวจ Supabase สร้างข้อมูลทดสอบจริง สร้าง QR สำหรับคนขับ และพาไป Mission Control เพื่อดูตำแหน่ง GPS ที่ส่งเข้ามา
             </p>
           </div>
           <div className="rounded-panel border border-white/10 bg-white/[0.06] p-4">
@@ -125,7 +125,7 @@ export function LiveGpsTestPanel() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StepItem active={currentStep === 1} done={currentStep > 1} title="ตรวจระบบ" detail="ตรวจ Supabase และตารางสำคัญก่อนสร้างข้อมูล" />
             <StepItem active={currentStep === 2} done={currentStep > 2} title="สร้างชุดทดสอบ" detail="สร้างโครงการ ภารกิจ Assignment และ QR จริง" />
-            <StepItem active={currentStep === 3} done={Boolean(result)} title="เปิดหน้าคนขับ" detail="เปิด QR บนมือถือแล้วเริ่มแชร์ GPS" />
+            <StepItem active={currentStep === 3} done={Boolean(result)} title="เปิดหน้าคนขับ" detail="เปิด QR บนมือถือแล้วเริ่มส่งตำแหน่ง GPS" />
             <StepItem active={currentStep === 4} done={false} title="ดูศูนย์ควบคุม" detail="ตรวจหมุด สถานะ และเวลาอัปเดตใน Mission Control" />
           </div>
 
@@ -178,7 +178,7 @@ export function LiveGpsTestPanel() {
             <div>
               <p className="section-label">QR สำหรับคนขับ</p>
               <h3 className="section-title mt-1">เปิดลิงก์นี้บนมือถือคนขับ</h3>
-              <p className="section-description mt-1.5">หลังเปิดแล้วให้กด “เริ่มแชร์ตำแหน่ง” และอนุญาต GPS ใน browser จากนั้นกลับมาดู Mission Control</p>
+              <p className="section-description mt-1.5">หลังเปิดแล้วให้กด “เริ่มส่งตำแหน่ง GPS” และอนุญาต GPS ใน browser จากนั้นกลับมาดู Mission Control</p>
             </div>
             <a
               className="break-all rounded-panel border border-route/30 bg-route-soft p-3 text-sm font-semibold text-route"

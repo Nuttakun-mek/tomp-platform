@@ -150,7 +150,7 @@ async function writeDriverLocationViaSupabase(
       objectId: ctx.assignmentId || inserted.id,
       eventType: input.trackingEvent === "sharing_started" ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED,
       source: "driver_qr",
-      reason: input.trackingEvent === "sharing_started" ? "คนขับเริ่มแชร์ตำแหน่งจาก web app" : "คนขับหยุดแชร์ตำแหน่งจาก web app",
+      reason: input.trackingEvent === "sharing_started" ? "คนขับเริ่มส่งตำแหน่ง GPS จาก web app" : "คนขับหยุดส่งตำแหน่ง GPS จาก web app",
       afterData: { latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt },
       metadata: { pilot: true }
     });
@@ -221,7 +221,7 @@ async function writeDriverLocationViaPostgres(ctx: DriverSessionContext, input: 
   if (input.trackingEvent === "sharing_started" || input.trackingEvent === "sharing_stopped") {
     await sql`
       insert into timeline_events (project_id, object_type, object_id, event_type, source, reason, after_data, metadata)
-      values (${ctx.projectId}, ${"driver_location"}, ${ctx.assignmentId}, ${input.trackingEvent === "sharing_started" ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED}, ${"driver_qr"}, ${input.trackingEvent === "sharing_started" ? "คนขับเริ่มแชร์ตำแหน่งจาก web app" : "คนขับหยุดแชร์ตำแหน่งจาก web app"}, ${JSON.stringify({ latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt })}::jsonb, ${JSON.stringify({ pilot: true, source: "postgres_direct" })}::jsonb)
+      values (${ctx.projectId}, ${"driver_location"}, ${ctx.assignmentId}, ${input.trackingEvent === "sharing_started" ? TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STARTED : TIMELINE_EVENTS.DRIVER_LOCATION_SHARING_STOPPED}, ${"driver_qr"}, ${input.trackingEvent === "sharing_started" ? "คนขับเริ่มส่งตำแหน่ง GPS จาก web app" : "คนขับหยุดส่งตำแหน่ง GPS จาก web app"}, ${JSON.stringify({ latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt })}::jsonb, ${JSON.stringify({ pilot: true, source: "postgres_direct" })}::jsonb)
     `;
   }
 

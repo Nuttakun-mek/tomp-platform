@@ -31,7 +31,7 @@ const statusTh: Record<string, string> = {
   live: "สด",
   slow: "สัญญาณช้า",
   offline: "ขาดการอัปเดต",
-  stopped: "หยุดแชร์แล้ว"
+  stopped: "หยุดส่ง GPS แล้ว"
 };
 
 export function formatStatusTh(status?: string | null): string {

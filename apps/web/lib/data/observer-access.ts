@@ -20,12 +20,17 @@ export interface ObserverAccessView {
   callSign: { id: string; label: string };
   assignment: { id: string; status: string; pickup: string; dropoff: string; startTime: string | null; endTime: string | null } | null;
   vehicle: { id: string; plateNumber: string; vehicleType: string } | null;
-  location: { latitude: number | null; longitude: number | null; recordedAt: string | null; status: string } | null;
+  location: { latitude: number | null; longitude: number | null; accuracy: number | null; recordedAt: string | null; status: string; metadata: Record<string, unknown> } | null;
 }
 
 function routeMeta(row: Row | null | undefined, key: string, fallback: string) {
   const meta = row?.metadata && typeof row.metadata === "object" ? row.metadata as Row : {};
   return text(meta, key) || text(meta, key.replace(/[A-Z]/g, (match) => `_${match.toLowerCase()}`), fallback);
+}
+
+function metadata(row: Row | null | undefined): Record<string, unknown> {
+  const value = row?.metadata;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 export async function getObserverAccessView(token: string): Promise<ObserverAccessView | null> {
@@ -62,7 +67,7 @@ export async function getObserverAccessView(token: string): Promise<ObserverAcce
         .maybeSingle(),
       client
         .from("gps_locations")
-        .select("latitude, longitude, recorded_at, sharing_event")
+        .select("latitude, longitude, accuracy, recorded_at, sharing_event, metadata")
         .eq("project_id", tokenRow.project_id)
         .eq("call_sign_id", tokenRow.call_sign_id)
         .order("recorded_at", { ascending: false })
@@ -115,7 +120,7 @@ async function getObserverAccessViewViaPostgres(tokenHash: string): Promise<Obse
       limit 1
     `,
     sql<Row[]>`
-      select latitude, longitude, recorded_at, sharing_event
+      select latitude, longitude, accuracy, recorded_at, sharing_event, metadata
       from gps_locations
       where project_id = ${String(tokenRow.project_id)}
         and call_sign_id = ${String(tokenRow.call_sign_id)}
@@ -164,8 +169,10 @@ function buildObserverView(project: Row, callSign: Row, assignment: Row | null, 
       ? {
           latitude: numberValue(location, "latitude"),
           longitude: numberValue(location, "longitude"),
+          accuracy: location.accuracy == null ? null : numberValue(location, "accuracy"),
           recordedAt: text(location, "recorded_at") || null,
-          status: text(location, "sharing_event", "location_ping")
+          status: text(location, "sharing_event", "location_ping"),
+          metadata: metadata(location)
         }
       : null
   };
