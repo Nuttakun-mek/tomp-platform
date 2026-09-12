@@ -47,6 +47,13 @@ const sql = postgres(url.replace(/:6543\//, ":5432/"), { ssl: "require", prepare
 const FRESH_LIMIT = 180; // cadence 120s + 60s slack, the usual case
 const SLOW_LIMIT = 600; // plus the slow-signal grace
 
+// Which build sent this. Blank means a build from before pings carried it, and
+// that is the answer to "why is there no diagnostic here" — that phone cannot
+// report one. Do not read a gap without reading this column first.
+function build(value) {
+  return (value ?? "pre-0.2.0+3").padEnd(11);
+}
+
 function band(ageSeconds) {
   if (ageSeconds <= FRESH_LIMIT) return "สด/จอดอยู่";
   if (ageSeconds <= SLOW_LIMIT) return "สัญญาณช้า";
@@ -60,7 +67,8 @@ try {
              g.metadata->>'platform' as platform, g.metadata->>'mode' as mode,
              g.metadata->>'heartbeatMs' as heartbeat_ms, g.metadata->>'idle' as idle,
              g.metadata->>'diagnosticReason' as diagnostic_reason,
-             g.metadata->>'diagnosticMessage' as diagnostic_message
+             g.metadata->>'diagnosticMessage' as diagnostic_message,
+             g.metadata->>'appBuild' as app_build
       from gps_locations g
       join call_signs c on c.id = g.call_sign_id
       where c.call_sign = ${callSign}
@@ -80,7 +88,7 @@ try {
       console.log(
         `${at.toISOString().slice(11, 19)}  +${String(gap).padStart(4)}s  ` +
           `${Number(row.latitude).toFixed(6)},${Number(row.longitude).toFixed(6)}  ` +
-          `acc=${accuracy}m  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}  ${row.sharing_event}${coarse}${diagnostic}`
+          `acc=${accuracy}m  ${build(row.app_build)}  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}  ${row.sharing_event}${coarse}${diagnostic}`
       );
       previous = at;
     }
@@ -95,7 +103,8 @@ try {
       select distinct on (g.call_sign_id)
         c.call_sign, g.recorded_at, g.latitude, g.longitude, g.accuracy,
         g.metadata->>'mode' as mode, g.metadata->>'idle' as idle,
-        g.metadata->>'diagnosticReason' as diagnostic_reason
+        g.metadata->>'diagnosticReason' as diagnostic_reason,
+        g.metadata->>'appBuild' as app_build
       from gps_locations g
       join call_signs c on c.id = g.call_sign_id
       where g.recorded_at > now() - (${`${hours} hours`}::interval)
@@ -107,7 +116,7 @@ try {
       console.log(`${String(row.call_sign).padEnd(24)} ${String(age).padStart(5)}s ago   ${band(age)}`);
       console.log(
         `  ${Number(row.latitude).toFixed(6)},${Number(row.longitude).toFixed(6)}  ` +
-          `acc=${row.accuracy === null ? "-" : Math.round(Number(row.accuracy))}m  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}${row.diagnostic_reason ? `  diagnostic=${row.diagnostic_reason}` : ""}`
+          `acc=${row.accuracy === null ? "-" : Math.round(Number(row.accuracy))}m  ${build(row.app_build)}  ${row.mode ?? "-"}${row.idle === "true" ? " idle" : ""}${row.diagnostic_reason ? `  diagnostic=${row.diagnostic_reason}` : ""}`
       );
     }
     console.log(`\nOne unit, ping by ping:  node scripts/inspect-pings.mjs "<call sign>"`);

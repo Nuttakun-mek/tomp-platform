@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
@@ -13,6 +14,21 @@ import { BACKGROUND_GPS_ENABLED, LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
 import { enqueueOfflineAction } from "./offline-queue";
 import { getMobileDriverSession, type MobileDriverSession } from "./mobile-session-store";
+
+// Which build sent this ping.
+//
+// Without it a gap in the data cannot be read: on 2026-09-12 a unit went quiet
+// for 59 minutes and nothing said whether that phone was even running the build
+// that reports why it stopped. Ten drivers over five days will not all install
+// the same day, so every ping has to say what it came from.
+const APP_BUILD = (() => {
+  const version = Constants.expoConfig?.version ?? "unknown";
+  const native =
+    Platform.OS === "ios"
+      ? Constants.expoConfig?.ios?.buildNumber
+      : String(Constants.expoConfig?.android?.versionCode ?? "");
+  return native ? `${version}+${native}` : version;
+})();
 
 type LocationCallback = (location: Location.LocationObject) => void;
 
@@ -359,6 +375,7 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
       ...(input.metadata ?? {}),
       clientEventId: (input.metadata as Record<string, unknown> | undefined)?.clientEventId ?? createLocationClientEventId(input.recordedAt, input.trackingEvent ?? "location_ping"),
       heartbeatMs: LOCATION_HEARTBEAT_MS,
+      appBuild: APP_BUILD,
       ...(idle ? { idle: true } : {})
     }
   };
