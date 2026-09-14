@@ -537,7 +537,56 @@ Do not delete these without understanding what each caught:
 
 ---
 
-# 12. Older notes
+# 12. iOS needs an explicit rescan / sign-out control
+
+Found after the mobile shell review: Android users can currently trigger
+`confirmResetAssignment()` with the hardware Back button while they are inside a
+job, but iOS has no equivalent hardware back affordance. That means an iOS
+driver can remain stuck on the previously opened driver job and cannot reliably
+return to the QR scanner to open a new QR.
+
+Current code already has the reset path:
+
+- `apps/mobile-driver/App.tsx` -> `resetAssignment()`
+- it stops location sharing
+- it clears the saved driver token
+- it returns the app to activation mode
+- it shows the QR scan screen again
+
+Implemented after this note:
+
+- `apps/mobile-driver/App.tsx` now shows `สแกน QR ใหม่` in the native shell's
+  location page.
+- the action uses the existing confirmation dialog before reset.
+- reset now stops location sharing, clears the mobile session, clears the saved
+  QR token, clears visible unread/sync state, and returns to the QR scanner.
+- reset also runs stale background-location cleanup again, clears delivered
+  notifications, and closes any QR/manual entry panel so the next screen is a
+  clean activation state.
+- token/session storage moved to v2 keys so iOS installs that kept old Keychain
+  values do not silently reopen the old QR after the next build.
+- app startup deletes the legacy token/session keys as a best-effort cleanup.
+
+Keep these UX rules for future refinements:
+
+- add a small secondary action labelled `ออกจากงานนี้` or `เปลี่ยนงาน`
+- place it in a low-risk location such as the settings/location page or a header
+  overflow action, not beside the GPS stop button
+- require a confirmation dialog before clearing the active job
+- wording must explain that the app will stop GPS and return to QR scanning
+- after reset, the driver must see the QR scanner/manual token page immediately
+
+Temporary workaround before a build containing the new button reaches the device:
+
+- close the native app and uninstall/reinstall it to clear SecureStore state, or
+- ask the operator to issue/open the new QR in a fresh build/device session
+
+Do not rely on the workaround for field testing. It is too slow for real driver
+operations and can hide device-rebinding problems.
+
+---
+
+# 13. Older notes
 
 Folded into this one. Open only for history.
 

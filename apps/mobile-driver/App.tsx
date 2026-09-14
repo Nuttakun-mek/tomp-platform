@@ -53,9 +53,15 @@ import {
   registerForPushNotifications,
   syncPushToken
 } from "./src/services/push";
-import { getInstallationId, getMobileDriverSession, saveMobileDriverSession } from "./src/services/mobile-session-store";
+import {
+  clearLegacyMobileDriverSessions,
+  clearMobileDriverSession,
+  getInstallationId,
+  getMobileDriverSession,
+  saveMobileDriverSession
+} from "./src/services/mobile-session-store";
 import { flushOfflineQueue, getOfflineQueueCount } from "./src/services/offline-queue";
-import { clearDriverToken, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
+import { clearDriverToken, clearLegacyDriverTokens, getSavedDriverToken, saveDriverToken } from "./src/services/token-store";
 import { parseDriverLink } from "./src/services/driver-link";
 import { decideWebViewNavigation } from "./src/services/webview-navigation";
 import { mt, type MobileLocale } from "./src/i18n";
@@ -396,12 +402,23 @@ export default function App() {
 
   const resetAssignment = useCallback(async () => {
     await stopLocationSharing().catch(() => undefined);
+    await clearMobileDriverSession().catch(() => undefined);
+    await stopStaleBackgroundLocationTask().catch(() => undefined);
+    await clearDeliveredNotifications().catch(() => undefined);
     await clearDriverToken();
     currentTokenRef.current = "";
     activeDriverMenuRef.current = "home";
     setCurrentToken("");
     setWebUrl("");
     setMode("activation");
+    setSessionReady(false);
+    setLocationSharingActive(false);
+    setHasUnreadMessages(false);
+    setOutboxCount(0);
+    setSyncLabel("");
+    setScannerOpen(false);
+    setManualEntryOpen(false);
+    setQrLocked(false);
     setStatus("รอรับงาน");
     setActiveDriverMenu("home");
     setMessage("ออกจากงานแล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
@@ -424,6 +441,8 @@ export default function App() {
     // anything else — otherwise it takes the app down on every start and the
     // driver only ever sees a white screen.
     void stopStaleBackgroundLocationTask();
+    void clearLegacyDriverTokens();
+    void clearLegacyMobileDriverSessions();
 
     getMobileLocale().then((savedLocale) => {
       localeRef.current = savedLocale;
@@ -585,9 +604,22 @@ export default function App() {
                     จัดการการส่งตำแหน่ง GPS ให้ศูนย์ควบคุม ตรวจสอบสิทธิ์ตำแหน่ง และเปิดการตั้งค่าอุปกรณ์เมื่อจำเป็น
                   </Text>
                 </View>
-                <Pressable style={styles.locationSettingsButton} onPress={() => Linking.openSettings()}>
-                  <Text style={styles.locationSettingsButtonText}>ตั้งค่าอุปกรณ์</Text>
-                </Pressable>
+                <View style={styles.locationActionGroup}>
+                  <Pressable
+                    accessibilityLabel="เปิดหน้าตั้งค่าอุปกรณ์"
+                    style={styles.locationSettingsButton}
+                    onPress={() => Linking.openSettings()}
+                  >
+                    <Text style={styles.locationSettingsButtonText}>ตั้งค่าอุปกรณ์</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="กลับไปสแกน QR ใหม่"
+                    style={styles.locationResetButton}
+                    onPress={confirmResetAssignment}
+                  >
+                    <Text style={styles.locationResetButtonText}>สแกน QR ใหม่</Text>
+                  </Pressable>
+                </View>
               </View>
             ) : null}
             <View style={styles.webFrame}>
@@ -1146,6 +1178,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 14
   },
+  locationActionGroup: {
+    alignItems: "stretch",
+    flexShrink: 0,
+    gap: 6,
+    width: 104
+  },
   locationSettingsButton: {
     alignItems: "center",
     backgroundColor: "#ffffff",
@@ -1161,6 +1199,23 @@ const styles = StyleSheet.create({
     fontFamily: "NotoSansThai_700Bold",
     fontSize: 11,
     fontWeight: "900"
+  },
+  locationResetButton: {
+    alignItems: "center",
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 38,
+    paddingHorizontal: 8
+  },
+  locationResetButtonText: {
+    color: colors.warning,
+    fontFamily: "NotoSansThai_700Bold",
+    fontSize: 10,
+    fontWeight: "900",
+    textAlign: "center"
   },
   webFrame: {
     flex: 1

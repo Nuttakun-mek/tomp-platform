@@ -2,7 +2,8 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 
 const INSTALLATION_ID_KEY = "tomp_driver_installation_id";
-const MOBILE_SESSION_KEY = "tomp_driver_mobile_session";
+const MOBILE_SESSION_KEY = "tomp_driver_mobile_session_v2";
+const LEGACY_MOBILE_SESSION_KEYS = ["tomp_driver_mobile_session"];
 const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY
 };
@@ -56,7 +57,14 @@ export async function getMobileDriverSession(): Promise<MobileDriverSession | nu
   }
 }
 
+export async function clearLegacyMobileDriverSessions() {
+  await Promise.all(LEGACY_MOBILE_SESSION_KEYS.map((key) => SecureStore.deleteItemAsync(key).catch(() => undefined)));
+}
+
 export async function clearMobileDriverSession() {
   cachedMobileSession = null;
-  await SecureStore.deleteItemAsync(MOBILE_SESSION_KEY);
+  await Promise.all([
+    SecureStore.deleteItemAsync(MOBILE_SESSION_KEY).catch(() => undefined),
+    clearLegacyMobileDriverSessions()
+  ]);
 }
