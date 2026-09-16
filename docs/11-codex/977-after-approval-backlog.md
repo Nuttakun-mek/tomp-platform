@@ -67,59 +67,59 @@ change; the lookup is correct, it was told a lie.
 
 ---
 
-# 2. One concern per page: resources form units, dispatch gives them work
+# 2. Resources prepares the pair; the management page forms the unit
 
-**Decided with the owner 2026-09-16.** Today one form on the dispatch page does
-four things in a single submit — `createMissionAction`, `createCallSignAction`,
-`createDriverAccessTokenAction`, `createObserverAccessTokenAction`
-(`components/assignments/unit-setup-form.tsx:99,154,173`). Four different layers
-in one button is why the flow reads as confusing. Split it so each page finishes
-its own job.
+**Decided with the owner 2026-09-16.** An earlier draft of this section had the
+QR moving to the resources tab. That was wrong and is corrected here: **the call
+sign and the QR are created on the management page**, which is also where they
+live today.
 
-**The three pages, and what each one owns**
+**Already true — do not rebuild it**
+- `components/assignments/call-sign-access-panel.tsx` issues the driver QR and
+  the observer QR per call sign, renders them, and handles revoke, redisplay and
+  PIN. The management page is already the place credentials come from.
+- `updateCallSignCrewAction` (`app/actions/call-signs.ts:35`) already writes a
+  `call_sign_crew_events` row **and** a timeline event when a driver or vehicle
+  is swapped. Swapping keeps the same call sign. Nothing to add.
 
-| page | owns |
-|---|---|
-| `/resources` (no `projectId`) | the central library: people and vehicles that outlive any one project |
-| `/resources?projectId=…` | **this project's resources, and the units formed from them** — already a project workspace tab |
-| `/projects/[id]/assignments` | **work only**: missions and assignments for units that already exist |
+**What changes**
 
-**On the project resources tab**
-- "เพิ่มหน่วย" creates the driver and the vehicle **together** and forms the call
-  sign in the same save — `createDriverAction` + `createVehicleAction` +
-  `createCallSignAction`, which already takes `driverId` and `vehicleId`.
-- Importing from the library ends the same way: pick a person and a vehicle,
-  import both copies, pair them into a unit **before leaving this page**. Never
-  hand a half-formed unit to dispatch.
-- Issue the QR here, when the unit is formed. Nothing blocks it:
-  `createDriverAccessTokenAction` needs only `projectId` + `callSignId` — no
-  assignment — and `/driver` already has a waiting view for a driver who scans a
-  valid QR before any work exists.
-- Swapping later stays where it is: `updateCallSignCrewAction` changes the driver
-  or the vehicle and keeps the same call sign. Put it on the unit card here, and
-  have it write a timeline event so the control room sees the unit changed hands.
+1. **Resources tab (`/resources?projectId=…`) — bring people and vehicles in as
+   a set.** One action creates a driver and a vehicle together rather than two
+   visits to two forms, and importing from the central library brings a person
+   and a vehicle across together. Record the intended pairing in the copies'
+   existing `metadata` jsonb (`pairedVehicleId` on the driver, `pairedDriverId`
+   on the vehicle) — **no migration needed**. A pair here is a prepared
+   suggestion, not yet a unit.
 
-**On the dispatch page**
-- Stop creating units, and stop minting tokens. The unit picker lists what the
-  resources tab already formed. If nothing is there, send the operator to the
-  resources tab rather than growing a second creation path.
+2. **Management page — show what is prepared, then form the unit.** List every
+   prepared pair, both the ones created inside the project and the ones imported
+   from outside, with the driver's name and phone, the plate and vehicle type,
+   and whether each side is still free. Forming the unit is
+   `createCallSignAction` from that pair; the QR follows from the panel that
+   already exists. This is the screen where a dispatcher decides, so this is
+   where the unit and its credentials are born.
 
-**Constraints this design respects, so do not fight them**
-- `call_signs.project_id` is **required**: a unit cannot exist in the central
-  library. Pairing belongs at import, not in the library. (If pairs turn out to
-  repeat across projects, add a template later — it layers on top without
-  reworking this.)
+3. **Stop the one button that does four things.**
+   `components/assignments/unit-setup-form.tsx` currently creates a mission, a
+   call sign, a driver token and an observer token in a single submit
+   (lines 99, 154, 173). Forming a unit and planning work are different
+   decisions: unit formation stays here, **mission creation moves to its own
+   step.**
+
+**Constraints this respects**
+- `call_signs.project_id` is required, so a unit cannot exist in the central
+  library — which is exactly why pairing at the resources stage is a suggestion
+  and the call sign is only formed once a project is in hand.
 - Library rows are **copied** into a project (`source_driver_id` /
-  `source_vehicle_id`, status reset to available), and the partial unique index
-  from migration `0035` refuses a second copy of the same source.
+  `source_vehicle_id`, status reset to available); the partial unique index from
+  migration `0035` refuses a second copy of the same source.
 
-**No schema change, and existing units are untouched.** This is a move of where
-things happen, not a change to what is stored.
-
-**Guard:** a test that the dispatch page no longer calls `createCallSignAction`
-or either token action — the same shape as the no-Thai-literal guard in
-`lib/fleet-access/no-actions.test.ts`, which exists because a split like this
-quietly grows back.
+**Guard:** a test that nothing under `components/resources/` imports
+`createCallSignAction`, `createDriverAccessTokenAction` or
+`createObserverAccessTokenAction` — the resources tab prepares, it does not
+issue. Same shape as `lib/fleet-access/no-actions.test.ts`, which exists because
+a split like this grows back quietly.
 
 ---
 
