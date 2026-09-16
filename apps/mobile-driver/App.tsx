@@ -290,6 +290,18 @@ function DriverShell() {
         return;
       }
 
+      if (parsed.type === "gps.status.request") {
+        // Answer from the watcher itself, not from the banner state: the banner
+        // is what goes stale, and a wrong answer here is worse than none — it
+        // would tell the page sharing is off while the phone keeps reporting.
+        if (isForegroundSharing()) {
+          postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่");
+        } else {
+          postStatusToWeb("gps_stopped", "ยังไม่ได้เริ่มส่งตำแหน่ง GPS");
+        }
+        return;
+      }
+
       if (parsed.type === "driver.notification.unread") {
         setHasUnreadMessages(activeDriverMenuRef.current !== "messages");
         return;

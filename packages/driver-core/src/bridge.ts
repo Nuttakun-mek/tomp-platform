@@ -20,6 +20,13 @@ export const NATIVE_STATUS_EVENT = "tomp:native-status";
 export type BridgeMessageType =
   | "gps.start"
   | "gps.stop"
+  // The page can ask; before this it could only wait to be told. Each driver
+  // tab is a separate URL, so switching tabs remounts the page with its sharing
+  // state reset to idle, while the shell is still sharing. The shell does post
+  // its status on navigation, but that fires before the page's listener exists,
+  // so the answer was routinely lost and the page offered "start sharing" for a
+  // session already running.
+  | "gps.status.request"
   | "open.url"
   | "driver.notification.unread"
   | "mobile-session.challenge"
@@ -28,6 +35,7 @@ export type BridgeMessageType =
 export type BridgeMessage =
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.start"; payload?: { reason?: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.stop"; payload?: { reason?: string } }
+  | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.status.request"; payload?: { reason?: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "open.url"; payload: { url: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "driver.notification.unread"; payload?: { count?: number } }
   | {
@@ -105,6 +113,7 @@ export function getMobileShell(container: unknown): MobileShellHandle | null {
 export interface BridgePayloadMap {
   "gps.start": { reason?: string };
   "gps.stop": { reason?: string };
+  "gps.status.request": { reason?: string };
   "open.url": { url: string };
   "driver.notification.unread": { count?: number };
   "mobile-session.challenge": { code: string; expiresAt: string };
@@ -130,7 +139,9 @@ export function parseBridgeMessage(raw: string): BridgeMessage | null {
   if (!isRecord(parsed)) return null;
   if (parsed.namespace !== BRIDGE_NAMESPACE || parsed.version !== BRIDGE_VERSION) return null;
 
-  if (parsed.type === "gps.start" || parsed.type === "gps.stop") return parsed as BridgeMessage;
+  if (parsed.type === "gps.start" || parsed.type === "gps.stop" || parsed.type === "gps.status.request") {
+    return parsed as BridgeMessage;
+  }
 
   if (parsed.type === "driver.notification.unread") {
     return parsed as BridgeMessage;

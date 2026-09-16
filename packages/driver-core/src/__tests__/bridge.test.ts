@@ -54,6 +54,19 @@ describe("bridge messages", () => {
     expect(parseBridgeMessage(JSON.stringify(message))).toEqual(message);
   });
 
+  it("lets the page ask the shell what the GPS is doing", () => {
+    // Switching driver tabs remounts the page with its sharing state reset, and
+    // the status the shell posts on navigation arrives before the page is
+    // listening. Without a question the page cannot recover, and it offers to
+    // start a session that is already running.
+    const message = buildBridgeMessage("gps.status.request", { reason: "page_mounted" });
+    expect(parseBridgeMessage(JSON.stringify(message))).toEqual(message);
+    // The payload is optional, like the other gps.* messages.
+    expect(parseBridgeMessage(JSON.stringify(buildBridgeMessage("gps.status.request")))).toEqual(
+      buildBridgeMessage("gps.status.request")
+    );
+  });
+
   it("supports unread driver notification signals", () => {
     const message = buildBridgeMessage("driver.notification.unread", { count: 2 });
     expect(parseBridgeMessage(JSON.stringify(message))).toEqual(message);
