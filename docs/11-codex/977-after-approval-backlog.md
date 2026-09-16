@@ -165,6 +165,52 @@ pending and ship one build.
 
 ---
 
-# 6. Later
+# 6. A one-day project counts as zero
+
+**Reported:** a project starting Monday the 1st and ending Monday the 1st is
+counted as 0 days.
+
+`describeDuration` (`apps/web/components/ui/datetime-field.tsx:56`) measures
+elapsed time, not operating days:
+
+```ts
+const minutes = Math.round((to.getTime() - from.getTime()) / 60000);
+if (minutes <= 0) return "";
+const days = Math.floor(minutes / (60 * 24));
+```
+
+Same day in, same day out is zero minutes, so it returns early and the summary
+chip never appears at all — the field falls back to "เลือกครบทั้งสองช่องเพื่อดู
+จำนวนวัน". A 1–3 September project reads "2 วัน" where the operation runs for
+three days and is staffed for three days.
+
+Elapsed time is the right answer for a time range and the wrong one for a date
+range, and the function cannot tell which it was given. `DateRangeFields` knows
+— it already takes `withTime` and `timeOnly` — but does not pass it down.
+
+**Fix:** give `describeDuration` the mode.
+- Date-only: count calendar days inclusive of both ends, never below 1.
+  1 Sep → 1 Sep is `1 วัน`; 1 Sep → 3 Sep is `3 วัน`.
+- With time: leave it exactly as it is.
+
+Callers to check after the change: `create-project-form.tsx` and
+`project-details-form.tsx` (date-only), `unit-setup-form.tsx` (date-only,
+"ช่วงวันปฏิบัติการ"), `create-assignment-form.tsx` (`timeOnly` — must not move).
+
+**Do the arithmetic on the `yyyy-mm-dd` parts, not on timestamps.** An ISO date
+parsed as UTC and read back in Asia/Bangkok lands on the previous day, which is
+the usual way an off-by-one fix turns into a different off-by-one.
+
+**Nothing downstream is short a day.** `project_days` rows are inserted one at a
+time by `app/actions/missions.ts`, not generated from the project range, so this
+is a display defect only. Nobody is missing an operating day in the data.
+
+**Guard:** unit tests over `describeDuration` — same day is 1 วัน, three-day
+range is 3 วัน, a backwards range still reports backwards, and a `timeOnly`
+range is unchanged.
+
+---
+
+# 7. Later
 
 Left deliberately empty. The owner is adding to this list.
