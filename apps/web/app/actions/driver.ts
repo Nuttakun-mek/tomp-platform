@@ -9,6 +9,7 @@ import {
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { resolveDriverSessionFromCookies } from "@/lib/api/driver-token";
 import { isTrustedDriverScope, type DriverScope, type TrustedDriverScope } from "@/lib/driver/trusted-scope";
+import { extractDriverMessageClientEventId } from "@/lib/driver/message-idempotency";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { uploadPlatePhoto, uploadVehiclePhoto } from "@/lib/storage/checkin-photos";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
@@ -256,6 +257,22 @@ export async function driverIssueReportAction(input: unknown, trusted?: TrustedD
   if (!scope) return actionFailure(SESSION_EXPIRED);
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
+  const clientEventId = extractDriverMessageClientEventId(parsed.data.metadata);
+
+  if (clientEventId) {
+    const { data: existing } = await client
+      .from("driver_issue_reports")
+      .select("id, message, created_at, issue_type, severity, metadata")
+      .eq("project_id", scope.projectId)
+      .eq("assignment_id", scope.assignmentId)
+      .eq("driver_id", scope.driverId)
+      .eq("metadata->>clientEventId", clientEventId)
+      .maybeSingle();
+
+    if (existing?.id) {
+      return actionSuccess({ mode, issueReport: existing, duplicate: true });
+    }
+  }
 
   const { data, error: insertError } = await client.from("driver_issue_reports").insert({
     project_id: scope.projectId,

@@ -13,6 +13,7 @@ import {
 import { getRequestBaseUrl } from "@/lib/request-origin";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
+import { getDefaultProjectObserverExpiry, normalizeFutureExpiry } from "@/lib/domain/observer-expiry";
 
 type ObserverScope = "call_sign" | "project";
 type WriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
@@ -32,17 +33,6 @@ interface CreateObserverInput {
 
 function cleanString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function defaultProjectExpiry(endDate: string | null | undefined) {
-  if (endDate) {
-    const value = new Date(endDate);
-    if (!Number.isNaN(value.getTime())) {
-      value.setDate(value.getDate() + 1);
-      return value.toISOString();
-    }
-  }
-  return getDefaultDriverTokenExpiry(24 * 30);
 }
 
 async function verifyProjectAndOptionalCallSign(client: WriteClient, input: CreateObserverInput, scope: ObserverScope) {
@@ -103,6 +93,14 @@ export async function createObserverAccessTokenAction(input: unknown): Promise<A
   const nowIso = new Date().toISOString();
   const { data: liveTokens } = await liveTokenQuery(client, projectId, scope, callSignId);
   const usable = (liveTokens ?? []).filter((row) => !row.expires_at || String(row.expires_at) > nowIso);
+  const expired = (liveTokens ?? []).filter((row) => row.expires_at && String(row.expires_at) <= nowIso);
+
+  if (expired.length) {
+    await client
+      .from("observer_access_tokens")
+      .update({ status: "revoked", metadata: { revokedReason: "expired_before_reissue", revokedAt: nowIso } })
+      .in("id", expired.map((row) => row.id));
+  }
 
   // Only an explicit reissue may replace a live link. Keying this off withPin as
   // well meant an operator who had ticked "use a PIN" silently minted a new token
@@ -128,7 +126,9 @@ export async function createObserverAccessTokenAction(input: unknown): Promise<A
       .in("id", usable.map((row) => row.id));
   }
 
-  const expiresAt = data.expiresAt || (scope === "project" ? defaultProjectExpiry(cleanString(verified.project?.end_date)) : getDefaultDriverTokenExpiry(12));
+  const requestedExpiresAt = normalizeFutureExpiry(cleanString(data.expiresAt));
+  const expiresAt =
+    requestedExpiresAt || (scope === "project" ? getDefaultProjectObserverExpiry(cleanString(verified.project?.end_date)) : getDefaultDriverTokenExpiry(12));
   const token = generateObserverAccessToken({ scope, projectId, callSignId, expiresAt });
   const pin = data.withPin ? generateObserverPin() : null;
   const label = cleanString(data.label) ?? (scope === "project" ? cleanString(verified.project?.project_name) : cleanString(verified.callSign?.call_sign));

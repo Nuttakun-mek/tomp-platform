@@ -18,11 +18,17 @@ describe("describeDuration", () => {
     expect(describeDuration("2026-09-15T08:00", "2026-09-17T08:00")).toBe("2 วัน");
   });
 
+  it("counts date-only operating days inclusively", () => {
+    expect(describeDuration("2026-09-01", "2026-09-01", { dateOnly: true })).toBe("1 วัน");
+    expect(describeDuration("2026-09-01", "2026-09-03", { dateOnly: true })).toBe("3 วัน");
+  });
+
   it("says nothing when the range is incomplete or inverted", () => {
     expect(describeDuration("09:30", "")).toBe("");
     expect(describeDuration("", "12:00")).toBe("");
     expect(describeDuration("12:00", "09:30")).toBe("");
     expect(describeDuration("09:30", "09:30")).toBe("");
+    expect(describeDuration("2026-09-03", "2026-09-01", { dateOnly: true })).toBe("");
   });
 });
 

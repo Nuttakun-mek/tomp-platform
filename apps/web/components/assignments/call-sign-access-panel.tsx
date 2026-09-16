@@ -11,6 +11,7 @@ import { ActionFeedback } from "@/components/ui/action-feedback";
 import { UnitCredentialSheet, type UnitCredentials } from "./unit-credential-sheet";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
+import { formatObserverExpiryLabel } from "@/lib/domain/observer-expiry";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { accentFor } from "@/lib/ui/unit-accent";
 import type { ProjectObserverLink } from "@/lib/data/observer-access";
@@ -46,6 +47,24 @@ async function renderQr(url: string, width = 240) {
   return QRCode.toDataURL(url, { margin: 2, width, errorCorrectionLevel: "M" });
 }
 
+function dateInputValue(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Bangkok",
+    year: "numeric"
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function endOfBangkokDate(value: string) {
+  return value ? `${value}T16:59:59.999Z` : null;
+}
+
 function ProjectFleetAccessCard({
   projectId,
   callSigns,
@@ -60,6 +79,7 @@ function ProjectFleetAccessCard({
   // does nothing to the live link — only "ออกลิงก์ใหม่" applies it.
   const [withPin, setWithPin] = useState(Boolean(projectObserverLink?.hasPin));
   const [showCrew, setShowCrew] = useState(Boolean(projectObserverLink?.showCrew));
+  const [expiresOn, setExpiresOn] = useState(dateInputValue(projectObserverLink?.expiresAt));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [url, setUrl] = useState("");
   const [pin, setPin] = useState<string | null>(null);
@@ -71,7 +91,8 @@ function ProjectFleetAccessCard({
   useEffect(() => {
     setWithPin(Boolean(projectObserverLink?.hasPin));
     setShowCrew(Boolean(projectObserverLink?.showCrew));
-  }, [projectObserverLink?.hasPin, projectObserverLink?.showCrew]);
+    setExpiresOn(dateInputValue(projectObserverLink?.expiresAt));
+  }, [projectObserverLink?.expiresAt, projectObserverLink?.hasPin, projectObserverLink?.showCrew]);
 
   useEffect(() => {
     if (!projectObserverLink?.token) return;
@@ -99,6 +120,7 @@ function ProjectFleetAccessCard({
         showCrew,
         reissue,
         callSignIds: selectedIds.size ? Array.from(selectedIds) : undefined,
+        expiresAt: endOfBangkokDate(expiresOn),
         label: "ลิงก์ติดตามทั้งโครงการ"
       });
 
@@ -108,16 +130,18 @@ function ProjectFleetAccessCard({
         return;
       }
 
-      const data = result.data as { accessUrl?: string; pin?: string | null; reused?: boolean };
+      const data = result.data as { accessUrl?: string; pin?: string | null; reused?: boolean; tokenRecord?: { expires_at?: string | null } };
       const nextUrl = data.accessUrl || "";
+      const nextExpiry = data.tokenRecord?.expires_at || endOfBangkokDate(expiresOn);
       setUrl(nextUrl);
       setPin(data.pin ?? null);
+      setExpiresOn(dateInputValue(nextExpiry));
       setQr(nextUrl ? await renderQr(nextUrl, 220).catch(() => null) : null);
       setTone(data.reused ? "warning" : "success");
       setMessage(
         data.reused
-          ? "แสดงลิงก์ติดตามโครงการเดิมที่ยังใช้งานได้ หากต้องการเปลี่ยน PIN หรือขอบเขต ให้กดออกลิงก์ใหม่"
-          : "สร้างลิงก์ติดตามโครงการแล้ว ลิงก์นี้อ่านอย่างเดียวและไม่สามารถแก้ไขงานได้"
+          ? `แสดงลิงก์ติดตามโครงการเดิมที่ยังใช้งานได้ หมดอายุ ${formatObserverExpiryLabel(nextExpiry)} หากต้องการเปลี่ยน PIN ขอบเขต หรือวันหมดอายุ ให้กดออกลิงก์ใหม่`
+          : `สร้างลิงก์ติดตามโครงการแล้ว หมดอายุ ${formatObserverExpiryLabel(nextExpiry)} ลิงก์นี้อ่านอย่างเดียวและไม่สามารถแก้ไขงานได้`
       );
     });
   }
@@ -139,7 +163,7 @@ function ProjectFleetAccessCard({
 
       <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
         <div className="grid min-w-0 content-start gap-3">
-          <div className="grid items-start gap-2 sm:grid-cols-2">
+          <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(13rem,0.8fr)]">
             <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
               <input type="checkbox" checked={withPin} onChange={(event) => setWithPin(event.target.checked)} className="h-4 w-4 accent-teal-600" />
               <LockKeyhole className="h-4 w-4 shrink-0" />
@@ -149,7 +173,22 @@ function ProjectFleetAccessCard({
               <input type="checkbox" checked={showCrew} onChange={(event) => setShowCrew(event.target.checked)} className="h-4 w-4 accent-teal-600" />
               <span className="min-w-0 leading-5">แสดงชื่อคนขับ</span>
             </label>
+            <label className="grid min-h-11 min-w-0 gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-ink-soft">
+              <span>วันหมดอายุลิงก์</span>
+              <input
+                type="date"
+                value={expiresOn}
+                onChange={(event) => setExpiresOn(event.target.value)}
+                className="min-h-8 rounded-lg border border-slate-200 bg-white px-2 text-[13px] font-bold text-ink"
+              />
+            </label>
           </div>
+
+          <p className="rounded-xl bg-teal-50 px-3 py-2 text-[12px] font-semibold leading-5 text-teal-900">
+            {expiresOn
+              ? `ลิงก์นี้จะหมดอายุหลังวันที่ ${formatObserverExpiryLabel(endOfBangkokDate(expiresOn))}`
+              : "หากไม่ระบุวันหมดอายุ ระบบจะกำหนดวันหมดอายุที่ยังใช้งานได้จริงโดยอัตโนมัติ"}
+          </p>
 
           <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p className="text-xs font-bold text-slate-500">จำกัดเฉพาะบาง Call Sign (ไม่เลือก = ทั้งโครงการ)</p>

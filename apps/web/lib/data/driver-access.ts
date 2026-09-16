@@ -570,7 +570,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${current.id} order by created_at desc limit 1`,
     sql<Row[]>`select * from driver_notifications where assignment_id = ${current.id} order by sent_at desc limit 10`,
     sql<Row[]>`select * from route_change_instructions where assignment_id = ${current.id} order by created_at desc limit 5`,
-    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
+    sql<Row[]>`select id, message, created_at, issue_type, severity, metadata from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
     sql<Row[]>`select id from driver_checkins where assignment_id = ${current.id} and status = 'ready' limit 1`,
     sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${current.id} order by created_at desc limit 1`
   ]);
@@ -622,7 +622,9 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
       text: text(row, "message"),
       at: text(row, "created_at", new Date().toISOString()),
       issueType: text(row, "issue_type", "message"),
-      severity: text(row, "severity", "info")
+      severity: text(row, "severity", "info"),
+      clientEventId: typeof metadata(row).clientEventId === "string" ? String(metadata(row).clientEventId) : null,
+      deliveryStatus: "sent"
     })),
     notifications: notificationRows.map((row) => ({
       id: text(row, "id"),
@@ -753,7 +755,7 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
     sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${current.id} order by created_at desc limit 1`,
     sql<Row[]>`select * from driver_notifications where assignment_id = ${current.id} order by sent_at desc limit 10`,
     sql<Row[]>`select * from route_change_instructions where assignment_id = ${current.id} order by created_at desc limit 5`,
-    sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
+    sql<Row[]>`select id, message, created_at, issue_type, severity, metadata from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
     sql<Row[]>`select id from driver_checkins where assignment_id = ${current.id} and status = 'ready' limit 1`,
     sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${current.id} order by created_at desc limit 1`
   ]);
@@ -795,7 +797,9 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
       text: text(row, "message"),
       at: text(row, "created_at", new Date().toISOString()),
       issueType: text(row, "issue_type", "message"),
-      severity: text(row, "severity", "info")
+      severity: text(row, "severity", "info"),
+      clientEventId: typeof metadata(row).clientEventId === "string" ? String(metadata(row).clientEventId) : null,
+      deliveryStatus: "sent"
     })),
     notifications: notificationRows.map((row) => ({
       id: text(row, "id"),

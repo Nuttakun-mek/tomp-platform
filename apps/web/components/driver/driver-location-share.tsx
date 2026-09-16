@@ -7,6 +7,7 @@ import {
   evaluateLocationHealth,
   getMobileShell,
   LOCATION_HEARTBEAT_MS,
+  MOBILE_SHELL_READY_EVENT,
   NATIVE_STATUS_EVENT,
   parseNativeStatusDetail,
   type LastSentFix
@@ -278,6 +279,13 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   }, [driverAccess.token, postLocation, releaseWakeLock, setSignal]);
 
   useEffect(() => {
+    const requestNativeStatus = () => {
+      const shell = getMobileShell(window);
+      if (shell?.canBackgroundLocation) {
+        shell.postMessage(buildBridgeMessage("gps.status.request", { reason: "page_mounted" }));
+      }
+    };
+
     const handleNativeStatus = (event: Event) => {
       const payload = parseNativeStatusDetail((event as CustomEvent).detail);
       if (!payload) return;
@@ -313,7 +321,13 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
     };
 
     window.addEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
-    return () => window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+    window.addEventListener(MOBILE_SHELL_READY_EVENT, requestNativeStatus);
+    const requestTimer = window.setTimeout(requestNativeStatus, 50);
+    return () => {
+      window.clearTimeout(requestTimer);
+      window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+      window.removeEventListener(MOBILE_SHELL_READY_EVENT, requestNativeStatus);
+    };
   }, [markFresh, setSignal]);
 
   useEffect(() => {

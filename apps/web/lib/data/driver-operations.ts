@@ -1,5 +1,6 @@
 import type { DriverAssignmentPacket, DriverNotification, RouteChangeInstruction } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
+import { attachmentFromMetadata, signDriverMessageAttachments, type DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
@@ -142,15 +143,22 @@ export interface DriverIssueMessage {
   at: string;
   issueType: string;
   severity: string;
+  clientEventId?: string | null;
+  deliveryStatus?: "sent" | "pending";
+  attachment?: DriverMessageAttachment | null;
 }
 
 function mapIssueMessage(row: Row): DriverIssueMessage {
+  const meta = metadata(row);
   return {
     id: text(row, "id"),
     text: text(row, "message"),
     at: text(row, "created_at", new Date().toISOString()),
     issueType: text(row, "issue_type", "message"),
-    severity: text(row, "severity", "info")
+    severity: text(row, "severity", "info"),
+    clientEventId: typeof meta.clientEventId === "string" ? meta.clientEventId : null,
+    deliveryStatus: "sent",
+    attachment: attachmentFromMetadata(meta)
   };
 }
 
@@ -161,11 +169,11 @@ export async function getDriverIssueMessagesByAssignmentId(assignmentId: string)
   if (client) {
     try {
       const result = await withTimeout(
-        client.from("driver_issue_reports").select("id, message, created_at, issue_type, severity").eq("assignment_id", assignmentId).order("created_at", { ascending: true }).limit(50),
+        client.from("driver_issue_reports").select("id, message, created_at, issue_type, severity, metadata").eq("assignment_id", assignmentId).order("created_at", { ascending: true }).limit(50),
         1800,
         "driver issue messages"
       );
-      if (!result.error && Array.isArray(result.data)) return (result.data as Row[]).map(mapIssueMessage);
+      if (!result.error && Array.isArray(result.data)) return signDriverMessageAttachments((result.data as Row[]).map(mapIssueMessage));
     } catch {
       /* fall through */
     }
@@ -173,8 +181,8 @@ export async function getDriverIssueMessagesByAssignmentId(assignmentId: string)
   const sql = getPostgresClient();
   if (!sql) return [];
   try {
-    const data = await sql<Row[]>`select id, message, created_at, issue_type, severity from driver_issue_reports where assignment_id = ${assignmentId} order by created_at asc limit 50`;
-    return data.map(mapIssueMessage);
+    const data = await sql<Row[]>`select id, message, created_at, issue_type, severity, metadata from driver_issue_reports where assignment_id = ${assignmentId} order by created_at asc limit 50`;
+    return signDriverMessageAttachments(data.map(mapIssueMessage));
   } catch {
     return [];
   }

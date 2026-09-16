@@ -52,8 +52,24 @@ export function describeThai(value: string, withTime: boolean): string {
   return withTime ? `${TH_DATETIME.format(date)} น.` : TH_DATE.format(date);
 }
 
+function calendarDayIndex(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.slice(0, 10));
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return Math.floor(Date.UTC(Number(year), Number(month) - 1, Number(day)) / (24 * 60 * 60 * 1000));
+}
+
 /** "4 ชม. 30 นาที", or "" when the pair is incomplete or backwards. */
-export function describeDuration(start: string, end: string): string {
+export function describeDuration(start: string, end: string, options: { dateOnly?: boolean } = {}): string {
+  if (options.dateOnly) {
+    const fromDay = calendarDayIndex(start);
+    const toDay = calendarDayIndex(end);
+    if (fromDay == null || toDay == null) return "";
+    const days = toDay - fromDay + 1;
+    if (days <= 0) return "";
+    return `${days} วัน`;
+  }
+
   // "09:30" alone is not a date; anchor both to the same day so the difference
   // is still meaningful for a time-only range.
   const anchor = (value: string) => (/^\d{2}:\d{2}$/.test(value) ? `2000-01-01T${value}` : value);
@@ -405,7 +421,7 @@ export function DateRangeFields({
   min?: string;
   max?: string;
 }) {
-  const duration = describeDuration(start, end);
+  const duration = describeDuration(start, end, { dateOnly: !withTime && !timeOnly });
   const backwards = isBackwards(start, end);
 
   return (

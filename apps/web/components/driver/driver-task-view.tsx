@@ -6,8 +6,10 @@ import { assignmentStatusUpdateAction, driverIssueReportAction } from "@/app/act
 import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
+import type { DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import { enqueueDriverOutbox, flushDriverOutbox, readDriverOutbox, type DriverOutboxItem } from "@/lib/driver/outbox";
+import { createDriverMessageClientEventId, extractDriverMessageClientEventId } from "@/lib/driver/message-idempotency";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import type { DriverNotification } from "@tomp/types/domain";
 import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail } from "@tomp/driver-core";
@@ -48,6 +50,12 @@ function jobTimeLabel(start?: string | null, end?: string | null) {
   return "ยังไม่ระบุเวลา";
 }
 
+function mergePendingMessages(serverMessages: DriverIssueMessage[], pending: Map<string, DriverIssueMessage>) {
+  const serverClientIds = new Set(serverMessages.map((message) => message.clientEventId).filter((value): value is string => Boolean(value)));
+  for (const clientEventId of serverClientIds) pending.delete(clientEventId);
+  return [...serverMessages, ...pending.values()].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+}
+
 export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
   const meta = driverAccess.assignment.metadata;
   const pickup = metaText(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ");
@@ -81,10 +89,21 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const [gpsLight, setGpsLight] = useState<DriverGpsLight>("off");
   const [outboxCount, setOutboxCount] = useState(0);
   const seenIds = useRef(new Set(driverAccess.notifications.map((notification) => notification.id)));
+  const pendingMessagesRef = useRef<Map<string, DriverIssueMessage>>(new Map());
 
   const sendOutboxItem = useCallback(async (item: DriverOutboxItem) => {
     if (item.kind === "status") return assignmentStatusUpdateAction(item.payload);
-    return driverIssueReportAction(item.payload);
+    const result = await driverIssueReportAction(item.payload);
+    if (result.success) {
+      const clientEventId = extractDriverMessageClientEventId(item.payload.metadata);
+      if (clientEventId) {
+        pendingMessagesRef.current.delete(clientEventId);
+        setMessages((current) => current.map((message) => (
+          message.clientEventId === clientEventId ? { ...message, deliveryStatus: "sent" } : message
+        )));
+      }
+    }
+    return result;
   }, []);
 
   const flushPending = useCallback(async () => {
@@ -131,7 +150,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           setTripStep((current) => Math.max(current, stepFromStatus(json.data?.latestStatus?.status)));
         }
         if (Array.isArray(json.data.dayAssignments)) setDayAssignments(json.data.dayAssignments);
-        if (Array.isArray(json.data.messages)) setMessages(json.data.messages);
+        if (Array.isArray(json.data.messages)) setMessages(mergePendingMessages(json.data.messages, pendingMessagesRef.current));
         if (Array.isArray(json.data.notifications)) {
           setNotifications(json.data.notifications);
           for (const notification of json.data.notifications) {
@@ -170,8 +189,8 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
     return () => window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
   }, []);
 
-  function enqueueFailed(kind: "status" | "message" | "issue", payload: Record<string, unknown>, text: string) {
-    enqueueDriverOutbox(driverAccess.token, { kind, payload });
+  function enqueueFailed(kind: "status" | "message" | "issue", payload: Record<string, unknown>, text: string, id?: string) {
+    enqueueDriverOutbox(driverAccess.token, { id, kind, payload });
     setOutboxCount(readDriverOutbox(driverAccess.token).length);
     setBanner({ tone: "error", text });
   }
@@ -192,12 +211,13 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
 
   function reportIssue(type: string) {
     const issue = ISSUE_TYPES.find((item) => item.type === type);
+    const clientEventId = createDriverMessageClientEventId("issue");
     const payload = {
       ...ids,
       issueType: type,
       severity: issue?.severity || "warning",
       message: issue?.label || type,
-      metadata: { via: "driver_task_view" }
+      metadata: { via: "driver_task_view", clientEventId }
     };
     setBanner(null);
     startTransition(async () => {
@@ -206,33 +226,59 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
       if (result.success) {
         setBanner({ tone: "ok", text: "แจ้งปัญหาแล้ว ศูนย์ควบคุมจะติดต่อกลับ" });
       } else {
-        enqueueFailed("issue", payload, result.error || "แจ้งปัญหาไม่สำเร็จ ระบบจะลองส่งใหม่เมื่อเชื่อมต่อได้");
+        enqueueFailed("issue", payload, result.error || "แจ้งปัญหาไม่สำเร็จ ระบบจะลองส่งใหม่เมื่อเชื่อมต่อได้", clientEventId);
       }
     });
   }
 
-  function sendMessage(text: string) {
+  function sendMessage(text: string, attachment?: DriverMessageAttachment | null) {
     const value = text.trim();
-    if (!value) return;
+    if (!value && !attachment) return;
+    const clientEventId = createDriverMessageClientEventId("message");
     const optimistic: DriverIssueMessage = {
-      id: `local-${Date.now()}`,
-      text: value,
+      id: `local-${clientEventId}`,
+      text: value || "ส่งรูปจากคนขับ",
       at: new Date().toISOString(),
       issueType: "message",
-      severity: "info"
+      severity: "info",
+      clientEventId,
+      deliveryStatus: "pending",
+      attachment: attachment ?? null
     };
+    const storedAttachment = attachment
+      ? {
+          type: "photo",
+          storagePath: attachment.storagePath,
+          capturedAt: attachment.capturedAt ?? null,
+          latitude: attachment.latitude ?? null,
+          longitude: attachment.longitude ?? null,
+          accuracy: attachment.accuracy ?? null,
+          hasLocation: Boolean(attachment.hasLocation),
+          stampApplied: attachment.stampApplied !== false
+        }
+      : null;
     const payload = {
       ...ids,
       issueType: "message",
       severity: "info",
-      message: value,
-      metadata: { via: "driver_task_view", kind: "driver_message" }
+      message: value || (attachment ? "ส่งรูปจากคนขับ" : ""),
+      metadata: { via: "driver_task_view", kind: "driver_message", clientEventId, attachment: storedAttachment }
     };
-    setMessages((current) => [...current, optimistic]);
+    pendingMessagesRef.current.set(clientEventId, optimistic);
+    setMessages((current) => (
+      current.some((message) => message.clientEventId === clientEventId)
+        ? current
+        : [...current, optimistic].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    ));
     startTransition(async () => {
       const result = await driverIssueReportAction(payload);
       if (!result.success) {
-        enqueueFailed("message", payload, result.error || "ส่งข้อความไม่สำเร็จ ระบบจะลองส่งใหม่เมื่อเชื่อมต่อได้");
+        enqueueFailed("message", payload, result.error || "ส่งข้อความไม่สำเร็จ ระบบจะลองส่งใหม่เมื่อเชื่อมต่อได้", clientEventId);
+      } else {
+        pendingMessagesRef.current.delete(clientEventId);
+        setMessages((current) => current.map((message) => (
+          message.clientEventId === clientEventId ? { ...message, deliveryStatus: "sent" } : message
+        )));
       }
     });
   }

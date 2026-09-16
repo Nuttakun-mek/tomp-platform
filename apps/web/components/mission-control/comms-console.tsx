@@ -259,6 +259,17 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
                         {item.kind === "issue" ? <span className="font-semibold">[แจ้งปัญหา] </span> : null}
                         {item.message || "(ไม่มีข้อความ)"}
                       </p>
+                      {item.attachment?.signedUrl ? (
+                        <a href={item.attachment.signedUrl} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL preview */}
+                          <img src={item.attachment.signedUrl} alt="รูปจากคนขับ" className="max-h-52 w-full object-cover" />
+                        </a>
+                      ) : null}
+                      {item.attachment ? (
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          รูปแนบมีตราประทับเวลา{item.attachment.hasLocation ? "และพิกัด GPS" : " แต่ไม่มีพิกัด GPS ณ เวลาถ่ายภาพ"}
+                        </p>
+                      ) : null}
                     </article>
                   );
                 }

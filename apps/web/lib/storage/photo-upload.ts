@@ -6,7 +6,7 @@ import { readCleanEnv } from "@/lib/env";
 export interface UploadDriverEvidenceInput {
   projectId: string;
   assignmentId: string;
-  kind: "vehicle" | "plate";
+  kind: "vehicle" | "plate" | "message";
   file: File;
 }
 

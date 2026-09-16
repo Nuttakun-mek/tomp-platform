@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { attachmentFromMetadata, signDriverMessageAttachments, type DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { rowLoose, rowObject, type Row } from "@/lib/data/row";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
@@ -13,6 +14,7 @@ export interface DriverInboundMessage {
   status: string;
   at: string;
   kind: "message" | "issue";
+  attachment?: DriverMessageAttachment | null;
 }
 
 export interface DriverOutboundMessage {
@@ -43,7 +45,8 @@ function mapInbound(row: Row): DriverInboundMessage {
     message: rowLoose(row, "message"),
     status: rowLoose(row, "status", "open"),
     at: rowLoose(row, "created_at", new Date().toISOString()),
-    kind
+    kind,
+    attachment: attachmentFromMetadata(meta)
   };
 }
 
@@ -72,7 +75,7 @@ export const getDriverCommsByProjectId = cache(async function getDriverCommsByPr
     ]);
     if (!inbound.error && !outbound.error) {
       return {
-        inbound: ((inbound.data as Row[] | null) ?? []).map(mapInbound),
+        inbound: await signDriverMessageAttachments(((inbound.data as Row[] | null) ?? []).map(mapInbound)),
         outbound: ((outbound.data as Row[] | null) ?? []).map(mapOutbound)
       };
     }
@@ -87,7 +90,7 @@ async function getDriverCommsByProjectIdViaPostgres(projectId: string): Promise<
       sql<Row[]>`select * from driver_issue_reports where project_id = ${projectId} order by created_at desc limit 60`,
       sql<Row[]>`select * from driver_notifications where project_id = ${projectId} order by sent_at desc nulls last limit 60`
     ]);
-    return { inbound: inbound.map(mapInbound), outbound: outbound.map(mapOutbound) };
+    return { inbound: await signDriverMessageAttachments(inbound.map(mapInbound)), outbound: outbound.map(mapOutbound) };
   } catch {
     return { inbound: [], outbound: [] };
   }
