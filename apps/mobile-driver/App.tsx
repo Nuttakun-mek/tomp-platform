@@ -74,7 +74,6 @@ import { getMobileLocale, saveMobileLocale } from "./src/services/locale-store";
 const DriverWebView = WebView as unknown as ComponentType<WebViewProps & RefAttributes<WebView>>;
 
 type ShellMode = "activation" | "web";
-type ShellStatus = "รอรับงาน" | "กำลังเปิดข้อมูล" | "อยู่ระหว่างปฏิบัติงาน" | "ต้องตรวจสอบ";
 type DriverMenuKey = "home" | "next" | "messages" | "location";
 
 const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; view?: DriverWebViewKey }> = [
@@ -110,7 +109,6 @@ function DriverShell() {
   });
   const webViewRef = useRef<WebView>(null);
   const [mode, setMode] = useState<ShellMode>("activation");
-  const [, setStatus] = useState<ShellStatus>("รอรับงาน");
   const [tokenInput, setTokenInput] = useState("");
   const [currentToken, setCurrentToken] = useState("");
   const [webUrl, setWebUrl] = useState("");
@@ -139,7 +137,13 @@ function DriverShell() {
   );
   const networkTone = locationSharingActive ? "live" : networkConnected === false ? "offline" : "idle";
   const networkDisplayLabel =
-    networkConnected === false ? "ออฟไลน์" : locationSharingActive ? "ออนไลน์ · กำลังส่ง GPS" : "ออนไลน์ · ยังไม่ได้ส่ง GPS";
+    // "ยังไม่ได้ส่ง GPS" read as a fault to drivers, when it is simply the
+    // normal state before a shift starts. Say what is true and what is next.
+    networkConnected === false
+      ? "ออฟไลน์ · ข้อมูลจะส่งเมื่อสัญญาณกลับมา"
+      : locationSharingActive
+        ? "กำลังส่งตำแหน่งให้ศูนย์ควบคุม"
+        : "พร้อมใช้งาน · ยังไม่เริ่มส่งตำแหน่ง";
   const currentScreenLabel = mode === "web"
     ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
     : `เวอร์ชัน ${TOMP_DRIVER_APP_VERSION}`;
@@ -202,7 +206,6 @@ function DriverShell() {
     async (rawValue: string) => {
       const parsed = parseDriverLink(rawValue, localeRef.current);
       if (!parsed) {
-        setStatus("ต้องตรวจสอบ");
         setMessage("ไม่พบ token หรือ URL งาน กรุณาตรวจสอบ QR อีกครั้ง");
         return;
       }
@@ -220,7 +223,6 @@ function DriverShell() {
       activeDriverMenuRef.current = "home";
       setActiveDriverMenu("home");
       setMode("web");
-      setStatus("กำลังเปิดข้อมูล");
       setMessage(parsed.source === "raw-token" ? "กำลังเปิดข้อมูลจาก token" : "กำลังเปิดข้อมูลจาก QR");
     },
     []
@@ -379,10 +381,8 @@ function DriverShell() {
     (event: WebViewNavigation) => {
       setCanGoBack(event.canGoBack);
       if (event.loading) {
-        setStatus("กำลังเปิดข้อมูล");
         return;
       }
-      setStatus("อยู่ระหว่างปฏิบัติงาน");
       setMessage("เปิดหน้าคนขับผ่าน TOMP Web แล้ว");
 
       // The page loads with no idea what the shell is doing, so it offered
@@ -432,7 +432,6 @@ function DriverShell() {
     setScannerOpen(false);
     setManualEntryOpen(false);
     setQrLocked(false);
-    setStatus("รอรับงาน");
     setActiveDriverMenu("home");
     setMessage("ออกจากงานแล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
   }, []);
@@ -612,11 +611,14 @@ function DriverShell() {
               </View>
             ) : null}
             {activeDriverMenu === "location" ? (
+              // Two account-level actions used to be squeezed into a 112px
+              // column beside the GPS copy, where a mis-tap costs a driver
+              // their session. They get a full-width row of their own.
               <View style={styles.locationAssist}>
                 <View style={styles.locationAssistCopy}>
                   <Text style={styles.locationAssistTitle}>การส่งตำแหน่ง GPS</Text>
                   <Text style={styles.locationAssistText}>
-                    จัดการการส่งตำแหน่ง GPS ให้ศูนย์ควบคุม ตรวจสอบสิทธิ์ตำแหน่ง และเปิดการตั้งค่าอุปกรณ์เมื่อจำเป็น
+                    หากศูนย์ควบคุมมองไม่เห็นตำแหน่งของคุณ ให้ตรวจสิทธิ์ตำแหน่งในการตั้งค่าอุปกรณ์
                   </Text>
                 </View>
                 <View style={styles.locationActionGroup}>
@@ -628,11 +630,11 @@ function DriverShell() {
                     <Text style={styles.locationSettingsButtonText}>ตั้งค่าอุปกรณ์</Text>
                   </Pressable>
                   <Pressable
-                    accessibilityLabel="กลับไปสแกน QR ใหม่"
+                    accessibilityLabel="ออกจากงานนี้และกลับไปสแกน QR ใหม่"
                     style={styles.locationResetButton}
                     onPress={confirmResetAssignment}
                   >
-                    <Text style={styles.locationResetButtonText}>สแกน QR ใหม่</Text>
+                    <Text style={styles.locationResetButtonText}>ออกจากงานนี้</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1155,11 +1157,9 @@ const styles = StyleSheet.create({
     ...text.micro
   },
   locationAssist: {
-    alignItems: "center",
     backgroundColor: colors.operationSoft,
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row",
     gap: space.sm,
     paddingHorizontal: space.md,
     paddingVertical: space.sm
@@ -1179,10 +1179,8 @@ const styles = StyleSheet.create({
     ...text.micro
   },
   locationActionGroup: {
-    alignItems: "stretch",
-    flexShrink: 0,
-    gap: space.xs,
-    width: 112
+    flexDirection: "row",
+    gap: space.sm
   },
   locationSettingsButton: {
     alignItems: "center",
@@ -1190,6 +1188,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radius.md,
     borderWidth: 1,
+    flex: 1,
     justifyContent: "center",
     minHeight: TOUCH_MIN,
     paddingHorizontal: space.sm
@@ -1205,6 +1204,7 @@ const styles = StyleSheet.create({
     borderColor: colors.warningLine,
     borderRadius: radius.md,
     borderWidth: 1,
+    flex: 1,
     justifyContent: "center",
     minHeight: TOUCH_MIN,
     paddingHorizontal: space.sm
