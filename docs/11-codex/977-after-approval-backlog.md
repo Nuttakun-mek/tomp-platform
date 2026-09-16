@@ -123,37 +123,95 @@ a split like this grows back quietly.
 
 ---
 
-# 3. Photo messages from the driver, stamped with time and place
+# 3. Photos in the central comms thread, both directions, stamped
 
-**Asked for:** the driver can send a photo in the chat with the control room, and
-the system stamps the capture time and coordinates onto it as proof.
+**Asked for:** a driver can send a photo in the chat with the control room, the
+photo carries the capture time and coordinates drawn on it, **the control room
+can send photos back**, and this lives in the central communications area. Photos
+here are **a separate system from check-in photos** — separate bucket, separate
+route, separate record.
 
-**Where it goes today.** Driver messages are `driver_issue_reports` rows
-(`apps/web/app/actions/driver.ts`, `driverIssueReportSchema` in
-`packages/types/schemas.ts:133`): `issueType`, `severity`, `message`, `metadata`.
-No attachment anywhere, and `components/driver/driver-chat-thread.tsx` has no
-file input.
+**This is almost entirely web work.** The native shell only hosts the page in a
+WebView; see "Native impact" at the end.
 
-**Reuse, do not invent.** The check-in flow already uploads photos:
-`lib/storage/checkin-photos.ts` → `uploadDriverEvidencePhoto` into the private
-`driver-evidence` bucket, with type and 10 MB validation, and
-`components/driver/driver-photo-check.tsx` already resizes client-side.
+## Where it lives today
 
-**Build**
-1. Capture with `capture="environment"`, read the position at capture time, and
-   burn `เวลา · พิกัด` into the image on a canvas before upload — that is what
-   makes the photo readable as evidence when it is forwarded out of the system.
-2. **Also store the real values** — `recordedAt`, `latitude`, `longitude`,
-   `accuracy` — in the row's metadata beside the storage path. Pixels can be
-   cropped; the row is what an audit trusts. Never let the drawn text be the only
-   copy.
-3. Show the thumbnail in the control room thread and in the driver's own thread.
-4. Say plainly in the UI that the photo carries time and location, before it is
-   taken. This is a passenger-carrying operation; drivers should know.
+| direction | path |
+|---|---|
+| driver → control | `driver-task-view.tsx::sendMessage` → `driverIssueReportAction` → `driver_issue_reports` |
+| control → driver | `/mission-control` → `comms-console.tsx` → `sendDriverNotificationAction` → `driver_notifications`, and it already fires `sendDriverPush` |
+| driver reads both | `driver-chat-thread.tsx::buildBubbles(messages, notifications)` |
 
-**Watch out:** a photo with no fix. Do not block the send — mark it
-"ไม่มีพิกัด" and store `latitude: null` rather than stamping a stale position,
-the same rule the heartbeat learned the hard way in `976`.
+## WEB — the work
+
+**Storage**
+1. Migration **`0039`**: new private bucket **`driver-message-photos`**, 10 MB,
+   same mime list as `0023`, policies copied from `0009`. Do **not** reuse
+   `driver-evidence` (that is check-in), and do **not** adopt the orphan
+   `driver-checkin-photos` bucket that exists with no code behind it.
+
+**Shared helpers (new)**
+2. `lib/images/compress.ts` — lift `compressImage` out of
+   `driver-photo-check.tsx` so both features share the technique without sharing
+   a pipeline. Pass `imageOrientation: "from-image"` to `createImageBitmap`, or a
+   photo taken sideways gets a sideways stamp.
+3. `lib/images/stamp.ts` — draw `เวลา · พิกัด` onto the canvas before upload.
+
+**Upload routes (new, one per side — the two callers authenticate differently)**
+4. `app/api/driver/message-photo/route.ts` — driver side, token-authed exactly
+   like `api/driver/evidence`, project and assignment taken from the token.
+5. `app/api/mission-control/message-photo/route.ts` — control-room side, session
+   authed, and it **must call `requirePermission(projectId, "assignment.update")`**.
+   There is no authenticated staff upload path today, and the nearest thing,
+   `vehiclePhotoUploadAction`, trusts a `projectId` posted in the form with no
+   check at all. Do not copy it.
+
+**Records**
+6. Driver → control: store `photoPath` plus the real `capturedAt`, `latitude`,
+   `longitude`, `accuracy` in `driver_issue_reports.metadata`.
+7. Control → driver: same fields in `driver_notifications.metadata`; give
+   `sendDriverNotificationAction` an optional photo and let the push body say a
+   photo is attached.
+
+**Read paths — one is a trap**
+8. `lib/data/driver-operations.ts` — `getDriverIssueMessagesByAssignmentId`
+   selects an explicit column list, `id, message, created_at, issue_type,
+   severity`, with **no `metadata`**. Add it, and add the photo to
+   `DriverIssueMessage`. Miss this and photos save correctly and never appear.
+9. `lib/data/driver-comms.ts::mapInbound` — already reads metadata; add the photo
+   field. Notifications are read with `select("*")`, so nothing to change there
+   beyond `mapNotification`.
+10. Signed URLs both sides: the bucket is private. Follow
+    `lib/data/vehicle-evidence.ts` — `createSignedUrls(paths, 3600)`.
+
+**UI**
+11. `driver-chat-thread.tsx` — camera button, local preview, photo bubbles, and
+    the outbound photos from the control room in the same thread.
+12. `comms-console.tsx` on `/mission-control` — attach a photo when sending, and
+    show inbound photo thumbnails opening full size.
+13. Tell the driver, before the shutter, that the photo carries time and place.
+
+## Traps
+
+- **The offline outbox is JSON only.** `enqueueDriverOutbox(token, { kind,
+  payload })` cannot hold a `File`. Upload the photo first and queue only the
+  path; if the upload fails because the driver is offline, say so plainly rather
+  than showing a sent message with no photo.
+- **The drawn stamp is not the evidence.** Pixels can be cropped, so the real
+  values go in the row. If there is no fix, write "ไม่มีพิกัด" and store
+  `latitude: null` — never a stale position. Same rule the heartbeat learned in
+  `976`.
+- **`sendDriverNotificationAction` has no permission check today** while every
+  sibling action calls `requirePermission`. Fix it while you are in there.
+
+## Native impact — needs a build only if something fails
+
+The WebView already has what it needs: `NSCameraUsageDescription` and the Android
+`CAMERA` permission are declared, and check-in already takes photos through the
+same WebView. **Verify on one real device of each platform** that
+`<input type="file" accept="image/*" capture="environment">` opens the camera
+inside the app. If Android refuses the file chooser, that is a `react-native-webview`
+setting and the only part of this feature that needs a new build.
 
 ---
 
