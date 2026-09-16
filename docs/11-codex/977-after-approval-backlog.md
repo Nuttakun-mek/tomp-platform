@@ -67,29 +67,59 @@ change; the lookup is correct, it was told a lie.
 
 ---
 
-# 2. Create the crew and the vehicle in one step
+# 2. One concern per page: resources form units, dispatch gives them work
 
-**Asked for:** creating a unit should create the person and the vehicle
-together, while still allowing a later swap — a different vehicle under the same
-driver, or a different driver in the same vehicle — **keeping the same call
-sign.**
+**Decided with the owner 2026-09-16.** Today one form on the dispatch page does
+four things in a single submit — `createMissionAction`, `createCallSignAction`,
+`createDriverAccessTokenAction`, `createObserverAccessTokenAction`
+(`components/assignments/unit-setup-form.tsx:99,154,173`). Four different layers
+in one button is why the flow reads as confusing. Split it so each page finishes
+its own job.
 
-**What already exists**
-- `createCallSignAction` (`apps/web/app/actions/call-signs.ts:127`) takes
-  `driverId` and `vehicleId` together, so a unit is already one record.
-- `updateCallSignCrewAction` (same file, line 35) swaps driver and/or vehicle on
-  an existing `callSignId` — the "same call sign, different crew" case is built.
+**The three pages, and what each one owns**
 
-**What is missing.** The *records* are made elsewhere:
-`components/resources/create-driver-form.tsx` and `create-vehicle-form.tsx`, on
-the resources page. `components/assignments/unit-setup-form.tsx` can only pick
-from what already exists, so standing up a new unit means three screens.
+| page | owns |
+|---|---|
+| `/resources` (no `projectId`) | the central library: people and vehicles that outlive any one project |
+| `/resources?projectId=…` | **this project's resources, and the units formed from them** — already a project workspace tab |
+| `/projects/[id]/assignments` | **work only**: missions and assignments for units that already exist |
 
-**Fix:** inline "add new" inside the unit form for both fields — call
-`createDriverAction` / `createVehicleAction`, then pass the new ids straight into
-`createCallSignAction`. One screen, one save. Keep the existing swap UI reachable
-from the unit afterwards, and make sure the swap writes a timeline event so the
-control room can see the unit changed hands.
+**On the project resources tab**
+- "เพิ่มหน่วย" creates the driver and the vehicle **together** and forms the call
+  sign in the same save — `createDriverAction` + `createVehicleAction` +
+  `createCallSignAction`, which already takes `driverId` and `vehicleId`.
+- Importing from the library ends the same way: pick a person and a vehicle,
+  import both copies, pair them into a unit **before leaving this page**. Never
+  hand a half-formed unit to dispatch.
+- Issue the QR here, when the unit is formed. Nothing blocks it:
+  `createDriverAccessTokenAction` needs only `projectId` + `callSignId` — no
+  assignment — and `/driver` already has a waiting view for a driver who scans a
+  valid QR before any work exists.
+- Swapping later stays where it is: `updateCallSignCrewAction` changes the driver
+  or the vehicle and keeps the same call sign. Put it on the unit card here, and
+  have it write a timeline event so the control room sees the unit changed hands.
+
+**On the dispatch page**
+- Stop creating units, and stop minting tokens. The unit picker lists what the
+  resources tab already formed. If nothing is there, send the operator to the
+  resources tab rather than growing a second creation path.
+
+**Constraints this design respects, so do not fight them**
+- `call_signs.project_id` is **required**: a unit cannot exist in the central
+  library. Pairing belongs at import, not in the library. (If pairs turn out to
+  repeat across projects, add a template later — it layers on top without
+  reworking this.)
+- Library rows are **copied** into a project (`source_driver_id` /
+  `source_vehicle_id`, status reset to available), and the partial unique index
+  from migration `0035` refuses a second copy of the same source.
+
+**No schema change, and existing units are untouched.** This is a move of where
+things happen, not a change to what is stored.
+
+**Guard:** a test that the dispatch page no longer calls `createCallSignAction`
+or either token action — the same shape as the no-Thai-literal guard in
+`lib/fleet-access/no-actions.test.ts`, which exists because a split like this
+quietly grows back.
 
 ---
 
