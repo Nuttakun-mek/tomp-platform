@@ -3,6 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "moduleResolution": "bundler",
+    // expo/tsconfig.base pins `types`, so installing @types/node is not enough
+    // on its own. The guard test in src/shell-style.test.ts reads App.tsx off
+    // disk, which is the only thing here that needs node's types.
+    "types": ["node"],
     "paths": {
       "@/*": ["./src/*"]
     }

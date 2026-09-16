@@ -9,7 +9,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -17,23 +16,28 @@ import {
   TextInput,
   View
 } from "react-native";
+// React Native's own SafeAreaView is iOS-only — on Android it renders a plain
+// View and honours nothing, which is why this file used to guess the gesture
+// bar at a flat 54px. These insets are measured by the OS on both platforms.
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
 import * as ExpoLinking from "expo-linking";
 import * as Network from "expo-network";
 import { useFonts } from "expo-font";
+// Three weights, matching src/theme's `font`. Medium and Black were loaded and
+// barely used — Black on nearly every label, which is what made the shell shout
+// — and two extra font files is two more things to fetch before first paint.
 import {
   NotoSansThai_400Regular,
-  NotoSansThai_500Medium,
   NotoSansThai_600SemiBold,
-  NotoSansThai_700Bold,
-  NotoSansThai_900Black
+  NotoSansThai_700Bold
 } from "@expo-google-fonts/noto-sans-thai";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
-import { buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, type DriverWebViewKey } from "./src/config";
-import { colors, radius } from "./src/theme";
+import { BACKGROUND_GPS_ENABLED, buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, type DriverWebViewKey } from "./src/config";
+import { colors, font, overlay, radius, space, text, TOUCH_MIN } from "./src/theme";
 import {
   hasBackgroundLocationPermission,
   isForegroundSharing,
@@ -73,8 +77,6 @@ type ShellMode = "activation" | "web";
 type ShellStatus = "รอรับงาน" | "กำลังเปิดข้อมูล" | "อยู่ระหว่างปฏิบัติงาน" | "ต้องตรวจสอบ";
 type DriverMenuKey = "home" | "next" | "messages" | "location";
 
-const ANDROID_NAVIGATION_BAR_GUARD = Platform.OS === "android" ? 54 : 0;
-
 const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; view?: DriverWebViewKey }> = [
   { key: "home", label: "ปฏิบัติงาน", view: "home" },
   { key: "next", label: "ลำดับงาน", view: "next" },
@@ -87,9 +89,9 @@ const bridgeBootstrap = `
     window.TOMP_MOBILE_SHELL = {
       namespace: "${BRIDGE_NAMESPACE}",
       version: ${BRIDGE_VERSION},
-      platform: "android",
+      platform: "${Platform.OS}",
       appVersion: "${TOMP_DRIVER_APP_VERSION}",
-      canBackgroundLocation: true,
+      canBackgroundLocation: ${BACKGROUND_GPS_ENABLED},
       postMessage: function(message) {
         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(message));
       }
@@ -99,13 +101,12 @@ const bridgeBootstrap = `
   true;
 `;
 
-export default function App() {
+function DriverShell() {
+  const insets = useSafeAreaInsets();
   const [fontsLoaded] = useFonts({
     NotoSansThai_400Regular,
-    NotoSansThai_500Medium,
     NotoSansThai_600SemiBold,
-    NotoSansThai_700Bold,
-    NotoSansThai_900Black
+    NotoSansThai_700Bold
   });
   const webViewRef = useRef<WebView>(null);
   const [mode, setMode] = useState<ShellMode>("activation");
@@ -541,21 +542,23 @@ export default function App() {
 
   if (!fontsLoaded) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={[styles.safe, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" backgroundColor={colors.command} />
         <View style={styles.fontLoading}>
-          <ActivityIndicator color="#8be2da" />
+          <ActivityIndicator color={colors.accent} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={colors.command} />
       <ExpoStatusBar style="light" />
       <View style={styles.shell}>
-        <View style={styles.topbar}>
+        {/* The bar owns the status-bar area itself, so its colour runs to the
+            top of the screen instead of leaving a pale strip above it. */}
+        <View style={[styles.topbar, { paddingTop: insets.top + space.md }]}>
           <View style={styles.identity}>
             <Text style={styles.product}>TOMP Driver</Text>
             <Text style={styles.title}>{currentScreenLabel}</Text>
@@ -643,7 +646,7 @@ export default function App() {
                 )}
               />
             </View>
-            <View style={styles.bottomBar}>
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + space.md }]}>
               {DRIVER_MENU_ITEMS.map((item) => (
                 <Pressable
                   key={item.key}
@@ -663,7 +666,7 @@ export default function App() {
         ) : (
           <ScrollView
             style={styles.activationScroller}
-            contentContainerStyle={[styles.activation, { paddingBottom: 28 + ANDROID_NAVIGATION_BAR_GUARD }]}
+            contentContainerStyle={[styles.activation, { paddingBottom: insets.bottom + space.xxl }]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.heroCard}>
@@ -702,7 +705,7 @@ export default function App() {
                     autoCorrect={false}
                     onChangeText={setTokenInput}
                     placeholder="เช่น https://.../driver/..."
-                    placeholderTextColor="#7d8b99"
+                    placeholderTextColor={colors.placeholder}
                     style={styles.input}
                     value={tokenInput}
                   />
@@ -736,7 +739,18 @@ export default function App() {
           </ScrollView>
         )}
       </View>
-    </SafeAreaView>
+    </View>
+  );
+}
+
+// The provider has to sit above anything that reads insets, and App is the root,
+// so the shell moved one level down rather than the provider being bolted on
+// inside it.
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <DriverShell />
+    </SafeAreaProvider>
   );
 }
 
@@ -760,110 +774,106 @@ const styles = StyleSheet.create({
     backgroundColor: colors.command,
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingBottom: 12,
-    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 14 : 18
+    paddingBottom: space.md,
+    paddingHorizontal: space.lg
   },
   identity: {
     flex: 1,
-    gap: 1,
+    gap: 2,
     minWidth: 0
   },
   product: {
-    color: "#8be2da",
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: 0
+    color: colors.accent,
+    fontFamily: font.bold,
+    ...text.display
   },
   title: {
-    color: "#d6e5ee",
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 13,
-    fontWeight: "800"
+    color: colors.onCommand,
+    fontFamily: font.semibold,
+    ...text.caption
   },
   statusGroup: {
     alignItems: "flex-end",
     flexShrink: 0,
-    gap: 5
+    gap: space.xs
   },
   localeSwitch: {
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: overlay.faint,
     borderRadius: radius.pill,
     flexDirection: "row",
     gap: 2,
     padding: 2
   },
+  // The one control deliberately under TOUCH_MIN: a language toggle is a
+  // settings affordance, not something reached for while moving, and two 44pt
+  // chips would own the header.
   localeButton: {
+    alignItems: "center",
     borderRadius: radius.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 5
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: space.md
   },
   localeButtonActive: {
-    backgroundColor: "#8be2da"
+    backgroundColor: colors.accent
   },
   localeButtonText: {
-    color: "#bdd1df",
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 11,
-    fontWeight: "900"
+    color: colors.onCommandMuted,
+    fontFamily: font.bold,
+    ...text.micro
   },
   localeButtonTextActive: {
     color: colors.command
   },
   statusPill: {
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: overlay.soft,
     borderRadius: radius.pill,
-    color: "#ffffff",
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 12,
-    fontWeight: "800",
-    paddingHorizontal: 10,
-    paddingVertical: 6
+    color: colors.surface,
+    fontFamily: font.bold,
+    paddingHorizontal: space.md,
+    paddingVertical: 6,
+    ...text.caption
   },
   network: {
     borderRadius: radius.pill,
-    color: "#bdd1df",
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 11,
-    fontWeight: "700",
+    color: colors.onCommandMuted,
+    fontFamily: font.semibold,
     overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 4
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    ...text.micro
   },
   networkLive: {
-    backgroundColor: "rgba(34,197,94,0.16)",
-    color: "#86efac"
+    backgroundColor: overlay.successFill,
+    color: colors.successOnDark
   },
   networkIdle: {
-    backgroundColor: "rgba(245,158,11,0.13)",
-    color: "#f8d181"
+    backgroundColor: overlay.warningFill,
+    color: colors.warningOnDark
   },
   networkOffline: {
-    backgroundColor: "rgba(239,68,68,0.14)",
-    color: "#fecaca"
+    backgroundColor: overlay.dangerFill,
+    color: colors.dangerOnDark
   },
   outboxText: {
-    color: "#ffd166",
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 11,
-    fontWeight: "800"
+    color: colors.warningOnDark,
+    fontFamily: font.bold,
+    ...text.micro
   },
   syncText: {
-    color: "#8be2da",
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 10,
-    fontWeight: "800",
+    color: colors.accent,
+    fontFamily: font.semibold,
     maxWidth: 180,
-    textAlign: "right"
+    textAlign: "right",
+    ...text.micro
   },
   activationScroller: {
     flex: 1
   },
   activation: {
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingTop: 16
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingTop: space.lg
   },
   heroCard: {
     backgroundColor: colors.surface,
@@ -871,32 +881,28 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 3,
-    padding: 18,
-    shadowColor: "#102034",
+    padding: space.lg,
+    shadowColor: colors.ink,
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 0.07,
     shadowRadius: 18
   },
   kicker: {
     color: colors.operationDeep,
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 12,
-    fontWeight: "900"
+    fontFamily: font.bold,
+    ...text.caption
   },
   heroTitle: {
     color: colors.ink,
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 26,
-    fontWeight: "900",
-    lineHeight: 33,
-    marginTop: 8
+    fontFamily: font.bold,
+    marginTop: space.sm,
+    ...text.display
   },
   heroCopy: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_400Regular",
-    fontSize: 14,
-    lineHeight: 22,
-    marginTop: 8
+    fontFamily: font.regular,
+    marginTop: space.sm,
+    ...text.body
   },
   formCard: {
     backgroundColor: colors.surface,
@@ -904,9 +910,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 2,
-    gap: 10,
-    padding: 16,
-    shadowColor: "#102034",
+    gap: space.sm,
+    padding: space.lg,
+    shadowColor: colors.ink,
     shadowOffset: { height: 6, width: 0 },
     shadowOpacity: 0.06,
     shadowRadius: 14
@@ -918,67 +924,64 @@ const styles = StyleSheet.create({
     elevation: 3,
     justifyContent: "center",
     minHeight: 52,
-    paddingHorizontal: 18,
+    paddingHorizontal: space.lg,
     shadowColor: colors.operation,
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 0.18,
     shadowRadius: 14
   },
   primaryButtonText: {
-    color: "#ffffff",
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 16,
-    fontWeight: "900"
+    color: colors.surface,
+    fontFamily: font.bold,
+    ...text.strong
   },
   manualToggle: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 36
+    minHeight: TOUCH_MIN
   },
   manualToggleText: {
     color: colors.operationDeep,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 13,
-    fontWeight: "900"
+    fontFamily: font.semibold,
+    ...text.body
   },
   manualEntryBox: {
-    gap: 10
+    gap: space.sm
   },
   secondaryButton: {
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radius.lg,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 48,
-    paddingHorizontal: 16
+    paddingHorizontal: space.lg
   },
   secondaryButtonText: {
     color: colors.ink,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 15,
-    fontWeight: "900"
+    fontFamily: font.semibold,
+    ...text.strong
   },
   orText: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_400Regular",
-    fontSize: 13,
-    textAlign: "center"
+    fontFamily: font.regular,
+    textAlign: "center",
+    ...text.body
   },
   input: {
-    backgroundColor: "#f8fbfd",
-    borderColor: "#cbd7e3",
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.lineSoft,
     borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.ink,
-    fontFamily: "NotoSansThai_400Regular",
-    fontSize: 16,
+    fontFamily: font.regular,
     minHeight: 52,
-    paddingHorizontal: 14
+    paddingHorizontal: space.md,
+    ...text.strong
   },
   scannerBox: {
-    backgroundColor: "#061421",
+    backgroundColor: colors.commandDeep,
     borderRadius: radius.xl,
     height: 320,
     overflow: "hidden",
@@ -990,7 +993,7 @@ const styles = StyleSheet.create({
   },
   scannerOverlay: {
     alignItems: "center",
-    borderColor: "rgba(255,255,255,0.85)",
+    borderColor: overlay.frame,
     borderRadius: radius.lg,
     borderWidth: 2,
     bottom: 48,
@@ -1001,49 +1004,46 @@ const styles = StyleSheet.create({
     top: 48
   },
   scannerText: {
-    backgroundColor: "rgba(6,20,33,0.78)",
+    backgroundColor: overlay.scannerLabel,
     borderRadius: radius.pill,
-    color: "#ffffff",
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 14,
-    fontWeight: "900",
-    paddingHorizontal: 14,
-    paddingVertical: 8
+    color: colors.surface,
+    fontFamily: font.bold,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    ...text.body
   },
   noteCard: {
-    backgroundColor: "#f8fbfb",
-    borderColor: "#cce6e3",
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.operationSoft,
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 1,
-    gap: 12,
-    padding: 16,
-    shadowColor: "#102034",
+    gap: space.md,
+    padding: space.lg,
+    shadowColor: colors.ink,
     shadowOffset: { height: 4, width: 0 },
     shadowOpacity: 0.04,
     shadowRadius: 12
   },
   noteTitle: {
     color: colors.operationDeep,
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 14,
-    fontWeight: "900"
+    fontFamily: font.bold,
+    ...text.body
   },
   instructionList: {
-    gap: 10
+    gap: space.sm
   },
   instructionRow: {
     alignItems: "flex-start",
     flexDirection: "row",
-    gap: 10
+    gap: space.sm
   },
   instructionNumber: {
-    backgroundColor: "#dff3f1",
+    backgroundColor: colors.operationSoft,
     borderRadius: radius.pill,
     color: colors.operationDeep,
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 12,
-    fontWeight: "900",
+    fontFamily: font.bold,
+    fontSize: text.caption.fontSize,
     height: 24,
     lineHeight: 24,
     textAlign: "center",
@@ -1051,29 +1051,26 @@ const styles = StyleSheet.create({
   },
   instructionText: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_400Regular",
     flex: 1,
-    fontSize: 13,
-    lineHeight: 20
+    fontFamily: font.regular,
+    ...text.body
   },
   versionText: {
     alignSelf: "flex-start",
-    backgroundColor: "#ffffff",
-    borderColor: "#dbe5ee",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radius.pill,
     borderWidth: 1,
     color: colors.ink,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 12,
-    fontWeight: "900",
-    paddingHorizontal: 10,
-    paddingVertical: 5
+    fontFamily: font.semibold,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    ...text.caption
   },
   noteText: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_400Regular",
-    fontSize: 12,
-    lineHeight: 18
+    fontFamily: font.regular,
+    ...text.caption
   },
   webContainer: {
     backgroundColor: colors.surface,
@@ -1081,20 +1078,20 @@ const styles = StyleSheet.create({
   },
   operationStrip: {
     alignItems: "center",
-    backgroundColor: "#fbfdfe",
+    backgroundColor: colors.surfaceSoft,
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
     flexDirection: "row",
-    gap: 8,
+    gap: space.sm,
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 7
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm
   },
   operationStatusItem: {
     alignItems: "center",
     flex: 1,
     flexDirection: "row",
-    gap: 9
+    gap: space.sm
   },
   statusDot: {
     borderRadius: radius.pill,
@@ -1112,54 +1109,48 @@ const styles = StyleSheet.create({
   },
   operationStatusTitle: {
     color: colors.ink,
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 11,
-    fontWeight: "900"
+    fontFamily: font.bold,
+    ...text.caption
   },
   operationStatusText: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_500Medium",
-    fontSize: 10,
-    fontWeight: "700",
-    lineHeight: 14
+    fontFamily: font.regular,
+    ...text.micro
   },
   webVersionText: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radius.pill,
     borderWidth: 1,
     color: colors.muted,
-    fontFamily: "NotoSansThai_700Bold",
     flexShrink: 0,
-    fontSize: 10,
-    fontWeight: "900",
-    paddingHorizontal: 8,
-    paddingVertical: 4
+    fontFamily: font.semibold,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    ...text.micro
   },
   syncNotice: {
-    backgroundColor: "#fff8e7",
-    borderBottomColor: "#f1d294",
+    backgroundColor: colors.warningSoft,
+    borderBottomColor: colors.warningLine,
     borderBottomWidth: 1,
     gap: 2,
-    paddingHorizontal: 14,
-    paddingVertical: 8
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm
   },
   syncNoticeText: {
     color: colors.warning,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 11,
-    fontWeight: "800",
-    lineHeight: 15
+    fontFamily: font.semibold,
+    ...text.micro
   },
   locationAssist: {
     alignItems: "center",
-    backgroundColor: "#edf9f7",
-    borderBottomColor: "#cce6e3",
+    backgroundColor: colors.operationSoft,
+    borderBottomColor: colors.line,
     borderBottomWidth: 1,
     flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm
   },
   locationAssistCopy: {
     flex: 1,
@@ -1167,55 +1158,50 @@ const styles = StyleSheet.create({
   },
   locationAssistTitle: {
     color: colors.operationDeep,
-    fontFamily: "NotoSansThai_900Black",
-    fontSize: 12,
-    fontWeight: "900"
+    fontFamily: font.bold,
+    ...text.caption
   },
   locationAssistText: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_500Medium",
-    fontSize: 10,
-    fontWeight: "700",
-    lineHeight: 14
+    fontFamily: font.regular,
+    ...text.micro
   },
   locationActionGroup: {
     alignItems: "stretch",
     flexShrink: 0,
-    gap: 6,
-    width: 104
+    gap: space.xs,
+    width: 112
   },
   locationSettingsButton: {
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radius.md,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 38,
-    paddingHorizontal: 10
+    minHeight: TOUCH_MIN,
+    paddingHorizontal: space.sm
   },
   locationSettingsButtonText: {
     color: colors.ink,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 11,
-    fontWeight: "900"
+    fontFamily: font.semibold,
+    ...text.micro
   },
   locationResetButton: {
     alignItems: "center",
-    backgroundColor: "#fff7ed",
-    borderColor: "#fed7aa",
+    backgroundColor: colors.warningSoft,
+    borderColor: colors.warningLine,
     borderRadius: radius.md,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 38,
-    paddingHorizontal: 8
+    minHeight: TOUCH_MIN,
+    paddingHorizontal: space.sm
   },
   locationResetButtonText: {
     color: colors.warning,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 10,
-    fontWeight: "900",
-    textAlign: "center"
+    fontFamily: font.semibold,
+    textAlign: "center",
+    ...text.micro
   },
   webFrame: {
     flex: 1
@@ -1224,7 +1210,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     bottom: 0,
-    gap: 10,
+    gap: space.sm,
     justifyContent: "center",
     left: 0,
     position: "absolute",
@@ -1233,21 +1219,19 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 14,
-    fontWeight: "800"
+    fontFamily: font.semibold,
+    ...text.body
   },
   bottomBar: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderTopColor: colors.line,
     borderTopWidth: 1,
     elevation: 14,
     flexDirection: "row",
-    gap: 5,
-    paddingBottom: 12 + ANDROID_NAVIGATION_BAR_GUARD,
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    shadowColor: "#071827",
+    gap: space.xs,
+    paddingHorizontal: space.sm,
+    paddingTop: space.md,
+    shadowColor: colors.ink,
     shadowOffset: { height: -4, width: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 12
@@ -1257,7 +1241,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     flex: 1,
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: TOUCH_MIN,
     paddingHorizontal: 2,
     position: "relative"
   },
@@ -1265,23 +1249,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.operation
   },
   menuButtonUnread: {
-    backgroundColor: "#fff1f2",
-    borderColor: "#fecdd3",
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.dangerLine,
     borderWidth: 1
   },
   menuButtonText: {
     color: colors.muted,
-    fontFamily: "NotoSansThai_700Bold",
-    fontSize: 10.5,
-    fontWeight: "900",
-    textAlign: "center"
+    fontFamily: font.semibold,
+    textAlign: "center",
+    ...text.micro
   },
   menuButtonTextActive: {
-    color: "#ffffff"
+    color: colors.surface
   },
   menuBadge: {
     backgroundColor: colors.danger,
-    borderColor: "#ffffff",
+    borderColor: colors.surface,
     borderRadius: radius.pill,
     borderWidth: 2,
     height: 12,
@@ -1297,28 +1280,30 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     flex: 1,
     justifyContent: "center",
-    minHeight: 46,
-    paddingHorizontal: 14
+    minHeight: TOUCH_MIN,
+    paddingHorizontal: space.md
   },
+  // These two carried a fontWeight and no fontFamily, so they rendered in the
+  // system font while everything around them was Noto Sans Thai.
   bottomPrimaryButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "900"
+    color: colors.surface,
+    fontFamily: font.bold,
+    ...text.body
   },
   bottomSecondaryButton: {
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radius.md,
     borderWidth: 1,
     flex: 1,
     justifyContent: "center",
-    minHeight: 46,
-    paddingHorizontal: 14
+    minHeight: TOUCH_MIN,
+    paddingHorizontal: space.md
   },
   bottomSecondaryButtonText: {
     color: colors.ink,
-    fontSize: 14,
-    fontWeight: "900"
+    fontFamily: font.semibold,
+    ...text.body
   }
 });
