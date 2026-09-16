@@ -41,6 +41,7 @@ import { colors, font, overlay, radius, space, text, TOUCH_MIN } from "./src/the
 import {
   hasBackgroundLocationPermission,
   isForegroundSharing,
+  isLocationSharingActive,
   requestBackgroundLocationPermission,
   requestForegroundLocationPermission,
   startBackgroundLocationSharing,
@@ -179,6 +180,14 @@ function DriverShell() {
     `);
   }, []);
 
+  const postLocationSharingStatus = useCallback(async () => {
+    if (await isLocationSharingActive()) {
+      postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่");
+    } else {
+      postStatusToWeb("gps_stopped", "ยังไม่ได้เริ่มส่งตำแหน่ง GPS");
+    }
+  }, [postStatusToWeb]);
+
   const flushOutbox = useCallback(async () => {
     const session = await getMobileDriverSession();
     if (!session) {
@@ -296,11 +305,7 @@ function DriverShell() {
         // Answer from the watcher itself, not from the banner state: the banner
         // is what goes stale, and a wrong answer here is worse than none — it
         // would tell the page sharing is off while the phone keeps reporting.
-        if (isForegroundSharing()) {
-          postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่");
-        } else {
-          postStatusToWeb("gps_stopped", "ยังไม่ได้เริ่มส่งตำแหน่ง GPS");
-        }
+        await postLocationSharingStatus();
         return;
       }
 
@@ -374,7 +379,7 @@ function DriverShell() {
         { backgroundGps: backgroundResult }
       );
     },
-    [flushOutbox, postStatusToWeb]
+    [flushOutbox, postLocationSharingStatus, postStatusToWeb]
   );
 
   const handleNavigation = useCallback(
@@ -387,12 +392,9 @@ function DriverShell() {
 
       // The page loads with no idea what the shell is doing, so it offered
       // "share again" while sharing was already running. Tell it the truth.
-      if (isForegroundSharing()) {
-        setLocationSharingActive(true);
-        postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่");
-      }
+      void postLocationSharingStatus();
     },
-    [postStatusToWeb]
+    [postLocationSharingStatus]
   );
 
   const handleShouldStartLoad = useCallback((request: { url: string }) => {

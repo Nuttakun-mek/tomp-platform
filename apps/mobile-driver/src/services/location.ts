@@ -142,6 +142,11 @@ export function isForegroundSharing() {
   return foregroundWatch !== null;
 }
 
+export async function isLocationSharingActive() {
+  if (isForegroundSharing()) return true;
+  return Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+}
+
 function backgroundLocationPayload(
   location: Location.LocationObject,
   mode: "background" | "background_diagnostic",

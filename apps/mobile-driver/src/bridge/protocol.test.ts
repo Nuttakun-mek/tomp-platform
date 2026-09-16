@@ -5,6 +5,8 @@ describe("mobile bridge protocol", () => {
   it("accepts supported gps commands", () => {
     const message = JSON.stringify({ namespace: BRIDGE_NAMESPACE, version: BRIDGE_VERSION, type: "gps.start" });
     expect(parseBridgeMessage(message)).toEqual({ namespace: BRIDGE_NAMESPACE, version: BRIDGE_VERSION, type: "gps.start" });
+    const statusRequest = JSON.stringify({ namespace: BRIDGE_NAMESPACE, version: BRIDGE_VERSION, type: "gps.status.request" });
+    expect(parseBridgeMessage(statusRequest)).toEqual({ namespace: BRIDGE_NAMESPACE, version: BRIDGE_VERSION, type: "gps.status.request" });
   });
 
   it("rejects invalid namespace", () => {
