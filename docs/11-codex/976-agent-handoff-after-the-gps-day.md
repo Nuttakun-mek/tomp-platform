@@ -597,3 +597,13 @@ Folded into this one. Open only for history.
 | `973` | the customer fleet view plan — fully delivered |
 | `974` | previous handoff — emptied into this one |
 | `975` | iOS readiness — the live parts are §5, minus what has since been done |
+
+---
+
+# 14. Work that came after this note
+
+`977-after-approval-backlog.md` holds everything raised after iOS build 3 cleared
+Beta App Review: the project-wide tracking QR that expires before it is issued,
+creating crew and vehicle in one step, photo messages stamped with time and
+place, and the mobile UI pass. This file stays the map of how the four surfaces
+fit together and what the GPS day taught; `977` is the queue.
