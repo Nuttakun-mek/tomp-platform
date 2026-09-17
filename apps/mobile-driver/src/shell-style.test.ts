@@ -42,6 +42,23 @@ describe("the shell spends the theme instead of inventing values", () => {
   });
 });
 
+describe("the shell keeps the web page in touch with the phone", () => {
+  it("opens Geolocation to the page inside the WebView", () => {
+    // Android WebView defaults Geolocation off, which left navigator.geolocation
+    // dead inside the shell while the app's own GPS reported fine over the
+    // bridge. The driver page calls it directly to stamp a photo, so every
+    // picture waited out an 8s timeout and then printed no coordinates at all.
+    expect(shell).toContain("geolocationEnabled");
+  });
+
+  it("repeats the GPS status after a load instead of answering once", () => {
+    // The GPS tab asks for status itself and survives a missed answer. The job
+    // tab only listens, so a status that lands before React attaches the
+    // listener is gone for good and its dot stays dark through a live session.
+    expect(shell).toMatch(/setTimeout\(\(\) => void postLocationSharingStatus\(\), \d+\)/);
+  });
+});
+
 describe("the theme itself", () => {
   it("pairs every text step with a line height Thai can breathe in", () => {
     for (const [name, step] of Object.entries(text)) {

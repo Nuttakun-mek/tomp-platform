@@ -392,7 +392,16 @@ function DriverShell() {
 
       // The page loads with no idea what the shell is doing, so it offered
       // "share again" while sharing was already running. Tell it the truth.
+      //
+      // Twice, because "navigation finished" is not "React has mounted and
+      // attached its listener". The GPS tab asks for status itself and recovers
+      // from a missed first answer; the job tab only listens, so an answer that
+      // lands before its listener exists is gone for good — which is how its GPS
+      // dot sat on "ยังไม่ได้ส่ง GPS" for a session the phone was actively
+      // reporting. A second truthful status costs nothing; a lost one costs the
+      // driver their trust in the light.
       void postLocationSharingStatus();
+      setTimeout(() => void postLocationSharingStatus(), 600);
     },
     [postLocationSharingStatus]
   );
@@ -653,6 +662,13 @@ function DriverShell() {
                 thirdPartyCookiesEnabled
                 javaScriptEnabled
                 domStorageEnabled
+                // Android WebView ships with Geolocation OFF, so navigator.geolocation
+                // was silently dead inside the shell while the app's own GPS kept
+                // reporting normally over the bridge. The driver page uses it directly
+                // when stamping a photo, so every picture waited out the 8s timeout and
+                // then printed "GPS ไม่มีพิกัด" — the one thing the stamp exists to carry.
+                // iOS ignores this prop; the manifest already carries ACCESS_FINE_LOCATION.
+                geolocationEnabled
                 startInLoadingState
                 renderLoading={() => (
                   <View style={styles.loading}>
