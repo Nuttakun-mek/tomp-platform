@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { CheckCircle2, ChevronDown, MapPin, Navigation, Phone, RotateCcw, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, ChevronDown, Home, ListChecks, MapPin, MessageCircle, Navigation, Phone, RotateCcw, Satellite, TriangleAlert } from "lucide-react";
 import { assignmentStatusUpdateAction, driverIssueReportAction } from "@/app/actions/driver";
 import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
@@ -18,6 +19,13 @@ import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
 type DriverGpsLight = "off" | "live" | "stale";
 export type DriverTaskViewMode = "home" | "next" | "messages" | "gps";
 type TripStatus = "arrived_pickup" | "passenger_onboard" | "completed";
+
+const WEB_DRIVER_TABS: Array<{ view: DriverTaskViewMode; label: string; icon: typeof Home }> = [
+  { view: "home", label: "ปฏิบัติงาน", icon: Home },
+  { view: "next", label: "ลำดับงาน", icon: ListChecks },
+  { view: "messages", label: "ข้อความ", icon: MessageCircle },
+  { view: "gps", label: "ตำแหน่ง", icon: Satellite }
+];
 
 const TRIP_STEPS: Array<{ status: TripStatus; label: string }> = [
   { status: "arrived_pickup", label: "ถึงจุดรับแล้ว" },
@@ -88,6 +96,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const [dayAssignments, setDayAssignments] = useState(driverAccess.dayAssignments);
   const [gpsLight, setGpsLight] = useState<DriverGpsLight>("off");
   const [outboxCount, setOutboxCount] = useState(0);
+  const [insideNativeShell, setInsideNativeShell] = useState(false);
   const seenIds = useRef(new Set(driverAccess.notifications.map((notification) => notification.id)));
   const pendingMessagesRef = useRef<Map<string, DriverIssueMessage>>(new Map());
 
@@ -177,6 +186,13 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [driverAccess.token]);
+
+  useEffect(() => {
+    const updateShellState = () => setInsideNativeShell(Boolean(getMobileShell(window)));
+    updateShellState();
+    window.addEventListener("tomp:mobile-shell-ready", updateShellState);
+    return () => window.removeEventListener("tomp:mobile-shell-ready", updateShellState);
+  }, []);
 
   useEffect(() => {
     const handleNativeStatus = (event: Event) => {
@@ -303,7 +319,10 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           : "รายการปฏิบัติงาน";
 
   return (
-    <div id="driver-home" className="grid gap-3 pb-6">
+    <div
+      id="driver-home"
+      className={`grid gap-3 ${insideNativeShell ? "pb-6" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"}`}
+    >
       <header className="grid gap-3 rounded-[1.35rem] bg-[linear-gradient(145deg,#0d344c_0%,#0b2538_58%,#071827_100%)] p-4 text-white shadow-[0_16px_38px_rgba(7,24,39,0.2)]">
         <div className="flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.16em] text-teal-100">{driverAccess.project.projectName}</p>
@@ -540,6 +559,41 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
             ))}
           </div>
         </section>
+      ) : null}
+
+      {!insideNativeShell ? (
+        <nav
+          aria-label="เมนูหน้าคนขับสำหรับทดสอบผ่านเว็บ"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_36px_rgba(16,32,51,0.12)] backdrop-blur"
+        >
+          <div className="mx-auto grid max-w-[520px] grid-cols-4 gap-1.5">
+            {WEB_DRIVER_TABS.map((item) => {
+              const Icon = item.icon;
+              const active = view === item.view;
+              const unread = item.view === "messages" && notifications.some((notification) => notification.status === "unread");
+              return (
+                <Link
+                  key={item.view}
+                  href={`/driver?token=${encodeURIComponent(driverAccess.token)}&view=${item.view}`}
+                  className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-[1rem] px-1 text-[11px] font-bold transition active:scale-[0.98] ${
+                    active
+                      ? "bg-operation text-white shadow-[0_8px_18px_rgba(8,123,115,0.22)]"
+                      : "text-ink-soft hover:bg-canvas"
+                  }`}
+                  aria-current={active ? "page" : undefined}
+                  title={`เปิดหน้า${item.label}`}
+                >
+                  {unread ? <span className="absolute right-3 top-2 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" /> : null}
+                  <Icon className="h-4 w-4" />
+                  <span className="max-w-full truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+          <p className="mx-auto mt-1 max-w-[520px] text-center text-[10px] font-semibold text-ink-faint">
+            เมนูนี้แสดงเฉพาะเมื่อเปิดหน้าคนขับผ่านเว็บเบราว์เซอร์ เพื่อใช้ตรวจสอบแต่ละหน้าก่อนทดสอบบนแอป
+          </p>
+        </nav>
       ) : null}
     </div>
   );
