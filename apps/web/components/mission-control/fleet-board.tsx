@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Check, ChevronDown, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { CarFront, Check, ChevronDown, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
 import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
@@ -287,26 +288,13 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         </span>
                       ) : null}
                     </span>
+                    {/* One line, not three. The old middle line comma-joined
+                        every job label onto a card that lists those same jobs in
+                        full the moment it opens, and the line below it repeated
+                        the freshness the coloured dot already carries. */}
                     <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · {group.jobs.map((job) => job.label).join(", ")}
-                    </span>
-                    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                      <span
-                        className={`rounded-full px-2 py-0.5 ${
-                          group.freshness === "live"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : group.freshness === "slow"
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {FRESH_LABEL[group.freshness]}
-                      </span>
-                      {group.location ? (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
-                          {formatRelativeTh(group.location.recordedAt, effectiveNow)}
-                        </span>
-                      ) : null}
+                      {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · {FRESH_LABEL[group.freshness]}
+                      {group.location ? ` · ${formatRelativeTh(group.location.recordedAt, effectiveNow)}` : ""}
                     </span>
                   </span>
                   <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
@@ -314,13 +302,11 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
 
                 {open ? (
                   <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                    <div className="grid gap-1 text-xs text-slate-600">
-                      <p>คนขับ: <span className="font-medium text-ink">{group.driver?.fullName ?? "-"}</span></p>
-                      <p>เบอร์โทร: <span className="font-medium text-ink">{phone || "-"}</span></p>
-                      <p>รถ: <span className="font-medium text-ink">{group.vehicle?.plateNumber ?? "-"} / {group.vehicle?.vehicleType ?? "-"}</span></p>
-                      <p>GPS ล่าสุด: <span className="font-medium text-ink">{group.location ? formatRelativeTh(group.location.recordedAt, effectiveNow) : "ยังไม่มีข้อมูล"}</span></p>
-                    </div>
-
+                    {/* The four key/value rows that used to open this panel are
+                        gone: three of them repeated the header — the driver's
+                        name is the card title, the plate and the GPS age are on
+                        line two — and the fourth, the phone number, is the
+                        โทรหาคนขับ button below. */}
                     <div className="grid gap-1.5">
                       <p className="text-xs font-semibold text-slate-600">งานของคนขับคนนี้ ({group.jobs.length})</p>
                       {group.jobs.map((job) => (
@@ -359,6 +345,23 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         >
                           <MapPin className="h-3.5 w-3.5" /> เปิดตำแหน่งใน Google Maps
                         </a>
+                      ) : null}
+                      {/* The two things the deleted vehicle panel had that this
+                          card did not. A Call Sign is one driver in one vehicle,
+                          so they belong on the same card rather than on a second
+                          list of the same units keyed the other way. */}
+                      {group.vehicle ? (
+                        <>
+                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                            สถานะรถ: {formatStatusTh(group.vehicle.status)}
+                          </span>
+                          <Link
+                            href={`/resources/vehicles/${group.vehicle.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+                          >
+                            <CarFront className="h-3.5 w-3.5" /> ดูรายละเอียดรถ
+                          </Link>
+                        </>
                       ) : null}
                     </div>
 

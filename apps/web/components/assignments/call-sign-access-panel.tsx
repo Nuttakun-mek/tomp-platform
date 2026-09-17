@@ -8,6 +8,7 @@ import { deleteCallSignAction, revokeCallSignQrAction } from "@/app/actions/call
 import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
 import { createObserverAccessTokenAction } from "@/app/actions/observer-access";
 import { ActionFeedback } from "@/components/ui/action-feedback";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { UnitCredentialSheet, type UnitCredentials } from "./unit-credential-sheet";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
@@ -150,28 +151,18 @@ function ProjectFleetAccessCard({
   const scopeCount = selectedIds.size;
   const hasLink = Boolean(url);
 
+  // The heading, the description and the "in use" badge now belong to the
+  // CollapsibleSection that wraps this, so that folding the section away folds
+  // the whole thing. Keeping them here too stacked two headers on one card.
+  //
+  // One band per step, in the order an operator works through them. The card
+  // used to sit the QR in a fixed 240px column beside the form, so a project
+  // with no link yet spent a quarter of its width on a grey "ยังไม่มี QR" box,
+  // while the three controls were crammed into a three-column grid that wrapped
+  // differently at every width. Settings, scope, action, result — and the result
+  // only exists once there is one.
   return (
-    <section className="rounded-card border border-teal-200 bg-white p-3 shadow-sm sm:p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="section-label">Fleet View</p>
-          <h3 className="mt-1 text-lg font-bold text-ink">ลิงก์ติดตามรถทั้งโครงการ</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-soft">
-            ใช้สำหรับลูกค้าหรือผู้ติดตามภายนอก เปิดดูตำแหน่งรถที่ได้รับอนุญาตแบบอ่านอย่างเดียว ไม่แสดงเบอร์โทรคนขับ
-          </p>
-        </div>
-        {projectObserverLink ? (
-          <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">มีลิงก์ใช้งานอยู่</span>
-        ) : null}
-      </div>
-
-      {/* One band per step, in the order an operator works through them.
-          The card used to sit the QR in a fixed 240px column beside the form,
-          so a project with no link yet spent a quarter of its width on a grey
-          "ยังไม่มี QR" box, while the three controls were crammed into a
-          three-column grid that wrapped differently at every width. Settings,
-          scope, action, result — and the result only exists once there is one. */}
-      <div className="mt-4 grid min-w-0 gap-3">
+    <div className="grid min-w-0 gap-3">
         <fieldset className="grid min-w-0 gap-2.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
           <legend className="px-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">ตั้งค่าลิงก์</legend>
 
@@ -323,8 +314,7 @@ function ProjectFleetAccessCard({
             ยังไม่มีลิงก์ติดตามของโครงการนี้ — ตั้งค่าด้านบนแล้วกด “สร้างลิงก์ติดตามโครงการ”
           </p>
         )}
-      </div>
-    </section>
+    </div>
   );
 }
 
@@ -659,8 +649,24 @@ export function CallSignAccessPanel({
         </div>
       ) : null}
 
+      {/* Folded away once a link exists, because issuing it is a thing you do
+          once per project and then stop thinking about — but left open while
+          there is none, so a new project still sees the step it has not taken.
+          CollapsibleSection remembers the operator's own choice after that. */}
       <div className="mt-4">
-        <ProjectFleetAccessCard projectId={projectId} callSigns={callSigns} projectObserverLink={projectObserverLink} />
+        <CollapsibleSection
+          title="ลิงก์ติดตามรถทั้งโครงการ"
+          description="ลิงก์อ่านอย่างเดียวสำหรับลูกค้าหรือผู้ติดตามภายนอก ไม่แสดงเบอร์โทรคนขับ"
+          storageKey={`dispatch.${projectId}.fleetlink`}
+          defaultOpen={!projectObserverLink}
+          badge={
+            projectObserverLink ? (
+              <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-800">มีลิงก์ใช้งานอยู่</span>
+            ) : null
+          }
+        >
+          <ProjectFleetAccessCard projectId={projectId} callSigns={callSigns} projectObserverLink={projectObserverLink} />
+        </CollapsibleSection>
       </div>
 
       <div className="mt-3 grid gap-2.5">

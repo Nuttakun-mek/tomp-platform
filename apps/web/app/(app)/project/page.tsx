@@ -2,11 +2,10 @@ import Link from "next/link";
 import { AccessDenied } from "@/components/auth/access-denied";
 import { ProjectArchiveButton } from "@/components/projects/project-archive-button";
 import { ProjectDeletePanel } from "@/components/projects/project-delete-panel";
-import { ProjectAssignmentBoard } from "@/components/projects/project-assignment-board";
 import { ProjectChangePanel } from "@/components/projects/project-change-panel";
 import { ProjectMissionBoard } from "@/components/projects/project-mission-board";
+import { ProjectOperationSummaryPanel } from "@/components/projects/project-operation-summary";
 import { ProjectPublishPanel } from "@/components/projects/project-publish-panel";
-import { ProjectReadinessSummary } from "@/components/projects/project-readiness-summary";
 import { ProjectDetailsForm } from "@/components/projects/project-details-form";
 import { ProjectContactForm } from "@/components/projects/project-contact-form";
 import { resolveCoordinatorPhone, resolveOperationPhone } from "@/lib/domain/contact-numbers";
@@ -16,12 +15,16 @@ import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
+import { getCallSignsByProjectId } from "@/lib/data/call-signs";
+import { getLatestDriverLocationsByProjectId } from "@/lib/data/locations";
 import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getOperationDaysByProjectId } from "@/lib/data/operation-days";
 import { getProjectById } from "@/lib/data/projects";
 import { getProjectMembers } from "@/lib/data/project-members";
+import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { getViewerAccess } from "@/lib/auth/access";
 import { checkProjectPublishReadiness } from "@/lib/domain/publish-readiness";
+import { summariseProjectOperation } from "@/lib/domain/project-operation-summary";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { roleLabelTh } from "@/lib/i18n/role-th";
 
@@ -86,37 +89,40 @@ export default async function ProjectPage({ searchParams }: ProjectPageProps) {
 }
 
 async function OverviewView({ projectId }: { projectId: string }) {
-  const [missionsResult, assignmentsResult, operationDaysResult, project] = await Promise.all([
+  const [missionsResult, callSignsResult, vehicles, drivers, locations] = await Promise.all([
     getMissionsByProjectId(projectId),
-    getAssignmentsByProjectId(projectId),
-    getOperationDaysByProjectId(projectId),
-    getProjectById(projectId)
+    getCallSignsByProjectId(projectId),
+    getProjectVehicles(projectId),
+    getProjectDrivers(projectId),
+    getLatestDriverLocationsByProjectId(projectId)
   ]);
 
-  const load = combineResults(missionsResult, assignmentsResult, operationDaysResult);
+  const load = combineResults(missionsResult, callSignsResult);
   if (!load.ok) {
     return <DataUnavailable description="โหลดข้อมูลภาพรวมโครงการไม่สำเร็จ" detail={load.error} />;
   }
 
   const missions = missionsResult.data;
-  const assignments = assignmentsResult.data;
-  const operationDays = operationDaysResult.data;
-  const readiness = checkProjectPublishReadiness({ project, operationDays, missions, assignments });
+  const summary = summariseProjectOperation({
+    vehicles,
+    drivers,
+    callSigns: callSignsResult.data,
+    locations,
+    now: Date.now()
+  });
 
+  // One column, three blocks, in the order an operator reads them: where the
+  // project stands, what work is planned, what has been asked to change.
+  //
+  // This page used to open with a publish button that gates nothing anyone
+  // uses — no project has ever been published and no driver route checks the
+  // status — beside a "readiness %" that was jobs ÷ missions capped at 100, and
+  // a job count already printed directly above it. None of it said anything
+  // about the operation, which is what someone opening ภาพรวม came to see.
   return (
     <div className="grid gap-4">
-      {/* Summary-first: readiness + what's on the plan, then create/change
-          flows folded away until needed. */}
-      <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr] xl:items-start">
-        <div className="grid content-start gap-4">
-          <ProjectReadinessSummary missions={missions.length} assignments={assignments.length} />
-          <ProjectPublishPanel projectId={projectId} readiness={readiness} />
-        </div>
-        <div className="grid content-start gap-4">
-          <ProjectAssignmentBoard projectId={projectId} assignments={assignments} />
-          <ProjectMissionBoard missions={missions} />
-        </div>
-      </div>
+      <ProjectOperationSummaryPanel summary={summary} />
+      <ProjectMissionBoard missions={missions} />
 
       {/* Creating a mission moved to จัดงาน: it is the first step of planning
           work, and having it here meant the operator started on one tab and
@@ -151,10 +157,12 @@ async function SettingsView({
   canDelete: boolean;
   archived: boolean;
 }) {
-  const [members, missionsResult, assignmentsResult] = await Promise.all([
+  const [members, missionsResult, assignmentsResult, operationDaysResult, project] = await Promise.all([
     getProjectMembers(projectId),
     getMissionsByProjectId(projectId),
-    getAssignmentsByProjectId(projectId)
+    getAssignmentsByProjectId(projectId),
+    getOperationDaysByProjectId(projectId),
+    getProjectById(projectId)
   ]);
   // Shown in the delete confirmation: "this many jobs" makes the scale of the
   // action concrete in a way the project name alone does not.
@@ -217,6 +225,21 @@ async function SettingsView({
           <p className="text-sm text-slate-600">ยังไม่มีสมาชิก — เพิ่มผู้ใช้ที่หน้า “ผู้ใช้และสิทธิ์”</p>
         )}
       </section>
+
+      {/* Publishing lives here rather than on ภาพรวม. The lock is real — it
+          stops a published plan being edited underneath the people working it —
+          but it is a once-per-project act, not something to look at daily. */}
+      {canManage ? (
+        <ProjectPublishPanel
+          projectId={projectId}
+          readiness={checkProjectPublishReadiness({
+            project,
+            operationDays: operationDaysResult.data,
+            missions: missionsResult.data,
+            assignments: assignmentsResult.data
+          })}
+        />
+      ) : null}
 
       {canManage || canDelete ? (
         <section className="enterprise-panel grid gap-4 p-4">

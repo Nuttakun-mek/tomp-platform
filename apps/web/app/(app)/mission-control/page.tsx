@@ -7,7 +7,6 @@ import { MissionControlFeedProvider } from "@/components/mission-control/mission
 import { OperationKpiStrip } from "@/components/mission-control/operation-kpi-strip";
 import { OperationTimelinePanel } from "@/components/mission-control/operation-timeline-panel";
 import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
-import { VehicleMonitorPanel } from "@/components/mission-control/vehicle-monitor-panel";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
@@ -22,7 +21,6 @@ import { getProjects } from "@/lib/data/projects";
 import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
-import { getVehicleOperationProfilesByProjectId } from "@/lib/data/vehicle-operations";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import Link from "next/link";
 import { JobStatusBoard } from "@/components/mission-control/job-status-board";
@@ -59,11 +57,10 @@ export default async function MissionControlPage({ searchParams }: MissionContro
     redirect("/projects");
   }
 
-  const [eventsResult, locations, assignmentsResult, vehicleProfiles, assignmentStatuses, callSignsResult, comms, drivers, vehicles, evidence, missionsResult] = await Promise.all([
+  const [eventsResult, locations, assignmentsResult, assignmentStatuses, callSignsResult, comms, drivers, vehicles, evidence, missionsResult] = await Promise.all([
     getTimelineEventsByProjectId(activeProject.id),
     getLatestDriverLocationsByProjectId(activeProject.id),
     getAssignmentsByProjectId(activeProject.id),
-    getVehicleOperationProfilesByProjectId(activeProject.id),
     getLatestAssignmentStatuses(activeProject.id),
     getCallSignsByProjectId(activeProject.id),
     getDriverCommsByProjectId(activeProject.id),
@@ -129,10 +126,12 @@ export default async function MissionControlPage({ searchParams }: MissionContro
         />
       </CollapsibleSection>
 
-      <CollapsibleSection title="รายละเอียดรถในโครงการ" storageKey="mc.vehicles" defaultOpen={false}>
-        <VehicleMonitorPanel profiles={vehicleProfiles} />
-      </CollapsibleSection>
-
+      {/* "รายละเอียดรถในโครงการ" is gone. It listed the same units as the fleet
+          board keyed by vehicle instead of by driver, and a Call Sign is one
+          driver in one vehicle, so the two lists had the same rows. Its data
+          call also ran on every load despite the section defaulting to closed,
+          fanning out to every project, every driver, 100 locations, missions,
+          and per-project status and evidence lookups. */}
       <CollapsibleSection title="งานที่ยังขาดข้อมูล" storageKey="mc.risk" defaultOpen={false}>
         <RiskAndExceptionPanel assignments={assignments} locations={locations} />
       </CollapsibleSection>

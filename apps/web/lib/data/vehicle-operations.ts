@@ -117,13 +117,7 @@ export async function getVehicleOperationProfileById(vehicleId: string): Promise
   return profile ?? emptyProfile(vehicle);
 }
 
-export async function getVehicleOperationProfilesByProjectId(projectId: string): Promise<VehicleOperationProfile[]> {
-  const assignments = await getAssignmentsByProjectIds([projectId]);
-  const vehicleIds = new Set(assignments.map((assignment) => assignment.vehicleId).filter((id): id is string => Boolean(id)));
-  const vehicles = (await getVehicles()).filter((vehicle) => vehicleIds.has(vehicle.id));
-
-  const profiles = await buildProfiles(vehicles, assignments);
-  return profiles.filter(
-    (profile) => profile.currentTasks.length || profile.remainingTasks.length || profile.completedTasks.length || profile.cancelledTasks.length
-  );
-}
+// getVehicleOperationProfilesByProjectId was deleted with the mission-control
+// vehicle panel that was its only caller. It fanned out to every project, every
+// driver, 100 locations and per-project status lookups on every control-room
+// load, for a section that defaulted to closed.
