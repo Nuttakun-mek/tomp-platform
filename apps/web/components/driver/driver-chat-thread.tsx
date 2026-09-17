@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Loader2, Send, X } from "lucide-react";
 import type { DriverNotification } from "@tomp/types/domain";
+import { buildBridgeMessage, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail } from "@tomp/driver-core";
 import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import type { DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
@@ -46,8 +47,27 @@ export function buildBubbles(messages: DriverIssueMessage[], notifications: Driv
 }
 
 type PendingPhoto = DriverMessageAttachment & { previewUrl?: string | null };
+type CaptureLocation = { latitude: number; longitude: number; accuracy: number | null; recordedAt?: string | null };
 
-function getCaptureLocation(): Promise<{ latitude: number; longitude: number; accuracy: number | null } | null> {
+function locationFromNativeStatusDetail(detail: unknown): CaptureLocation | null {
+  if (!detail || typeof detail !== "object" || Array.isArray(detail)) return null;
+  const value = detail as Record<string, unknown>;
+  if (typeof value.latitude !== "number" || typeof value.longitude !== "number") return null;
+  return {
+    latitude: value.latitude,
+    longitude: value.longitude,
+    accuracy: typeof value.accuracy === "number" ? value.accuracy : null,
+    recordedAt: typeof value.recordedAt === "string" ? value.recordedAt : null
+  };
+}
+
+function isRecentLocation(location: CaptureLocation | null, now = Date.now()) {
+  if (!location) return false;
+  const recordedAt = location.recordedAt ? new Date(location.recordedAt).getTime() : now;
+  return Number.isFinite(recordedAt) && now - recordedAt <= 5 * 60 * 1000;
+}
+
+function getCaptureLocation(): Promise<CaptureLocation | null> {
   return new Promise((resolve) => {
     if (!("geolocation" in navigator)) {
       resolve(null);
@@ -58,7 +78,8 @@ function getCaptureLocation(): Promise<{ latitude: number; longitude: number; ac
         resolve({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy ?? null
+          accuracy: position.coords.accuracy ?? null,
+          recordedAt: new Date(position.timestamp).toISOString()
         }),
       () => resolve(null),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 8000 }
@@ -133,7 +154,19 @@ export function DriverChatThread({
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nativeLocationRef = useRef<CaptureLocation | null>(null);
   const bubbles = useMemo(() => buildBubbles(messages, notifications), [messages, notifications]);
+
+  useEffect(() => {
+    const handleNativeStatus = (event: Event) => {
+      const payload = parseNativeStatusDetail((event as CustomEvent).detail);
+      if (payload?.status !== "gps_sharing") return;
+      const location = locationFromNativeStatusDetail(payload.detail);
+      if (location) nativeLocationRef.current = location;
+    };
+    window.addEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+    return () => window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+  }, []);
 
   useEffect(() => {
     setNow(Date.now());
@@ -161,12 +194,41 @@ export function DriverChatThread({
     setPhoto(null);
   }
 
+  function requestNativeLocationSnapshot(timeoutMs = 1200): Promise<CaptureLocation | null> {
+    if (isRecentLocation(nativeLocationRef.current)) return Promise.resolve(nativeLocationRef.current);
+
+    const shell = getMobileShell(window);
+    if (!shell?.canBackgroundLocation) return Promise.resolve(null);
+
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => {
+        window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+        resolve(isRecentLocation(nativeLocationRef.current) ? nativeLocationRef.current : null);
+      }, timeoutMs);
+
+      const handleNativeStatus = (event: Event) => {
+        const payload = parseNativeStatusDetail((event as CustomEvent).detail);
+        if (payload?.status !== "gps_sharing") return;
+        const location = locationFromNativeStatusDetail(payload.detail);
+        if (!location) return;
+        nativeLocationRef.current = location;
+        window.clearTimeout(timer);
+        window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+        resolve(location);
+      };
+
+      window.addEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+      shell.postMessage(buildBridgeMessage("gps.status.request", { reason: "photo_attachment" }));
+    });
+  }
+
   async function handlePhoto(file: File) {
     setPhotoError(null);
     setUploadingPhoto(true);
     try {
       const capturedAt = new Date().toISOString();
-      const location = await getCaptureLocation();
+      const nativeSnapshot = requestNativeLocationSnapshot();
+      const location = (await getCaptureLocation()) ?? (await nativeSnapshot);
       const base: PendingPhoto = {
         type: "photo",
         storagePath: "",

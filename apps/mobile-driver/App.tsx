@@ -39,6 +39,7 @@ import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridge
 import { BACKGROUND_GPS_ENABLED, buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, type DriverWebViewKey } from "./src/config";
 import { colors, font, overlay, radius, space, text, TOUCH_MIN } from "./src/theme";
 import {
+  getLastSharedLocation,
   hasBackgroundLocationPermission,
   isForegroundSharing,
   isLocationSharingActive,
@@ -182,7 +183,12 @@ function DriverShell() {
 
   const postLocationSharingStatus = useCallback(async () => {
     if (await isLocationSharingActive()) {
-      postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่");
+      const lastLocation = getLastSharedLocation();
+      postStatusToWeb(
+        "gps_sharing",
+        "กำลังส่งตำแหน่ง GPS จากแอปอยู่",
+        lastLocation ? { ...lastLocation, source: "native_last_shared_location" } : undefined
+      );
     } else {
       postStatusToWeb("gps_stopped", "ยังไม่ได้เริ่มส่งตำแหน่ง GPS");
     }

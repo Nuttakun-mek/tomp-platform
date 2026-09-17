@@ -70,6 +70,7 @@ let foregroundWatch: Location.LocationSubscription | null = null;
 // and the cadence that rides along on every ping — lives in @tomp/driver-core so
 // the web page and this app cannot drift apart. They feed the same map.
 let lastSent: LastSentFix | null = null;
+let lastSharedLocation: { latitude: number; longitude: number; accuracy: number | null; recordedAt: string } | null = null;
 
 // `timeInterval` is Android-only — expo-location documents it as such, and iOS
 // ignores it entirely. So the cadence both watchers below ask for (10s / 30s)
@@ -145,6 +146,10 @@ export function isForegroundSharing() {
 export async function isLocationSharingActive() {
   if (isForegroundSharing()) return true;
   return Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+}
+
+export function getLastSharedLocation() {
+  return lastSharedLocation;
 }
 
 function backgroundLocationPayload(
@@ -392,6 +397,12 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
   // 2-minute cadence showed up in the data as "121s, 0s, 122s, 0s".
   const previous = lastSent;
   lastSent = { latitude: input.latitude, longitude: input.longitude, at: Date.now() };
+  lastSharedLocation = {
+    latitude: input.latitude,
+    longitude: input.longitude,
+    accuracy: input.accuracy ?? null,
+    recordedAt: input.recordedAt || new Date().toISOString()
+  };
 
   const session = mobileSession ?? (await getMobileDriverSession());
   const result = await submitLocation(payload, session).catch((error) => ({
