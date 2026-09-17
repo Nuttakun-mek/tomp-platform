@@ -1,10 +1,11 @@
 import { AlertTriangle, CarFront, CheckCircle2, ClipboardList, Plus, ShieldCheck } from "lucide-react";
 import { AirportTransferCaseCard } from "@/components/airport-transfer/case-card";
+import { AirportTransferApiHealthCard } from "@/components/airport-transfer/api-health-card";
 import { ButtonLink } from "@/components/ui/button";
-import { getAirportTransferCases, summarizeAirportTransferCases } from "@/lib/airport-transfer/data";
+import { getAirportTransferApiHealth, getAirportTransferCases, summarizeAirportTransferCases } from "@/lib/airport-transfer/data";
 
 export default async function AirportTransferDashboardPage() {
-  const cases = await getAirportTransferCases();
+  const [cases, apiHealth] = await Promise.all([getAirportTransferCases(), getAirportTransferApiHealth()]);
   const summary = summarizeAirportTransferCases(cases);
   const metrics = [
     { label: "เคสทั้งหมด", value: summary.total, icon: ClipboardList, color: "text-slate-700 bg-slate-100" },
@@ -25,6 +26,7 @@ export default async function AirportTransferDashboardPage() {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map(({ label, value, icon: Icon, color }) => <article key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className={`grid h-9 w-9 place-items-center rounded-xl ${color}`}><Icon className="h-4 w-4" /></div><p className="mt-4 text-2xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-sm text-slate-500">{label}</p></article>)}
       </section>
+      <AirportTransferApiHealthCard health={apiHealth} />
       <section className="grid gap-3">
         <div className="flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Action Queue</p><h2 className="mt-1 text-xl font-semibold">งานตามลำดับที่ต้องจัดการ</h2></div><ButtonLink href="/airport-transfer/cases" variant="secondary">ดูทั้งหมด</ButtonLink></div>
         {cases.length ? cases.slice(0, 8).map((item) => <AirportTransferCaseCard key={item.id} item={item} />) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center"><p className="font-semibold">ยังไม่มีข้อมูลการเดินทาง</p><p className="mt-1 text-sm text-slate-500">สร้างการ์ดแรกหรือนำเข้าข้อมูลจาก Excel</p></div>}
@@ -32,4 +34,3 @@ export default async function AirportTransferDashboardPage() {
     </>
   );
 }
-

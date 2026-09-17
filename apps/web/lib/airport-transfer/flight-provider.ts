@@ -10,8 +10,12 @@ export interface FlightVerificationCandidate {
   destinationAirportName: string | null;
   scheduledDepartureAt: string | null;
   scheduledDepartureLocal: string | null;
+  estimatedDepartureAt: string | null;
+  actualDepartureAt: string | null;
   scheduledArrivalAt: string | null;
   scheduledArrivalLocal: string | null;
+  estimatedArrivalAt: string | null;
+  actualArrivalAt: string | null;
   status: string | null;
   raw: unknown;
 }
@@ -27,6 +31,10 @@ function nestedString(value: unknown, ...path: string[]): string | null {
     current = (current as Record<string, unknown>)[key];
   }
   return typeof current === "string" ? current : null;
+}
+
+function firstString(...values: Array<string | null>): string | null {
+  return values.find(Boolean) || null;
 }
 
 export async function verifyFlightByNumberAndDate(flightNumber: string, dateLocal: string): Promise<FlightVerificationResult> {
@@ -58,8 +66,24 @@ export async function verifyFlightByNumberAndDate(flightNumber: string, dateLoca
         destinationAirportName: nestedString(flight, "arrival", "airport", "name"),
         scheduledDepartureAt: nestedString(flight, "departure", "scheduledTime", "utc"),
         scheduledDepartureLocal: nestedString(flight, "departure", "scheduledTime", "local"),
+        estimatedDepartureAt: firstString(
+          nestedString(flight, "departure", "revisedTime", "utc"),
+          nestedString(flight, "departure", "predictedTime", "utc")
+        ),
+        actualDepartureAt: firstString(
+          nestedString(flight, "departure", "runwayTime", "utc"),
+          nestedString(flight, "departure", "actualTime", "utc")
+        ),
         scheduledArrivalAt: nestedString(flight, "arrival", "scheduledTime", "utc"),
         scheduledArrivalLocal: nestedString(flight, "arrival", "scheduledTime", "local"),
+        estimatedArrivalAt: firstString(
+          nestedString(flight, "arrival", "revisedTime", "utc"),
+          nestedString(flight, "arrival", "predictedTime", "utc")
+        ),
+        actualArrivalAt: firstString(
+          nestedString(flight, "arrival", "runwayTime", "utc"),
+          nestedString(flight, "arrival", "actualTime", "utc")
+        ),
         status: nestedString(flight, "status"),
         raw: flight
       }))

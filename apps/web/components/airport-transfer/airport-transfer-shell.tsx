@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, FileSpreadsheet, Gauge, PlaneTakeoff, Plus, Settings } from "lucide-react";
+import { ClipboardList, FileSpreadsheet, Gauge, PlaneTakeoff, Plus, Settings, Trash2 } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 
 const items = [
@@ -7,6 +7,7 @@ const items = [
   { href: "/airport-transfer/cases", label: "ข้อมูลการเดินทาง", icon: ClipboardList },
   { href: "/airport-transfer/cases/new", label: "สร้างการ์ดข้อมูล", icon: Plus },
   { href: "/airport-transfer/imports", label: "นำเข้า Excel", icon: FileSpreadsheet },
+  { href: "/airport-transfer/trash", label: "ข้อมูลที่ลบแล้ว", icon: Trash2 },
   { href: "/airport-transfer/settings", label: "ตั้งค่าระบบ", icon: Settings }
 ];
 

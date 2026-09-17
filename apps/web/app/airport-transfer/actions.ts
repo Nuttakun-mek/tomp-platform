@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { verifyFlightByNumberAndDate } from "@/lib/airport-transfer/flight-provider";
+import { syncActiveAirportTransferFlights } from "@/lib/airport-transfer/flight-sync";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import type { AirportTransferOperationalStatus } from "@/lib/airport-transfer/types";
@@ -32,6 +33,22 @@ export interface FlightLookupCandidate {
 export type FlightLookupState =
   | { ok: true; message: string; candidates: FlightLookupCandidate[] }
   | { ok: false; message: string; reason: "invalid_input" | "not_configured" | "not_found" | "provider_error" };
+
+export interface UpdateTransferCaseState {
+  ok: boolean;
+  message: string;
+  fieldErrors?: Record<string, string[]>;
+}
+
+export interface RefreshFlightState {
+  ok: boolean;
+  message: string;
+}
+
+export interface CaseLifecycleState {
+  ok: boolean;
+  message: string;
+}
 
 const optionalText = z.string().trim().transform((value) => value || null);
 const createCaseSchema = z.object({
@@ -66,6 +83,12 @@ const createCaseSchema = z.object({
   driverPhone: optionalText,
   notes: optionalText,
   fastTrack: z.boolean()
+});
+
+const updateCaseSchema = createCaseSchema.extend({
+  caseId: z.string().uuid(),
+  originalUpdatedAt: z.string().datetime({ offset: true }),
+  editReason: optionalText
 });
 
 function thailandTimeToIso(value: string | null): string | null {
@@ -295,7 +318,11 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
             provider: "aerodatabox",
             verification_status: verificationStatus,
             scheduled_departure_at: candidate.scheduledDepartureAt,
+            estimated_departure_at: candidate.estimatedDepartureAt,
+            actual_departure_at: candidate.actualDepartureAt,
             scheduled_arrival_at: candidate.scheduledArrivalAt,
+            estimated_arrival_at: candidate.estimatedArrivalAt,
+            actual_arrival_at: candidate.actualArrivalAt,
             provider_status: candidate.status,
             confidence: "confirmed",
             raw_payload: candidate.raw
@@ -307,6 +334,336 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
   revalidatePath("/airport-transfer");
   revalidatePath("/airport-transfer/cases");
   redirect(`/airport-transfer/cases?created=${encodeURIComponent(caseCode)}`);
+}
+
+export async function updateAirportTransferCase(_previous: UpdateTransferCaseState, formData: FormData): Promise<UpdateTransferCaseState> {
+  const access = await getAirportTransferAccess();
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์แก้ไขเคส Airport Transfer" };
+
+  const parsed = updateCaseSchema.safeParse({
+    caseId: formData.get("caseId"),
+    originalUpdatedAt: formData.get("originalUpdatedAt"),
+    direction: formData.get("direction"),
+    clientName: formData.get("clientName") || "",
+    passengerTitle: formData.get("passengerTitle") || "",
+    passengerFirstName: formData.get("passengerFirstName"),
+    passengerLastName: formData.get("passengerLastName"),
+    passengerEmail: formData.get("passengerEmail") || "",
+    passengerMobile: formData.get("passengerMobile") || "",
+    passengerCount: formData.get("passengerCount") || 1,
+    luggageCount: formData.get("luggageCount") || 0,
+    travelDate: formData.get("travelDate"),
+    flightNumber: formData.get("flightNumber"),
+    originAirport: formData.get("originAirport") || "",
+    destinationAirport: formData.get("destinationAirport") || "",
+    scheduledDepartureLocal: formData.get("scheduledDepartureLocal") || "",
+    scheduledDepartureUtc: "",
+    scheduledArrivalLocal: formData.get("scheduledArrivalLocal") || "",
+    scheduledArrivalUtc: "",
+    pickupName: formData.get("pickupName"),
+    pickupAddress: formData.get("pickupAddress") || "",
+    pickupMapsUrl: formData.get("pickupMapsUrl") || "",
+    dropoffName: formData.get("dropoffName"),
+    dropoffAddress: formData.get("dropoffAddress") || "",
+    dropoffMapsUrl: formData.get("dropoffMapsUrl") || "",
+    confirmedPickupLocal: formData.get("confirmedPickupLocal") || "",
+    pickupTimeOverrideReason: formData.get("pickupTimeOverrideReason") || "",
+    vehicleType: formData.get("vehicleType") || "",
+    vehiclePlate: formData.get("vehiclePlate") || "",
+    driverName: formData.get("driverName") || "",
+    driverPhone: formData.get("driverPhone") || "",
+    notes: formData.get("notes") || "",
+    fastTrack: formData.get("fastTrack") === "on",
+    editReason: formData.get("editReason") || ""
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: "กรุณาตรวจสอบข้อมูลที่จำเป็น", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่าการเชื่อมต่อ Supabase" };
+  const profile = await getCurrentUserProfile();
+  const input = parsed.data;
+  const { data: current, error: readError } = await supabase.from("airport_transfer_cases").select("*").eq("id", input.caseId).maybeSingle();
+  if (readError || !current) return { ok: false, message: "ไม่พบเคสที่ต้องการแก้ไข" };
+  if (current.deleted_at) return { ok: false, message: "เคสนี้อยู่ในข้อมูลที่ลบแล้ว กรุณากู้คืนก่อนแก้ไข" };
+  if (current.updated_at !== input.originalUpdatedAt) {
+    return { ok: false, message: "ข้อมูลเคสถูกแก้ไขจากอีกหน้าหนึ่งแล้ว กรุณารีเฟรชหน้าและตรวจสอบข้อมูลล่าสุดก่อนบันทึกอีกครั้ง" };
+  }
+
+  const departureAt = thailandTimeToIso(input.scheduledDepartureLocal);
+  const arrivalAt = thailandTimeToIso(input.scheduledArrivalLocal);
+  const suggestedPickup = recommendedPickup(input.direction, departureAt, arrivalAt);
+  const confirmedPickup = thailandTimeToIso(input.confirmedPickupLocal) || suggestedPickup;
+  const updatePayload: Record<string, unknown> = {
+    direction: input.direction,
+    client_name: input.clientName,
+    passenger_title: input.passengerTitle,
+    passenger_first_name: input.passengerFirstName,
+    passenger_last_name: input.passengerLastName,
+    passenger_email: input.passengerEmail,
+    passenger_mobile: input.passengerMobile,
+    passenger_count: input.passengerCount,
+    luggage_count: input.luggageCount,
+    travel_date: input.travelDate,
+    flight_number: input.flightNumber,
+    origin_airport: input.originAirport,
+    destination_airport: input.destinationAirport,
+    scheduled_departure_at: departureAt,
+    scheduled_arrival_at: arrivalAt,
+    pickup_name: input.pickupName,
+    pickup_address: input.pickupAddress,
+    pickup_maps_url: input.pickupMapsUrl,
+    dropoff_name: input.dropoffName,
+    dropoff_address: input.dropoffAddress,
+    dropoff_maps_url: input.dropoffMapsUrl,
+    recommended_pickup_at: suggestedPickup,
+    confirmed_pickup_at: confirmedPickup,
+    pickup_time_override_reason: input.pickupTimeOverrideReason,
+    vehicle_type: input.vehicleType,
+    vehicle_plate_snapshot: input.vehiclePlate,
+    driver_name_snapshot: input.driverName,
+    driver_phone_snapshot: input.driverPhone,
+    fast_track: input.fastTrack,
+    notes: input.notes,
+    next_action_at: confirmedPickup
+  };
+
+  const flightKeys = ["travel_date", "flight_number", "origin_airport", "destination_airport", "scheduled_departure_at", "scheduled_arrival_at"];
+  const flightChanged = flightKeys.some((key) => JSON.stringify(current[key]) !== JSON.stringify(updatePayload[key]));
+  if (flightChanged) {
+    updatePayload.flight_verification_status = "needs_recheck";
+    if (!["completed", "cancelled"].includes(String(current.operational_status))) updatePayload.operational_status = "needs_review";
+  }
+
+  const changedKeys = Object.keys(updatePayload).filter((key) => JSON.stringify(current[key] ?? null) !== JSON.stringify(updatePayload[key] ?? null));
+  if (!changedKeys.length) return { ok: true, message: "ไม่มีข้อมูลเปลี่ยนแปลง" };
+
+  const oldValue = Object.fromEntries(changedKeys.map((key) => [key, current[key] ?? null]));
+  const newValue = Object.fromEntries(changedKeys.map((key) => [key, updatePayload[key] ?? null]));
+  const { data: updated, error: updateError } = await supabase
+    .from("airport_transfer_cases")
+    .update(updatePayload)
+    .eq("id", input.caseId)
+    .eq("updated_at", input.originalUpdatedAt)
+    .select("id")
+    .maybeSingle();
+  if (updateError) return { ok: false, message: `บันทึกการแก้ไขไม่สำเร็จ: ${updateError.message}` };
+  if (!updated) return { ok: false, message: "มีผู้ใช้อื่นแก้ไขเคสนี้ระหว่างที่คุณกำลังบันทึก กรุณารีเฟรชหน้าแล้วลองใหม่" };
+
+  const { error: auditError } = await supabase.from("airport_transfer_audit_logs").insert({
+    case_id: input.caseId,
+    entity_type: "transfer_case",
+    entity_id: input.caseId,
+    action: "updated",
+    old_value: oldValue,
+    new_value: newValue,
+    reason: input.editReason,
+    actor_profile_id: profile.id,
+    metadata: { changed_fields: changedKeys }
+  });
+  if (auditError) return { ok: false, message: `แก้ไขเคสแล้ว แต่บันทึกประวัติไม่สำเร็จ: ${auditError.message}` };
+
+  if (current.direction !== input.direction) {
+    const desiredTasks = taskTemplate(input.direction).map(([taskKey, label, ownerRole], sequence) => ({
+      case_id: input.caseId,
+      task_key: taskKey,
+      label,
+      owner_role: ownerRole,
+      sequence: sequence + 1
+    }));
+    const desiredKeys = new Set(desiredTasks.map((task) => task.task_key));
+    const { data: existingTasks } = await supabase.from("airport_transfer_tasks").select("id, task_key, status").eq("case_id", input.caseId);
+    const cancelledTaskIds = (existingTasks || []).filter((task) => task.status === "pending" && !desiredKeys.has(String(task.task_key))).map((task) => String(task.id));
+    await Promise.all([
+      supabase.from("airport_transfer_tasks").upsert(desiredTasks, { onConflict: "case_id,task_key" }),
+      cancelledTaskIds.length ? supabase.from("airport_transfer_tasks").update({ status: "cancelled" }).in("id", cancelledTaskIds) : Promise.resolve()
+    ]);
+  }
+
+  revalidatePath("/airport-transfer");
+  revalidatePath("/airport-transfer/cases");
+  revalidatePath(`/airport-transfer/cases/${input.caseId}`);
+  redirect(`/airport-transfer/cases/${input.caseId}?updated=1`);
+}
+
+export async function refreshAirportTransferFlight(caseId: string, _previous: RefreshFlightState): Promise<RefreshFlightState> {
+  void _previous;
+  const id = z.string().uuid().safeParse(caseId);
+  if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
+  const access = await getAirportTransferAccess();
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์อัปเดตข้อมูลเที่ยวบิน" };
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่าการเชื่อมต่อ Supabase" };
+  const profile = await getCurrentUserProfile();
+  const { data: current } = await supabase.from("airport_transfer_cases").select("*").eq("id", caseId).maybeSingle();
+  if (!current) return { ok: false, message: "ไม่พบเคสที่ต้องการอัปเดต" };
+  if (current.deleted_at || current.operational_status === "cancelled") return { ok: false, message: "เคสนี้ถูกยกเลิกหรืออยู่ในข้อมูลที่ลบแล้ว" };
+
+  const verification = await verifyFlightByNumberAndDate(String(current.flight_number), String(current.travel_date));
+  if (!verification.ok) {
+    const failedAt = new Date().toISOString();
+    const message = verification.reason === "not_configured"
+      ? "ยังไม่ได้ตั้งค่า Flight API"
+      : verification.reason === "not_found"
+        ? "ไม่พบเที่ยวบินนี้ในวันที่ระบุ"
+        : "ผู้ให้บริการข้อมูลเที่ยวบินไม่ตอบสนอง";
+    const healthPayload: Record<string, unknown> = {
+      connection_status: verification.reason === "not_configured" ? "not_configured" : "error",
+      last_check_at: failedAt,
+      last_error_at: failedAt,
+      last_error_message: message
+    };
+    if (verification.reason === "not_configured") healthPayload.next_check_at = null;
+    await supabase.from("airport_transfer_api_health").update(healthPayload).eq("provider", "aerodatabox");
+    return { ok: false, message };
+  }
+
+  const matching = verification.candidates.filter((candidate) =>
+    (!current.origin_airport || candidate.originAirport === current.origin_airport) &&
+    (!current.destination_airport || candidate.destinationAirport === current.destination_airport)
+  );
+  const selected = matching.length === 1 ? matching[0] : verification.candidates.length === 1 ? verification.candidates[0] : null;
+  const checkedAt = new Date().toISOString();
+  const verificationStatus = selected ? "verified" : "multiple_matches";
+  const updatePayload: Record<string, unknown> = {
+    flight_verification_status: verificationStatus,
+    flight_provider: "aerodatabox",
+    flight_provider_checked_at: checkedAt
+  };
+
+  if (selected) {
+    const departureAt = selected.scheduledDepartureAt;
+    const arrivalAt = selected.scheduledArrivalAt;
+    const nextRecommended = recommendedPickup(current.direction === "departure" ? "departure" : "arrival", departureAt, arrivalAt);
+    const pickupWasAutomatic = !current.confirmed_pickup_at || current.confirmed_pickup_at === current.recommended_pickup_at;
+    Object.assign(updatePayload, {
+      origin_airport: selected.originAirport,
+      destination_airport: selected.destinationAirport,
+      scheduled_departure_at: departureAt,
+      scheduled_arrival_at: arrivalAt,
+      recommended_pickup_at: nextRecommended,
+      confirmed_pickup_at: pickupWasAutomatic ? nextRecommended : current.confirmed_pickup_at,
+      next_action_at: pickupWasAutomatic ? nextRecommended : current.confirmed_pickup_at
+    });
+  }
+
+  const { error: updateError } = await supabase.from("airport_transfer_cases").update(updatePayload).eq("id", caseId);
+  if (updateError) return { ok: false, message: `อัปเดตเที่ยวบินไม่สำเร็จ: ${updateError.message}` };
+
+  const oldValue = Object.fromEntries(Object.keys(updatePayload).map((key) => [key, current[key] ?? null]));
+  await Promise.all([
+    supabase.from("airport_transfer_flight_snapshots").insert(verification.candidates.map((candidate) => ({
+      case_id: caseId,
+      provider: "aerodatabox",
+      verification_status: verificationStatus,
+      scheduled_departure_at: candidate.scheduledDepartureAt,
+      estimated_departure_at: candidate.estimatedDepartureAt,
+      actual_departure_at: candidate.actualDepartureAt,
+      scheduled_arrival_at: candidate.scheduledArrivalAt,
+      estimated_arrival_at: candidate.estimatedArrivalAt,
+      actual_arrival_at: candidate.actualArrivalAt,
+      provider_status: candidate.status,
+      confidence: "confirmed",
+      raw_payload: candidate.raw
+    }))),
+    supabase.from("airport_transfer_audit_logs").insert({
+      case_id: caseId,
+      entity_type: "transfer_case",
+      entity_id: caseId,
+      action: "flight_refreshed",
+      old_value: oldValue,
+      new_value: updatePayload,
+      actor_profile_id: profile.id,
+      metadata: { provider: "aerodatabox", candidate_count: verification.candidates.length }
+    }),
+    supabase.from("airport_transfer_api_health").update({
+      connection_status: "healthy",
+      last_check_at: checkedAt,
+      last_success_at: checkedAt,
+      last_error_message: null
+    }).eq("provider", "aerodatabox")
+  ]);
+
+  revalidatePath("/airport-transfer");
+  revalidatePath("/airport-transfer/cases");
+  revalidatePath(`/airport-transfer/cases/${caseId}`);
+  return { ok: true, message: selected ? "อัปเดตข้อมูลเที่ยวบินล่าสุดแล้ว" : "พบหลายเที่ยวบิน กรุณาตรวจสอบเส้นทางก่อนเลือกข้อมูล" };
+}
+
+export async function runAirportTransferFlightSync(_previous: RefreshFlightState): Promise<RefreshFlightState> {
+  void _previous;
+  const access = await getAirportTransferAccess();
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์สั่งตรวจข้อมูลเที่ยวบิน" };
+  const result = await syncActiveAirportTransferFlights();
+  revalidatePath("/airport-transfer");
+  revalidatePath("/airport-transfer/cases");
+  return { ok: result.ok, message: result.message };
+}
+
+export async function cancelAirportTransferCase(caseId: string, _previous: CaseLifecycleState, formData: FormData): Promise<CaseLifecycleState> {
+  const id = z.string().uuid().safeParse(caseId);
+  if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
+  const access = await getAirportTransferAccess();
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ยกเลิกงาน" };
+  const reason = String(formData.get("reason") || "").trim();
+  if (!reason) return { ok: false, message: "กรุณาระบุเหตุผลที่ยกเลิก" };
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return { ok: false, message: "Supabase ไม่พร้อมใช้งาน" };
+  const profile = await getCurrentUserProfile();
+  const { data: current } = await supabase.from("airport_transfer_cases").select("operational_status, cancelled_at, cancellation_reason").eq("id", caseId).maybeSingle();
+  if (!current) return { ok: false, message: "ไม่พบเคส" };
+  if (current.operational_status === "cancelled") return { ok: true, message: "งานนี้ถูกยกเลิกแล้ว" };
+  const cancelledAt = new Date().toISOString();
+  const { error } = await supabase.from("airport_transfer_cases").update({ operational_status: "cancelled", cancelled_at: cancelledAt, cancelled_by: profile.id, cancellation_reason: reason, next_action_at: null }).eq("id", caseId);
+  if (error) return { ok: false, message: error.message };
+  await Promise.all([
+    supabase.from("airport_transfer_tasks").update({ status: "cancelled" }).eq("case_id", caseId).eq("status", "pending"),
+    supabase.from("airport_transfer_status_events").insert({ case_id: caseId, from_status: current.operational_status, to_status: "cancelled", event_type: "case_cancelled", note: reason, actor_profile_id: profile.id }),
+    supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "cancelled", old_value: current, new_value: { operational_status: "cancelled", cancelled_at: cancelledAt, cancellation_reason: reason }, reason, actor_profile_id: profile.id })
+  ]);
+  revalidatePath("/airport-transfer");
+  revalidatePath("/airport-transfer/cases");
+  revalidatePath(`/airport-transfer/cases/${caseId}`);
+  return { ok: true, message: "ยกเลิกงานแล้ว ระบบหยุดติดตามเที่ยวบินของเคสนี้" };
+}
+
+export async function trashAirportTransferCase(caseId: string, _previous: CaseLifecycleState, formData: FormData): Promise<CaseLifecycleState> {
+  const id = z.string().uuid().safeParse(caseId);
+  if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
+  const access = await getAirportTransferAccess();
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ย้ายงานไปถังขยะ" };
+  const reason = String(formData.get("reason") || "").trim();
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return { ok: false, message: "Supabase ไม่พร้อมใช้งาน" };
+  const profile = await getCurrentUserProfile();
+  const deletedAt = new Date().toISOString();
+  const { error } = await supabase.from("airport_transfer_cases").update({ deleted_at: deletedAt, deleted_by: profile.id, delete_reason: reason || null, next_action_at: null }).eq("id", caseId).is("deleted_at", null);
+  if (error) return { ok: false, message: error.message };
+  await supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "moved_to_trash", new_value: { deleted_at: deletedAt, delete_reason: reason || null }, reason: reason || null, actor_profile_id: profile.id });
+  revalidatePath("/airport-transfer");
+  revalidatePath("/airport-transfer/cases");
+  revalidatePath("/airport-transfer/trash");
+  redirect("/airport-transfer/cases?trashed=1");
+}
+
+export async function restoreAirportTransferCase(caseId: string, _previous: CaseLifecycleState): Promise<CaseLifecycleState> {
+  void _previous;
+  const id = z.string().uuid().safeParse(caseId);
+  if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
+  const access = await getAirportTransferAccess();
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์กู้คืนงาน" };
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return { ok: false, message: "Supabase ไม่พร้อมใช้งาน" };
+  const profile = await getCurrentUserProfile();
+  const { error } = await supabase.from("airport_transfer_cases").update({ deleted_at: null, deleted_by: null, delete_reason: null }).eq("id", caseId).not("deleted_at", "is", null);
+  if (error) return { ok: false, message: error.message };
+  await supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "restored", new_value: { deleted_at: null }, actor_profile_id: profile.id });
+  revalidatePath("/airport-transfer");
+  revalidatePath("/airport-transfer/cases");
+  revalidatePath("/airport-transfer/trash");
+  return { ok: true, message: "กู้คืนงานแล้ว" };
 }
 
 const taskStatusMap: Record<string, AirportTransferOperationalStatus | undefined> = {
@@ -334,6 +691,13 @@ export async function completeAirportTransferTask(caseId: string, taskId: string
   const profile = await getCurrentUserProfile();
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return;
+
+  const { data: activeCase } = await supabase
+    .from("airport_transfer_cases")
+    .select("operational_status, deleted_at")
+    .eq("id", caseId)
+    .maybeSingle();
+  if (!activeCase || activeCase.deleted_at || activeCase.operational_status === "cancelled") return;
 
   const { data: task } = await supabase
     .from("airport_transfer_tasks")

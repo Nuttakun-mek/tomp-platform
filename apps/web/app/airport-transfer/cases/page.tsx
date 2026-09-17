@@ -2,7 +2,7 @@ import { AirportTransferCaseCard } from "@/components/airport-transfer/case-card
 import { ButtonLink } from "@/components/ui/button";
 import { getAirportTransferCases } from "@/lib/airport-transfer/data";
 
-interface CasesPageProps { searchParams?: Promise<{ direction?: string; status?: string; q?: string; created?: string }> }
+interface CasesPageProps { searchParams?: Promise<{ direction?: string; status?: string; q?: string; created?: string; trashed?: string }> }
 
 export default async function AirportTransferCasesPage({ searchParams }: CasesPageProps) {
   const params = searchParams ? await searchParams : {};
@@ -11,6 +11,7 @@ export default async function AirportTransferCasesPage({ searchParams }: CasesPa
     <>
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Travel Cases</p><h1 className="mt-1 text-2xl font-semibold">ข้อมูลการเดินทางทั้งหมด</h1><p className="mt-2 text-sm text-slate-500">ค้นหาและกรองตามทิศทาง สถานะ และข้อมูลผู้โดยสาร</p></div><ButtonLink href="/airport-transfer/cases/new">สร้างการ์ดข้อมูล</ButtonLink></header>
       {params.created ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">สร้างเคส {params.created} เรียบร้อยแล้ว</div> : null}
+      {params.trashed ? <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">ย้ายเคสไปยัง “ข้อมูลที่ลบแล้ว” เรียบร้อย สามารถกู้คืนได้ภายหลัง</div> : null}
       <form className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_180px_200px_auto]" method="get">
         <input name="q" defaultValue={params.q} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="ค้นหา Case ID, เที่ยวบิน หรือชื่อ" />
         <select name="direction" defaultValue={params.direction || ""} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm"><option value="">ทุกประเภท</option><option value="arrival">รับเข้า</option><option value="departure">ส่งออก</option></select>
@@ -21,4 +22,3 @@ export default async function AirportTransferCasesPage({ searchParams }: CasesPa
     </>
   );
 }
-
