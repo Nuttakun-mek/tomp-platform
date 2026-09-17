@@ -35,6 +35,11 @@ playwright-report/
 # mobile shell simulation artefact
 mobile-shell-sim.png
 
+# Preview shots and build QR codes written while working — screenshots of a UI
+# pass, install QRs from an EAS build. They are outputs of a moment, not source,
+# and they go stale the next time either one is regenerated.
+artifacts/
+
 # FCM / Google service-account keys — these are real secrets, never commit
 *service-account*.json
 tomp-project-*.json
