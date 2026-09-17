@@ -37,11 +37,22 @@ const BUSINESS_TABLES = [
   "projects",
   "vehicles",
   "drivers",
-  "project_members",
-  "user_role_assignments",
-  "profiles",
-  "organizations"
+  "project_members"
 ];
+
+// Deliberately NOT truncated: profiles, user_role_assignments, organizations.
+//
+// This script truncates rather than deletes, because TRUNCATE does not fire the
+// row triggers that make timeline_events immutable. But a truncate cannot be
+// filtered, so every row in a listed table goes — and these three tables hold
+// *who you are*, not business data. Truncating them left an auth.users row that
+// could still sign in, attached to no profile and holding no super_admin
+// assignment: locked out of your own system with no way back in. The closing
+// message used to claim roles and permissions survived, which was true, and
+// quietly omitted that your profile did not.
+//
+// Wiping the work a project did is not the same act as deleting the operator.
+const IDENTITY_TABLES = ["profiles", "user_role_assignments", "organizations"];
 
 function argValue(name) {
   const index = argv.indexOf(name);
@@ -157,6 +168,10 @@ async function main() {
     const after = await getCounts(sql, tables);
     printCounts("\nCounts after reset:", after);
     console.log("\nReset completed. Schema, migration tracking, roles, permissions, and auth users were not truncated.");
+    console.log(`Kept so you can still sign in : ${IDENTITY_TABLES.join(", ")}`);
+    console.log("Apple's App Review demo job was business data and is now gone.");
+    console.log("Rebuild it at /superadmin/dev-tools/apple-review and send Apple the new link and PIN");
+    console.log("BEFORE submitting any build for review — a reviewer who opens a dead link is a rejection.");
   } finally {
     await sql.end({ timeout: 5 });
   }

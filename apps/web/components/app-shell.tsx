@@ -10,7 +10,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { ProjectScopePill } from "@/components/workspace/project-scope-pill";
 import { getViewerAccess } from "@/lib/auth/access";
 import { NAV_SECTIONS, filterNav } from "@/lib/auth/nav-model";
-import { getProjects } from "@/lib/data/projects";
+import { getVisibleProjects } from "@/lib/data/projects";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { SCOPE_COOKIE, resolveActiveScope } from "@/lib/workspace/scope";
@@ -21,7 +21,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
   const sections = filterNav(NAV_SECTIONS, { permissions, roleKeys });
   const signedIn = Boolean(profile.authUserId) || profile.isDevelopmentFallback;
 
-  const projects = (await getProjects()).map((project) => ({
+  const projects = (await getVisibleProjects()).map((project) => ({
     id: project.id,
     projectCode: project.projectCode,
     projectName: project.projectName,

@@ -3,11 +3,11 @@ import { RecoveryCommandPanel } from "@/components/recovery/recovery-command-pan
 import { PageHeader } from "@/components/page-header";
 import { BackLink } from "@/components/ui/back-link";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
-import { getProjects } from "@/lib/data/projects";
+import { getVisibleProjects } from "@/lib/data/projects";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 
 export default async function RecoveryPage() {
-  const projects = await getProjects();
+  const projects = await getVisibleProjects();
   const activeProjects = projects.length ? projects : demoKernel.projects;
   const assignmentsByProject = await Promise.all(
     activeProjects.map(async (project) => (await getAssignmentsByProjectId(project.id)).data)

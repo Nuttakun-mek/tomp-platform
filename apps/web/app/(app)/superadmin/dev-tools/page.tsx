@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, ClipboardList, DatabaseZap, Gauge, ListChecks, ServerCog, Trash2 } from "lucide-react";
+import { Activity, Apple, ClipboardList, DatabaseZap, Gauge, ListChecks, ServerCog, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 
 const TOOLS = [
@@ -9,7 +9,8 @@ const TOOLS = [
   { href: "/superadmin/dev-tools/readiness", label: "ความพร้อม 12 แกน", detail: "สิ่งที่พร้อม สิ่งที่ต้อง harden ก่อน production", icon: Gauge },
   { href: "/superadmin/dev-tools/runbook", label: "Runbook ดูแลระบบ", detail: "ขั้นตอนตรวจสุขภาพระบบและรับมือเหตุผิดปกติ", icon: ListChecks },
   { href: "/superadmin/dev-tools/pilot-checklist", label: "Pilot checklist", detail: "ลำดับทดสอบ end-to-end ทีละบทบาท", icon: ClipboardList },
-  { href: "/superadmin/dev-tools/purge-test-data", label: "ล้างข้อมูลทดสอบ", detail: "ลบข้อมูลที่เครื่องมือทดสอบสร้าง (smokeTest) ออกจากฐานข้อมูลจริง", icon: Trash2 }
+  { href: "/superadmin/dev-tools/purge-test-data", label: "ล้างข้อมูลทดสอบ", detail: "ลบข้อมูลที่เครื่องมือทดสอบสร้าง (smokeTest) ออกจากฐานข้อมูลจริง", icon: Trash2 },
+  { href: "/superadmin/dev-tools/apple-review", label: "งานสาธิตสำหรับ Apple", detail: "สร้าง QR ถาวรให้ผู้ตรวจ App Review ใช้งานได้ครบทุกฟังก์ชัน ซ่อนจากรายการโครงการ", icon: Apple }
 ];
 
 export default function DevToolsPage() {

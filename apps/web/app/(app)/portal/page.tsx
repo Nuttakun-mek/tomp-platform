@@ -4,10 +4,10 @@ import { PortalMissionStatus } from "@/components/portal/portal-mission-status";
 import { PortalProjectCard } from "@/components/portal/portal-project-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getMissionsByProjectId } from "@/lib/data/missions";
-import { getProjects } from "@/lib/data/projects";
+import { getVisibleProjects } from "@/lib/data/projects";
 
 export default async function PortalPage() {
-  const projects = await getProjects();
+  const projects = await getVisibleProjects();
   const missionsByProject = await Promise.all(
     projects.map(async (project) => (await getMissionsByProjectId(project.id)).data)
   );

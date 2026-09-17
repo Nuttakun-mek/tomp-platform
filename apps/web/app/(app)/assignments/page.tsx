@@ -10,7 +10,7 @@ import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getObserverLinksByProjectId, getProjectObserverLinkByProjectId } from "@/lib/data/observer-access";
-import { getProjects } from "@/lib/data/projects";
+import { getVisibleProjects } from "@/lib/data/projects";
 import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
@@ -24,7 +24,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
   const params = searchParams ? await searchParams : {};
   const viewer = await getCurrentUserProfile();
   if (!viewer.authUserId && !viewer.isDevelopmentFallback) redirect("/login");
-  const projects = await getProjects();
+  const projects = await getVisibleProjects();
 
   if (!projects.length) {
     return (

@@ -21,6 +21,31 @@ export const getProjects = cache(async function getProjects(): Promise<Project[]
   }
 });
 
+/**
+ * True for the demo project kept for Apple's app reviewer.
+ *
+ * It is a real project doing real work — that is the point, the reviewer has to
+ * be able to drive the whole flow — but it is not one of yours, so it has no
+ * business in a list you pick from.
+ */
+export function isAppleReviewProject(project: Project): boolean {
+  return project.metadata?.appleReview === true;
+}
+
+/**
+ * The projects an operator chooses between.
+ *
+ * Deliberately *not* a filter inside `getProjects()`. Half of that function's
+ * callers resolve a project someone already named — mission control finds the
+ * one in the URL, the users page needs every project to assign a role against —
+ * and hiding a row from them turns "open this project" into a redirect to
+ * nowhere. Listing and resolving are different questions, so they get different
+ * functions, and each call site says which one it is asking.
+ */
+export async function getVisibleProjects(): Promise<Project[]> {
+  return (await getProjects()).filter((project) => !isAppleReviewProject(project));
+}
+
 export async function getProjectById(projectId: string): Promise<Project | null> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return getProjectByIdViaPostgres(projectId);

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, FolderKanban, Plus } from "lucide-react";
 import { ProjectArchiveButton } from "@/components/projects/project-archive-button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getProjects } from "@/lib/data/projects";
+import { getVisibleProjects } from "@/lib/data/projects";
 import { getViewerAccess } from "@/lib/auth/access";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
@@ -23,7 +23,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const canManage = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.update");
   const canCreate = permissions.includes("*") || permissions.includes("project.create");
 
-  const all = await getProjects();
+  const all = await getVisibleProjects();
   const live = all.filter((p) => !["closed", "archived"].includes(p.status));
   const archived = all.filter((p) => p.status === "archived");
   const shown = showArchived ? archived : live;
