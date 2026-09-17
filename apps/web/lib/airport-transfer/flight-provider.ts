@@ -5,9 +5,13 @@ import { readCleanEnv } from "@/lib/env";
 export interface FlightVerificationCandidate {
   flightNumber: string;
   originAirport: string | null;
+  originAirportName: string | null;
   destinationAirport: string | null;
+  destinationAirportName: string | null;
   scheduledDepartureAt: string | null;
+  scheduledDepartureLocal: string | null;
   scheduledArrivalAt: string | null;
+  scheduledArrivalLocal: string | null;
   status: string | null;
   raw: unknown;
 }
@@ -49,9 +53,13 @@ export async function verifyFlightByNumberAndDate(flightNumber: string, dateLoca
       candidates: payload.map((flight) => ({
         flightNumber: nestedString(flight, "number") || normalized,
         originAirport: nestedString(flight, "departure", "airport", "iata"),
+        originAirportName: nestedString(flight, "departure", "airport", "name"),
         destinationAirport: nestedString(flight, "arrival", "airport", "iata"),
+        destinationAirportName: nestedString(flight, "arrival", "airport", "name"),
         scheduledDepartureAt: nestedString(flight, "departure", "scheduledTime", "utc"),
+        scheduledDepartureLocal: nestedString(flight, "departure", "scheduledTime", "local"),
         scheduledArrivalAt: nestedString(flight, "arrival", "scheduledTime", "utc"),
+        scheduledArrivalLocal: nestedString(flight, "arrival", "scheduledTime", "local"),
         status: nestedString(flight, "status"),
         raw: flight
       }))
@@ -60,4 +68,3 @@ export async function verifyFlightByNumberAndDate(flightNumber: string, dateLoca
     return { ok: false, provider: "aerodatabox", reason: "provider_error", detail: error instanceof Error ? error.message : "unknown error" };
   }
 }
-

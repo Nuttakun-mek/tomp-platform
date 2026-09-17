@@ -16,6 +16,21 @@ export interface CreateTransferCaseState {
   fieldErrors?: Record<string, string[]>;
 }
 
+export interface FlightLookupCandidate {
+  flightNumber: string;
+  originAirport: string;
+  originAirportName: string | null;
+  destinationAirport: string;
+  destinationAirportName: string | null;
+  scheduledDepartureLocal: string;
+  scheduledArrivalLocal: string;
+  status: string | null;
+}
+
+export type FlightLookupState =
+  | { ok: true; message: string; candidates: FlightLookupCandidate[] }
+  | { ok: false; message: string; reason: "invalid_input" | "not_configured" | "not_found" | "provider_error" };
+
 const optionalText = z.string().trim().transform((value) => value || null);
 const createCaseSchema = z.object({
   direction: z.enum(["arrival", "departure"]),
@@ -86,6 +101,59 @@ function taskTemplate(direction: "arrival" | "departure") {
     ["passenger_handed_over", "ส่งมอบผู้โดยสารแล้ว", "airport_coordinator"]
   ];
   return [...shared, ...(direction === "arrival" ? arrival : departure), ["completed", "ปิดงาน", "airport_dispatcher"]] as Array<[string, string, string]>;
+}
+
+export async function lookupAirportTransferFlight(input: {
+  travelDate: string;
+  flightNumber: string;
+}): Promise<FlightLookupState> {
+  const access = await getAirportTransferAccess();
+  if (!access.allowed || !access.canManage) {
+    return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ตรวจสอบเที่ยวบิน", reason: "invalid_input" };
+  }
+
+  const parsed = z.object({
+    travelDate: z.string().date(),
+    flightNumber: z.string().trim().min(2).max(10).transform((value) => value.replace(/\s+/g, "").toUpperCase())
+  }).safeParse(input);
+
+  if (!parsed.success) {
+    return { ok: false, message: "กรุณาระบุวันเดินทางและหมายเลขเที่ยวบินให้ครบถ้วน", reason: "invalid_input" };
+  }
+
+  const verification = await verifyFlightByNumberAndDate(parsed.data.flightNumber, parsed.data.travelDate);
+  if (!verification.ok) {
+    const messages = {
+      not_configured: "ยังไม่ได้ตั้งค่า Flight API กรุณาติดต่อผู้ดูแลระบบ",
+      not_found: "ไม่พบเที่ยวบินนี้ในวันที่ระบุ กรุณาตรวจสอบวันเดินทางและหมายเลขเที่ยวบิน",
+      provider_error: "ผู้ให้บริการข้อมูลเที่ยวบินไม่ตอบสนอง กรุณาลองใหม่อีกครั้ง"
+    } as const;
+    return { ok: false, message: messages[verification.reason], reason: verification.reason };
+  }
+
+  const candidates = verification.candidates.flatMap((candidate) => {
+    if (!candidate.originAirport || !candidate.destinationAirport || !candidate.scheduledDepartureLocal || !candidate.scheduledArrivalLocal) return [];
+    return [{
+      flightNumber: candidate.flightNumber,
+      originAirport: candidate.originAirport,
+      originAirportName: candidate.originAirportName,
+      destinationAirport: candidate.destinationAirport,
+      destinationAirportName: candidate.destinationAirportName,
+      scheduledDepartureLocal: candidate.scheduledDepartureLocal,
+      scheduledArrivalLocal: candidate.scheduledArrivalLocal,
+      status: candidate.status
+    }];
+  });
+
+  if (!candidates.length) {
+    return { ok: false, message: "พบเที่ยวบิน แต่ข้อมูลสนามบินหรือเวลาไม่ครบถ้วน กรุณาตรวจสอบด้วยตนเอง", reason: "provider_error" };
+  }
+
+  return {
+    ok: true,
+    message: candidates.length === 1 ? "ตรวจสอบเที่ยวบินสำเร็จ" : `พบข้อมูลเที่ยวบิน ${candidates.length} รายการ กรุณาเลือกรายการที่ถูกต้อง`,
+    candidates
+  };
 }
 
 export async function createAirportTransferCase(_previous: CreateTransferCaseState, formData: FormData): Promise<CreateTransferCaseState> {
