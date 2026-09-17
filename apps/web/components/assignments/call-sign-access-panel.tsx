@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Copy, ExternalLink, Eye, LockKeyhole, QrCode, RefreshCw, Trash2, Undo2 } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, LockKeyhole, QrCode, RefreshCw, Trash2, Undo2 } from "lucide-react";
 import type { Assignment, CallSign, Driver, Vehicle } from "@tomp/types/domain";
 import { deleteCallSignAction, revokeCallSignQrAction } from "@/app/actions/call-signs";
 import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
@@ -146,6 +146,10 @@ function ProjectFleetAccessCard({
     });
   }
 
+  const activeCallSigns = callSigns.filter((callSign) => callSign.status === "active");
+  const scopeCount = selectedIds.size;
+  const hasLink = Boolean(url);
+
   return (
     <section className="rounded-card border border-teal-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -161,114 +165,164 @@ function ProjectFleetAccessCard({
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_240px]">
-        <div className="grid min-w-0 content-start gap-3">
-          <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(13rem,0.8fr)]">
-            <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
+      {/* One band per step, in the order an operator works through them.
+          The card used to sit the QR in a fixed 240px column beside the form,
+          so a project with no link yet spent a quarter of its width on a grey
+          "ยังไม่มี QR" box, while the three controls were crammed into a
+          three-column grid that wrapped differently at every width. Settings,
+          scope, action, result — and the result only exists once there is one. */}
+      <div className="mt-4 grid min-w-0 gap-3">
+        <fieldset className="grid min-w-0 gap-2.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <legend className="px-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">ตั้งค่าลิงก์</legend>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-ink-soft">
               <input type="checkbox" checked={withPin} onChange={(event) => setWithPin(event.target.checked)} className="h-4 w-4 accent-teal-600" />
               <LockKeyhole className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 leading-5">ใช้ PIN สำหรับลิงก์นี้</span>
+              <span className="min-w-0 leading-5">ต้องใส่ PIN ก่อนดู</span>
             </label>
-            <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-ink-soft">
+            <label className="flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-ink-soft">
               <input type="checkbox" checked={showCrew} onChange={(event) => setShowCrew(event.target.checked)} className="h-4 w-4 accent-teal-600" />
               <span className="min-w-0 leading-5">แสดงชื่อคนขับ</span>
             </label>
-            <label className="grid min-h-11 min-w-0 gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-ink-soft">
-              <span>วันหมดอายุลิงก์</span>
+          </div>
+
+          <div className="grid min-w-0 gap-1.5 sm:grid-cols-[minmax(11rem,14rem)_minmax(0,1fr)] sm:items-center">
+            <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-ink-soft">
+              <span className="shrink-0">หมดอายุ</span>
               <input
                 type="date"
                 value={expiresOn}
                 onChange={(event) => setExpiresOn(event.target.value)}
-                className="min-h-8 rounded-lg border border-slate-200 bg-white px-2 text-[13px] font-bold text-ink"
+                className="min-w-0 flex-1 bg-transparent text-[13px] font-bold text-ink outline-none"
               />
             </label>
+            <p className="min-w-0 text-[12px] leading-5 text-ink-soft">
+              {expiresOn
+                ? `ใช้ได้ถึง ${formatObserverExpiryLabel(endOfBangkokDate(expiresOn))}`
+                : "เว้นว่างไว้ ระบบจะตั้งวันหมดอายุที่ยังใช้งานได้จริงให้เอง"}
+            </p>
           </div>
+        </fieldset>
 
-          <p className="rounded-xl bg-teal-50 px-3 py-2 text-[12px] font-semibold leading-5 text-teal-900">
-            {expiresOn
-              ? `ลิงก์นี้จะหมดอายุหลังวันที่ ${formatObserverExpiryLabel(endOfBangkokDate(expiresOn))}`
-              : "หากไม่ระบุวันหมดอายุ ระบบจะกำหนดวันหมดอายุที่ยังใช้งานได้จริงโดยอัตโนมัติ"}
-          </p>
-
-          <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs font-bold text-slate-500">จำกัดเฉพาะบาง Call Sign (ไม่เลือก = ทั้งโครงการ)</p>
-            <div className="mt-2 flex max-h-24 flex-wrap gap-2 overflow-y-auto pr-1">
-              {callSigns.filter((callSign) => callSign.status === "active").map((callSign) => (
+        <fieldset className="grid min-w-0 gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <legend className="px-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">ขอบเขตที่ลิงก์มองเห็น</legend>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="min-w-0 text-[12px] leading-5 text-ink-soft">
+              {scopeCount
+                ? `เลือกไว้ ${scopeCount} หน่วย — ลิงก์นี้จะเห็นเฉพาะหน่วยที่เลือก`
+                : "ยังไม่เลือก — ลิงก์นี้จะเห็นรถทุกหน่วยในโครงการ"}
+            </p>
+            {scopeCount ? (
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="shrink-0 rounded-command px-2 py-1 text-[12px] font-bold text-operation underline-offset-2 hover:underline"
+              >
+                ล้างการเลือก
+              </button>
+            ) : null}
+          </div>
+          {activeCallSigns.length ? (
+            <div className="flex max-h-28 min-w-0 flex-wrap gap-1.5 overflow-y-auto pr-1">
+              {activeCallSigns.map((callSign) => (
                 <button
                   key={callSign.id}
                   type="button"
                   onClick={() => toggle(callSign.id)}
+                  aria-pressed={selectedIds.has(callSign.id)}
                   className={`inline-flex h-8 max-w-full shrink-0 items-center rounded-full px-3 text-xs font-bold transition ${
-                    selectedIds.has(callSign.id) ? "bg-teal-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
+                    selectedIds.has(callSign.id) ? "bg-teal-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:ring-teal-300"
                   }`}
                 >
                   <span className="truncate">{callSign.callSign}</span>
                 </button>
               ))}
             </div>
-          </div>
+          ) : (
+            <p className="rounded-lg bg-white px-3 py-2 text-[12px] text-ink-faint">ยังไม่มีหน่วยรถที่ใช้งานอยู่ในโครงการนี้</p>
+          )}
+        </fieldset>
 
-          {message ? <ActionFeedback tone={tone} message={message} /> : null}
+        {message ? <ActionFeedback tone={tone} message={message} /> : null}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => issueProjectLink(false)}
-              className="inline-flex h-10 max-w-full shrink-0 items-center justify-center gap-2 rounded-command bg-operation px-4 text-sm font-bold leading-none text-white disabled:opacity-50"
-              title={projectObserverLink || url ? "แสดงลิงก์ติดตามโครงการที่ยังใช้งานอยู่" : "สร้างลิงก์ติดตามโครงการ"}
-            >
-              <QrCode className="h-4 w-4 shrink-0" />
-              <span className="truncate">{projectObserverLink || url ? "แสดงลิงก์เดิม" : "สร้างลิงก์ติดตามโครงการ"}</span>
-            </button>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => issueProjectLink(true)}
-              className="inline-flex h-10 max-w-full shrink-0 items-center justify-center gap-2 rounded-command border border-slate-300 bg-white px-4 text-sm font-bold leading-none text-ink-soft disabled:opacity-50"
-              title="ออกลิงก์ใหม่เมื่อจำเป็นเท่านั้น เพราะลิงก์เดิมจะถูกยกเลิก"
-            >
-              <RefreshCw className="h-4 w-4 shrink-0" />
-              <span className="truncate">ออกลิงก์ใหม่</span>
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => issueProjectLink(false)}
+            className="inline-flex h-11 max-w-full shrink-0 items-center justify-center gap-2 rounded-command bg-operation px-4 text-sm font-bold leading-none text-white disabled:opacity-50"
+            title={hasLink || projectObserverLink ? "แสดงลิงก์ติดตามโครงการที่ยังใช้งานอยู่" : "สร้างลิงก์ติดตามโครงการ"}
+          >
+            <QrCode className="h-4 w-4 shrink-0" />
+            <span className="truncate">{hasLink || projectObserverLink ? "แสดงลิงก์เดิม" : "สร้างลิงก์ติดตามโครงการ"}</span>
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => issueProjectLink(true)}
+            className="inline-flex h-11 max-w-full shrink-0 items-center justify-center gap-2 rounded-command border border-slate-300 bg-white px-4 text-sm font-bold leading-none text-ink-soft disabled:opacity-50"
+            title="ออกลิงก์ใหม่เมื่อจำเป็นเท่านั้น เพราะลิงก์เดิมจะถูกยกเลิกทันที"
+          >
+            <RefreshCw className="h-4 w-4 shrink-0" />
+            <span className="truncate">ออกลิงก์ใหม่</span>
+          </button>
+          <p className="min-w-0 flex-1 text-[11px] leading-4 text-ink-faint">
+            การตั้งค่าด้านบนจะมีผลเมื่อกด “ออกลิงก์ใหม่” เท่านั้น — ลิงก์ที่แจกไปแล้วจะไม่เปลี่ยนตาม
+          </p>
         </div>
 
-        <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 text-center xl:w-60">
-          {qr ? (
-            // eslint-disable-next-line @next/next/no-img-element -- QR is a generated data URL, not a remote image asset.
-            <img src={qr} alt="QR Fleet View" className="mx-auto h-40 w-40 rounded-xl bg-white p-2 sm:h-44 sm:w-44" />
-          ) : (
-            <div className="grid h-40 place-items-center rounded-xl bg-white text-sm font-semibold text-slate-400 sm:h-44">ยังไม่มี QR</div>
-          )}
-          {pin ? (
-            <div className="mt-2 rounded-xl border border-amber-400 bg-amber-50 px-3 py-2 text-left">
-              <p className="text-[10px] font-bold text-amber-900">รหัส PIN ของลิงก์นี้ (แสดงครั้งเดียว)</p>
-              <p className="text-center text-2xl font-bold leading-tight tracking-[0.25em] text-amber-900">{pin}</p>
-              <p className="mt-1 text-[10px] leading-4 text-amber-800">
-                บันทึกหรือจดเดี๋ยวนี้ ก่อนปิดหรือรีเฟรชหน้านี้ — รหัสนี้เก็บเป็นค่าเข้ารหัสและจะไม่แสดงอีก ถ้าพลาดต้องกด “ออกลิงก์ใหม่” ซึ่งลิงก์เดิมจะใช้ไม่ได้ทันที · ส่งรหัสคนละช่องทางกับ QR
-              </p>
-            </div>
-          ) : null}
-          {!pin && projectObserverLink?.hasPin ? (
-            <p className="mt-2 rounded-xl bg-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-600">
-              ลิงก์นี้มี PIN อยู่แล้ว แต่แสดงซ้ำไม่ได้ — ถ้าลืม ให้กด “ออกลิงก์ใหม่”
-            </p>
-          ) : null}
-          {url ? (
-            <div className="mt-2 grid gap-2">
-              <p className="max-h-20 overflow-y-auto break-all rounded-xl bg-white px-3 py-2 text-left text-[11px] leading-4 text-slate-600">{url}</p>
-              <div className="flex justify-center gap-2">
-                <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-white text-slate-600 ring-1 ring-slate-200 transition hover:text-operation hover:ring-operation/30" onClick={() => navigator.clipboard.writeText(url)} title="คัดลอกลิงก์ติดตาม">
-                  <Copy className="h-4 w-4" />
+        {hasLink ? (
+          <div className="grid min-w-0 items-start gap-3 rounded-xl border border-teal-200 bg-teal-50/50 p-3 sm:grid-cols-[auto_minmax(0,1fr)]">
+            {qr ? (
+              // eslint-disable-next-line @next/next/no-img-element -- QR is a generated data URL, not a remote image asset.
+              <img src={qr} alt="QR ลิงก์ติดตามทั้งโครงการ" className="mx-auto h-40 w-40 rounded-xl bg-white p-2" />
+            ) : (
+              <div className="mx-auto grid h-40 w-40 place-items-center rounded-xl bg-white text-[12px] font-semibold text-slate-400">กำลังสร้าง QR</div>
+            )}
+            <div className="grid min-w-0 content-start gap-2">
+              <p className="text-[12px] font-bold text-teal-900">ลิงก์อ่านอย่างเดียวสำหรับลูกค้าหรือผู้ติดตาม</p>
+              <p className="max-h-20 min-w-0 overflow-y-auto break-all rounded-lg bg-white px-3 py-2 text-[11px] leading-4 text-slate-600">{url}</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(url)}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-command border border-slate-300 bg-white px-3 text-[12px] font-semibold leading-none text-ink-soft"
+                  title="คัดลอกลิงก์ติดตาม"
+                >
+                  <Copy className="h-3.5 w-3.5 shrink-0" /> คัดลอกลิงก์
                 </button>
-                <a className="grid h-9 w-9 place-items-center rounded-full bg-white text-slate-600 ring-1 ring-slate-200 transition hover:text-operation hover:ring-operation/30" href={url} target="_blank" rel="noreferrer" title="เปิดลิงก์ติดตาม">
-                  <ExternalLink className="h-4 w-4" />
+                <a
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-command border border-slate-300 bg-white px-3 text-[12px] font-semibold leading-none text-ink-soft"
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="เปิดลิงก์ติดตามในแท็บใหม่"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0" /> เปิดดู
                 </a>
               </div>
+              {pin ? (
+                <div className="rounded-xl border border-amber-400 bg-amber-50 px-3 py-2">
+                  <p className="text-[10px] font-bold text-amber-900">รหัส PIN ของลิงก์นี้ (แสดงครั้งเดียว)</p>
+                  <p className="text-center text-2xl font-bold leading-tight tracking-[0.25em] text-amber-900">{pin}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-amber-800">
+                    บันทึกหรือจดเดี๋ยวนี้ ก่อนปิดหรือรีเฟรชหน้านี้ — รหัสนี้เก็บเป็นค่าเข้ารหัสและจะไม่แสดงอีก ถ้าพลาดต้องกด “ออกลิงก์ใหม่” ซึ่งลิงก์เดิมจะใช้ไม่ได้ทันที · ส่งรหัสคนละช่องทางกับ QR
+                  </p>
+                </div>
+              ) : null}
+              {!pin && projectObserverLink?.hasPin ? (
+                <p className="rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
+                  ลิงก์นี้มี PIN อยู่แล้ว แต่แสดงซ้ำไม่ได้ — ถ้าลืม ให้กด “ออกลิงก์ใหม่”
+                </p>
+              ) : null}
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-center text-[12px] leading-5 text-ink-soft">
+            ยังไม่มีลิงก์ติดตามของโครงการนี้ — ตั้งค่าด้านบนแล้วกด “สร้างลิงก์ติดตามโครงการ”
+          </p>
+        )}
       </div>
     </section>
   );
@@ -437,54 +491,95 @@ export function CallSignAccessPanel({
 
   const ready = units.filter((u) => u.driver && u.vehicle);
 
-  function issue(unit: Unit, replaceExisting: boolean) {
+  /**
+   * Both halves of a unit's handover, in one press.
+   *
+   * They used to be two buttons, and each rebuilt the whole sheet out of its
+   * own result while copying the other half from whatever happened to be left
+   * in this tab. So "ออก QR" returned a sheet carrying only the driver's code,
+   * and "สร้าง QR ผู้โดยสาร/ผู้ติดตาม" returned one carrying only the
+   * passenger's — and an operator with a driver standing in front of them had
+   * to know to press both, in the right order, to get a complete handover.
+   * unit-setup-form has issued the pair together since the day it was written;
+   * this is that same thing for a unit that already exists.
+   */
+  function issueUnitCredentials(unit: Unit, replaceDriverQr: boolean) {
     setMessage(null);
     startTransition(async () => {
-      const result = await createDriverAccessTokenAction({
-        projectId,
-        callSignId: unit.callSign.id,
-        driverId: unit.callSign.driverId || null,
-        replaceExisting
-      });
+      const [driverResult, observerResult] = await Promise.all([
+        createDriverAccessTokenAction({
+          projectId,
+          callSignId: unit.callSign.id,
+          driverId: unit.callSign.driverId || null,
+          replaceExisting: replaceDriverQr
+        }),
+        createObserverAccessTokenAction({ projectId, callSignId: unit.callSign.id })
+      ]);
 
-      if (!result.success) {
-        // The refusal carries the Call Sign, which is how we know to offer the
-        // deliberate reissue rather than just showing an error.
-        const blocked = (result.fieldErrors?.callSignId ?? [])[0];
-        if (blocked) {
-          setConfirmReissue(unit.callSign.id);
-          setTone("warning");
-          setMessage(result.error || "Call Sign นี้มี QR ที่ใช้งานอยู่แล้ว");
-          return;
-        }
-        setConfirmReissue(null);
-        setTone("danger");
-        setMessage(result.error || "ออก QR ไม่สำเร็จ");
-        return;
-      }
+      const driverData = driverResult.success ? (driverResult.data as { accessUrl?: string; pin?: string }) : null;
+      const observerData = observerResult.success
+        ? (observerResult.data as { accessUrl?: string; trackUrl?: string; reused?: boolean })
+        : null;
+      const driverUrl = driverData?.accessUrl || "";
+      const observerUrl = observerData?.trackUrl || observerData?.accessUrl || "";
+      const [driverQr, observerQr] = await Promise.all([
+        driverUrl ? renderQr(driverUrl).catch(() => null) : Promise.resolve(null),
+        observerUrl ? renderQr(observerUrl).catch(() => null) : Promise.resolve(null)
+      ]);
 
-      const data = result.data as { accessUrl?: string; pin?: string };
-      const accessUrl = data.accessUrl || "";
-      setConfirmReissue(null);
-      const qr = accessUrl ? await renderQr(accessUrl) : null;
+      // A live driver QR is not an error to decode — it is the system refusing
+      // to invalidate a code someone is already holding. The passenger half is
+      // untouched by that refusal, so it still goes onto the sheet.
+      const driverBlocked = !driverResult.success && Boolean((driverResult.fieldErrors?.callSignId ?? [])[0]);
+      setConfirmReissue(driverBlocked ? unit.callSign.id : null);
+
+      const previous = issued[unit.callSign.id];
       onIssued?.({
         callSignId: unit.callSign.id,
         callSignLabel: unit.callSign.callSign,
         driverName: unit.driver?.fullName ?? "ไม่ทราบชื่อคนขับ",
         vehicleLabel: unit.vehicle ? `${unit.vehicle.plateNumber} · ${unit.vehicle.vehicleType}` : "ไม่ทราบรถ",
-        driverUrl: accessUrl,
-        driverQr: qr,
-        pin: data.pin || null,
-        observerUrl: issued[unit.callSign.id]?.observerUrl ?? "",
-        observerQr: issued[unit.callSign.id]?.observerQr ?? null
+        driverUrl: driverUrl || previous?.driverUrl || "",
+        driverQr: driverQr ?? previous?.driverQr ?? null,
+        pin: driverData?.pin ?? previous?.pin ?? null,
+        observerUrl: observerUrl || previous?.observerUrl || "",
+        observerQr: observerQr ?? previous?.observerQr ?? null
       });
       setExpanded((current) => new Set(current).add(unit.callSign.id));
+
+      if (!driverResult.success && !observerResult.success) {
+        setTone("danger");
+        setMessage(driverResult.error || observerResult.error || "ออก QR ไม่สำเร็จ");
+        return;
+      }
+
+      if (driverBlocked) {
+        setTone("warning");
+        setMessage(
+          `${driverResult.error || "หน่วยนี้มี QR คนขับที่ยังใช้งานอยู่"} — QR ผู้โดยสารแสดงไว้ให้แล้วด้านล่าง กดยืนยันอีกครั้งถ้าต้องการออก QR คนขับใบใหม่`
+        );
+        return;
+      }
+
+      if (!driverResult.success || !observerResult.success) {
+        setTone("warning");
+        setMessage(
+          driverResult.success
+            ? `ออก QR คนขับแล้ว แต่ QR ผู้โดยสารไม่สำเร็จ — ${observerResult.error || "ลองอีกครั้ง"}`
+            : `ออก QR ผู้โดยสารแล้ว แต่ QR คนขับไม่สำเร็จ — ${driverResult.error || "ลองอีกครั้ง"}`
+        );
+        return;
+      }
+
       setTone("success");
       setMessage(
-        replaceExisting
-          ? "ออก QR ใบใหม่แล้ว ใบเดิมและรหัสเดิมใช้ไม่ได้อีก กรุณาแจ้งคนขับ"
-          : "ออก QR และรหัสสำเร็จ ส่ง QR กับรหัสคนละช่องทาง"
+        replaceDriverQr
+          ? "ออก QR ใหม่ครบทั้ง 2 ใบแล้ว — ใบคนขับเดิมและรหัสเดิมใช้ไม่ได้อีก กรุณาแจ้งคนขับ"
+          : "ออก QR ครบทั้ง 2 ใบแล้ว — ส่ง QR คนขับกับรหัสคนละช่องทาง"
       );
+      // A new passenger link is now in the database; refresh so it is redrawn
+      // from there on the next load rather than living only in this tab.
+      if (!observerData?.reused) router.refresh();
     });
   }
 
@@ -541,46 +636,6 @@ export function CallSignAccessPanel({
       observerUrl: live?.observerUrl || storedUrl,
       observerQr: live?.observerQr || storedQr
     };
-  }
-
-  function issueObserverLink(unit: Unit) {
-    setMessage(null);
-    startTransition(async () => {
-      const result = await createObserverAccessTokenAction({ projectId, callSignId: unit.callSign.id });
-      if (!result.success) {
-        setTone("danger");
-        setMessage(result.error || "สร้างลิงก์ไม่สำเร็จ");
-        return;
-      }
-      const data = result.data as { trackUrl?: string; accessUrl?: string; reused?: boolean };
-      const url = data.trackUrl || data.accessUrl || "";
-
-      // This used to stop at the URL and render it as text, so the button called
-      // "ลิงก์ผู้โดยสาร" produced no QR at all — the one thing a passenger can
-      // actually use. It goes onto the same sheet as the driver's.
-      const existing = issued[unit.callSign.id];
-      onIssued?.({
-        callSignId: unit.callSign.id,
-        callSignLabel: unit.callSign.callSign,
-        driverName: unit.driver?.fullName ?? "ไม่ทราบชื่อคนขับ",
-        vehicleLabel: unit.vehicle ? `${unit.vehicle.plateNumber} · ${unit.vehicle.vehicleType}` : "ไม่ทราบรถ",
-        driverUrl: existing?.driverUrl ?? "",
-        driverQr: existing?.driverQr ?? null,
-        pin: existing?.pin ?? null,
-        observerUrl: url,
-        observerQr: url ? await renderQr(url) : null
-      });
-      setExpanded((current) => new Set(current).add(unit.callSign.id));
-      setTone("success");
-      setMessage(
-        data.reused
-          ? "แสดง QR ผู้โดยสารใบเดิม ลิงก์นี้ยังใช้งานได้ ไม่ได้ออกใบใหม่"
-          : "สร้าง QR ผู้โดยสาร/ผู้ติดตามแล้ว ลิงก์นี้ดูตำแหน่งได้อย่างเดียว แก้ไขงานไม่ได้"
-      );
-      // A new link is now in the database; refresh so it is redrawn from there
-      // on the next load rather than living only in this tab.
-      if (!data.reused) router.refresh();
-    });
   }
 
   return (
@@ -709,30 +764,27 @@ export function CallSignAccessPanel({
 
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  {/* One press, both codes. Two buttons meant two half-sheets
+                      and an order to remember; the handover is one thing. */}
                   <button
                     type="button"
                     disabled={isPending || !crewed}
-                    onClick={() => issue(unit, needsConfirm)}
+                    onClick={() => issueUnitCredentials(unit, needsConfirm)}
+                    title={
+                      needsConfirm
+                        ? "ออก QR คนขับใบใหม่ — ใบเดิมและรหัสเดิมจะใช้ไม่ได้ทันที"
+                        : "ออก QR คนขับและ QR ผู้โดยสาร/ผู้ติดตาม พร้อมกันในครั้งเดียว"
+                    }
                     className={`flex min-h-9 items-center gap-1.5 rounded-command px-3 text-[12px] font-semibold text-white disabled:opacity-40 ${
                       needsConfirm || hasIssuedSheet ? "bg-amber-600" : "bg-route"
                     }`}
                   >
                     {needsConfirm ? <RefreshCw className="h-3.5 w-3.5" /> : <QrCode className="h-3.5 w-3.5" />}
-                    {needsConfirm ? "ยืนยันออก QR ใหม่" : hasIssuedSheet ? "ออก QR ใหม่" : "ออก QR"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || !crewed}
-                    onClick={() => issueObserverLink(unit)}
-                    title={
-                      hasObserverLink
-                        ? "แสดง QR ผู้โดยสารใบเดิมที่ยังใช้งานได้"
-                        : "สร้าง QR สำหรับผู้โดยสาร/ผู้ติดตาม ดูตำแหน่งได้อย่างเดียว"
-                    }
-                    className="flex min-h-9 items-center gap-1.5 rounded-command border border-slate-300 bg-white px-3 text-[12px] font-semibold text-ink-soft disabled:opacity-40"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    {hasObserverLink ? "แสดง QR ผู้โดยสาร" : "สร้าง QR ผู้โดยสาร/ผู้ติดตาม"}
+                    {needsConfirm
+                      ? "ยืนยันออก QR ใหม่ทั้ง 2 ใบ"
+                      : hasIssuedSheet || hasObserverLink
+                        ? "ออก QR ใหม่ทั้ง 2 ใบ"
+                        : "ออก QR ทั้ง 2 ใบ"}
                   </button>
                   <button
                     type="button"
