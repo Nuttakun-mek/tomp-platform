@@ -63,7 +63,9 @@ export function CreateAirportTransferCaseForm() {
   const [destinationAirport, setDestinationAirport] = useState("");
   const [destinationAirportName, setDestinationAirportName] = useState<string | null>(null);
   const [departureTime, setDepartureTime] = useState("");
+  const [departureUtc, setDepartureUtc] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
+  const [arrivalUtc, setArrivalUtc] = useState("");
   const [flightLookup, setFlightLookup] = useState<FlightLookupState | null>(null);
   const [selectedFlightIndex, setSelectedFlightIndex] = useState(0);
   const suggestedDeparturePickup = useMemo(() => formatSuggestedTime(departureTime), [departureTime]);
@@ -77,7 +79,9 @@ export function CreateAirportTransferCaseForm() {
     setDestinationAirport(candidate.destinationAirport);
     setDestinationAirportName(candidate.destinationAirportName);
     setDepartureTime(toDateTimeLocal(candidate.scheduledDepartureLocal));
+    setDepartureUtc(candidate.scheduledDepartureAt || "");
     setArrivalTime(toDateTimeLocal(candidate.scheduledArrivalLocal));
+    setArrivalUtc(candidate.scheduledArrivalAt || "");
   }
 
   function invalidateFlightLookup() {
@@ -87,7 +91,9 @@ export function CreateAirportTransferCaseForm() {
     setDestinationAirport("");
     setDestinationAirportName(null);
     setDepartureTime("");
+    setDepartureUtc("");
     setArrivalTime("");
+    setArrivalUtc("");
   }
 
   function checkFlight() {
@@ -161,10 +167,12 @@ export function CreateAirportTransferCaseForm() {
             <Input name="destinationAirport" maxLength={3} value={destinationAirport} onChange={(event) => setDestinationAirport(event.target.value.toUpperCase())} />
           </Field>
           <Field label="เวลาออก" hint="เวลาท้องถิ่นของสนามบินต้นทาง">
-            <Input name="scheduledDepartureLocal" type="datetime-local" value={departureTime} onChange={(event) => setDepartureTime(event.target.value)} />
+            <Input name="scheduledDepartureLocal" type="datetime-local" value={departureTime} onChange={(event) => { setDepartureTime(event.target.value); setDepartureUtc(""); }} />
+            <input name="scheduledDepartureUtc" type="hidden" value={departureUtc} />
           </Field>
           <Field label="เวลาถึง" hint="เวลาท้องถิ่นของสนามบินปลายทาง">
-            <Input name="scheduledArrivalLocal" type="datetime-local" value={arrivalTime} onChange={(event) => setArrivalTime(event.target.value)} />
+            <Input name="scheduledArrivalLocal" type="datetime-local" value={arrivalTime} onChange={(event) => { setArrivalTime(event.target.value); setArrivalUtc(""); }} />
+            <input name="scheduledArrivalUtc" type="hidden" value={arrivalUtc} />
           </Field>
         </div>
       </Section>

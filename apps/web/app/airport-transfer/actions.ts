@@ -23,7 +23,9 @@ export interface FlightLookupCandidate {
   destinationAirport: string;
   destinationAirportName: string | null;
   scheduledDepartureLocal: string;
+  scheduledDepartureAt: string | null;
   scheduledArrivalLocal: string;
+  scheduledArrivalAt: string | null;
   status: string | null;
 }
 
@@ -47,7 +49,9 @@ const createCaseSchema = z.object({
   originAirport: optionalText.transform((value) => value?.toUpperCase() || null),
   destinationAirport: optionalText.transform((value) => value?.toUpperCase() || null),
   scheduledDepartureLocal: optionalText,
+  scheduledDepartureUtc: optionalText,
   scheduledArrivalLocal: optionalText,
+  scheduledArrivalUtc: optionalText,
   pickupName: z.string().trim().min(1, "กรุณาระบุจุดรับ"),
   pickupAddress: optionalText,
   pickupMapsUrl: optionalText,
@@ -140,7 +144,9 @@ export async function lookupAirportTransferFlight(input: {
       destinationAirport: candidate.destinationAirport,
       destinationAirportName: candidate.destinationAirportName,
       scheduledDepartureLocal: candidate.scheduledDepartureLocal,
+      scheduledDepartureAt: candidate.scheduledDepartureAt,
       scheduledArrivalLocal: candidate.scheduledArrivalLocal,
+      scheduledArrivalAt: candidate.scheduledArrivalAt,
       status: candidate.status
     }];
   });
@@ -175,7 +181,9 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
     originAirport: formData.get("originAirport") || "",
     destinationAirport: formData.get("destinationAirport") || "",
     scheduledDepartureLocal: formData.get("scheduledDepartureLocal") || "",
+    scheduledDepartureUtc: formData.get("scheduledDepartureUtc") || "",
     scheduledArrivalLocal: formData.get("scheduledArrivalLocal") || "",
+    scheduledArrivalUtc: formData.get("scheduledArrivalUtc") || "",
     pickupName: formData.get("pickupName"),
     pickupAddress: formData.get("pickupAddress") || "",
     pickupMapsUrl: formData.get("pickupMapsUrl") || "",
@@ -201,8 +209,8 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
 
   const input = parsed.data;
   const profile = await getCurrentUserProfile();
-  const departureAt = thailandTimeToIso(input.scheduledDepartureLocal);
-  const arrivalAt = thailandTimeToIso(input.scheduledArrivalLocal);
+  const departureAt = input.scheduledDepartureUtc || thailandTimeToIso(input.scheduledDepartureLocal);
+  const arrivalAt = input.scheduledArrivalUtc || thailandTimeToIso(input.scheduledArrivalLocal);
   const suggestedPickup = recommendedPickup(input.direction, departureAt, arrivalAt);
   const confirmedPickup = thailandTimeToIso(input.confirmedPickupLocal);
   const caseId = randomUUID();
