@@ -257,3 +257,57 @@ in this spec:
   message type has no field for today while inbound already carries attachments.
 - **Wave 4 — ทรัพยากร.** Creating a person and a vehicle together, with the Call
   Sign and QR issued afterwards on the dispatch page.
+
+- **Wave 5 — สัญลักษณ์รถ.** Every vehicle on the map is the same 9px dot
+  (`L.circleMarker`, `live-tracking-map.tsx:106`) whose only variable is GPS
+  freshness colour, so telling a van from a sedan means opening a popup. The
+  operator wants a real vehicle silhouette, chosen per vehicle.
+
+  **Three colour channels already compete, and this fixes that.** `accentFor`
+  assigns a stable colour per Call Sign meaning *which unit this is*;
+  `TRACKING_MARKER_COLORS` means *how fresh the GPS is*; and Wave 2 adds amber
+  and red meaning *how the time and budget stand*. Amber for a slow signal and
+  amber for a closing window are different emergencies wearing the same colour.
+  Giving type its own channel — **shape** — frees colour to mean one thing at a
+  time: silhouette = vehicle type, ring around the glyph = GPS freshness, fill =
+  unit identity, and time/budget gets a separate numeric badge rather than a
+  third colour, because an overrun is a number a person acts on, not a hue.
+
+  **Icons are already installed.** `lucide-react` ships `Van`, `Car`,
+  `CarFront`, `CarTaxiFront`, `Bus`, `BusFront`, `Truck`, `TruckElectric`,
+  `Ambulance`, `Caravan`, `Bike`, `Scooter`, `Tractor`, `Forklift` — verified in
+  `node_modules`, no new dependency. `Van` matters most: 13 of 25 vehicles are
+  one.
+
+  **Store the choice in `vehicles.metadata.icon`.** That column is jsonb and
+  already carries ten keys, so no migration. The default when nothing is chosen
+  comes from `capacity`, which is clean (2, 4, 5, 8) — **not** from
+  `vehicle_type`, which is free text and unusable: 25 vehicles carry 7 distinct
+  values including `Van` and `van` as separate entries and obvious test junk
+  (`ตู้วววว`, `หรูววววว`, `แว๊นนนน`, `รถทดสอบ`). The icon list becomes the
+  controlled vocabulary `vehicle_type` never had, without forcing anyone to
+  clean the old free text first.
+
+  **This wave builds the first vehicle edit path in the product.** There is no
+  `updateVehicleAction` and no edit form anywhere — only `CreateVehicleForm`.
+  Today a plate typed wrong stays wrong. The picker belongs on the unit card in
+  จัดการ, which already renders ทะเบียน / ประเภทรถ / ที่นั่ง / ยี่ห้อ / สี rows,
+  so it needs no new page; the read-only vehicle profile page is a natural
+  second home.
+
+  **Threading the icon to the map touches four points, in two pairs.**
+  `lib/data/locations.ts` enriches location metadata twice — once over Supabase
+  (select at line 65, builder at 95–109) and once over Postgres as a fallback
+  (select at 145, builder at 171–185). Neither select fetches `capacity` or
+  `metadata`, so both must widen and both builders must emit the icon. Changing
+  only one path leaves the fallback silently iconless, which is the hardest
+  class of bug to notice. `TrackedPoint` then needs the field, and
+  `toTrackedPoint` needs to carry it.
+
+  **Two things must not break.** The marker keeps reading
+  `TRACKING_MARKER_COLORS`, because the legend under the map renders from that
+  same map (`live-location-map.tsx:182`) — recolour the marker alone and the
+  legend starts lying. And `spreadOverlappingMapPoints` offsets markers that
+  sit on top of each other using a threshold tuned for a 9px dot; a larger
+  glyph collides sooner, so that threshold and its test in
+  `lib/map/marker-overlap.test.ts` get revisited in the same pass.
