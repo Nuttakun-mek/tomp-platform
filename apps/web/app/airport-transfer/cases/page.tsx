@@ -1,13 +1,14 @@
 import { AirportTransferCaseCard } from "@/components/airport-transfer/case-card";
 import { ButtonLink } from "@/components/ui/button";
-import { getAirportTransferCases, getLatestAirportTransferFlightSnapshots } from "@/lib/airport-transfer/data";
+import { getAirportTransferCases, getAirportTransferTasksByCaseIds, getLatestAirportTransferFlightSnapshots } from "@/lib/airport-transfer/data";
 
 interface CasesPageProps { searchParams?: Promise<{ direction?: string; status?: string; q?: string; created?: string; trashed?: string }> }
 
 export default async function AirportTransferCasesPage({ searchParams }: CasesPageProps) {
   const params = searchParams ? await searchParams : {};
   const cases = await getAirportTransferCases({ direction: params.direction, status: params.status, query: params.q });
-  const snapshots = await getLatestAirportTransferFlightSnapshots(cases.map((item) => item.id));
+  const caseIds = cases.map((item) => item.id);
+  const [snapshots, tasks] = await Promise.all([getLatestAirportTransferFlightSnapshots(caseIds), getAirportTransferTasksByCaseIds(caseIds)]);
   return (
     <>
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Travel Cases</p><h1 className="mt-1 text-2xl font-semibold">ข้อมูลการเดินทางทั้งหมด</h1><p className="mt-2 text-sm text-slate-500">ค้นหาและกรองตามทิศทาง สถานะ และข้อมูลผู้โดยสาร</p></div><ButtonLink href="/airport-transfer/cases/new">สร้างการ์ดข้อมูล</ButtonLink></header>
@@ -19,7 +20,7 @@ export default async function AirportTransferCasesPage({ searchParams }: CasesPa
         <select name="status" defaultValue={params.status || ""} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm"><option value="">ทุกสถานะ</option><option value="needs_review">รอตรวจสอบ</option><option value="ready_to_assign">พร้อมจัดรถ</option><option value="assigned">จัดรถแล้ว</option><option value="completed">เสร็จสิ้น</option><option value="issue">มีปัญหา</option></select>
         <button className="rounded-xl bg-cyan-800 px-4 py-2.5 text-sm font-semibold text-white">ค้นหา</button>
       </form>
-      <section className="grid gap-2">{cases.length ? cases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} />) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500">ไม่พบข้อมูลตามเงื่อนไข</div>}</section>
+      <section className="grid gap-2">{cases.length ? cases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} />) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500">ไม่พบข้อมูลตามเงื่อนไข</div>}</section>
     </>
   );
 }
