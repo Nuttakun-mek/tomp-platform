@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
+import { createCaseSchema, updateCaseSchema } from "@/lib/airport-transfer/case-schema";
 import { FLIGHT_PROVIDER, verifyFlightByNumberAndDate } from "@/lib/airport-transfer/flight-provider";
 import { flightNumberHelpMessage } from "@/lib/airport-transfer/flight-number";
 import { syncActiveAirportTransferFlights } from "@/lib/airport-transfer/flight-sync";
@@ -51,52 +52,6 @@ export interface CaseLifecycleState {
   ok: boolean;
   message: string;
 }
-
-const optionalText = z.string().trim().transform((value) => value || null);
-const createCaseSchema = z.object({
-  direction: z.enum(["arrival", "departure"]),
-  projectId: z.string().uuid("กรุณาเลือกโครงการ"),
-  clientName: optionalText,
-  passengerTitle: optionalText,
-  passengerFirstName: z.string().trim().min(1, "กรุณากรอกชื่อผู้โดยสาร"),
-  passengerLastName: z.string().trim().min(1, "กรุณากรอกนามสกุลผู้โดยสาร"),
-  passengerEmail: z.union([z.string().trim().email("รูปแบบอีเมลไม่ถูกต้อง"), z.literal("")]).transform((value) => value || null),
-  passengerMobile: optionalText,
-  passengerCount: z.coerce.number().int().min(1).max(99),
-  luggageCount: z.coerce.number().int().min(0).max(999),
-  travelDate: z.string().date("กรุณาระบุวันเดินทาง"),
-  flightNumber: z.string().trim().min(2, "กรุณากรอกหมายเลขเที่ยวบิน").max(10).transform((value) => value.replace(/\s+/g, "").toUpperCase()),
-  originAirport: optionalText.transform((value) => value?.toUpperCase() || null),
-  destinationAirport: optionalText.transform((value) => value?.toUpperCase() || null),
-  scheduledDepartureLocal: optionalText,
-  scheduledDepartureUtc: optionalText,
-  scheduledArrivalLocal: optionalText,
-  scheduledArrivalUtc: optionalText,
-  pickupName: z.string().trim().min(1, "กรุณาระบุจุดรับ"),
-  pickupAddress: optionalText,
-  pickupMapsUrl: optionalText,
-  dropoffName: z.string().trim().min(1, "กรุณาระบุจุดส่ง"),
-  dropoffAddress: optionalText,
-  dropoffMapsUrl: optionalText,
-  confirmedPickupLocal: optionalText,
-  pickupTimeOverrideReason: optionalText,
-  vehicleType: optionalText,
-  vehiclePlate: optionalText,
-  driverName: optionalText,
-  driverPhone: optionalText,
-  notes: optionalText,
-  fastTrack: z.boolean()
-});
-
-const updateCaseSchema = createCaseSchema.extend({
-  // The edit form never lets a case change project, so it never submits a
-  // projectId field — override createCaseSchema's required one so an edit
-  // isn't rejected for a field it was never asked to send.
-  projectId: z.string().uuid().optional(),
-  caseId: z.string().uuid(),
-  originalUpdatedAt: z.string().datetime({ offset: true }),
-  editReason: optionalText
-});
 
 function thailandTimeToIso(value: string | null): string | null {
   if (!value) return null;
