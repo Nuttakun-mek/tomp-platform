@@ -52,6 +52,15 @@ function toDateTimeLocal(value: string) {
   return match?.[0] || "";
 }
 
+function subtractHours(value: string, hours: number) {
+  if (!value || !Number.isFinite(hours)) return "";
+  const date = new Date(`${toDateTimeLocal(value)}:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setMinutes(date.getMinutes() - hours * 60);
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
+}
+
 export function CreateAirportTransferCaseForm() {
   const [state, formAction, pending] = useActionState(createAirportTransferCase, initialState);
   const [isCheckingFlight, startFlightCheck] = useTransition();
@@ -66,6 +75,8 @@ export function CreateAirportTransferCaseForm() {
   const [departureUtc, setDepartureUtc] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
   const [arrivalUtc, setArrivalUtc] = useState("");
+  const [pickupLeadHours, setPickupLeadHours] = useState(3);
+  const [confirmedPickupTime, setConfirmedPickupTime] = useState("");
   const [flightLookup, setFlightLookup] = useState<FlightLookupState | null>(null);
   const [selectedFlightIndex, setSelectedFlightIndex] = useState(0);
   const suggestedDeparturePickup = useMemo(() => formatSuggestedTime(departureTime), [departureTime]);
@@ -78,10 +89,12 @@ export function CreateAirportTransferCaseForm() {
     setOriginAirportName(candidate.originAirportName);
     setDestinationAirport(candidate.destinationAirport);
     setDestinationAirportName(candidate.destinationAirportName);
-    setDepartureTime(toDateTimeLocal(candidate.scheduledDepartureLocal));
+    const nextDepartureTime = toDateTimeLocal(candidate.scheduledDepartureLocal);
+    setDepartureTime(nextDepartureTime);
     setDepartureUtc(candidate.scheduledDepartureAt || "");
     setArrivalTime(toDateTimeLocal(candidate.scheduledArrivalLocal));
     setArrivalUtc(candidate.scheduledArrivalAt || "");
+    if (direction === "departure") setConfirmedPickupTime(subtractHours(nextDepartureTime, pickupLeadHours));
   }
 
   function invalidateFlightLookup() {
@@ -94,6 +107,7 @@ export function CreateAirportTransferCaseForm() {
     setDepartureUtc("");
     setArrivalTime("");
     setArrivalUtc("");
+    setConfirmedPickupTime("");
   }
 
   function checkFlight() {
@@ -109,7 +123,7 @@ export function CreateAirportTransferCaseForm() {
       <Section number="1" title="ประเภทบริการ" description="เลือกทิศทางการเดินทางและลูกค้าผู้ว่าจ้าง">
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="ประเภทบริการ">
-            <Select name="direction" value={direction} onChange={(event) => setDirection(event.target.value as "arrival" | "departure")}>
+            <Select name="direction" value={direction} onChange={(event) => { const value = event.target.value as "arrival" | "departure"; setDirection(value); setConfirmedPickupTime(value === "departure" ? subtractHours(departureTime, pickupLeadHours) : ""); }}>
               <option value="arrival">รับเข้าจากสนามบิน → ที่พัก</option>
               <option value="departure">ส่งออกจากที่พัก → สนามบิน</option>
             </Select>
@@ -167,7 +181,7 @@ export function CreateAirportTransferCaseForm() {
             <Input name="destinationAirport" maxLength={3} value={destinationAirport} onChange={(event) => setDestinationAirport(event.target.value.toUpperCase())} />
           </Field>
           <Field label="เวลาออก" hint="เวลาท้องถิ่นของสนามบินต้นทาง">
-            <Input name="scheduledDepartureLocal" type="datetime-local" value={departureTime} onChange={(event) => { setDepartureTime(event.target.value); setDepartureUtc(""); }} />
+            <Input name="scheduledDepartureLocal" type="datetime-local" value={departureTime} onChange={(event) => { const value = event.target.value; setDepartureTime(value); setDepartureUtc(""); if (direction === "departure") setConfirmedPickupTime(subtractHours(value, pickupLeadHours)); }} />
             <input name="scheduledDepartureUtc" type="hidden" value={departureUtc} />
           </Field>
           <Field label="เวลาถึง" hint="เวลาท้องถิ่นของสนามบินปลายทาง">
@@ -185,7 +199,14 @@ export function CreateAirportTransferCaseForm() {
           <Field label="ที่อยู่จุดส่ง"><Input name="dropoffAddress" /></Field>
           <Field label="Google Maps จุดรับ"><Input name="pickupMapsUrl" type="url" /></Field>
           <Field label="Google Maps จุดส่ง"><Input name="dropoffMapsUrl" type="url" /></Field>
-          <Field label="เวลารับที่ยืนยัน" hint="ปล่อยว่างเพื่อใช้เวลาที่ระบบแนะนำ"><Input name="confirmedPickupLocal" type="datetime-local" /></Field>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <Field label="เวลารับที่ยืนยัน" hint={direction === "departure" ? `คำนวณอัตโนมัติก่อนเครื่องออก ${pickupLeadHours} ชั่วโมง` : "ปล่อยว่างเพื่อใช้เวลาที่ระบบแนะนำ"}>
+              <Input name="confirmedPickupLocal" type="datetime-local" value={confirmedPickupTime} onChange={(event) => setConfirmedPickupTime(event.target.value)} />
+            </Field>
+            <Field label="รับล่วงหน้า (ชั่วโมง)" hint="ค่าเริ่มต้น 3 ชั่วโมง">
+              <Input name="pickupLeadHours" type="number" min="0" max="24" step="0.5" value={pickupLeadHours} disabled={direction !== "departure"} onChange={(event) => { const hours = Number(event.target.value); setPickupLeadHours(hours); setConfirmedPickupTime(subtractHours(departureTime, hours)); }} />
+            </Field>
+          </div>
           <Field label="เหตุผลที่ปรับเวลา"><Input name="pickupTimeOverrideReason" /></Field>
         </div>
       </Section>
