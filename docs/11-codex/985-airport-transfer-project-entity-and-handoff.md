@@ -101,17 +101,19 @@ pre-checked, any others optional. Submit writes the `projects` row exactly as
 today, plus one `project_systems` row per system checked. Whether someone
 starts from Ground Transfer's own "new project" or Airport Transfer's, it is
 the same underlying action; only which box comes pre-checked differs. A
-project then appears in `/ground-transfer/projects` if it has a
-`('ground_transfer')` row, in `/airport-transfer/projects` if it has
-`('airport_transfer')`, either, or both — and this is also where
-`/ground-transfer/projects` should start filtering out projects that never
-enabled it, so an airport-only client's project stops cluttering a Ground
-Transfer dispatcher's list, which it would today if nothing filtered on this.
+project then appears with a working "Ground Transfer" tab if it has a
+`('ground_transfer')` row, a working "Airport Transfer" tab if it has
+`('airport_transfer')`, either, or both — and `/projects` (the shared list,
+per `984`'s revised URL structure) should filter or badge on this, so an
+airport-only client's project stops reading as broken to a Ground Transfer
+dispatcher who opens it and finds an empty Ground Transfer tab.
 
 ## How this actually looks — two different "landing" moments, not one
 
 Asked directly, so answered concretely rather than left to implementation to
-guess:
+guess. Superseded once by `984`'s revision — the strip-with-a-link this
+section first described is now the three-tab structure `984` settled on;
+kept here as the same idea, in its current shape:
 
 **Account-level, `/` after login — unchanged from `984`.** One tile per row
 in the `systems` registry, locked or not by account access alone. This page
@@ -125,29 +127,30 @@ knows nothing about any project yet:
 └───────────────────────────────────────────────┘
 ```
 
-**Project-level, on the project detail page — new, added by this document.**
-This is where "โครงการนี้ใช้อะไรได้บ้าง" actually gets answered: a small strip
-naming every system the project has a `project_systems` row for, the one
-you're currently viewing marked as such, every other enabled one a plain
-link to that same `project_id` under the other system's own prefix:
+**Project-level, at `/projects/<project_code>/` — new, added by this
+document, shaped by `984`'s later revision.** This is where
+"โครงการนี้ใช้อะไรได้บ้าง" actually gets answered: three tabs, not a strip —
+Ground Transfer, Airport Transfer, Settings. A tab for a system the project
+has not enabled (no `project_systems` row) renders empty/locked rather than
+missing entirely, the same "visible but not usable" rule `984` already
+applies at the account level, one level down:
 
 ```
-โครงการ: Chevron Q4 2026
-┌────────────────────────────────────────┐
-│ ระบบที่ใช้ในโครงการนี้:                        │
-│  🚐 Ground Transfer (กำลังดูอยู่)              │
-│  ✈️ Airport Transfer   [ไปดูที่นี่ →]           │
-└────────────────────────────────────────┘
+โครงการ: Chevron Q4 2026 (TOMP-20260911-DNZC)
+┌─────────────────┬──────────────────┬──────────┐
+│ 🚐 Ground        │ ✈️ Airport         │ ⚙️ Settings │
+│  Transfer        │  Transfer         │           │
+│  (กำลังดูอยู่)     │                  │           │
+└─────────────────┴──────────────────┴──────────┘
 ```
 
-The reverse strip renders on `/airport-transfer/projects/<id>` for the same
-project. Clicking the other system's pill is an ordinary navigation to
-`/airport-transfer/projects/<id>` (or `/ground-transfer/projects/<id>`) —
-no embedding, no shared frame, just the same `project_id` read by a
-different system's own page. **Full path through the product:** tile on `/`
-→ that system's own project list → a project card → the project's own detail
-page, which is where this strip lives and where switching to the project's
-other enabled system, if any, happens.
+Switching tabs is an ordinary navigation between
+`/projects/<code>/ground-transfer` and `/projects/<code>/airport-transfer`
+— no embedding, no shared frame, just the same `project_code` read by a
+different facet of the same page. **Full path through the product:** tile
+on `/` → `/projects` (the shared list) → a project card → this three-tab
+page, where the Settings tab is where `984`'s granting model lives — one
+shared member list across both facets, not split per system.
 
 ## Existing live data — the backfill decision, unchanged in substance
 
@@ -162,34 +165,42 @@ distinct `client_name` values, since `null` on half the rows makes that
 guess unreliable; whoever runs Airport Transfer day to day can re-split them
 by hand afterward with better information than a migration script has.
 
-## Where this sits relative to `984`
+## Where this sits relative to `984` — updated by `984`'s own later revision
 
-Still two independent dimensions, and sharing the `projects` table does not
-collapse them into one:
+This section originally argued Airport Transfer's roles stay flat and
+account-level, independent of this document's `project_systems`. `984` has
+since reversed that on its own side — Airport Transfer's roles are now
+project-scoped too, via the same generalized `project_members` (with a
+`system_key` column) that `984`'s Layer 2 defines. What remains true, and is
+what this document actually contributes, is that **enablement and
+membership are still two different questions, answered by two different
+tables:**
 
-- **`984` — account-level:** can this profile open a system at all, and what
-  role does it hold there. Unchanged. Airport Transfer's roles stay flat and
-  system-wide — an `airport_dispatcher` is not a member of any particular
-  project the way a TOMP `project_manager` is.
-- **This document — project-level:** which system(s) does a given project
-  use. A profile still needs *both* an account-level grant for a system
-  (`984`) *and* that project to have enabled it (`project_systems`) before
-  there is anything to do there. Neither alone is sufficient, and giving
-  Airport Transfer cases a `project_id` does not make Airport Transfer's own
-  RBAC project-scoped — if that is ever wanted, it is a separate, later
-  decision.
+- **`project_systems` (this document) — does this project use a system at
+  all.** A coarse, person-independent flag. Can be set by whoever creates
+  or edits the project even without personal access to that system
+  themselves (`985` Part C already covers this) — it says "this engagement
+  needs Airport Transfer," not "I can do Airport Transfer work."
+- **`project_members` with `system_key` (`984`) — which specific person
+  holds which specific role, on which system, for this project.** Requires
+  the project to have enabled that system first; there is nothing to be a
+  member *of* otherwise.
+
+A case cannot exist under `airport_transfer` for a project that has no
+`project_systems` row for it, and nobody can be granted an Airport Transfer
+role on a project that has not enabled it — the two checks compose, they do
+not duplicate each other.
 
 ## URLs
 
-Unchanged from `984` — this was asked directly and answered there: URL
-prefixing splits by *which system's UI you are looking at*; sharing the
-underlying project row is a data-layer decision, orthogonal to it. What is
-new is that the same `project_id` can now legitimately appear under both
-prefixes for one engagement — `/ground-transfer/projects/<id>` and
-`/airport-transfer/projects/<id>` (or `/airport-transfer/cases?projectId=<id>`)
-referring to the same row — which is what makes a "ดูงานอีกระบบของโครงการนี้"
-link between them possible at all; there was no shared, reliable id to build
-that link on before this.
+Superseded by `984`'s later revision, not merely unchanged: the prefix now
+follows the *project*, not the other way around —
+`/projects/<project_code>/ground-transfer` and
+`/projects/<project_code>/airport-transfer` for the same `project_code`,
+under `984`'s project-first hierarchy. What this document contributed —
+that the same project can legitimately be viewed from either system's tab —
+still holds; only the exact path shape changed. See `984`'s "URL structure"
+section for the current, authoritative form.
 
 ---
 
@@ -329,20 +340,18 @@ without an answer.
 
 1. Login → `/` → both tiles unlocked → clicks either one; say Ground
    Transfer.
-2. `/ground-transfer/projects` → "สร้างโครงการ" → the existing fields
-   (code, name, dates, timezone, service level), plus the new "ระบบที่จะใช้
-   ในโครงการนี้" section: Ground Transfer pre-checked, Airport Transfer also
-   checked.
+2. `/projects` → "สร้างโครงการ" → the existing fields (code, name, dates,
+   timezone, service level), plus the new "ระบบที่จะใช้ในโครงการนี้" section:
+   Ground Transfer pre-checked, Airport Transfer also checked.
 3. Submit → one `projects` row, two `project_systems` rows
    (`ground_transfer`, `airport_transfer`).
-4. Lands on `/ground-transfer/projects/<id>` — the project's TOMP-side home
-   (the four-figure summary and mission board from `981`), plus the new
-   strip: "🚐 Ground Transfer (กำลังดูอยู่) · ✈️ Airport Transfer
-   [ไปดูที่นี่ →]".
+4. Lands on `/projects/<project_code>/ground-transfer` — the project's TOMP
+   tab (the four-figure summary and mission board from `981`), alongside the
+   project's other two tabs: Airport Transfer, and Settings.
 5. Sets up the TOMP side as normal — resources, call signs, missions,
    assignments, QR.
-6. Clicks the Airport Transfer pill → `/airport-transfer/projects/<id>` —
-   same project, Airport Transfer's own pages, cases created against it via
+6. Clicks the Airport Transfer tab → `/projects/<project_code>/airport-transfer`
+   — same project, Airport Transfer's own pages, cases created against it via
    the new `project_id` column.
 7. *(Once Part B ships — not now.)* A case reaches its trigger window
    (`scheduled_arrival_at` or `confirmed_pickup_at`), staff sends the driver
@@ -370,13 +379,14 @@ open:
    `airport_dispatcher` find the project later; leaving it unchecked keeps
    the project single-system, extendable afterward the same way (next
    point).
-3. On the project detail page, the systems strip renders per the *viewer's*
-   own access, not only what the project has enabled: a system the viewer
-   can enter is a working link; a system the project has enabled but this
-   viewer cannot enter is plain text — "✈️ Airport Transfer (ใช้อยู่ใน
-   โครงการนี้)", no link — so nobody clicks through into a dead-end
-   access-denied page. This is `984`'s "visible but locked" rule, applied
-   one level down from the top landing tiles to this per-project strip.
+3. On the project's three-tab page, each tab renders per the *viewer's* own
+   access, not only what the project has enabled: a system the viewer can
+   enter is a working tab; a system the project has enabled but this viewer
+   cannot enter renders locked — "✈️ Airport Transfer (ใช้อยู่ในโครงการนี้)"
+   with no working content behind it — so nobody clicks a tab into a
+   dead-end access-denied page. This is `984`'s "visible but locked" rule,
+   applied one level down from the top landing tiles to this project's own
+   tabs.
 4. Adding or removing a system later follows the same rule as step 2 —
    available to whoever can edit the project, regardless of whether they
    personally hold access to the system being toggled.
