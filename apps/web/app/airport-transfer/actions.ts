@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { FLIGHT_PROVIDER, verifyFlightByNumberAndDate } from "@/lib/airport-transfer/flight-provider";
+import { flightNumberHelpMessage } from "@/lib/airport-transfer/flight-number";
 import { syncActiveAirportTransferFlights } from "@/lib/airport-transfer/flight-sync";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
@@ -152,6 +153,7 @@ export async function lookupAirportTransferFlight(input: {
   if (!verification.ok) {
     const messages = {
       not_configured: "ยังไม่ได้ตั้งค่า Flight API กรุณาติดต่อผู้ดูแลระบบ",
+      invalid_input: flightNumberHelpMessage(parsed.data.flightNumber),
       not_found: "ไม่พบเที่ยวบินนี้ในวันที่ระบุ กรุณาตรวจสอบวันเดินทางและหมายเลขเที่ยวบิน",
       provider_error: "ผู้ให้บริการข้อมูลเที่ยวบินไม่ตอบสนอง กรุณาลองใหม่อีกครั้ง"
     } as const;
@@ -506,6 +508,8 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
     const failedAt = new Date().toISOString();
     const message = verification.reason === "not_configured"
       ? "ยังไม่ได้ตั้งค่า Flight API"
+      : verification.reason === "invalid_input"
+        ? flightNumberHelpMessage(String(current.flight_number))
       : verification.reason === "not_found"
         ? "ไม่พบเที่ยวบินนี้ในวันที่ระบุ"
         : "ผู้ให้บริการข้อมูลเที่ยวบินไม่ตอบสนอง";
