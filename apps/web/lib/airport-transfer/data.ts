@@ -1,8 +1,15 @@
 import "server-only";
 
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import { FLIGHT_PROVIDER } from "./flight-provider";
 import type { AirportTransferApiHealth, AirportTransferAuditLog, AirportTransferCase, AirportTransferFlightSnapshot, AirportTransferSummary, AirportTransferTask } from "./types";
+
+export interface AirportTransferProjectOption {
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+}
 
 type CaseRow = Record<string, unknown>;
 
@@ -231,6 +238,35 @@ export async function getAirportTransferTasksByCaseIds(caseIds: string[]): Promi
     });
     return groups;
   }, {});
+}
+
+/**
+ * The projects the current profile can create an Airport Transfer case
+ * under — every active project_members row they hold on system_key
+ * 'airport_transfer' (docs/11-codex/984 Layer 2). Powers the required
+ * project selector on the create-case form.
+ */
+export async function getAirportTransferProjectOptions(): Promise<AirportTransferProjectOption[]> {
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return [];
+  const profile = await getCurrentUserProfile();
+  const { data, error } = await supabase
+    .from("project_members")
+    .select("project_id, projects(project_code, project_name)")
+    .eq("system_key", "airport_transfer")
+    .eq("profile_id", profile.id)
+    .eq("status", "active");
+  if (error || !data) return [];
+  return data.flatMap((row) => {
+    const projectId = asNullableString(row.project_id);
+    const project = Array.isArray(row.projects) ? row.projects[0] : row.projects;
+    if (!projectId || !project || typeof project !== "object") return [];
+    return [{
+      projectId,
+      projectCode: String((project as { project_code?: unknown }).project_code || ""),
+      projectName: String((project as { project_name?: unknown }).project_name || "")
+    }];
+  });
 }
 
 export function summarizeAirportTransferCases(cases: AirportTransferCase[]): AirportTransferSummary {

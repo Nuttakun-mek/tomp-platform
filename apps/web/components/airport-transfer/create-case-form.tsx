@@ -13,6 +13,7 @@ import { DateTimeField } from "@/components/ui/datetime-field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { AirportTransferProjectOption } from "@/lib/airport-transfer/data";
 import { ArrowDown, ArrowRight, Building2, MapPin, PlaneLanding, PlaneTakeoff } from "lucide-react";
 
 const initialState: CreateTransferCaseState = { ok: false, message: "" };
@@ -63,9 +64,10 @@ function subtractHours(value: string, hours: number) {
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
 }
 
-export function CreateAirportTransferCaseForm() {
+export function CreateAirportTransferCaseForm({ projectOptions }: { projectOptions: AirportTransferProjectOption[] }) {
   const [state, formAction, pending] = useActionState(createAirportTransferCase, initialState);
   const [isCheckingFlight, startFlightCheck] = useTransition();
+  const [projectId, setProjectId] = useState("");
   const [direction, setDirection] = useState<"arrival" | "departure">("arrival");
   const [travelDate, setTravelDate] = useState("");
   const [flightNumber, setFlightNumber] = useState("");
@@ -114,7 +116,7 @@ export function CreateAirportTransferCaseForm() {
 
   function checkFlight() {
     startFlightCheck(async () => {
-      const result = await lookupAirportTransferFlight({ travelDate, flightNumber });
+      const result = await lookupAirportTransferFlight({ travelDate, flightNumber, projectId: projectId || undefined });
       setFlightLookup(result);
       if (result.ok) applyFlight(result.candidates[0], 0);
     });
@@ -123,7 +125,23 @@ export function CreateAirportTransferCaseForm() {
   return (
     <form action={formAction} className="grid gap-4">
       <Section number="1" title="ประเภทบริการ" description="เลือกทิศทางการเดินทางและลูกค้าผู้ว่าจ้าง">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,1fr)]">
+        <div className="grid gap-4">
+          <Field label="โครงการ *" error={errors.projectId} hint={projectOptions.length ? undefined : "บัญชีนี้ยังไม่มีสิทธิ์ Airport Transfer ในโครงการใด กรุณาติดต่อผู้ดูแลระบบ"}>
+            <Select name="projectId" required value={projectId} onChange={(event) => setProjectId(event.target.value)} disabled={!projectOptions.length}>
+              {projectOptions.length ? (
+                <>
+                  <option value="">เลือกโครงการ</option>
+                  {projectOptions.map((option) => (
+                    <option key={option.projectId} value={option.projectId}>{option.projectCode} — {option.projectName}</option>
+                  ))}
+                </>
+              ) : (
+                <option value="">ไม่มีโครงการที่มีสิทธิ์</option>
+              )}
+            </Select>
+          </Field>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,1fr)]">
           <fieldset>
             <legend className="mb-1.5 text-sm font-semibold text-slate-700">ประเภทบริการ</legend>
             <div className="grid gap-2 sm:grid-cols-2">

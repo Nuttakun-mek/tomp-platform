@@ -55,6 +55,7 @@ export interface CaseLifecycleState {
 const optionalText = z.string().trim().transform((value) => value || null);
 const createCaseSchema = z.object({
   direction: z.enum(["arrival", "departure"]),
+  projectId: z.string().uuid("กรุณาเลือกโครงการ"),
   clientName: optionalText,
   passengerTitle: optionalText,
   passengerFirstName: z.string().trim().min(1, "กรุณากรอกชื่อผู้โดยสาร"),
@@ -88,6 +89,10 @@ const createCaseSchema = z.object({
 });
 
 const updateCaseSchema = createCaseSchema.extend({
+  // The edit form never lets a case change project, so it never submits a
+  // projectId field — override createCaseSchema's required one so an edit
+  // isn't rejected for a field it was never asked to send.
+  projectId: z.string().uuid().optional(),
   caseId: z.string().uuid(),
   originalUpdatedAt: z.string().datetime({ offset: true }),
   editReason: optionalText
@@ -135,8 +140,14 @@ function taskTemplate(direction: "arrival" | "departure") {
 export async function lookupAirportTransferFlight(input: {
   travelDate: string;
   flightNumber: string;
+  projectId?: string;
 }): Promise<FlightLookupState> {
-  const access = await getAirportTransferAccess();
+  // No case exists yet at lookup time, so there is nothing to read a
+  // project_id from — this trusts the project the create-case form already
+  // has selected (Step 7 puts that selector first, before flight lookup can
+  // run), falling back to the unscoped, account-level check if it hasn't
+  // been picked yet.
+  const access = input.projectId ? await getAirportTransferAccess(input.projectId) : await getAirportTransferAccess();
   if (!access.allowed || !access.canManage) {
     return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ตรวจสอบเที่ยวบิน", reason: "invalid_input" };
   }
@@ -189,11 +200,13 @@ export async function lookupAirportTransferFlight(input: {
 }
 
 export async function createAirportTransferCase(_previous: CreateTransferCaseState, formData: FormData): Promise<CreateTransferCaseState> {
-  const access = await getAirportTransferAccess();
+  const projectIdRaw = String(formData.get("projectId") || "");
+  const access = projectIdRaw ? await getAirportTransferAccess(projectIdRaw) : await getAirportTransferAccess();
   if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์สร้างเคส Airport Transfer" };
 
   const parsed = createCaseSchema.safeParse({
     direction: formData.get("direction"),
+    projectId: formData.get("projectId"),
     clientName: formData.get("clientName") || "",
     passengerTitle: formData.get("passengerTitle") || "",
     passengerFirstName: formData.get("passengerFirstName"),
@@ -261,6 +274,7 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
   const { error: caseError } = await supabase.from("airport_transfer_cases").insert({
     id: caseId,
     organization_id: profile.organizationId,
+    project_id: input.projectId,
     case_code: caseCode,
     direction: input.direction,
     client_name: input.clientName,
@@ -340,9 +354,6 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
 }
 
 export async function updateAirportTransferCase(_previous: UpdateTransferCaseState, formData: FormData): Promise<UpdateTransferCaseState> {
-  const access = await getAirportTransferAccess();
-  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์แก้ไขเคส Airport Transfer" };
-
   const parsed = updateCaseSchema.safeParse({
     caseId: formData.get("caseId"),
     originalUpdatedAt: formData.get("originalUpdatedAt"),
@@ -390,6 +401,8 @@ export async function updateAirportTransferCase(_previous: UpdateTransferCaseSta
   const input = parsed.data;
   const { data: current, error: readError } = await supabase.from("airport_transfer_cases").select("*").eq("id", input.caseId).maybeSingle();
   if (readError || !current) return { ok: false, message: "ไม่พบเคสที่ต้องการแก้ไข" };
+  const access = await getAirportTransferAccess(String(current.project_id));
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์แก้ไขเคส Airport Transfer" };
   if (current.deleted_at) return { ok: false, message: "เคสนี้อยู่ในข้อมูลที่ลบแล้ว กรุณากู้คืนก่อนแก้ไข" };
   if (current.updated_at !== input.originalUpdatedAt) {
     return { ok: false, message: "ข้อมูลเคสถูกแก้ไขจากอีกหน้าหนึ่งแล้ว กรุณารีเฟรชหน้าและตรวจสอบข้อมูลล่าสุดก่อนบันทึกอีกครั้ง" };
@@ -497,13 +510,13 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
   void _previous;
   const id = z.string().uuid().safeParse(caseId);
   if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
-  const access = await getAirportTransferAccess();
-  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์อัปเดตข้อมูลเที่ยวบิน" };
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่าการเชื่อมต่อ Supabase" };
   const profile = await getCurrentUserProfile();
   const { data: current } = await supabase.from("airport_transfer_cases").select("*").eq("id", caseId).maybeSingle();
   if (!current) return { ok: false, message: "ไม่พบเคสที่ต้องการอัปเดต" };
+  const access = await getAirportTransferAccess(String(current.project_id));
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์อัปเดตข้อมูลเที่ยวบิน" };
   if (current.deleted_at || current.operational_status === "cancelled") return { ok: false, message: "เคสนี้ถูกยกเลิกหรืออยู่ในข้อมูลที่ลบแล้ว" };
 
   const verification = await verifyFlightByNumberAndDate(String(current.flight_number), String(current.travel_date));
@@ -602,7 +615,23 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
 export async function runAirportTransferFlightSync(_previous: RefreshFlightState): Promise<RefreshFlightState> {
   void _previous;
   const access = await getAirportTransferAccess();
-  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์สั่งตรวจข้อมูลเที่ยวบิน" };
+  if (!access.allowed) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์สั่งตรวจข้อมูลเที่ยวบิน" };
+  if (access.role !== "super_admin" && access.role !== "development") {
+    const supabase = getSupabaseServerDataClient();
+    const profile = await getCurrentUserProfile();
+    const { data } = await supabase
+      ?.from("project_members")
+      .select("roles(role_key)")
+      .eq("profile_id", profile.id)
+      .eq("system_key", "airport_transfer")
+      .eq("status", "active") ?? { data: null };
+    const canManageAnyProject = (data ?? []).some((row) => {
+      const roles = row.roles as { role_key?: string } | { role_key?: string }[] | null;
+      const roleKey = Array.isArray(roles) ? roles[0]?.role_key : roles?.role_key;
+      return roleKey === "airport_admin" || roleKey === "airport_dispatcher";
+    });
+    if (!canManageAnyProject) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์สั่งตรวจข้อมูลเที่ยวบิน" };
+  }
   const result = await syncActiveAirportTransferFlights();
   revalidatePath("/airport-transfer");
   revalidatePath("/airport-transfer/cases");
@@ -612,15 +641,15 @@ export async function runAirportTransferFlightSync(_previous: RefreshFlightState
 export async function cancelAirportTransferCase(caseId: string, _previous: CaseLifecycleState, formData: FormData): Promise<CaseLifecycleState> {
   const id = z.string().uuid().safeParse(caseId);
   if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
-  const access = await getAirportTransferAccess();
-  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ยกเลิกงาน" };
   const reason = String(formData.get("reason") || "").trim();
   if (!reason) return { ok: false, message: "กรุณาระบุเหตุผลที่ยกเลิก" };
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return { ok: false, message: "Supabase ไม่พร้อมใช้งาน" };
   const profile = await getCurrentUserProfile();
-  const { data: current } = await supabase.from("airport_transfer_cases").select("operational_status, cancelled_at, cancellation_reason").eq("id", caseId).maybeSingle();
+  const { data: current } = await supabase.from("airport_transfer_cases").select("operational_status, cancelled_at, cancellation_reason, project_id").eq("id", caseId).maybeSingle();
   if (!current) return { ok: false, message: "ไม่พบเคส" };
+  const access = await getAirportTransferAccess(String(current.project_id));
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ยกเลิกงาน" };
   if (current.operational_status === "cancelled") return { ok: true, message: "งานนี้ถูกยกเลิกแล้ว" };
   const cancelledAt = new Date().toISOString();
   const { error } = await supabase.from("airport_transfer_cases").update({ operational_status: "cancelled", cancelled_at: cancelledAt, cancelled_by: profile.id, cancellation_reason: reason, next_action_at: null }).eq("id", caseId);
@@ -639,11 +668,13 @@ export async function cancelAirportTransferCase(caseId: string, _previous: CaseL
 export async function trashAirportTransferCase(caseId: string, _previous: CaseLifecycleState, formData: FormData): Promise<CaseLifecycleState> {
   const id = z.string().uuid().safeParse(caseId);
   if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
-  const access = await getAirportTransferAccess();
-  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ย้ายงานไปถังขยะ" };
   const reason = String(formData.get("reason") || "").trim();
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return { ok: false, message: "Supabase ไม่พร้อมใช้งาน" };
+  const { data: current } = await supabase.from("airport_transfer_cases").select("project_id").eq("id", caseId).maybeSingle();
+  if (!current) return { ok: false, message: "ไม่พบเคส" };
+  const access = await getAirportTransferAccess(String(current.project_id));
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์ย้ายงานไปถังขยะ" };
   const profile = await getCurrentUserProfile();
   const deletedAt = new Date().toISOString();
   const { error } = await supabase.from("airport_transfer_cases").update({ deleted_at: deletedAt, deleted_by: profile.id, delete_reason: reason || null, next_action_at: null }).eq("id", caseId).is("deleted_at", null);
@@ -659,10 +690,12 @@ export async function restoreAirportTransferCase(caseId: string, _previous: Case
   void _previous;
   const id = z.string().uuid().safeParse(caseId);
   if (!id.success) return { ok: false, message: "รหัสเคสไม่ถูกต้อง" };
-  const access = await getAirportTransferAccess();
-  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์กู้คืนงาน" };
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return { ok: false, message: "Supabase ไม่พร้อมใช้งาน" };
+  const { data: current } = await supabase.from("airport_transfer_cases").select("project_id").eq("id", caseId).maybeSingle();
+  if (!current) return { ok: false, message: "ไม่พบเคส" };
+  const access = await getAirportTransferAccess(String(current.project_id));
+  if (!access.allowed || !access.canManage) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์กู้คืนงาน" };
   const profile = await getCurrentUserProfile();
   const { error } = await supabase.from("airport_transfer_cases").update({ deleted_at: null, deleted_by: null, delete_reason: null }).eq("id", caseId).not("deleted_at", "is", null);
   if (error) return { ok: false, message: error.message };
@@ -693,8 +726,6 @@ export async function completeAirportTransferTask(caseId: string, taskId: string
   const validId = z.string().uuid();
   if (!validId.safeParse(caseId).success || !validId.safeParse(taskId).success) return;
 
-  const access = await getAirportTransferAccess();
-  if (!access.allowed) return;
   const profile = await getCurrentUserProfile();
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return;
@@ -705,6 +736,12 @@ export async function completeAirportTransferTask(caseId: string, taskId: string
     .eq("id", caseId)
     .maybeSingle();
   if (!activeCase || activeCase.deleted_at || activeCase.operational_status === "cancelled") return;
+
+  // Scoped by this case's own project, not the account-wide form: canManage
+  // here must mean "admin/dispatcher on THIS project", the same project the
+  // task-ownership check below reads getAirportTransferProjectRole against.
+  const access = await getAirportTransferAccess(activeCase.project_id ? String(activeCase.project_id) : undefined);
+  if (!access.allowed) return;
 
   const { data: task } = await supabase
     .from("airport_transfer_tasks")
