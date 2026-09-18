@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, CarFront, Clock3, MapPin, PlaneLanding, PlaneTakeoff, UserRound } from "lucide-react";
+import { AlertTriangle, CalendarClock, CarFront, Clock3, MapPin, Phone, PlaneLanding, PlaneTakeoff, UserRound } from "lucide-react";
 import { operationalStatusLabel, verificationStatusLabel } from "@/lib/airport-transfer/labels";
 import type { AirportTransferCase, AirportTransferFlightSnapshot } from "@/lib/airport-transfer/types";
 import { ButtonLink } from "@/components/ui/button";
@@ -38,6 +38,17 @@ function flightSummary(item: AirportTransferCase, snapshot?: AirportTransferFlig
   return { label: `${base}${delay !== null ? " · ตรงเวลา" : ""}`, problem: ["delayed", "cancelled", "diverted"].includes(snapshot.providerStatus || "") };
 }
 
+function nextAction(item: AirportTransferCase) {
+  if (!["verified", "manual_confirmed"].includes(item.verificationStatus)) return "ตรวจสอบเที่ยวบิน";
+  if (!item.vehicleType || !item.vehiclePlate) return "จัดรถ";
+  if (!item.driverName || !item.driverPhone) return "จัดคนขับ";
+  if (["verified", "ready_to_assign", "assigned"].includes(item.operationalStatus)) return "แจ้งและยืนยันคนขับ";
+  if (["driver_notified", "driver_confirmed"].includes(item.operationalStatus)) return "ติดตามรถไปจุดรับ";
+  if (["vehicle_en_route", "vehicle_arrived"].includes(item.operationalStatus)) return "ติดตามการรับผู้โดยสาร";
+  if (["passenger_met", "passenger_on_board", "en_route"].includes(item.operationalStatus)) return "ติดตามจนถึงปลายทาง";
+  return "เปิด Checklist";
+}
+
 export function AirportTransferCaseCard({ item, snapshot }: { item: AirportTransferCase; snapshot?: AirportTransferFlightSnapshot }) {
   const DirectionIcon = item.direction === "arrival" ? PlaneLanding : PlaneTakeoff;
   const pickupAt = item.confirmedPickupAt || item.recommendedPickupAt;
@@ -55,6 +66,7 @@ export function AirportTransferCaseCard({ item, snapshot }: { item: AirportTrans
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="rounded-full bg-slate-900 px-2 py-1 font-semibold text-white">ถัดไป: {nextAction(item)}</span>
           {timeAlert ? <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-bold ${timeAlert.color}`}>{timeAlert.urgent ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}{timeAlert.label}</span> : null}
           <span className={`rounded-full px-2 py-1 font-semibold ${flight.problem ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>เที่ยวบิน: {flight.label}</span>
           <span className="rounded-full bg-cyan-50 px-2 py-1 font-semibold text-cyan-800">{operationalStatusLabel[item.operationalStatus]}</span>
@@ -65,7 +77,7 @@ export function AirportTransferCaseCard({ item, snapshot }: { item: AirportTrans
         <div className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span><strong>รับ {formatDateTime(pickupAt)}</strong><span className="block text-slate-500">บิน {formatDateTime(item.direction === "arrival" ? item.scheduledArrivalAt : item.scheduledDepartureAt)}</span></span></div>
         <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate"><strong>{item.pickupName}</strong> → {item.dropoffName}</span></div>
         <div className="flex items-center gap-1.5"><CarFront className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span><strong>{item.vehicleType || "ยังไม่จัดรถ"}</strong> · {item.vehiclePlate || "ไม่มีทะเบียน"}</span></div>
-        <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-1.5"><UserRound className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate"><strong>{item.driverName || "ยังไม่จัดคนขับ"}</strong>{snapshot ? <span className="block text-[10px] text-slate-400">อัปเดต {formatDateTime(snapshot.observedAt)}</span> : null}</span></span><ButtonLink href={`/airport-transfer/cases/${item.id}`} variant="secondary" className="min-h-8 shrink-0 px-2 py-1 text-xs">เปิดเคส</ButtonLink></div>
+        <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-1.5"><UserRound className="h-3.5 w-3.5 shrink-0 text-slate-400" /><span className="truncate"><strong>{item.driverName || "ยังไม่จัดคนขับ"}</strong>{snapshot ? <span className="block text-[10px] text-slate-400">อัปเดต {formatDateTime(snapshot.observedAt)}</span> : null}</span></span><span className="flex shrink-0 gap-1">{item.driverPhone ? <a href={`tel:${item.driverPhone}`} title="โทรหาคนขับ" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-cyan-800 hover:bg-cyan-50"><Phone className="h-3.5 w-3.5" /></a> : null}{item.pickupMapsUrl ? <a href={item.pickupMapsUrl} target="_blank" rel="noreferrer" title="เปิดแผนที่จุดรับ" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-cyan-800 hover:bg-cyan-50"><MapPin className="h-3.5 w-3.5" /></a> : null}<ButtonLink href={`/airport-transfer/cases/${item.id}`} variant="secondary" className="min-h-8 px-2 py-1 text-xs">เปิดเคส</ButtonLink></span></div>
       </div>
     </article>
   );
