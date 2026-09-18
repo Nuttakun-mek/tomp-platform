@@ -25,7 +25,24 @@ export interface FlightVerificationCandidate {
 
 export type FlightVerificationResult =
   | { ok: true; provider: typeof FLIGHT_PROVIDER; candidates: FlightVerificationCandidate[] }
-  | { ok: false; provider: typeof FLIGHT_PROVIDER; reason: "not_configured" | "not_found" | "provider_error"; detail?: string };
+  | { ok: false; provider: typeof FLIGHT_PROVIDER; reason: "invalid_input" | "not_configured" | "not_found" | "provider_error"; detail?: string };
+
+type FlightLookupIdentifier = { parameter: "flight_iata" | "flight_icao"; value: string };
+
+const airlineAliases: Record<string, string> = {
+  ELAL: "LY"
+};
+
+export function resolveFlightLookupIdentifier(flightNumber: string): FlightLookupIdentifier | null {
+  let normalized = flightNumber.replace(/[\s-]+/g, "").toUpperCase();
+  for (const [alias, iata] of Object.entries(airlineAliases)) {
+    if (normalized.startsWith(alias)) normalized = `${iata}${normalized.slice(alias.length)}`;
+  }
+
+  if (/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(normalized)) return { parameter: "flight_iata", value: normalized };
+  if (/^[A-Z]{3}\d{1,4}[A-Z]?$/.test(normalized)) return { parameter: "flight_icao", value: normalized };
+  return null;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -99,8 +116,10 @@ export async function verifyFlightByNumberAndDate(flightNumber: string, dateLoca
   const apiKey = readCleanEnv(FLIGHT_PROVIDER_API_KEY_ENV);
   if (!apiKey) return { ok: false, provider: FLIGHT_PROVIDER, reason: "not_configured" };
 
-  const normalized = flightNumber.replace(/\s+/g, "").toUpperCase();
-  const parameters = new URLSearchParams({ flight_iata: normalized, limit: "50", api_key: apiKey });
+  const identifier = resolveFlightLookupIdentifier(flightNumber);
+  if (!identifier) return { ok: false, provider: FLIGHT_PROVIDER, reason: "invalid_input" };
+
+  const parameters = new URLSearchParams({ [identifier.parameter]: identifier.value, limit: "50", api_key: apiKey });
   const endpoint = `https://airlabs.co/api/v9/schedules?${parameters.toString()}`;
 
   try {
@@ -111,14 +130,23 @@ export async function verifyFlightByNumberAndDate(flightNumber: string, dateLoca
     });
     if (response.status === 204 || response.status === 404) return { ok: false, provider: FLIGHT_PROVIDER, reason: "not_found" };
     const payload: unknown = await response.json().catch(() => null);
-    if (!response.ok) return { ok: false, provider: FLIGHT_PROVIDER, reason: "provider_error", detail: providerError(payload) || `HTTP ${response.status}` };
+    if (!response.ok) {
+      const detail = providerError(payload) || `HTTP ${response.status}`;
+      console.warn("[airport-transfer:flight-provider] AirLabs request failed", { status: response.status, detail });
+      return { ok: false, provider: FLIGHT_PROVIDER, reason: "provider_error", detail };
+    }
     const error = providerError(payload);
-    if (error) return { ok: false, provider: FLIGHT_PROVIDER, reason: "provider_error", detail: error };
+    if (error) {
+      console.warn("[airport-transfer:flight-provider] AirLabs returned an error", { detail: error });
+      return { ok: false, provider: FLIGHT_PROVIDER, reason: "provider_error", detail: error };
+    }
 
-    const candidates = responseRows(payload).map((row) => toCandidate(row, normalized)).filter((candidate) => candidateMatchesDate(candidate, dateLocal));
+    const candidates = responseRows(payload).map((row) => toCandidate(row, identifier.value)).filter((candidate) => candidateMatchesDate(candidate, dateLocal));
     if (!candidates.length) return { ok: false, provider: FLIGHT_PROVIDER, reason: "not_found" };
     return { ok: true, provider: FLIGHT_PROVIDER, candidates };
   } catch (error) {
-    return { ok: false, provider: FLIGHT_PROVIDER, reason: "provider_error", detail: error instanceof Error ? error.message : "unknown error" };
+    const detail = error instanceof Error ? error.message : "unknown error";
+    console.warn("[airport-transfer:flight-provider] AirLabs request threw", { detail });
+    return { ok: false, provider: FLIGHT_PROVIDER, reason: "provider_error", detail };
   }
 }
