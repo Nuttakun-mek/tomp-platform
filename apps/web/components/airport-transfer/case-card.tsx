@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, CarFront, Check, ChevronDown, Circle, MapPin, Phone, PlaneLanding, PlaneTakeoff, UserRound } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, ChevronDown, Circle, Clock3, Luggage, MapPin, Phone, PlaneLanding, PlaneTakeoff, UsersRound } from "lucide-react";
 import { completeAirportTransferTask } from "@/app/airport-transfer/actions";
 import { operationalStatusLabel, verificationStatusLabel } from "@/lib/airport-transfer/labels";
 import type { AirportTransferCase, AirportTransferFlightSnapshot, AirportTransferTask } from "@/lib/airport-transfer/types";
@@ -9,20 +9,16 @@ function formatDateTime(value: string | null) {
   return new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(value));
 }
 
+function minutesUntil(value: string | null) {
+  if (!value) return null;
+  const minutes = Math.ceil((new Date(value).getTime() - Date.now()) / 60_000);
+  return Number.isFinite(minutes) ? minutes : null;
+}
+
 function minutesBetween(first: string | null, second: string | null) {
   if (!first || !second) return null;
   const value = Math.round((new Date(second).getTime() - new Date(first).getTime()) / 60_000);
   return Number.isFinite(value) ? value : null;
-}
-
-function urgency(pickupAt: string | null, pickupFinished: boolean) {
-  if (!pickupAt || pickupFinished) return null;
-  const minutes = Math.ceil((new Date(pickupAt).getTime() - Date.now()) / 60_000);
-  if (minutes < 0) return { label: `เลยเวลารับ ${Math.abs(minutes)} นาที`, color: "bg-red-600 text-white", urgent: true };
-  if (minutes <= 30) return { label: `เหลือ ${minutes} นาที`, color: "bg-red-50 text-red-800 ring-1 ring-red-200", urgent: true };
-  if (minutes <= 120) return { label: `ใกล้ถึงเวลา ${Math.floor(minutes / 60)} ชม. ${minutes % 60} นาที`, color: "bg-amber-50 text-amber-800 ring-1 ring-amber-200", urgent: true };
-  if (minutes <= 360) return { label: `อีก ${Math.ceil(minutes / 60)} ชั่วโมง`, color: "bg-blue-50 text-blue-800", urgent: false };
-  return null;
 }
 
 const flightStatusLabels: Record<string, string> = {
@@ -39,54 +35,109 @@ function flightSummary(item: AirportTransferCase, snapshot?: AirportTransferFlig
   return { label: `${base}${delay !== null ? " · ตรงเวลา" : ""}`, problem: ["delayed", "cancelled", "diverted"].includes(snapshot.providerStatus || "") };
 }
 
-function nextAction(item: AirportTransferCase) {
-  if (!["verified", "manual_confirmed"].includes(item.verificationStatus)) return "ตรวจสอบเที่ยวบิน";
-  if (!item.vehicleType || !item.vehiclePlate) return "จัดรถ";
-  if (!item.driverName || !item.driverPhone) return "จัดคนขับ";
-  if (["verified", "ready_to_assign", "assigned"].includes(item.operationalStatus)) return "แจ้งและยืนยันคนขับ";
-  if (["driver_notified", "driver_confirmed"].includes(item.operationalStatus)) return "ติดตามรถไปจุดรับ";
-  if (["vehicle_en_route", "vehicle_arrived"].includes(item.operationalStatus)) return "ติดตามการรับผู้โดยสาร";
-  if (["passenger_met", "passenger_on_board", "en_route"].includes(item.operationalStatus)) return "ติดตามจนถึงปลายทาง";
+export type OperationalAlert = { label: string; tone: "danger" | "warning" | "info"; score: number };
+
+export function getAirportTransferOperationalAlerts(item: AirportTransferCase, tasks: AirportTransferTask[]): OperationalAlert[] {
+  if (["completed", "cancelled"].includes(item.operationalStatus)) return [];
+  const completedKeys = new Set(tasks.filter((task) => task.status === "completed").map((task) => task.taskKey));
+  const alerts: OperationalAlert[] = [];
+  const pickupAt = item.confirmedPickupAt || item.recommendedPickupAt;
+  const pickupMinutes = minutesUntil(pickupAt);
+  const passengerPickedUp = completedKeys.has("passenger_on_board") || ["passenger_on_board", "en_route", "arrived_destination"].includes(item.operationalStatus);
+
+  if (pickupMinutes !== null && pickupMinutes < 0 && !passengerPickedUp) {
+    alerts.push({ label: `เลยเวลารับ ${Math.abs(pickupMinutes)} นาที · ยังไม่รับผู้โดยสาร`, tone: "danger", score: 600 });
+  } else if (pickupMinutes !== null && pickupMinutes <= 60 && !passengerPickedUp) {
+    alerts.push({ label: `ถึงเวลารับใน ${Math.max(0, pickupMinutes)} นาที`, tone: pickupMinutes <= 30 ? "danger" : "warning", score: 450 });
+  }
+
+  if (item.direction === "departure") {
+    const departureMinutes = minutesUntil(item.scheduledDepartureAt);
+    const arrivedAirport = completedKeys.has("airport_arrived") || completedKeys.has("passenger_handed_over") || item.operationalStatus === "arrived_destination";
+    if (departureMinutes !== null && departureMinutes < 0) {
+      alerts.push({ label: `เครื่องออกแล้ว ${Math.abs(departureMinutes)} นาที · ยังไม่ปิดงาน`, tone: "danger", score: 700 });
+    } else if (departureMinutes !== null && departureMinutes <= 60 && !arrivedAirport) {
+      alerts.push({ label: `เหลือ ${Math.max(0, departureMinutes)} นาทีเครื่องออก · ยังไม่ถึงสนามบิน`, tone: "danger", score: 650 });
+    } else if (departureMinutes !== null && departureMinutes <= 120 && !arrivedAirport) {
+      alerts.push({ label: "ใกล้เวลาเครื่องออก · ยังไม่ถึงสนามบิน", tone: "warning", score: 500 });
+    }
+  } else {
+    const arrivalMinutes = minutesUntil(item.scheduledArrivalAt);
+    const passengerMet = completedKeys.has("passenger_met") || passengerPickedUp;
+    if (arrivalMinutes !== null && arrivalMinutes < -15 && !passengerMet) {
+      alerts.push({ label: `เครื่องถึงแล้ว ${Math.abs(arrivalMinutes)} นาที · ยังไม่พบผู้โดยสาร`, tone: "danger", score: 650 });
+    }
+  }
+
+  if (!["verified", "manual_confirmed"].includes(item.verificationStatus)) alerts.push({ label: verificationStatusLabel[item.verificationStatus], tone: "warning", score: 400 });
+  if (!item.vehicleType || !item.vehiclePlate || !item.driverName || !item.driverPhone) alerts.push({ label: "ข้อมูลรถหรือคนขับยังไม่ครบ", tone: "info", score: 300 });
+  return alerts.sort((a, b) => b.score - a.score);
+}
+
+function nextAction(item: AirportTransferCase, tasks: AirportTransferTask[]) {
+  const nextTask = tasks.find((task) => task.status === "pending");
+  if (nextTask) return nextTask.label;
+  if (item.operationalStatus === "completed") return "เสร็จสิ้น";
+  if (item.operationalStatus === "cancelled") return "ยกเลิก";
   return "ตรวจรายละเอียด";
 }
 
-const pickupFinishedStatuses = new Set(["passenger_met", "passenger_on_board", "en_route", "arrived_destination", "completed", "cancelled"]);
+const alertTone = {
+  danger: "border-red-200 bg-red-50 text-red-800",
+  warning: "border-amber-200 bg-amber-50 text-amber-800",
+  info: "border-blue-200 bg-blue-50 text-blue-800"
+};
 
 export function AirportTransferCaseCard({ item, snapshot, tasks = [] }: { item: AirportTransferCase; snapshot?: AirportTransferFlightSnapshot; tasks?: AirportTransferTask[] }) {
   const DirectionIcon = item.direction === "arrival" ? PlaneLanding : PlaneTakeoff;
   const pickupAt = item.confirmedPickupAt || item.recommendedPickupAt;
-  const timeAlert = urgency(pickupAt, pickupFinishedStatuses.has(item.operationalStatus));
   const flight = flightSummary(item, snapshot);
   const completedTasks = tasks.filter((task) => task.status === "completed").length;
+  const alerts = getAirportTransferOperationalAlerts(item, tasks);
+  const isCompleted = item.operationalStatus === "completed";
+  const currentTaskIndex = tasks.findIndex((task) => task.status === "pending");
 
   return (
-    <details className={`group rounded-xl border bg-white shadow-sm ${timeAlert?.urgent ? "border-amber-300" : "border-slate-200"}`}>
-      <summary className="flex cursor-pointer list-none flex-col gap-2 px-3 py-3 xl:flex-row xl:items-center [&::-webkit-details-marker]:hidden">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cyan-50 text-cyan-800"><DirectionIcon className="h-4 w-4" /></span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><p className="truncate font-semibold text-slate-950">{item.passengerName}</p><span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{item.caseCode}</span></div>
-            <p className="truncate text-xs text-slate-500"><strong>{item.flightNumber}</strong> · {item.originAirport || "—"} → {item.destinationAirport || "—"} · {item.pickupName} → {item.dropoffName}</p>
+    <details className={`group rounded-xl border bg-white shadow-sm ${alerts.some((alert) => alert.tone === "danger") ? "border-red-300" : alerts.length ? "border-amber-300" : isCompleted ? "border-emerald-200 bg-emerald-50/20" : "border-slate-200"}`}>
+      <summary className="cursor-pointer list-none px-3 py-3 [&::-webkit-details-marker]:hidden">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${isCompleted ? "bg-emerald-100 text-emerald-700" : "bg-cyan-50 text-cyan-800"}`}><DirectionIcon className="h-4 w-4" /></span>
+            <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><p className="truncate font-semibold text-slate-950">{item.passengerName}</p><span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{item.caseCode}</span></div><p className="truncate text-xs text-slate-500">{item.clientName || "ไม่ระบุลูกค้า"} · {item.passengerCount} คน · {item.luggageCount} กระเป๋า</p></div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className={`rounded-full px-2 py-1 font-bold ${isCompleted ? "bg-emerald-600 text-white" : "bg-cyan-100 text-cyan-900"}`}>{operationalStatusLabel[item.operationalStatus]}</span>
+            {!isCompleted ? <span className="rounded-full border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-800">ถัดไป: {nextAction(item, tasks)}</span> : null}
+            <span className="inline-flex items-center gap-1 font-semibold text-cyan-800">รายละเอียด <ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="rounded-full bg-slate-900 px-2 py-1 font-semibold text-white">ถัดไป: {nextAction(item)}</span>
-          {timeAlert ? <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-bold ${timeAlert.color}`}><AlertTriangle className="h-3.5 w-3.5" />{timeAlert.label}</span> : null}
-          <span className="rounded-full bg-cyan-50 px-2 py-1 font-semibold text-cyan-800">{operationalStatusLabel[item.operationalStatus]}</span>
-          <span className="font-semibold text-slate-700">รับ {formatDateTime(pickupAt)}</span>
-          <span className="inline-flex items-center gap-1 font-semibold text-cyan-800">รายละเอียด <ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></span>
+
+        <div className="mt-2 grid gap-2 border-t border-slate-100 pt-2 text-xs md:grid-cols-2 xl:grid-cols-4">
+          <div><span className="text-slate-500">เที่ยวบิน / สถานะ</span><p className={`font-bold ${flight.problem ? "text-amber-800" : "text-slate-900"}`}>{item.flightNumber} · {flight.label}</p></div>
+          <div><span className="text-slate-500">เส้นทางเครื่องบิน</span><p className="font-bold text-slate-900">{item.originAirport || "—"} → {item.destinationAirport || "—"}</p></div>
+          <div><span className="text-slate-500">เส้นทางรถ / เวลารับ</span><p className="font-bold text-slate-900">{item.pickupName} → {item.dropoffName}</p><p className="text-slate-500">รับ {formatDateTime(pickupAt)}</p></div>
+          <div><span className="text-slate-500">รถ / คนขับ</span><p className="font-bold text-slate-900">{item.vehicleType || "ยังไม่จัดรถ"} · {item.vehiclePlate || "ไม่มีทะเบียน"}</p><p className="text-slate-600">{item.driverName || "ยังไม่จัดคนขับ"} · {item.driverPhone || "ไม่มีเบอร์"}</p></div>
         </div>
+
+        {alerts.length ? <div className="mt-2 flex flex-wrap gap-1.5">{alerts.slice(0, 3).map((alert) => <span key={alert.label} className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-bold ${alertTone[alert.tone]}`}><AlertTriangle className="h-3.5 w-3.5" />{alert.label}</span>)}</div> : null}
       </summary>
 
-      <div className="border-t border-slate-100 px-3 py-3">
-        <div className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5 text-slate-400" /><span><strong>เที่ยวบิน {flight.label}</strong><span className="block text-slate-500">บิน {formatDateTime(item.direction === "arrival" ? item.scheduledArrivalAt : item.scheduledDepartureAt)} · อัปเดต {snapshot ? formatDateTime(snapshot.observedAt) : "—"}</span></span></div>
-          <div className="flex items-center gap-1.5"><CarFront className="h-3.5 w-3.5 text-slate-400" /><span><strong>{item.vehicleType || "ยังไม่จัดรถ"}</strong> · {item.vehiclePlate || "ไม่มีทะเบียน"}</span></div>
-          <div className="flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5 text-slate-400" /><span><strong>{item.driverName || "ยังไม่จัดคนขับ"}</strong> · {item.driverPhone || "ไม่มีเบอร์"}</span></div>
-          <div className="flex flex-wrap items-center justify-end gap-1">{item.driverPhone ? <a href={`tel:${item.driverPhone}`} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-cyan-800"><Phone className="h-3.5 w-3.5" /></a> : null}{item.pickupMapsUrl ? <a href={item.pickupMapsUrl} target="_blank" rel="noreferrer" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-cyan-800"><MapPin className="h-3.5 w-3.5" /></a> : null}<ButtonLink href={`/airport-transfer/cases/${item.id}`} variant="secondary" className="min-h-8 px-2 py-1 text-xs">เปิดเคส</ButtonLink></div>
-        </div>
+      <div className="grid border-t border-slate-100 lg:grid-cols-2">
+        <section className="grid content-start gap-3 p-3 text-xs lg:border-r lg:border-slate-100">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex gap-2"><CalendarClock className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">เวลาเที่ยวบิน</p><p className="text-slate-600">ออก {formatDateTime(item.scheduledDepartureAt)}</p><p className="text-slate-600">ถึง {formatDateTime(item.scheduledArrivalAt)}</p></div></div>
+            <div className="flex gap-2"><Clock3 className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">ข้อมูลล่าสุด</p><p className="text-slate-600">Flight API {snapshot ? formatDateTime(snapshot.observedAt) : "ยังไม่มีข้อมูล"}</p><p className="text-slate-600">แก้ไข {formatDateTime(item.updatedAt)}</p></div></div>
+            <div className="flex gap-2"><UsersRound className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">ผู้โดยสาร</p><p className="text-slate-600">{item.passengerCount} คน {item.fastTrack ? "· Fast Track" : ""}</p>{item.passengerMobile ? <p className="text-slate-600">{item.passengerMobile}</p> : null}</div></div>
+            <div className="flex gap-2"><Luggage className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">สัมภาระ / หมายเหตุ</p><p className="text-slate-600">{item.luggageCount} กระเป๋า</p><p className="line-clamp-2 text-slate-600">{item.notes || "ไม่มีหมายเหตุ"}</p></div></div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">{item.driverPhone ? <a href={`tel:${item.driverPhone}`} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><Phone className="h-3.5 w-3.5" />โทรหาคนขับ</a> : null}{item.pickupMapsUrl ? <a href={item.pickupMapsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><MapPin className="h-3.5 w-3.5" />แผนที่จุดรับ</a> : null}<ButtonLink href={`/airport-transfer/cases/${item.id}`} variant="secondary" className="min-h-8 px-2 py-1 text-xs">เปิดเคส</ButtonLink></div>
+        </section>
 
-        {tasks.length ? <div className="mt-3 border-t border-slate-100 pt-3"><div className="mb-2 flex items-center justify-between text-xs"><strong>Checklist การปฏิบัติงาน</strong><span className="text-slate-500">{completedTasks}/{tasks.length} · ทำตามลำดับ</span></div><div className="grid gap-1.5 md:grid-cols-2">{tasks.map((task, index) => { const completed = task.status === "completed"; const canComplete = tasks.slice(0, index).every((earlier) => earlier.status !== "pending"); const action = completeAirportTransferTask.bind(null, item.id, task.id); return <div key={task.id} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${completed ? "border-emerald-200 bg-emerald-50" : canComplete ? "border-cyan-300 bg-cyan-50/40" : "border-slate-200"}`}><span className={completed ? "text-emerald-700" : "text-slate-400"}>{completed ? <Check className="h-4 w-4" /> : <Circle className="h-4 w-4" />}</span><span className="min-w-0 flex-1 truncate text-xs font-semibold">{task.label}</span>{!completed && canComplete && !item.deletedAt && item.operationalStatus !== "cancelled" ? <form action={action}><Button type="submit" variant="secondary" className="min-h-7 px-2 py-1 text-[11px]">เสร็จแล้ว</Button></form> : null}</div>; })}</div></div> : null}
+        <section className="p-3">
+          <div className="mb-2 flex items-center justify-between text-xs"><strong>Checklist การปฏิบัติงาน</strong><span className="font-semibold text-slate-500">{completedTasks}/{tasks.length}</span></div>
+          <div className="grid gap-1.5 sm:grid-cols-2">{tasks.map((task, index) => { const completed = task.status === "completed"; const isCurrent = index === currentTaskIndex; const action = completeAirportTransferTask.bind(null, item.id, task.id); return <div key={task.id} className={`flex min-h-9 items-center gap-2 rounded-lg border px-2 py-1.5 ${completed ? "border-emerald-200 bg-emerald-50 text-emerald-900" : isCurrent ? "border-cyan-400 bg-cyan-50 ring-1 ring-cyan-200" : "border-slate-200 bg-slate-50 text-slate-500"}`}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${completed ? "bg-emerald-600 text-white" : isCurrent ? "bg-cyan-700 text-white" : "bg-slate-200 text-slate-600"}`}>{completed ? <Check className="h-3 w-3" /> : task.sequence || index + 1}</span><span className="min-w-0 flex-1 text-[11px] font-semibold leading-4">{task.label}</span>{!completed && isCurrent && !item.deletedAt && item.operationalStatus !== "cancelled" ? <form action={action}><Button type="submit" variant="secondary" className="min-h-7 px-2 py-1 text-[10px]">เสร็จแล้ว</Button></form> : null}</div>; })}</div>
+          {!tasks.length ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-xs text-slate-500"><Circle className="mx-auto mb-1 h-4 w-4" />ยังไม่มีเช็กลิสต์</div> : null}
+        </section>
       </div>
     </details>
   );
