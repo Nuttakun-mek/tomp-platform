@@ -60,14 +60,13 @@ export function AirportTransferApiHealthCard({ health }: { health: AirportTransf
   }, [health?.pollingEnabled, health?.pollingIntervalMinutes, health?.nextCheckAt]);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-start gap-3">
-          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${colors[status]}`}><Activity className="h-5 w-5" /></span>
+    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-2.5">
+          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${colors[status]}`}><Activity className="h-4 w-4" /></span>
           <div>
             <div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold">สถานะ Flight API</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${colors[status]}`}>{pending ? "กำลังตรวจสอบ" : labels[status]}</span></div>
-            <p className="mt-1 text-xs text-slate-500">ติดตาม {health?.activeCaseCount || 0} เคส · ตรวจสำเร็จรอบล่าสุด {health?.checkedCaseCount || 0} · ผิดพลาด {health?.failedCaseCount || 0}</p>
-            <p className="mt-1 text-xs text-slate-500">ตรวจล่าสุด {formatTime(health?.lastCheckAt || null)} · รอบถัดไป {health?.activeCaseCount ? formatTime(health?.nextCheckAt || null) : "หยุดจนกว่าจะมีงาน"}</p>
+            <p className="mt-0.5 text-xs text-slate-500">ติดตาม {health?.activeCaseCount || 0} เคส · สำเร็จ {health?.checkedCaseCount || 0} · ผิดพลาด {health?.failedCaseCount || 0} · ตรวจล่าสุด {formatTime(health?.lastCheckAt || null)} · รอบถัดไป {health?.activeCaseCount ? formatTime(health?.nextCheckAt || null) : "หยุดจนกว่าจะมีงาน"}</p>
             {health?.lastErrorMessage ? <p className="mt-1 text-xs text-red-700">{health.lastErrorMessage}</p> : null}
             {message ? <p className="mt-1 text-xs text-slate-600">{message}</p> : null}
           </div>
