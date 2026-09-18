@@ -315,3 +315,71 @@ data staff would need to make that call already exists on the case.
   Airport Transfer case for reference?
 
 None of these need answering to ship Part A.
+
+---
+
+# Part C — walking through it, start to finish
+
+Two full journeys, asked for directly rather than left to inference. Walking
+through them surfaced one rule that had never been decided; resolved inline
+rather than left as an open question, since the journey does not make sense
+without an answer.
+
+## An account with both systems
+
+1. Login → `/` → both tiles unlocked → clicks either one; say Ground
+   Transfer.
+2. `/ground-transfer/projects` → "สร้างโครงการ" → the existing fields
+   (code, name, dates, timezone, service level), plus the new "ระบบที่จะใช้
+   ในโครงการนี้" section: Ground Transfer pre-checked, Airport Transfer also
+   checked.
+3. Submit → one `projects` row, two `project_systems` rows
+   (`ground_transfer`, `airport_transfer`).
+4. Lands on `/ground-transfer/projects/<id>` — the project's TOMP-side home
+   (the four-figure summary and mission board from `981`), plus the new
+   strip: "🚐 Ground Transfer (กำลังดูอยู่) · ✈️ Airport Transfer
+   [ไปดูที่นี่ →]".
+5. Sets up the TOMP side as normal — resources, call signs, missions,
+   assignments, QR.
+6. Clicks the Airport Transfer pill → `/airport-transfer/projects/<id>` —
+   same project, Airport Transfer's own pages, cases created against it via
+   the new `project_id` column.
+7. *(Once Part B ships — not now.)* A case reaches its trigger window
+   (`scheduled_arrival_at` or `confirmed_pickup_at`), staff sends the driver
+   a link, the case hands off — a Ground Transfer assignment appears under
+   the same project, visible from the Ground Transfer side without any
+   cross-system linking step, because it was always the same `project_id`.
+8. Engagement ends → archive or delete the project once, from either side —
+   same underlying action — and both systems' data for it moves together.
+
+## An account with only one system
+
+Symmetric, with the one rule this surfaced now resolved rather than left
+open:
+
+1. Login → `/` → one tile unlocked, the other locked with
+   "ติดต่อผู้ดูแลระบบ".
+2. Creates a project within their own system as usual. **The other system's
+   checkbox still renders and is still selectable, even though this account
+   cannot enter that system at all.** Resolved this way on purpose:
+   declaring "this engagement will also need Airport Transfer" is a fact
+   about the client, not a capability the creator personally needs to hold —
+   the same distinction Part A already drew between account-level access and
+   project-level scope, applied to who is *allowed to say* a project uses a
+   system, not just who can *use* it once said. Checking it lets an
+   `airport_dispatcher` find the project later; leaving it unchecked keeps
+   the project single-system, extendable afterward the same way (next
+   point).
+3. On the project detail page, the systems strip renders per the *viewer's*
+   own access, not only what the project has enabled: a system the viewer
+   can enter is a working link; a system the project has enabled but this
+   viewer cannot enter is plain text — "✈️ Airport Transfer (ใช้อยู่ใน
+   โครงการนี้)", no link — so nobody clicks through into a dead-end
+   access-denied page. This is `984`'s "visible but locked" rule, applied
+   one level down from the top landing tiles to this per-project strip.
+4. Adding or removing a system later follows the same rule as step 2 —
+   available to whoever can edit the project, regardless of whether they
+   personally hold access to the system being toggled.
+5. Archiving or deleting is unchanged for this account: one action, reaching
+   whatever the project has enabled, same mechanism as the two-system
+   journey above.
