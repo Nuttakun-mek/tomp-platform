@@ -28,7 +28,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "timeline.create",
     "change.create",
     "change.approve",
-    "change.apply"
+    "change.apply",
+    "project.manage_members"
   ],
   dispatcher: [
     "project.read",
