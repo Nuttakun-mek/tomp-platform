@@ -212,6 +212,27 @@ export async function getAirportTransferTasks(caseId: string): Promise<AirportTr
   }));
 }
 
+export async function getAirportTransferTasksByCaseIds(caseIds: string[]): Promise<Record<string, AirportTransferTask[]>> {
+  if (!caseIds.length) return {};
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return {};
+  const { data, error } = await supabase
+    .from("airport_transfer_tasks")
+    .select("case_id, id, task_key, label, owner_role, sequence, status, completed_at, note")
+    .in("case_id", caseIds)
+    .order("sequence", { ascending: true });
+  if (error || !data) return {};
+  return data.reduce<Record<string, AirportTransferTask[]>>((groups, row) => {
+    const caseId = String(row.case_id);
+    (groups[caseId] ||= []).push({
+      id: String(row.id), taskKey: String(row.task_key), label: String(row.label), ownerRole: String(row.owner_role),
+      sequence: Number(row.sequence || 0), status: row.status as AirportTransferTask["status"],
+      completedAt: asNullableString(row.completed_at), note: asNullableString(row.note)
+    });
+    return groups;
+  }, {});
+}
+
 export function summarizeAirportTransferCases(cases: AirportTransferCase[]): AirportTransferSummary {
   const verificationProblems = new Set(["route_mismatch", "date_mismatch", "not_found", "provider_unavailable", "needs_recheck"]);
   return {
