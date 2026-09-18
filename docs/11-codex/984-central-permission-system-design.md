@@ -53,7 +53,7 @@ explicit ask that more systems are coming. `route` is a URL prefix, not just
 an entry page — see "URL structure" below for what that does and does not
 cover.
 
-### URL structure — one prefix per system, old paths kept as permanent redirects
+### URL structure — one prefix per system, moved cleanly, no redirect
 
 The ask was explicit: give each system its own URL namespace so the split is
 visible in the address bar, not just in code —
@@ -65,36 +65,27 @@ pages sit at bare paths (`/projects`, `/assignments`, `/mission-control`,
 `/resources`, `/recovery`, `/superadmin`, `/project`, `/driver/[token]`,
 `/driver`, `/fleet/[token]`, `/track/[token]`, and `/`).
 
-**All of it moves under `/ground-transfer`, including the token pages —
-revised from an earlier pass of this document, which held `/driver`,
-`/fleet`, `/track` back.** That held only because moving them outright would
-break a live QR the moment it shipped, with no fix possible from the server
-side. The owner has since confirmed a new mobile app build is coming
-regardless (for a separate, unrelated reason), which removes the reason to
-wait: a build that has to happen anyway can simply point at the corrected
-path, and the fix costs nothing extra to do now rather than later.
+**All of it moves under `/ground-transfer`, including the token pages, and
+the old paths are simply gone — no redirect kept.** Two earlier passes of
+this document each proposed keeping the old paths alive, first by not moving
+them at all, then by redirecting them forever. Both were solving for
+continuity of links already in real use. The owner has confirmed that concern
+does not apply right now: this work is happening *before* the next full
+rebuild and Apple resubmission, not against a live tested surface, and the
+new links going to Apple this time are meant to be minted fresh under the
+corrected structure from the start — one standard, not an old one preserved
+alongside a new one. A redirect layer would be solving a problem that, for
+this cutover, does not exist; it can be added later if a future rename ever
+does need to protect a link already in the field, but that is a decision for
+that day, not this one.
 
-**"Moves" means the canonical page moves; the old path is never deleted —
-it becomes a permanent redirect to the new one.** `/driver/[token]` (and the
-other three) keep resolving forever, forwarding to
-`/ground-transfer/driver/[token]`, so:
-
-- **Today's already-installed app builds keep working unchanged** — old
-  binaries still request `/driver/${token}`; the redirect catches them.
-  Apple's reviewer's build is one of these and needs nothing done to it.
-- **Already-sent `/fleet/[token]` and `/track/[token]` links keep working** —
-  a browser follows a redirect on its own; nobody has to be handed a new link.
-- **The next mobile app build points `buildDriverWebUrl()` at the new,
-  correct path directly** — no redirect hop, the "better future" this was
-  asked for.
-
-The redirect is a standing commitment, not a migration shim to remove once
-things "settle" — there is no way to know every old QR code or printed link
-is gone, so it stays indefinitely. Implementation detail for the plan, not
-decided here: a `redirects()` rule (`next.config`, or `vercel.json`'s own
-`redirects` array, matching the pattern this repo already uses there for
-`headers`) is the right mechanism — a param-matched rule, not a page
-component, so it resolves at the edge before the app router even sees it.
+**Concrete consequence, so it is written down rather than assumed:** the
+three external TestFlight testers currently on build 3 are holding QR codes
+that point at the old `/driver/[token]`. Once this ships, those stop
+resolving. They get new QR codes once the next build — the one already
+planned, carrying the corrected `buildDriverWebUrl()` path — reaches them.
+Nothing about this design revives the old path for that gap; the rebuild and
+the reissue happen together, deliberately.
 
 `/login` and `/no-access` are unaffected by any of this and stay at root, for
 an unrelated reason: they exist *before* a system is chosen, so they were
@@ -253,18 +244,18 @@ Closing them is part of this plan, not a side effect of it.
   / `_audit_logs` / `_import_*` / `_api_health` — unchanged; only
   `_memberships` gains a column and a new caller.
 - Not the login/landing surface itself — drivers never see it, they reach a
-  job through the QR flow. `apps/mobile-driver/**` does need one small,
-  coordinated change per "URL structure" above: `buildDriverWebUrl()` starts
-  pointing at `/ground-transfer/driver/${token}` in whatever build ships next.
-  Nothing on the server blocks on that build landing — the redirect covers
-  every build already out, and every build still to come until it does.
+  job through the QR flow. `apps/mobile-driver/**` does need the coordinated
+  change per "URL structure" above: `buildDriverWebUrl()` must point at
+  `/ground-transfer/driver/${token}` in the same build/deploy this ships
+  with — there is no redirect to fall back on this time, so the server
+  cutover and that app change land together, not one ahead of the other.
 - `/login` and `/no-access` — unaffected, root-level, unrelated to any
   system's prefix; see "URL structure" above.
-- Every server-side URL generator that mints a fresh link — `buildDriverAccessUrl()`,
-  `observer-access.ts`'s fleet/track builder — should emit the new
-  `/ground-transfer/...` path from the day this ships, not the old one. Only
-  *already-issued* links depend on the redirect; a link minted after the
-  cutover should never need to bounce through it.
+- Every server-side URL generator that mints a link —
+  `buildDriverAccessUrl()`, `observer-access.ts`'s fleet/track builder —
+  emits the new `/ground-transfer/...` path from day one. Any link minted
+  before the cutover under the old path is dead once this ships; see the
+  "concrete consequence" note above.
 
 ## Open item carried from the last design pass, now answered by this doc
 
