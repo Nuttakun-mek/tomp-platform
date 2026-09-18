@@ -3,9 +3,9 @@ import { isPublicPath } from "./public-paths";
 
 describe("public path guard", () => {
   it("allows public customer and driver entry routes intentionally", () => {
-    expect(isPublicPath("/driver/abc")).toBe(true);
-    expect(isPublicPath("/fleet/abc")).toBe(true);
-    expect(isPublicPath("/track/abc")).toBe(true);
+    expect(isPublicPath("/ground-transfer/driver/abc")).toBe(true);
+    expect(isPublicPath("/ground-transfer/fleet/abc")).toBe(true);
+    expect(isPublicPath("/ground-transfer/track/abc")).toBe(true);
   });
 
   it("keeps protected app routes protected and respects path boundaries", () => {

@@ -6,5 +6,5 @@ function getFallbackBaseUrl() {
 }
 
 export function buildDriverAccessUrl(token: string, baseUrl = getFallbackBaseUrl()): string {
-  return `${baseUrl.replace(/\/$/, "")}/driver?token=${encodeURIComponent(token)}`;
+  return `${baseUrl.replace(/\/$/, "")}/ground-transfer/driver?token=${encodeURIComponent(token)}`;
 }

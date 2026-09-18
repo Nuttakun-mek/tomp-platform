@@ -2,11 +2,11 @@ export const PUBLIC_PREFIXES = [
   "/login",
   "/no-access",
   "/auth/callback",
-  "/driver",
+  "/ground-transfer/driver",
   "/api/driver",
   "/api/health",
-  "/fleet",
-  "/track",
+  "/ground-transfer/fleet",
+  "/ground-transfer/track",
   "/_next",
   "/favicon.ico"
 ] as const;

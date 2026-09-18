@@ -97,7 +97,7 @@ function ProjectFleetAccessCard({
 
   useEffect(() => {
     if (!projectObserverLink?.token) return;
-    const nextUrl = `${window.location.origin}/fleet/${encodeURIComponent(projectObserverLink.token)}`;
+    const nextUrl = `${window.location.origin}/ground-transfer/fleet/${encodeURIComponent(projectObserverLink.token)}`;
     setUrl(nextUrl);
     renderQr(nextUrl, 220).then(setQr).catch(() => setQr(null));
   }, [projectObserverLink?.token]);
@@ -402,7 +402,7 @@ export function CallSignAccessPanel({
     const origin = typeof window === "undefined" ? "" : window.location.origin;
     const map: Record<string, string> = {};
     for (const [callSignId, token] of Object.entries(observerLinks)) {
-      if (token) map[callSignId] = `${origin}/track/${encodeURIComponent(token)}`;
+      if (token) map[callSignId] = `${origin}/ground-transfer/track/${encodeURIComponent(token)}`;
     }
     return map;
   }, [observerLinks]);

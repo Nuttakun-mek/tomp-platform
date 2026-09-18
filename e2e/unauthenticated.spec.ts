@@ -19,7 +19,7 @@ test("login page renders its form", async ({ page }) => {
 });
 
 test("driver entry with no token shows the 'no job' notice, not an error", async ({ page }) => {
-  const response = await page.goto("/driver");
+  const response = await page.goto("/ground-transfer/driver");
   expect(response?.status()).toBe(200);
   await expect(page.getByRole("heading", { name: /ไม่พบงาน/ })).toBeVisible();
 });

@@ -241,7 +241,7 @@ async function dropPinCookies(tokenIds: string[]) {
   if (!tokenIds.length) return;
   const store = await cookies();
   for (const tokenId of tokenIds) {
-    store.set(`${DRIVER_PIN_COOKIE_PREFIX}${tokenId}`, "", { path: "/driver", maxAge: 0 });
+    store.set(`${DRIVER_PIN_COOKIE_PREFIX}${tokenId}`, "", { path: "/ground-transfer/driver", maxAge: 0 });
   }
 }
 
@@ -251,7 +251,7 @@ async function setPinCookie(tokenId: string) {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/driver",
+    path: "/ground-transfer/driver",
     maxAge: 60 * 60 * 12
   });
 }

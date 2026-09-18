@@ -20,9 +20,9 @@ const checks = [
   { path: "/superadmin", expect: "redirect-login" },
   { path: "/resources", expect: "redirect-login" },
   // Driver entry with no token — should render its "no job" notice, not error.
-  { path: "/driver", expect: "public-200" },
-  { path: "/track/not-a-real-token", expect: "public-200" },
-  { path: "/fleet/not-a-real-token", expect: "public-200" },
+  { path: "/ground-transfer/driver", expect: "public-200" },
+  { path: "/ground-transfer/track/not-a-real-token", expect: "public-200" },
+  { path: "/ground-transfer/fleet/not-a-real-token", expect: "public-200" },
   // Retired legacy paths — must not serve content (404, or a compat redirect).
   { path: "/admin", expect: "gone" },
   { path: "/live-test", expect: "gone" }

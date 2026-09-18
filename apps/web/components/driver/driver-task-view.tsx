@@ -574,7 +574,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
               return (
                 <Link
                   key={item.view}
-                  href={`/driver?token=${encodeURIComponent(driverAccess.token)}&view=${item.view}`}
+                  href={`/ground-transfer/driver?token=${encodeURIComponent(driverAccess.token)}&view=${item.view}`}
                   className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-[1rem] px-1 text-[11px] font-bold transition active:scale-[0.98] ${
                     active
                       ? "bg-operation text-white shadow-[0_8px_18px_rgba(8,123,115,0.22)]"

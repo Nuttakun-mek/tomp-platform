@@ -18,7 +18,7 @@ const THAI = /[฀-๿]/;
 
 describe("fleet view read-only guard", () => {
   it("imports no mutating server actions except the PIN gate", () => {
-    const files = [...walk("components/fleet-view"), ...walk("app/fleet")];
+    const files = [...walk("components/fleet-view"), ...walk("app/ground-transfer/fleet")];
     for (const file of files) {
       const source = fs.readFileSync(file, "utf8");
       const imports = [...source.matchAll(/from "@\/app\/actions\/([\w-]+)"/g)].map((match) => match[1]);
@@ -32,7 +32,7 @@ describe("fleet view read-only guard", () => {
   // with the dictionary looking complete to anyone reviewing it. The copy lives
   // in lib/i18n or the page is not translated at all.
   it("renders no Thai literal of its own — every string comes from the dictionary", () => {
-    const files = [...walk("components/fleet-view"), ...walk("app/fleet")];
+    const files = [...walk("components/fleet-view"), ...walk("app/ground-transfer/fleet")];
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
       const source = fs.readFileSync(file, "utf8");

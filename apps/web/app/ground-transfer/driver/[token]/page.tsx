@@ -18,5 +18,5 @@ export default async function DriverTokenPage({ params, searchParams }: DriverTo
       query.set(key, value);
     }
   }
-  redirect(`/driver?${query.toString()}`);
+  redirect(`/ground-transfer/driver?${query.toString()}`);
 }

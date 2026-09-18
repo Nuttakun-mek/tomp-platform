@@ -17,7 +17,7 @@ export default async function PilotChecklistPage() {
     { title: "เพิ่มภารกิจ", detail: "กำหนดจุดรับ จุดส่ง เวลา และข้อผูกพันด้านบริการ", href: projectDetailHref },
     { title: "จัดสรรรถและคนขับ", detail: "เชื่อมภารกิจ Call Sign คนขับ รถ และช่วงเวลา", href: assignmentsHref },
     { title: "สร้าง QR", detail: "สร้างลิงก์เข้าหน้าปฏิบัติงานสำหรับคนขับแบบ assignment-scoped", href: assignmentsHref },
-    { title: "คนขับยืนยันความพร้อม", detail: "เปิดหน้าคนขับ ยืนยันข้อมูล และพร้อมเริ่มงาน", href: "/driver" },
+    { title: "คนขับยืนยันความพร้อม", detail: "เปิดหน้าคนขับ ยืนยันข้อมูล และพร้อมเริ่มงาน", href: "/ground-transfer/driver" },
     { title: "ส่งตำแหน่ง GPS", detail: "คนขับกดเริ่มส่งตำแหน่ง GPS จาก web app", href: "/superadmin/dev-tools/live-test" },
     { title: "ศูนย์ควบคุมติดตามสถานะ", detail: "ดูหมุด สีสัญญาณ ความเสี่ยง และรายการที่ต้องติดตาม", href: `/mission-control?projectId=${activeProject.id}` },
     { title: "ตรวจ Timeline", detail: "ยืนยันว่าลำดับเหตุการณ์สำคัญถูกบันทึก", href: `/mission-control?projectId=${activeProject.id}` },
