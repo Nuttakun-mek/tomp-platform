@@ -440,13 +440,17 @@ export async function updateAirportTransferCase(_previous: UpdateTransferCaseSta
   }
 
   const changedKeys = Object.keys(updatePayload).filter((key) => JSON.stringify(current[key] ?? null) !== JSON.stringify(updatePayload[key] ?? null));
-  if (!changedKeys.length) return { ok: true, message: "ไม่มีข้อมูลเปลี่ยนแปลง" };
+  if (!changedKeys.length) {
+    const flightRefresh = await refreshAirportTransferFlight(input.caseId, { ok: false, message: "" });
+    redirect(`/airport-transfer/cases/${input.caseId}?updated=0&flightUpdated=${flightRefresh.ok ? "1" : "0"}`);
+  }
 
   const oldValue = Object.fromEntries(changedKeys.map((key) => [key, current[key] ?? null]));
   const newValue = Object.fromEntries(changedKeys.map((key) => [key, updatePayload[key] ?? null]));
+  const changedPayload = Object.fromEntries(changedKeys.map((key) => [key, updatePayload[key]]));
   const { data: updated, error: updateError } = await supabase
     .from("airport_transfer_cases")
-    .update(updatePayload)
+    .update(changedPayload)
     .eq("id", input.caseId)
     .eq("updated_at", input.originalUpdatedAt)
     .select("id")
@@ -487,7 +491,8 @@ export async function updateAirportTransferCase(_previous: UpdateTransferCaseSta
   revalidatePath("/airport-transfer");
   revalidatePath("/airport-transfer/cases");
   revalidatePath(`/airport-transfer/cases/${input.caseId}`);
-  redirect(`/airport-transfer/cases/${input.caseId}?updated=1`);
+  const flightRefresh = await refreshAirportTransferFlight(input.caseId, { ok: false, message: "" });
+  redirect(`/airport-transfer/cases/${input.caseId}?updated=1&flightUpdated=${flightRefresh.ok ? "1" : "0"}`);
 }
 
 export async function refreshAirportTransferFlight(caseId: string, _previous: RefreshFlightState): Promise<RefreshFlightState> {
