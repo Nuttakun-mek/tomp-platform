@@ -53,7 +53,7 @@ explicit ask that more systems are coming. `route` is a URL prefix, not just
 an entry page — see "URL structure" below for what that does and does not
 cover.
 
-### URL structure — one prefix per system, with a hard exception
+### URL structure — one prefix per system, old paths kept as permanent redirects
 
 The ask was explicit: give each system its own URL namespace so the split is
 visible in the address bar, not just in code —
@@ -62,38 +62,47 @@ visible in the address bar, not just in code —
 own prefix the same way. Airport Transfer already matches this shape today —
 every one of its pages sits under `/airport-transfer/**`. TOMP does not; its
 pages sit at bare paths (`/projects`, `/assignments`, `/mission-control`,
-`/resources`, `/recovery`, `/superadmin`, `/project`, and `/`).
+`/resources`, `/recovery`, `/superadmin`, `/project`, `/driver/[token]`,
+`/driver`, `/fleet/[token]`, `/track/[token]`, and `/`).
 
-**Renaming TOMP's paths is safe for the eight pages above and only those.**
-Nothing external points at them; the only cost is updating roughly 34 files
-that hardcode the literal strings (`grep`-confirmed) — mechanical, no design
-risk.
+**All of it moves under `/ground-transfer`, including the token pages —
+revised from an earlier pass of this document, which held `/driver`,
+`/fleet`, `/track` back.** That held only because moving them outright would
+break a live QR the moment it shipped, with no fix possible from the server
+side. The owner has since confirmed a new mobile app build is coming
+regardless (for a separate, unrelated reason), which removes the reason to
+wait: a build that has to happen anyway can simply point at the corrected
+path, and the fix costs nothing extra to do now rather than later.
 
-**Five paths must never move, permanently, regardless of how many systems
-this registry grows to:** `/driver/[token]`, `/driver`, `/fleet/[token]`,
-`/track/[token]`, `/login`, `/no-access`. The reason is not symmetry with
-Airport Transfer's shell — it's that the first four are URLs already handed
-out and baked into things this repo cannot edit after the fact:
+**"Moves" means the canonical page moves; the old path is never deleted —
+it becomes a permanent redirect to the new one.** `/driver/[token]` (and the
+other three) keep resolving forever, forwarding to
+`/ground-transfer/driver/[token]`, so:
 
-- `apps/mobile-driver/src/config.ts`'s `buildDriverWebUrl()` constructs
-  `${origin}/driver/${token}` and is compiled into every app binary already
-  installed on a driver's phone right now, including the build in Apple's
-  reviewer's hands. Moving `/driver` breaks every one of those installs
-  immediately, with no server-side fix possible — the app would need a new
-  build to catch up, which the owner has stood down for the moment.
-- `/fleet/[token]` and `/track/[token]` are literal links already sent to real
-  people — a customer's fleet-tracking link, and the demo link handed to
-  Apple's reviewer yesterday (`984`'s sibling document, `983`, and the Apple
-  review work earlier this session). Moving them breaks a link that cannot be
-  re-sent to whoever already has it.
-- `/login` and `/no-access` stay at root because they exist *before* a system
-  is chosen — they are not "TOMP's" or "Airport Transfer's" to claim a prefix
-  for.
+- **Today's already-installed app builds keep working unchanged** — old
+  binaries still request `/driver/${token}`; the redirect catches them.
+  Apple's reviewer's build is one of these and needs nothing done to it.
+- **Already-sent `/fleet/[token]` and `/track/[token]` links keep working** —
+  a browser follows a redirect on its own; nobody has to be handed a new link.
+- **The next mobile app build points `buildDriverWebUrl()` at the new,
+  correct path directly** — no redirect hop, the "better future" this was
+  asked for.
 
-So: `route` in the registry means "where this system's *authenticated staff
-app* lives," never the public/token surface. TOMP's `route` becomes
-`/ground-transfer`; its `/driver`, `/fleet`, `/track` pages stay exactly where
-they are, owned by no system's prefix, forever.
+The redirect is a standing commitment, not a migration shim to remove once
+things "settle" — there is no way to know every old QR code or printed link
+is gone, so it stays indefinitely. Implementation detail for the plan, not
+decided here: a `redirects()` rule (`next.config`, or `vercel.json`'s own
+`redirects` array, matching the pattern this repo already uses there for
+`headers`) is the right mechanism — a param-matched rule, not a page
+component, so it resolves at the edge before the app router even sees it.
+
+`/login` and `/no-access` are unaffected by any of this and stay at root, for
+an unrelated reason: they exist *before* a system is chosen, so they were
+never going to carry a system's prefix regardless of what happens to
+`/driver`.
+
+`route` in the registry means "where this system's app lives" — for TOMP that
+is now `/ground-transfer`, covering everything including the token pages.
 
 ### Layer 2 — module access + role (new, generic, for flat-role systems)
 
@@ -243,11 +252,19 @@ Closing them is part of this plan, not a side effect of it.
 - `airport_transfer_cases` / `_tasks` / `_status_events` / `_flight_snapshots`
   / `_audit_logs` / `_import_*` / `_api_health` — unchanged; only
   `_memberships` gains a column and a new caller.
-- Nothing in `apps/mobile-driver/**` — drivers reach TOMP through the QR flow,
-  never through this login/landing surface.
-- `/driver/[token]`, `/driver`, `/fleet/[token]`, `/track/[token]`, `/login`,
-  `/no-access` — see "URL structure" above. These do not move now and must
-  not move later, even when a third or fourth system joins the registry.
+- Not the login/landing surface itself — drivers never see it, they reach a
+  job through the QR flow. `apps/mobile-driver/**` does need one small,
+  coordinated change per "URL structure" above: `buildDriverWebUrl()` starts
+  pointing at `/ground-transfer/driver/${token}` in whatever build ships next.
+  Nothing on the server blocks on that build landing — the redirect covers
+  every build already out, and every build still to come until it does.
+- `/login` and `/no-access` — unaffected, root-level, unrelated to any
+  system's prefix; see "URL structure" above.
+- Every server-side URL generator that mints a fresh link — `buildDriverAccessUrl()`,
+  `observer-access.ts`'s fleet/track builder — should emit the new
+  `/ground-transfer/...` path from the day this ships, not the old one. Only
+  *already-issued* links depend on the redirect; a link minted after the
+  cutover should never need to bounce through it.
 
 ## Open item carried from the last design pass, now answered by this doc
 
