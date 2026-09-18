@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
+import { FLIGHT_PROVIDER } from "./flight-provider";
 import type { AirportTransferApiHealth, AirportTransferAuditLog, AirportTransferCase, AirportTransferFlightSnapshot, AirportTransferSummary, AirportTransferTask } from "./types";
 
 type CaseRow = Record<string, unknown>;
@@ -136,7 +137,7 @@ export async function getDeletedAirportTransferCases(): Promise<AirportTransferC
 export async function getAirportTransferApiHealth(): Promise<AirportTransferApiHealth | null> {
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return null;
-  const { data, error } = await supabase.from("airport_transfer_api_health").select("*").eq("provider", "aerodatabox").maybeSingle();
+  const { data, error } = await supabase.from("airport_transfer_api_health").select("*").eq("provider", FLIGHT_PROVIDER).maybeSingle();
   if (error || !data) return null;
   return {
     provider: String(data.provider),

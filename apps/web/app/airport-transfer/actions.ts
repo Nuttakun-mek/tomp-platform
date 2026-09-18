@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
-import { verifyFlightByNumberAndDate } from "@/lib/airport-transfer/flight-provider";
+import { FLIGHT_PROVIDER, verifyFlightByNumberAndDate } from "@/lib/airport-transfer/flight-provider";
 import { syncActiveAirportTransferFlights } from "@/lib/airport-transfer/flight-sync";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
@@ -290,7 +290,7 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
     fast_track: input.fastTrack,
     notes: input.notes,
     flight_verification_status: verificationStatus,
-    flight_provider: verification.ok || verification.reason !== "not_configured" ? "aerodatabox" : null,
+    flight_provider: verification.ok || verification.reason !== "not_configured" ? FLIGHT_PROVIDER : null,
     flight_provider_checked_at: providerCheckedAt,
     operational_status: verificationStatus === "verified" ? "verified" : "needs_review",
     next_action_at: confirmedPickup || suggestedPickup,
@@ -315,7 +315,7 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
       ? supabase.from("airport_transfer_flight_snapshots").insert(
           verification.candidates.map((candidate) => ({
             case_id: caseId,
-            provider: "aerodatabox",
+            provider: FLIGHT_PROVIDER,
             verification_status: verificationStatus,
             scheduled_departure_at: candidate.scheduledDepartureAt,
             estimated_departure_at: candidate.estimatedDepartureAt,
@@ -516,7 +516,7 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
       last_error_message: message
     };
     if (verification.reason === "not_configured") healthPayload.next_check_at = null;
-    await supabase.from("airport_transfer_api_health").update(healthPayload).eq("provider", "aerodatabox");
+    await supabase.from("airport_transfer_api_health").update(healthPayload).eq("provider", FLIGHT_PROVIDER);
     return { ok: false, message };
   }
 
@@ -529,7 +529,7 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
   const verificationStatus = selected ? "verified" : "multiple_matches";
   const updatePayload: Record<string, unknown> = {
     flight_verification_status: verificationStatus,
-    flight_provider: "aerodatabox",
+    flight_provider: FLIGHT_PROVIDER,
     flight_provider_checked_at: checkedAt
   };
 
@@ -556,7 +556,7 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
   await Promise.all([
     supabase.from("airport_transfer_flight_snapshots").insert(verification.candidates.map((candidate) => ({
       case_id: caseId,
-      provider: "aerodatabox",
+      provider: FLIGHT_PROVIDER,
       verification_status: verificationStatus,
       scheduled_departure_at: candidate.scheduledDepartureAt,
       estimated_departure_at: candidate.estimatedDepartureAt,
@@ -576,14 +576,14 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
       old_value: oldValue,
       new_value: updatePayload,
       actor_profile_id: profile.id,
-      metadata: { provider: "aerodatabox", candidate_count: verification.candidates.length }
+      metadata: { provider: FLIGHT_PROVIDER, candidate_count: verification.candidates.length }
     }),
     supabase.from("airport_transfer_api_health").update({
       connection_status: "healthy",
       last_check_at: checkedAt,
       last_success_at: checkedAt,
       last_error_message: null
-    }).eq("provider", "aerodatabox")
+    }).eq("provider", FLIGHT_PROVIDER)
   ]);
 
   revalidatePath("/airport-transfer");

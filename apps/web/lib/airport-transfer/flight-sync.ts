@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { verifyFlightByNumberAndDate } from "./flight-provider";
+import { FLIGHT_PROVIDER, FLIGHT_PROVIDER_API_KEY_ENV, verifyFlightByNumberAndDate } from "./flight-provider";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 type CaseRow = Record<string, unknown>;
@@ -27,13 +27,25 @@ function recommendedPickup(direction: unknown, departureAt: string | null, arriv
   return new Date(new Date(base).getTime() + adjustment).toISOString();
 }
 
+function monitoringIntervalMinutes(row: CaseRow, now: Date): number | null {
+  const scheduled = row.direction === "departure" ? row.scheduled_departure_at : row.scheduled_arrival_at;
+  const fallback = `${String(row.travel_date)}T12:00:00+07:00`;
+  const eventAt = new Date(typeof scheduled === "string" && scheduled ? scheduled : fallback);
+  if (Number.isNaN(eventAt.getTime())) return null;
+  const hoursUntilEvent = (eventAt.getTime() - now.getTime()) / (60 * 60 * 1000);
+  if (hoursUntilEvent > 10) return null;
+  if (hoursUntilEvent > 6) return 120;
+  if (hoursUntilEvent > 2) return 60;
+  return 20;
+}
+
 export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunResult> {
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return { ok: false, status: "error", activeCases: 0, checkedCases: 0, failedCases: 0, message: "Supabase ไม่พร้อมใช้งาน" };
 
-  const { data: health } = await supabase.from("airport_transfer_api_health").select("polling_enabled, polling_interval_minutes").eq("provider", "aerodatabox").maybeSingle();
+  const { data: health } = await supabase.from("airport_transfer_api_health").select("polling_enabled, polling_interval_minutes").eq("provider", FLIGHT_PROVIDER).maybeSingle();
   if (health && health.polling_enabled === false) {
-    await supabase.from("airport_transfer_api_health").update({ connection_status: "paused", active_case_count: 0, next_check_at: null }).eq("provider", "aerodatabox");
+    await supabase.from("airport_transfer_api_health").update({ connection_status: "paused", active_case_count: 0, next_check_at: null }).eq("provider", FLIGHT_PROVIDER);
     return { ok: true, status: "paused", activeCases: 0, checkedCases: 0, failedCases: 0, message: "หยุดการติดตามอัตโนมัติชั่วคราว" };
   }
 
@@ -50,7 +62,7 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
 
   if (error) {
     const now = new Date().toISOString();
-    await supabase.from("airport_transfer_api_health").update({ connection_status: "error", last_check_at: now, last_error_at: now, last_error_message: error.message, next_check_at: null }).eq("provider", "aerodatabox");
+    await supabase.from("airport_transfer_api_health").update({ connection_status: "error", last_check_at: now, last_error_at: now, last_error_message: error.message, next_check_at: null }).eq("provider", FLIGHT_PROVIDER);
     return { ok: false, status: "error", activeCases: 0, checkedCases: 0, failedCases: 0, message: error.message };
   }
 
@@ -58,14 +70,18 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
   const now = new Date();
   const nextCheckAt = new Date(now.getTime() + intervalMinutes * 60 * 1000).toISOString();
   if (!activeCases) {
-    await supabase.from("airport_transfer_api_health").update({ connection_status: "idle", active_case_count: 0, checked_case_count: 0, failed_case_count: 0, last_check_at: now.toISOString(), last_error_message: null, next_check_at: null }).eq("provider", "aerodatabox");
+    await supabase.from("airport_transfer_api_health").update({ connection_status: "idle", active_case_count: 0, checked_case_count: 0, failed_case_count: 0, last_check_at: now.toISOString(), last_error_message: null, next_check_at: null }).eq("provider", FLIGHT_PROVIDER);
     return { ok: true, status: "idle", activeCases: 0, checkedCases: 0, failedCases: 0, message: "ไม่มีงานที่อยู่ในช่วงติดตาม จึงไม่เรียก Flight API" };
   }
 
-  const dueBefore = now.getTime() - intervalMinutes * 60 * 1000;
-  const dueRows = (rows as CaseRow[]).filter((row) => !row.flight_provider_checked_at || new Date(String(row.flight_provider_checked_at)).getTime() <= dueBefore).slice(0, 10);
+  const dueRows = (rows as CaseRow[]).filter((row) => {
+    const caseInterval = monitoringIntervalMinutes(row, now);
+    if (!caseInterval) return false;
+    if (!row.flight_provider_checked_at) return true;
+    return new Date(String(row.flight_provider_checked_at)).getTime() <= now.getTime() - caseInterval * 60 * 1000;
+  }).slice(0, 10);
   if (!dueRows.length) {
-    await supabase.from("airport_transfer_api_health").update({ connection_status: "healthy", active_case_count: activeCases, checked_case_count: 0, failed_case_count: 0, last_check_at: now.toISOString(), last_error_message: null, next_check_at: nextCheckAt }).eq("provider", "aerodatabox");
+    await supabase.from("airport_transfer_api_health").update({ connection_status: "healthy", active_case_count: activeCases, checked_case_count: 0, failed_case_count: 0, last_check_at: now.toISOString(), last_error_message: null, next_check_at: nextCheckAt }).eq("provider", FLIGHT_PROVIDER);
     return { ok: true, status: "healthy", activeCases, checkedCases: 0, failedCases: 0, message: "ข้อมูลทุกเคสยังใหม่อยู่ ยังไม่ถึงรอบเรียก API" };
   }
 
@@ -78,7 +94,7 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
     return { ok: true, status: "healthy", activeCases, checkedCases: 0, failedCases: 0, message: "มีรอบตรวจ Flight API อื่นกำลังทำงานอยู่" };
   }
 
-  await supabase.from("airport_transfer_api_health").update({ active_case_count: activeCases, last_check_at: now.toISOString(), next_check_at: nextCheckAt }).eq("provider", "aerodatabox").eq("sync_lock_token", lockToken);
+  await supabase.from("airport_transfer_api_health").update({ active_case_count: activeCases, last_check_at: now.toISOString(), next_check_at: nextCheckAt }).eq("provider", FLIGHT_PROVIDER).eq("sync_lock_token", lockToken);
 
   let checkedCases = 0;
   let failedCases = 0;
@@ -90,7 +106,7 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
     if (!result.ok) {
       if (result.reason === "not_configured") {
         notConfigured = true;
-        lastError = "ยังไม่ได้ตั้งค่า AERODATABOX_API_KEY";
+        lastError = `ยังไม่ได้ตั้งค่า ${FLIGHT_PROVIDER_API_KEY_ENV}`;
         break;
       }
       failedCases += 1;
@@ -109,7 +125,7 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
     const selected = matching.length === 1 ? matching[0] : result.candidates.length === 1 ? result.candidates[0] : null;
     const checkedAt = new Date().toISOString();
     const verificationStatus = selected ? "verified" : "multiple_matches";
-    const updatePayload: Record<string, unknown> = { flight_verification_status: verificationStatus, flight_provider: "aerodatabox", flight_provider_checked_at: checkedAt };
+    const updatePayload: Record<string, unknown> = { flight_verification_status: verificationStatus, flight_provider: FLIGHT_PROVIDER, flight_provider_checked_at: checkedAt };
     if (selected) {
       const nextRecommended = recommendedPickup(row.direction, selected.scheduledDepartureAt, selected.scheduledArrivalAt);
       const pickupWasAutomatic = !row.confirmed_pickup_at || row.confirmed_pickup_at === row.recommended_pickup_at;
@@ -127,7 +143,7 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
       supabase.from("airport_transfer_cases").update(updatePayload).eq("id", row.id),
       supabase.from("airport_transfer_flight_snapshots").insert(result.candidates.map((candidate) => ({
         case_id: row.id,
-        provider: "aerodatabox",
+        provider: FLIGHT_PROVIDER,
         verification_status: verificationStatus,
         scheduled_departure_at: candidate.scheduledDepartureAt,
         estimated_departure_at: candidate.estimatedDepartureAt,
@@ -146,7 +162,7 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
         action: "flight_auto_refreshed",
         old_value: { flight_provider_checked_at: row.flight_provider_checked_at || null },
         new_value: updatePayload,
-        metadata: { provider: "aerodatabox", source: "scheduled_sync" }
+        metadata: { provider: FLIGHT_PROVIDER, source: "scheduled_sync" }
       })] : [])
     ]);
     checkedCases += 1;
@@ -167,7 +183,7 @@ export async function syncActiveAirportTransferFlights(): Promise<FlightSyncRunR
   };
   if (checkedCases) healthPayload.last_success_at = finishedAt;
   if (failedCases || notConfigured) healthPayload.last_error_at = finishedAt;
-  await supabase.from("airport_transfer_api_health").update(healthPayload).eq("provider", "aerodatabox").eq("sync_lock_token", lockToken);
+  await supabase.from("airport_transfer_api_health").update(healthPayload).eq("provider", FLIGHT_PROVIDER).eq("sync_lock_token", lockToken);
 
   return {
     ok: status === "healthy" || status === "degraded",
