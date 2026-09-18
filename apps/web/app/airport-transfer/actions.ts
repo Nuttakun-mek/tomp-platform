@@ -8,6 +8,7 @@ import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { FLIGHT_PROVIDER, verifyFlightByNumberAndDate } from "@/lib/airport-transfer/flight-provider";
 import { flightNumberHelpMessage } from "@/lib/airport-transfer/flight-number";
 import { syncActiveAirportTransferFlights } from "@/lib/airport-transfer/flight-sync";
+import { getAirportTransferProjectRole } from "@/lib/airport-transfer/project-role";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import type { AirportTransferOperationalStatus } from "@/lib/airport-transfer/types";
@@ -693,25 +694,35 @@ export async function completeAirportTransferTask(caseId: string, taskId: string
   if (!validId.safeParse(caseId).success || !validId.safeParse(taskId).success) return;
 
   const access = await getAirportTransferAccess();
-  if (!access.allowed || !access.canManage) return;
+  if (!access.allowed) return;
   const profile = await getCurrentUserProfile();
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return;
 
   const { data: activeCase } = await supabase
     .from("airport_transfer_cases")
-    .select("operational_status, deleted_at")
+    .select("operational_status, deleted_at, project_id")
     .eq("id", caseId)
     .maybeSingle();
   if (!activeCase || activeCase.deleted_at || activeCase.operational_status === "cancelled") return;
 
   const { data: task } = await supabase
     .from("airport_transfer_tasks")
-    .select("id, task_key, status, sequence")
+    .select("id, task_key, status, sequence, owner_role")
     .eq("id", taskId)
     .eq("case_id", caseId)
     .maybeSingle();
   if (!task || task.status === "completed") return;
+
+  // Layer 3 (docs/11-codex/984): admin/dispatcher keep doing everything,
+  // unchanged. Everyone else may only complete the step labelled as their
+  // own duty, on the project this case actually belongs to.
+  if (!access.canManage) {
+    const projectRole = activeCase.project_id
+      ? await getAirportTransferProjectRole(String(activeCase.project_id), profile.id)
+      : null;
+    if (projectRole !== task.owner_role) return;
+  }
 
   const { count: unfinishedEarlierTasks } = await supabase
     .from("airport_transfer_tasks")
