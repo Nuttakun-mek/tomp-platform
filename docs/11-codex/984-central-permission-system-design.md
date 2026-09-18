@@ -196,6 +196,20 @@ straight into TOMP, even if TOMP is its only system, because "ทุกคนเ
 was explicit — the picker always shows, and lives at the one root path that
 was never going to be claimed by any single system's prefix anyway.
 
+**Checked against natural usage, not just decided and left.** For the
+majority — an account with exactly one granted system — this adds one click
+on login that did not exist before (straight into `/projects` today). Kept
+anyway, deliberately: it costs that click once per login, not once per page,
+since nothing after clicking through routes back to `/` during ordinary
+work. The friction that would actually matter — someone working two systems
+on the same engagement having to return to `/` every time they switch — is
+solved separately, not by weakening this page: `985` puts a direct
+system-switch link on the project detail page itself, so mid-work switching
+never touches the root picker at all. If a future pass is tempted to skip
+this page for single-system accounts to shave that one click, know that the
+trade was made on purpose, weighed against "ทุกคนเห็นระบบทุกระบบ" being an
+explicit instruction, not an oversight.
+
 ## The central admin page
 
 Lives at `/permission` — root-level, unprefixed by either system's namespace,
