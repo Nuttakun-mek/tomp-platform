@@ -226,13 +226,64 @@ holds the account-creation/editing form described above, plus a list of every
 account showing, per system, what it currently holds — the same two-card
 shape used to create a user, opened for editing.
 
+## Two tiers of admin, not one — `super_admin` platform-wide, `project_manager` scoped to their own project
+
+Asked directly, and it resolves a dangling promise already sitting in the
+code: `SettingsView` in `project/page.tsx` shows a project's member count
+today with an "เพิ่ม/จัดการผู้ใช้" link — pointing at `/superadmin/users`,
+which the viewing `project_manager` cannot open, since that page is
+`super_admin`-only. It has never worked for the one person who most needs
+it. Fixed here, not by opening `/permission` to more people, but by giving
+project-level membership its own scoped path:
+
+- **`super_admin` — platform-wide, via `/permission`.** Creates accounts,
+  grants or revokes which systems an account may open at all (Layer 2),
+  and is the only one who can do either.
+- **`project_manager` — scoped to the one project they manage, from that
+  project's own settings tab, not from `/permission`.** A new permission,
+  `project.manage_members`, checked the same way `assignment.update` already
+  is — `requirePermission(projectId, "project.manage_members")` — so holding
+  it says nothing about any project other than the one being checked. A
+  `project_manager` can add or remove a `dispatcher` / `coordinator` /
+  `customer_viewer` on their own project; they cannot reach any other
+  project's membership, and they cannot grant account-level system access —
+  that stays `super_admin`-only regardless. This is the same guarantee
+  `985`'s walkthrough already leaned on ("เห็นแค่โครงการนั้นๆ") applied to who
+  may *grant* access, not only who *has* it.
+
+This does not reopen `984`'s "no admin page per system" rule — that rule
+was about not building a second place to grant *system access* (Layer 2)
+inside Airport Transfer's own settings. A project's own membership panel is
+a narrower, older concept than any of this system-splitting work; TOMP
+already showed a member count there before `984` existed. It only needed its
+broken link fixed.
+
+## Complete URL reference
+
+Every path this design touches, settled in one place rather than scattered
+across sections — including `/superadmin`'s remaining pages, not just
+`/users`, which earlier passes of this document left unresolved.
+
+| Path | What it is | Why it lives there |
+|---|---|---|
+| `/` | Landing — system tiles | Pre-system, belongs to no system |
+| `/login`, `/no-access` | Auth | Pre-system |
+| `/permission` | Account creation, system-access grants (replaces `/superadmin/users` and `/superadmin`'s own index — both described themselves as "ผู้ใช้ สิทธิ์ และเครื่องมือแพลตฟอร์มทั้งหมด") | Governs every system, belongs to none |
+| `/permission/projects` | Every project, platform-wide (replaces `/superadmin/projects`, whose own description is "โครงการทั้งหมดในระบบ") | Crosses every project's own membership boundary — `super_admin` only, by nature |
+| `/permission/audit` | Cross-project activity (replaces `/superadmin/audit`, "ข้ามทุกโครงการในระบบ" per its own description) | Same reason |
+| `/permission/roles` | The role × permission matrix (replaces `/superadmin/roles`) | Platform-level by nature; TOMP-only today, a natural place to add Airport Transfer's role list later |
+| `/ground-transfer/**` | TOMP's own app | Per "URL structure" above |
+| `/ground-transfer/superadmin/dev-tools/**` | Moved from `/superadmin/dev-tools/**` | Confirmed TOMP-specific: driver QR, GPS, the Apple review demo all test Ground Transfer's own pipeline, nothing Airport Transfer touches |
+| `/ground-transfer/projects/<id>` (settings tab) | Project-scoped member management | New, per the two-tier model above — not a platform page |
+| `/airport-transfer/**` | Airport Transfer's own app | Unchanged |
+
 ## Permission matrix
 
 | System | Role | Can do | Status |
 |---|---|---|---|
 | *(registry)* | *(any)* | `system.access:<key>` — may this account even see this system as unlocked | new concept, layer 2 |
 | TOMP | `super_admin` | everything | unchanged |
-| TOMP | `project_manager` | full control of its project(s): publish, missions, assignments, resources | unchanged |
+| TOMP | `project_manager` | full control of its project(s): publish, missions, assignments, resources, **and now its own members** | +`project.manage_members`, scoped to projects they manage |
 | TOMP | `dispatcher` | assignments, QR, resources, status | unchanged |
 | TOMP | `coordinator` | read + confirm on-ground status | unchanged |
 | TOMP | `customer_viewer` | read-only + change requests | unchanged |
