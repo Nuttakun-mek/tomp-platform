@@ -1,5 +1,5 @@
 import { AlertTriangle, CarFront, CheckCircle2, ClipboardList, Clock3, Plus, ShieldCheck } from "lucide-react";
-import { AirportTransferCaseCard } from "@/components/airport-transfer/case-card";
+import { AirportTransferCaseCard, getAirportTransferOperationalAlerts } from "@/components/airport-transfer/case-card";
 import { AirportTransferApiHealthCard } from "@/components/airport-transfer/api-health-card";
 import { ButtonLink } from "@/components/ui/button";
 import { getAirportTransferApiHealth, getAirportTransferCases, getAirportTransferTasksByCaseIds, getLatestAirportTransferFlightSnapshots, summarizeAirportTransferCases } from "@/lib/airport-transfer/data";
@@ -8,24 +8,22 @@ export default async function AirportTransferDashboardPage() {
   const [cases, apiHealth] = await Promise.all([getAirportTransferCases(), getAirportTransferApiHealth()]);
   const now = Date.now();
   const activeCases = cases.filter((item) => !["completed", "cancelled"].includes(item.operationalStatus));
+  const tasks = await getAirportTransferTasksByCaseIds(activeCases.map((item) => item.id));
   const minutesToPickup = (item: (typeof cases)[number]) => {
     const value = item.confirmedPickupAt || item.recommendedPickupAt;
     return value ? (new Date(value).getTime() - now) / 60_000 : Number.POSITIVE_INFINITY;
   };
   const verificationProblem = (item: (typeof cases)[number]) => !["verified", "manual_confirmed"].includes(item.verificationStatus);
   const priority = (item: (typeof cases)[number]) => {
+    const operationalScore = getAirportTransferOperationalAlerts(item, tasks[item.id] || [])[0]?.score || 0;
     const minutes = minutesToPickup(item);
-    if (minutes < 0) return 500;
-    if (minutes <= 30) return 450;
-    if (verificationProblem(item)) return 400;
-    if (!item.driverName || !item.vehiclePlate) return 350;
-    if (minutes <= 120) return 300;
+    if (operationalScore) return operationalScore;
     if (minutes <= 360) return 200;
     return 100;
   };
   const visibleCases = [...activeCases].sort((a, b) => priority(b) - priority(a) || minutesToPickup(a) - minutesToPickup(b)).slice(0, 10);
   const visibleCaseIds = visibleCases.map((item) => item.id);
-  const [snapshots, tasks] = await Promise.all([getLatestAirportTransferFlightSnapshots(visibleCaseIds), getAirportTransferTasksByCaseIds(visibleCaseIds)]);
+  const snapshots = await getLatestAirportTransferFlightSnapshots(visibleCaseIds);
   const alerts = {
     overdue: activeCases.filter((item) => minutesToPickup(item) < 0).length,
     nextTwoHours: activeCases.filter((item) => minutesToPickup(item) >= 0 && minutesToPickup(item) <= 120).length,
