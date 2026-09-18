@@ -24,10 +24,14 @@ const fieldLabels: Record<string, string> = {
   direction: "ประเภทบริการ", client_name: "ลูกค้า/บริษัท", passenger_title: "คำนำหน้า", passenger_first_name: "ชื่อ", passenger_last_name: "นามสกุล",
   passenger_email: "อีเมล", passenger_mobile: "เบอร์โทร", passenger_count: "จำนวนผู้โดยสาร", luggage_count: "จำนวนกระเป๋า", travel_date: "วันเดินทาง",
   flight_number: "หมายเลขเที่ยวบิน", origin_airport: "สนามบินต้นทาง", destination_airport: "สนามบินปลายทาง", scheduled_departure_at: "เวลาออก", scheduled_arrival_at: "เวลาถึง",
-  pickup_name: "จุดรับ", dropoff_name: "จุดส่ง", confirmed_pickup_at: "เวลารับ", vehicle_type: "ประเภทรถ", vehicle_plate_snapshot: "ทะเบียนรถ",
+  pickup_name: "จุดรับ", pickup_address: "ที่อยู่จุดรับ", pickup_maps_url: "Google Maps จุดรับ", dropoff_name: "จุดส่ง", dropoff_address: "ที่อยู่จุดส่ง", dropoff_maps_url: "Google Maps จุดส่ง",
+  recommended_pickup_at: "เวลารับที่ระบบแนะนำ", confirmed_pickup_at: "เวลารับที่ยืนยัน", pickup_time_override_reason: "เหตุผลที่ปรับเวลารับ", vehicle_type: "ประเภทรถ", vehicle_plate_snapshot: "ทะเบียนรถ",
   driver_name_snapshot: "คนขับ", driver_phone_snapshot: "โทรศัพท์คนขับ", notes: "หมายเหตุ", operational_status: "สถานะงาน", flight_verification_status: "สถานะตรวจเที่ยวบิน",
-  deleted_at: "ย้ายไปถังขยะ", cancelled_at: "เวลายกเลิก"
+  fast_track: "Fast Track", deleted_at: "ย้ายไปถังขยะ", cancelled_at: "เวลายกเลิก"
 };
+
+const flightEditKeys = new Set(["travel_date", "flight_number", "origin_airport", "destination_airport", "scheduled_departure_at", "scheduled_arrival_at"]);
+const systemDerivedEditKeys = new Set(["flight_verification_status", "operational_status", "recommended_pickup_at", "next_action_at"]);
 
 const actionLabels: Record<string, string> = { created: "สร้างเคส", updated: "แก้ไขข้อมูล", flight_refreshed: "อัปเดตเที่ยวบินจาก API", flight_auto_refreshed: "ระบบอัปเดตเที่ยวบินอัตโนมัติ", cancelled: "ยกเลิกงาน", moved_to_trash: "ย้ายไปข้อมูลที่ลบแล้ว", restored: "กู้คืนงาน", completed: "ทำ Checklist สำเร็จ" };
 
@@ -44,6 +48,11 @@ export default async function AirportTransferCasePage({ params, searchParams }: 
   const query = searchParams ? await searchParams : {};
   const [item, tasks, auditLogs, latestFlight] = await Promise.all([getAirportTransferCase(caseId), getAirportTransferTasks(caseId), getAirportTransferAuditLogs(caseId), getLatestAirportTransferFlightSnapshot(caseId)]);
   if (!item) notFound();
+  const latestManualUpdate = query.updated === "1" ? auditLogs.find((log) => log.action === "updated") : undefined;
+  const changedKeys = latestManualUpdate
+    ? Array.from(new Set([...Object.keys(latestManualUpdate.oldValue || {}), ...Object.keys(latestManualUpdate.newValue || {})])).filter((key) => !systemDerivedEditKeys.has(key))
+    : [];
+  const flightWasEdited = changedKeys.some((key) => flightEditKeys.has(key));
 
   return (
     <>
@@ -60,7 +69,7 @@ export default async function AirportTransferCasePage({ params, searchParams }: 
         </div>
       </header>
 
-      {query.updated ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">บันทึกเฉพาะข้อมูลที่เปลี่ยนแปลงและประวัติเรียบร้อยแล้ว</div> : null}
+      {latestManualUpdate ? <section className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-950"><div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-bold">บันทึกการแก้ไขเรียบร้อย</p><p className="text-xs text-emerald-800">แสดงเฉพาะข้อมูลที่เปลี่ยนแปลงในครั้งนี้</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${flightWasEdited ? "bg-blue-100 text-blue-800" : "bg-white text-slate-600"}`}>ข้อมูลเที่ยวบิน: {flightWasEdited ? "มีการเปลี่ยนแปลง" : "ไม่เปลี่ยนแปลง"}</span></div>{changedKeys.length ? <div className="mt-3 grid gap-2 md:grid-cols-2">{changedKeys.map((key) => <div key={key} className="rounded-xl border border-emerald-200 bg-white p-3"><p className="text-xs font-bold text-slate-700">{fieldLabels[key] || key}</p><div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs"><span className="truncate text-slate-500">{displayAuditValue(latestManualUpdate.oldValue?.[key])}</span><span className="text-slate-300">→</span><span className="truncate font-semibold text-slate-900">{displayAuditValue(latestManualUpdate.newValue?.[key])}</span></div></div>)}</div> : <p className="mt-2 text-xs">ไม่พบข้อมูลหลักที่เปลี่ยนแปลง</p>}</section> : null}
       {query.flightUpdated === "1" ? <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">อัปเดตข้อมูลเที่ยวบินล่าสุดจาก API โดยอัตโนมัติแล้ว</div> : null}
       {query.flightUpdated === "0" ? <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">บันทึกข้อมูลแล้ว แต่ Flight API ไม่ตอบสนอง ระบบจะตรวจสอบอีกครั้งตามรอบอัตโนมัติ</div> : null}
       {item.deletedAt ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">เคสนี้อยู่ใน “ข้อมูลที่ลบแล้ว” ตั้งแต่ {formatDateTime(item.deletedAt)} และไม่ถูกนำไปติดตาม Flight API</div> : null}
