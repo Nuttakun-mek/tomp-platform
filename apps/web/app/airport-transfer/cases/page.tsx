@@ -9,6 +9,9 @@ export default async function AirportTransferCasesPage({ searchParams }: CasesPa
   const cases = await getAirportTransferCases({ direction: params.direction, status: params.status, query: params.q });
   const caseIds = cases.map((item) => item.id);
   const [snapshots, tasks] = await Promise.all([getLatestAirportTransferFlightSnapshots(caseIds), getAirportTransferTasksByCaseIds(caseIds)]);
+  const currentCases = cases.filter((item) => !["completed", "cancelled"].includes(item.operationalStatus));
+  const completedCases = cases.filter((item) => item.operationalStatus === "completed");
+  const cancelledCases = cases.filter((item) => item.operationalStatus === "cancelled");
   return (
     <>
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Travel Cases</p><h1 className="mt-1 text-2xl font-semibold">ข้อมูลการเดินทางทั้งหมด</h1><p className="mt-2 text-sm text-slate-500">ค้นหาและกรองตามทิศทาง สถานะ และข้อมูลผู้โดยสาร</p></div><ButtonLink href="/airport-transfer/cases/new">สร้างการ์ดข้อมูล</ButtonLink></header>
@@ -20,7 +23,11 @@ export default async function AirportTransferCasesPage({ searchParams }: CasesPa
         <select name="status" defaultValue={params.status || ""} className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm"><option value="">ทุกสถานะ</option><option value="needs_review">รอตรวจสอบ</option><option value="ready_to_assign">พร้อมจัดรถ</option><option value="assigned">จัดรถแล้ว</option><option value="completed">เสร็จสิ้น</option><option value="issue">มีปัญหา</option></select>
         <button className="rounded-xl bg-cyan-800 px-4 py-2.5 text-sm font-semibold text-white">ค้นหา</button>
       </form>
-      <section className="grid gap-2">{cases.length ? cases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} />) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500">ไม่พบข้อมูลตามเงื่อนไข</div>}</section>
+      {cases.length ? <>
+        {currentCases.length ? <section className="grid gap-2"><div className="flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-800">Active Operations</p><h2 className="text-lg font-semibold">งานที่กำลังดำเนินการ</h2></div><span className="text-sm font-semibold text-slate-500">{currentCases.length} งาน</span></div>{currentCases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} />)}</section> : null}
+        {completedCases.length ? <section className="grid gap-2"><div className="flex items-end justify-between border-t border-slate-200 pt-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Completed</p><h2 className="text-lg font-semibold">งานที่เสร็จสิ้น</h2></div><span className="text-sm font-semibold text-slate-500">{completedCases.length} งาน</span></div>{completedCases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} />)}</section> : null}
+        {cancelledCases.length ? <section className="grid gap-2"><div className="border-t border-slate-200 pt-4"><h2 className="text-lg font-semibold text-slate-600">งานที่ยกเลิก</h2></div>{cancelledCases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} />)}</section> : null}
+      </> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500">ไม่พบข้อมูลตามเงื่อนไข</div>}
     </>
   );
 }
