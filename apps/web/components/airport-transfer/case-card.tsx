@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, Check, ChevronDown, Circle, Clock3, Luggage, MapPin, Phone, PlaneLanding, PlaneTakeoff, UsersRound } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, Check, ChevronDown, Circle, Clock3, Luggage, MapPin, Phone, PlaneLanding, PlaneTakeoff, UsersRound } from "lucide-react";
 import { completeAirportTransferTask } from "@/app/airport-transfer/actions";
 import { operationalStatusLabel, verificationStatusLabel } from "@/lib/airport-transfer/labels";
 import type { AirportTransferCase, AirportTransferFlightSnapshot, AirportTransferTask } from "@/lib/airport-transfer/types";
@@ -22,17 +22,32 @@ function minutesBetween(first: string | null, second: string | null) {
 }
 
 const flightStatusLabels: Record<string, string> = {
-  scheduled: "ตามตาราง", active: "กำลังบิน", landed: "ถึงแล้ว", delayed: "ล่าช้า", cancelled: "ยกเลิก", diverted: "เปลี่ยนเส้นทาง"
+  scheduled: "ตามตาราง (Scheduled)",
+  on_time: "ตรงเวลา (On Time)",
+  active: "กำลังบิน (In Air)",
+  en_route: "กำลังบิน (In Air)",
+  boarding: "กำลังขึ้นเครื่อง (Boarding)",
+  landed: "ถึงแล้ว (Landed)",
+  arrived: "ถึงแล้ว (Landed)",
+  delayed: "ล่าช้า (Delayed)",
+  cancelled: "ยกเลิก (Cancelled)",
+  diverted: "เปลี่ยนเส้นทาง (Diverted)"
 };
 
 function flightSummary(item: AirportTransferCase, snapshot?: AirportTransferFlightSnapshot) {
-  if (!snapshot) return { label: verificationStatusLabel[item.verificationStatus], problem: !["verified", "manual_confirmed"].includes(item.verificationStatus) };
+  if (!snapshot) return { label: verificationStatusLabel[item.verificationStatus], problem: !["verified", "manual_confirmed"].includes(item.verificationStatus), tone: "neutral" as const };
   const scheduled = item.direction === "arrival" ? snapshot.scheduledArrivalAt : snapshot.scheduledDepartureAt;
   const estimated = item.direction === "arrival" ? snapshot.estimatedArrivalAt : snapshot.estimatedDepartureAt;
   const delay = minutesBetween(scheduled, estimated);
-  const base = flightStatusLabels[snapshot.providerStatus || ""] || snapshot.providerStatus || "ตรวจแล้ว";
-  if (delay !== null && delay > 5) return { label: `${base} · ช้า ${delay} นาที`, problem: true };
-  return { label: `${base}${delay !== null ? " · ตรงเวลา" : ""}`, problem: ["delayed", "cancelled", "diverted"].includes(snapshot.providerStatus || "") };
+  const providerStatus = (snapshot.providerStatus || "").toLowerCase().replaceAll(" ", "_");
+  if (providerStatus === "cancelled") return { label: flightStatusLabels.cancelled, problem: true, tone: "danger" as const };
+  if (providerStatus === "diverted") return { label: flightStatusLabels.diverted, problem: true, tone: "danger" as const };
+  if (providerStatus === "delayed" || (delay !== null && delay > 5)) return { label: `ล่าช้า (Delayed)${delay !== null && delay > 0 ? ` · ${delay} นาที` : ""}`, problem: true, tone: "warning" as const };
+  if (["landed", "arrived"].includes(providerStatus)) return { label: flightStatusLabels.landed, problem: false, tone: "success" as const };
+  if (["active", "en_route"].includes(providerStatus)) return { label: flightStatusLabels.active, problem: false, tone: "active" as const };
+  if (providerStatus === "boarding") return { label: flightStatusLabels.boarding, problem: false, tone: "active" as const };
+  if (delay !== null && delay <= 5) return { label: flightStatusLabels.on_time, problem: false, tone: "success" as const };
+  return { label: flightStatusLabels[providerStatus] || snapshot.providerStatus || "ตรวจสอบแล้ว", problem: false, tone: "neutral" as const };
 }
 
 export type OperationalAlert = { label: string; tone: "danger" | "warning" | "info"; score: number };
@@ -88,6 +103,14 @@ const alertTone = {
   info: "border-blue-200 bg-blue-50 text-blue-800"
 };
 
+const flightTone = {
+  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  warning: "border-amber-200 bg-amber-50 text-amber-900",
+  danger: "border-red-200 bg-red-50 text-red-800",
+  active: "border-blue-200 bg-blue-50 text-blue-800",
+  neutral: "border-slate-200 bg-slate-50 text-slate-700"
+};
+
 export function AirportTransferCaseCard({ item, snapshot, tasks = [] }: { item: AirportTransferCase; snapshot?: AirportTransferFlightSnapshot; tasks?: AirportTransferTask[] }) {
   const DirectionIcon = item.direction === "arrival" ? PlaneLanding : PlaneTakeoff;
   const pickupAt = item.confirmedPickupAt || item.recommendedPickupAt;
@@ -113,8 +136,8 @@ export function AirportTransferCaseCard({ item, snapshot, tasks = [] }: { item: 
         </div>
 
         <div className="mt-2 grid gap-2 border-t border-slate-100 pt-2 text-xs md:grid-cols-2 xl:grid-cols-4">
-          <div><span className="text-slate-500">เที่ยวบิน / สถานะ</span><p className={`font-bold ${flight.problem ? "text-amber-800" : "text-slate-900"}`}>{item.flightNumber} · {flight.label}</p></div>
-          <div><span className="text-slate-500">เส้นทางเครื่องบิน</span><p className="font-bold text-slate-900">{item.originAirport || "—"} → {item.destinationAirport || "—"}</p></div>
+          <div><span className="text-slate-500">เที่ยวบิน / สถานะการบิน</span><div className="mt-1 flex flex-wrap items-center gap-1.5"><strong className="text-sm text-slate-950">{item.flightNumber}</strong><span className={`rounded-lg border px-2 py-1 font-bold ${flightTone[flight.tone]}`}>{flight.label}</span></div></div>
+          <div><span className="text-slate-500">เส้นทางเครื่องบิน / เวลา</span><div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2"><div><p className="font-bold text-slate-900">{item.originAirport || "—"}</p><p className="text-[11px] text-slate-500">ออก {formatDateTime(item.scheduledDepartureAt)}</p></div><ArrowRight className="h-3.5 w-3.5 text-slate-300" /><div><p className="font-bold text-slate-900">{item.destinationAirport || "—"}</p><p className="text-[11px] text-slate-500">ถึง {formatDateTime(item.scheduledArrivalAt)}</p></div></div></div>
           <div><span className="text-slate-500">เส้นทางรถ / เวลารับ</span><p className="font-bold text-slate-900">{item.pickupName} → {item.dropoffName}</p><p className="text-slate-500">รับ {formatDateTime(pickupAt)}</p></div>
           <div><span className="text-slate-500">รถ / คนขับ</span><p className="font-bold text-slate-900">{item.vehicleType || "ยังไม่จัดรถ"} · {item.vehiclePlate || "ไม่มีทะเบียน"}</p><p className="text-slate-600">{item.driverName || "ยังไม่จัดคนขับ"} · {item.driverPhone || "ไม่มีเบอร์"}</p></div>
         </div>
