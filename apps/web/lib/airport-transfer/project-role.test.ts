@@ -40,6 +40,13 @@ describe("getAirportTransferProjectRole", () => {
     (getSupabaseServerDataClient as ReturnType<typeof vi.fn>).mockReturnValue({ from });
 
     const role = await getAirportTransferProjectRole("project-1", "profile-1");
+
     expect(role).toBeNull();
+    expect(from).toHaveBeenCalledWith("project_members");
+    expect(select).toHaveBeenCalledWith(expect.stringContaining("role_key"));
+    expect(eq1).toHaveBeenCalledWith("project_id", "project-1");
+    expect(eq2).toHaveBeenCalledWith("profile_id", "profile-1");
+    expect(eq3).toHaveBeenCalledWith("system_key", "airport_transfer");
+    expect(eq4).toHaveBeenCalledWith("status", "active");
   });
 });
