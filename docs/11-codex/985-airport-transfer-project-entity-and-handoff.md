@@ -152,6 +152,54 @@ system hands a confirmed order to a fulfilment system.
    there is exactly one live-tracking surface in the product, and Ground
    Transfer already owns it.
 
+## Worked examples — and why the checklist already fits this, unplanned
+
+Two concrete scenarios, given directly, ground everything above in something
+closer to a spec than a sketch:
+
+- **Arrival:** the schedule is known in advance; Airport Transfer runs its
+  normal intake and flight-verification work right up until the flight is
+  about to land. At that point staff sends the driver a link; the driver
+  presses it to accept the job at the scheduled time, and from then the
+  system can track where the vehicle is and whether it is getting close to
+  the pickup.
+- **Departure:** a link is sent to the driver, the driver accepts the job —
+  accepting *is* the acknowledgement, nothing separate needs ticking for
+  that — and once the driver arrives at the pickup point, that real action
+  is what checks the corresponding box, and so on for the statuses after it.
+
+Reading `taskTemplate()` in `app/airport-transfer/actions.ts` shows the
+checklist already has exactly the slots these two examples describe —
+checked directly against the live function, not assumed from memory —
+because it was written by someone already thinking about the same real
+workflow:
+
+| Task key (both directions) | Label | Matches |
+|---|---|---|
+| `driver_notified` | แจ้งงานคนขับแล้ว | "ลิงก์จะถูกส่งให้คนขับ" |
+| `driver_confirmed` | คนขับรับทราบแล้ว | "คนขับกดรับงาน" — the accept *is* this tick, not a second step |
+
+| Arrival task key | Matches a TOMP driver status | Departure task key | Matches |
+|---|---|---|---|
+| `vehicle_at_airport` | vehicle en route / live | `vehicle_en_route` | vehicle en route / live |
+| — | — | `vehicle_at_pickup` | `arrived_pickup` |
+| `passenger_on_board` | `passenger_onboard` | `passenger_on_board` | `passenger_onboard` |
+| `destination_arrived` | `completed` | `airport_arrived` | `completed` |
+
+So the auto-tick bridge in step 5 is not a new idea bolted onto an existing
+checklist — it is closer to a 1:1 mapping between TOMP's own driver-status
+vocabulary (`acknowledged | arrived_pickup | passenger_onboard | completed`)
+and the task keys that already exist for both directions. **This also answers
+"when does the handoff fire," using columns already on the case, no new
+schema:** for `direction = 'arrival'`, the trigger window is around
+`scheduled_arrival_at` (the flight's own landing time — which the existing
+AirLabs polling in `flight-sync.ts` is already watching); for
+`direction = 'departure'`, it is around `confirmed_pickup_at` (already
+computed today from the flight time minus a lead time, in
+`create-case-form.tsx`'s `formatSuggestedTime`). Neither direction needs a
+new column to know when staff should be prompted to send the link — the
+data staff would need to make that call already exists on the case.
+
 ## Open questions for whenever this is picked up
 
 - Is the handoff reversible — can a case be pulled back before a driver
