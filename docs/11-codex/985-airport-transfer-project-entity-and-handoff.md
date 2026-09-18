@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-18
 **Status:** Part A — design, revised once from its first pass (see "What changed"
-below), ready for `writing-plans` once the one open question (audit log /
-import row retention) is answered.
+below), and once more to resolve the audit-log retention question below. Ready
+for `writing-plans`.
 Part B (handoff) — deliberately deferred; recorded so the decision is not
 lost, not committed for now.
 **Related:** `docs/11-codex/983` (Airport Transfer consistency audit),
@@ -68,7 +68,7 @@ changes to that function** — it already just does
 lets Postgres's own cascade graph do the rest; it does not need to know
 Airport Transfer exists.
 
-## The one real gap this surfaced, and needs a decision
+## The one real gap this surfaced — decided
 
 Two tables under a case are **not** `ON DELETE CASCADE` — checked directly,
 not assumed:
@@ -77,14 +77,18 @@ not assumed:
 - `airport_transfer_import_rows.imported_case_id` → `ON DELETE SET NULL`
 
 Deleting a project today would leave both tables' rows behind, orphaned
-(`case_id`/`imported_case_id` set to null), rather than removed. This may be
-deliberate — audit trails often ought to outlive the record they describe —
-or it may not be what "delete this project" should mean if the point is to
-actually clear out a client's data, including whatever passenger names and
-phone numbers live inside `audit_logs.old_value`/`new_value`. **Needs an
-answer before this ships, not a guess:** either accept the orphaned rows as
-intentional audit permanence, or change both FKs to `ON DELETE CASCADE` (a
-small, separate migration) so a delete is a real delete.
+(`case_id`/`imported_case_id` set to null), rather than removed — including
+whatever passenger names and phone numbers live inside
+`audit_logs.old_value`/`new_value`. **Decided: change both FKs to
+`ON DELETE CASCADE`.** A project delete is meant to actually clear a
+client's data, not leave PII behind under a null-`case_id` row nobody will
+ever look for. This lands as part of the same migration that adds
+`airport_transfer_cases.project_id` (Part A's "What gets added" above) —
+`alter table public.airport_transfer_audit_logs drop constraint
+<existing_fk_name>, add constraint ... foreign key (case_id) references
+airport_transfer_cases(id) on delete cascade;`, same shape for
+`import_rows.imported_case_id`; the exact constraint names need a live
+`\d` check at implementation time rather than being guessed here.
 
 ## Project creation — the one new step, everywhere else unchanged
 
