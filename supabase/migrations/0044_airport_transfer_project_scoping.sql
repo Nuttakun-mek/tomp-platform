@@ -46,6 +46,10 @@ declare
 begin
   select id into v_org_id from public.organizations order by created_at asc limit 1;
 
+  if v_org_id is null then
+    raise exception 'no organizations row exists; cannot backfill airport_transfer_cases.project_id';
+  end if;
+
   insert into public.projects
     (organization_id, project_code, project_name, start_date, end_date, timezone, visibility_level, service_level, status, metadata)
   values
