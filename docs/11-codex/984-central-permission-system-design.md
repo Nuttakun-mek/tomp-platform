@@ -41,7 +41,7 @@ create table public.systems (
   key text primary key,           -- 'tomp' | 'airport_transfer' | future keys
   label_th text not null,
   icon text not null,             -- lucide icon name, e.g. 'CarFront' | 'PlaneTakeoff'
-  route text not null,            -- '/projects' | '/airport-transfer'
+  route text not null,            -- '/ground-transfer' | '/airport-transfer'
   is_active boolean not null default true,
   sort_order integer not null default 0
 );
@@ -49,7 +49,51 @@ create table public.systems (
 
 Two rows to start. Adding a third system later is one `insert`, not a schema
 change — this is what makes the registry the thing that scales, per the
-explicit ask that more systems are coming.
+explicit ask that more systems are coming. `route` is a URL prefix, not just
+an entry page — see "URL structure" below for what that does and does not
+cover.
+
+### URL structure — one prefix per system, with a hard exception
+
+The ask was explicit: give each system its own URL namespace so the split is
+visible in the address bar, not just in code —
+`tomp-platform.vercel.app/ground-transfer/...` for TOMP,
+`/airport-transfer/...` for Airport Transfer, and any future system claims its
+own prefix the same way. Airport Transfer already matches this shape today —
+every one of its pages sits under `/airport-transfer/**`. TOMP does not; its
+pages sit at bare paths (`/projects`, `/assignments`, `/mission-control`,
+`/resources`, `/recovery`, `/superadmin`, `/project`, and `/`).
+
+**Renaming TOMP's paths is safe for the eight pages above and only those.**
+Nothing external points at them; the only cost is updating roughly 34 files
+that hardcode the literal strings (`grep`-confirmed) — mechanical, no design
+risk.
+
+**Five paths must never move, permanently, regardless of how many systems
+this registry grows to:** `/driver/[token]`, `/driver`, `/fleet/[token]`,
+`/track/[token]`, `/login`, `/no-access`. The reason is not symmetry with
+Airport Transfer's shell — it's that the first four are URLs already handed
+out and baked into things this repo cannot edit after the fact:
+
+- `apps/mobile-driver/src/config.ts`'s `buildDriverWebUrl()` constructs
+  `${origin}/driver/${token}` and is compiled into every app binary already
+  installed on a driver's phone right now, including the build in Apple's
+  reviewer's hands. Moving `/driver` breaks every one of those installs
+  immediately, with no server-side fix possible — the app would need a new
+  build to catch up, which the owner has stood down for the moment.
+- `/fleet/[token]` and `/track/[token]` are literal links already sent to real
+  people — a customer's fleet-tracking link, and the demo link handed to
+  Apple's reviewer yesterday (`984`'s sibling document, `983`, and the Apple
+  review work earlier this session). Moving them breaks a link that cannot be
+  re-sent to whoever already has it.
+- `/login` and `/no-access` stay at root because they exist *before* a system
+  is chosen — they are not "TOMP's" or "Airport Transfer's" to claim a prefix
+  for.
+
+So: `route` in the registry means "where this system's *authenticated staff
+app* lives," never the public/token surface. TOMP's `route` becomes
+`/ground-transfer`; its `/driver`, `/fleet`, `/track` pages stay exactly where
+they are, owned by no system's prefix, forever.
 
 ### Layer 2 — module access + role (new, generic, for flat-role systems)
 
@@ -140,18 +184,23 @@ use the same shape.
 
 ## The landing page
 
-Server-rendered from `systems` joined against what the signed-in account
-actually holds (TOMP via the derived check above, every other system via
-`module_memberships`). Every active system row renders a tile; a tile the
-account cannot enter renders locked, with one line naming who to ask (a fixed
-"ติดต่อผู้ดูแลระบบ" is enough — this is not a self-service request flow).
-Replaces today's `REDIRECT_BY_ROLE` auto-redirect: an account is no longer sent
-straight into TOMP on login, even if TOMP is its only system, because
-"ทุกคนเห็นระบบทุกระบบ" was explicit — the picker always shows.
+Lives at root, `/` — replacing today's `RootPage`, which currently just
+`redirect("/projects")`s unconditionally. Server-rendered from `systems`
+joined against what the signed-in account actually holds (TOMP via the
+derived check above, every other system via `module_memberships`). Every
+active system row renders a tile; a tile the account cannot enter renders
+locked, with one line naming who to ask (a fixed "ติดต่อผู้ดูแลระบบ" is enough
+— this is not a self-service request flow). Also replaces today's
+`REDIRECT_BY_ROLE` auto-redirect on login: an account is no longer sent
+straight into TOMP, even if TOMP is its only system, because "ทุกคนเห็นระบบทุกระบบ"
+was explicit — the picker always shows, and lives at the one root path that
+was never going to be claimed by any single system's prefix anyway.
 
 ## The central admin page
 
-One page, reachable only to `super_admin` (`anyRole: ["super_admin"]`,
+Lives at `/permission` — root-level, unprefixed by either system's namespace,
+for the same reason `/` and `/login` are: it governs both systems and belongs
+to neither. Reachable only to `super_admin` (`anyRole: ["super_admin"]`,
 matching how `/superadmin` is already gated in `nav-model.ts`). It **replaces**
 today's `/superadmin/users`, which currently only manages TOMP project roles.
 `apps/web/app/airport-transfer/settings/page.tsx` exists today, but the 983
@@ -196,6 +245,9 @@ Closing them is part of this plan, not a side effect of it.
   `_memberships` gains a column and a new caller.
 - Nothing in `apps/mobile-driver/**` — drivers reach TOMP through the QR flow,
   never through this login/landing surface.
+- `/driver/[token]`, `/driver`, `/fleet/[token]`, `/track/[token]`, `/login`,
+  `/no-access` — see "URL structure" above. These do not move now and must
+  not move later, even when a third or fourth system joins the registry.
 
 ## Open item carried from the last design pass, now answered by this doc
 
