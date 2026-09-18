@@ -39,7 +39,7 @@ function displayAuditValue(value: unknown) {
   return String(value);
 }
 
-export default async function AirportTransferCasePage({ params, searchParams }: { params: Promise<{ caseId: string }>; searchParams?: Promise<{ updated?: string }> }) {
+export default async function AirportTransferCasePage({ params, searchParams }: { params: Promise<{ caseId: string }>; searchParams?: Promise<{ updated?: string; flightUpdated?: string }> }) {
   const { caseId } = await params;
   const query = searchParams ? await searchParams : {};
   const [item, tasks, auditLogs, latestFlight] = await Promise.all([getAirportTransferCase(caseId), getAirportTransferTasks(caseId), getAirportTransferAuditLogs(caseId), getLatestAirportTransferFlightSnapshot(caseId)]);
@@ -60,7 +60,9 @@ export default async function AirportTransferCasePage({ params, searchParams }: 
         </div>
       </header>
 
-      {query.updated ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">บันทึกการแก้ไขและประวัติเรียบร้อยแล้ว</div> : null}
+      {query.updated ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">บันทึกเฉพาะข้อมูลที่เปลี่ยนแปลงและประวัติเรียบร้อยแล้ว</div> : null}
+      {query.flightUpdated === "1" ? <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">อัปเดตข้อมูลเที่ยวบินล่าสุดจาก API โดยอัตโนมัติแล้ว</div> : null}
+      {query.flightUpdated === "0" ? <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">บันทึกข้อมูลแล้ว แต่ Flight API ไม่ตอบสนอง ระบบจะตรวจสอบอีกครั้งตามรอบอัตโนมัติ</div> : null}
       {item.deletedAt ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">เคสนี้อยู่ใน “ข้อมูลที่ลบแล้ว” ตั้งแต่ {formatDateTime(item.deletedAt)} และไม่ถูกนำไปติดตาม Flight API</div> : null}
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
