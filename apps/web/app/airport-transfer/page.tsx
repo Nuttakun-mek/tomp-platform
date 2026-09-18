@@ -2,7 +2,7 @@ import { AlertTriangle, CarFront, CheckCircle2, ClipboardList, Clock3, Plus, Shi
 import { AirportTransferCaseCard } from "@/components/airport-transfer/case-card";
 import { AirportTransferApiHealthCard } from "@/components/airport-transfer/api-health-card";
 import { ButtonLink } from "@/components/ui/button";
-import { getAirportTransferApiHealth, getAirportTransferCases, getLatestAirportTransferFlightSnapshots, summarizeAirportTransferCases } from "@/lib/airport-transfer/data";
+import { getAirportTransferApiHealth, getAirportTransferCases, getAirportTransferTasksByCaseIds, getLatestAirportTransferFlightSnapshots, summarizeAirportTransferCases } from "@/lib/airport-transfer/data";
 
 export default async function AirportTransferDashboardPage() {
   const [cases, apiHealth] = await Promise.all([getAirportTransferCases(), getAirportTransferApiHealth()]);
@@ -24,7 +24,8 @@ export default async function AirportTransferDashboardPage() {
     return 100;
   };
   const visibleCases = [...activeCases].sort((a, b) => priority(b) - priority(a) || minutesToPickup(a) - minutesToPickup(b)).slice(0, 10);
-  const snapshots = await getLatestAirportTransferFlightSnapshots(visibleCases.map((item) => item.id));
+  const visibleCaseIds = visibleCases.map((item) => item.id);
+  const [snapshots, tasks] = await Promise.all([getLatestAirportTransferFlightSnapshots(visibleCaseIds), getAirportTransferTasksByCaseIds(visibleCaseIds)]);
   const alerts = {
     overdue: activeCases.filter((item) => minutesToPickup(item) < 0).length,
     nextTwoHours: activeCases.filter((item) => minutesToPickup(item) >= 0 && minutesToPickup(item) <= 120).length,
@@ -62,7 +63,7 @@ export default async function AirportTransferDashboardPage() {
       </section>
       <section className="grid gap-3">
         <div className="flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Priority Queue</p><h2 className="mt-1 text-xl font-semibold">งานเร่งด่วนและสิ่งที่ต้องทำ</h2><p className="text-xs text-slate-500">เรียงจากงานเลยเวลา งานใกล้ถึง และงานข้อมูลไม่พร้อม</p></div><ButtonLink href="/airport-transfer/cases" variant="secondary">ดูทั้งหมด</ButtonLink></div>
-        {visibleCases.length ? visibleCases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} />) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center"><p className="font-semibold">ยังไม่มีข้อมูลการเดินทาง</p><p className="mt-1 text-sm text-slate-500">สร้างการ์ดแรกหรือนำเข้าข้อมูลจาก Excel</p></div>}
+        {visibleCases.length ? visibleCases.map((item) => <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} />) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center"><p className="font-semibold">ยังไม่มีข้อมูลการเดินทาง</p><p className="mt-1 text-sm text-slate-500">สร้างการ์ดแรกหรือนำเข้าข้อมูลจาก Excel</p></div>}
       </section>
     </>
   );
