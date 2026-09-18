@@ -109,6 +109,34 @@ export async function getLatestAirportTransferFlightSnapshot(caseId: string): Pr
   };
 }
 
+export async function getLatestAirportTransferFlightSnapshots(caseIds: string[]): Promise<Record<string, AirportTransferFlightSnapshot>> {
+  if (!caseIds.length) return {};
+  const supabase = getSupabaseServerDataClient();
+  if (!supabase) return {};
+  const { data, error } = await supabase
+    .from("airport_transfer_flight_snapshots")
+    .select("case_id, provider_status, observed_at, scheduled_departure_at, estimated_departure_at, actual_departure_at, scheduled_arrival_at, estimated_arrival_at, actual_arrival_at")
+    .in("case_id", caseIds)
+    .order("observed_at", { ascending: false });
+  if (error || !data) return {};
+
+  return data.reduce<Record<string, AirportTransferFlightSnapshot>>((latest, row) => {
+    const caseId = String(row.case_id);
+    if (latest[caseId]) return latest;
+    latest[caseId] = {
+      providerStatus: asNullableString(row.provider_status),
+      observedAt: String(row.observed_at),
+      scheduledDepartureAt: asNullableString(row.scheduled_departure_at),
+      estimatedDepartureAt: asNullableString(row.estimated_departure_at),
+      actualDepartureAt: asNullableString(row.actual_departure_at),
+      scheduledArrivalAt: asNullableString(row.scheduled_arrival_at),
+      estimatedArrivalAt: asNullableString(row.estimated_arrival_at),
+      actualArrivalAt: asNullableString(row.actual_arrival_at)
+    };
+    return latest;
+  }, {});
+}
+
 export async function getAirportTransferCases(filters?: { direction?: string; status?: string; query?: string }): Promise<AirportTransferCase[]> {
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return [];
