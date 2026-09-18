@@ -440,10 +440,7 @@ export async function updateAirportTransferCase(_previous: UpdateTransferCaseSta
   }
 
   const changedKeys = Object.keys(updatePayload).filter((key) => JSON.stringify(current[key] ?? null) !== JSON.stringify(updatePayload[key] ?? null));
-  if (!changedKeys.length) {
-    const flightRefresh = await refreshAirportTransferFlight(input.caseId, { ok: false, message: "" });
-    redirect(`/airport-transfer/cases/${input.caseId}?updated=0&flightUpdated=${flightRefresh.ok ? "1" : "0"}`);
-  }
+  if (!changedKeys.length) return { ok: false, message: "ยังไม่มีข้อมูลเปลี่ยนแปลง จึงไม่มีรายการที่ต้องบันทึก" };
 
   const oldValue = Object.fromEntries(changedKeys.map((key) => [key, current[key] ?? null]));
   const newValue = Object.fromEntries(changedKeys.map((key) => [key, updatePayload[key] ?? null]));
