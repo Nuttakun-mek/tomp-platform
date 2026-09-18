@@ -705,11 +705,19 @@ export async function completeAirportTransferTask(caseId: string, taskId: string
 
   const { data: task } = await supabase
     .from("airport_transfer_tasks")
-    .select("id, task_key, status")
+    .select("id, task_key, status, sequence")
     .eq("id", taskId)
     .eq("case_id", caseId)
     .maybeSingle();
   if (!task || task.status === "completed") return;
+
+  const { count: unfinishedEarlierTasks } = await supabase
+    .from("airport_transfer_tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("case_id", caseId)
+    .lt("sequence", task.sequence)
+    .eq("status", "pending");
+  if (unfinishedEarlierTasks) return;
 
   const completedAt = new Date().toISOString();
   const { error } = await supabase
