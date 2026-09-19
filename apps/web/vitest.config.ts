@@ -26,7 +26,20 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL(".", import.meta.url)),
-      "server-only": fileURLToPath(new URL("./test/server-only.ts", import.meta.url))
+      "server-only": fileURLToPath(new URL("./test/server-only.ts", import.meta.url)),
+      // This app can run as a git worktree nested under the main checkout
+      // (apps/web/.claude/worktrees/...) with no node_modules of its own, so
+      // plain Node package resolution for "@tomp/*" walks up past the
+      // worktree root and silently resolves to the MAIN CHECKOUT's copy of
+      // these workspace packages via its node_modules symlink — not this
+      // worktree's own, possibly-edited, packages/*. tsconfig.json's own
+      // "paths" already point at the worktree-relative source (which is why
+      // `tsc` gets this right), but Vitest doesn't read tsconfig paths on
+      // its own; mirror them explicitly here so a test in a worktree
+      // actually exercises the code that worktree just changed.
+      "@tomp/types/schemas": fileURLToPath(new URL("../../packages/types/schemas.ts", import.meta.url)),
+      "@tomp/types/domain": fileURLToPath(new URL("../../packages/types/domain.ts", import.meta.url)),
+      "@tomp/types": fileURLToPath(new URL("../../packages/types/src", import.meta.url))
     }
   }
 });
