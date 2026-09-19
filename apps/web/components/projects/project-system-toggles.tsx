@@ -29,12 +29,20 @@ export function ProjectSystemToggles({ projectId, enabledSystems, editable }: { 
 
   return (
     <div className="flex flex-wrap gap-2">
-      {SYSTEMS.map((system) => (
-        <label key={system.key} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
-          <input type="checkbox" checked={enabled.has(system.key)} disabled={!editable || pending} onChange={() => toggle(system.key)} />
-          {system.label}
-        </label>
-      ))}
+      {SYSTEMS.map((system) => {
+        // Every project must keep ground_transfer enabled — the action
+        // rejects a request to disable it (toggleProjectSystemAction), so
+        // this checkbox is locked once it's already on, matching what the
+        // server will actually allow rather than letting someone attempt an
+        // uncheck that only bounces back as an error.
+        const lockedOn = system.key === "ground_transfer" && enabled.has(system.key);
+        return (
+          <label key={system.key} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <input type="checkbox" checked={enabled.has(system.key)} disabled={!editable || pending || lockedOn} onChange={() => toggle(system.key)} />
+            {system.label}
+          </label>
+        );
+      })}
     </div>
   );
 }

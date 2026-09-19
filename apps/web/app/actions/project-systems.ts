@@ -2,6 +2,7 @@
 
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
+import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -17,8 +18,25 @@ export async function toggleProjectSystemAction(input: unknown): Promise<ActionR
   const systemKey = String(data.systemKey || "");
   if (!projectId || !systemKey) return actionFailure("ข้อมูลไม่ครบถ้วน");
 
+  // Every project must keep ground_transfer enabled (migration 0047's
+  // create_project_command() already unions it in unconditionally at
+  // creation time) — without this guard, this action could delete that
+  // project_systems row on request and re-open the orphaned-project bug
+  // 0047 was written to close.
+  if (systemKey === "ground_transfer" && data.enabled === false) {
+    return actionFailure("ไม่สามารถปิดใช้งาน Ground Transfer ได้ ทุกโครงการต้องมีระบบนี้เปิดอยู่เสมอ");
+  }
+
+  // Compound OR with Airport Transfer's own project-scoped manager check —
+  // same reasoning as the Settings page's entry gate (docs/11-codex/984
+  // "Granting access"): requirePermission() can never approve an
+  // airport_admin/airport_dispatcher since the 5 Airport Transfer roles
+  // hold zero role_permissions rows on purpose.
   const permission = await requirePermission(projectId, "project.manage_members");
-  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขระบบของโครงการนี้");
+  if (!permission.allowed) {
+    const airportAccess = await getAirportTransferAccess(projectId);
+    if (!airportAccess.canManage) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขระบบของโครงการนี้");
+  }
 
   const { client, error } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");

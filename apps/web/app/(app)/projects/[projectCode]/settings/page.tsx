@@ -16,6 +16,7 @@ import { getProjectByCode } from "@/lib/data/projects";
 import { getProjectMembers } from "@/lib/data/project-members";
 import { getEnabledSystemKeys } from "@/lib/data/project-systems";
 import { requirePermission } from "@/lib/auth/rbac";
+import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ projectCode: string }> }) {
   const { projectCode } = await params;
@@ -37,14 +38,24 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   // "super_admin" role, and roleHasPermission("super_admin", ...) is true
   // for any permission via the "*" wildcard — the same bypass
   // canManageMembers already relied on before this fix.
-  const [memberPermission, managePermission, deletePermission] = await Promise.all([
+  // Compound OR with Airport Transfer's own project-scoped manager check
+  // (docs/11-codex/984 "Granting access"): the 5 Airport Transfer roles
+  // inserted by migration 0044 have zero role_permissions rows on purpose
+  // (access.ts checks project_members roles directly instead of going
+  // through roleHasPermission()'s matrix — see 986's "role_permissions
+  // wiring ... deliberately skipped"), so requirePermission() can NEVER
+  // return true for an airport_admin/airport_dispatcher, no matter what.
+  // Without this OR, an airport_admin on an Airport-Transfer-only project
+  // sees AccessDenied on their own project's Settings tab.
+  const [memberPermission, managePermission, deletePermission, airportAccess] = await Promise.all([
     requirePermission(project.id, "project.manage_members"),
     requirePermission(project.id, "project.update"),
-    requirePermission(project.id, "project.delete")
+    requirePermission(project.id, "project.delete"),
+    getAirportTransferAccess(project.id)
   ]);
-  const canManageMembers = memberPermission.allowed;
-  const canManage = managePermission.allowed;
-  const canDelete = deletePermission.allowed;
+  const canManageMembers = memberPermission.allowed || airportAccess.canManage;
+  const canManage = managePermission.allowed || airportAccess.canManage;
+  const canDelete = deletePermission.allowed || airportAccess.canManage;
 
   if (!canManageMembers && !canManage && !canDelete) {
     return <AccessDenied title="เข้าตั้งค่าโครงการนี้ไม่ได้" reason="ต้องมีสิทธิ์จัดการโครงการนี้ก่อน ติดต่อผู้จัดการโครงการ" />;

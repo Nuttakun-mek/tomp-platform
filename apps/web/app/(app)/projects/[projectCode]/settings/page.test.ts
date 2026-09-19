@@ -39,6 +39,23 @@ let requirePermissionResult: { allowed: boolean; reason?: string };
 const requirePermission = vi.fn(async (..._args: unknown[]) => requirePermissionResult);
 vi.mock("@/lib/auth/rbac", () => ({ requirePermission: (...args: unknown[]) => requirePermission(...args) }));
 
+// Finding 1's compound-OR fallback: an airport_admin/airport_dispatcher
+// passes the Settings gate even though requirePermission() (above) denies
+// them outright — the 5 Airport Transfer roles hold zero role_permissions
+// rows on purpose, so requirePermission can never approve them. Defaults to
+// canManage: false so the two pre-existing tests below are unaffected;
+// individual tests override this.
+let airportAccessResult: { allowed: boolean; canManage: boolean; role: string | null; profileId: string; signedIn: boolean } = {
+  allowed: false,
+  canManage: false,
+  role: null,
+  profileId: "p",
+  signedIn: true
+};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- same as above.
+const getAirportTransferAccess = vi.fn(async (..._args: unknown[]) => airportAccessResult);
+vi.mock("@/lib/airport-transfer/access", () => ({ getAirportTransferAccess: (...args: unknown[]) => getAirportTransferAccess(...args) }));
+
 vi.mock("@/lib/data/projects", () => ({ getProjectByCode: vi.fn(async () => project) }));
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- same as above.
 const getProjectMembers = vi.fn(async (..._args: unknown[]) => members);
@@ -80,5 +97,37 @@ describe("ProjectSettingsPage cross-project access", () => {
 
     expect(element.type).not.toBe(AccessDenied);
     expect(getProjectMembers).toHaveBeenCalledWith("project-b");
+  });
+});
+
+// Regression test for Finding 1 (final whole-branch review): an
+// airport_admin-only profile — no Ground Transfer role at all, so
+// requirePermission() denies every one of the three checks above, since the
+// 5 Airport Transfer roles hold zero role_permissions rows on purpose — must
+// still pass this page's entry gate and reach the grant form on their own
+// Airport-Transfer-only project, via the compound OR with
+// getAirportTransferAccess(project.id).canManage.
+describe("ProjectSettingsPage Airport Transfer manager access", () => {
+  it("passes the gate and can see/use the grant form for an airport_admin with no Ground Transfer role", async () => {
+    requirePermissionResult = { allowed: false, reason: "No project membership was found." };
+    airportAccessResult = { allowed: true, canManage: true, role: "airport_admin", profileId: "p1", signedIn: true };
+    getProjectMembers.mockClear();
+
+    const element = (await ProjectSettingsPage({ params: Promise.resolve({ projectCode: "PRJ-B" }) })) as unknown as { type: unknown };
+
+    expect(element.type).not.toBe(AccessDenied);
+    expect(getProjectMembers).toHaveBeenCalledWith("project-b");
+    expect(getAirportTransferAccess).toHaveBeenCalledWith("project-b");
+  });
+
+  it("still denies when neither requirePermission nor Airport Transfer's canManage approve", async () => {
+    requirePermissionResult = { allowed: false, reason: "No project membership was found." };
+    airportAccessResult = { allowed: true, canManage: false, role: "airport_viewer", profileId: "p1", signedIn: true };
+    getProjectMembers.mockClear();
+
+    const element = (await ProjectSettingsPage({ params: Promise.resolve({ projectCode: "PRJ-B" }) })) as unknown as { type: unknown };
+
+    expect(element.type).toBe(AccessDenied);
+    expect(getProjectMembers).not.toHaveBeenCalled();
   });
 });

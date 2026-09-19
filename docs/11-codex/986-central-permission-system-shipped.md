@@ -18,7 +18,33 @@ file. This document summarizes it; that file is the ground truth if the two ever
 This worktree has **no database credentials and no deployed environment**. Nothing below was applied to or
 verified against a live database. Whoever has production Supabase credentials must, in order:
 
-1. `node scripts/apply-migrations.mjs` — applies `0043` through `0047` in order (filenames below).
+0. **Pre-flight check, before touching anything else — confirm `0043` won't hard-fail.** `0043` narrows
+   `project_members`'s unique constraint from `(project_id, profile_id, role_id)` (which permitted one
+   profile holding two DIFFERENT roles on the same project) to `(project_id, system_key, profile_id)`. If
+   any such duplicate-role row exists in production today, `0043`'s `ADD CONSTRAINT` statement will hard-fail
+   and abort the entire `0043`–`0047` sequence partway through — this is the single highest-probability
+   deploy-blocking event in the whole migration set. Run this against production and confirm it returns
+   **zero rows** before proceeding:
+
+   ```sql
+   select project_id, profile_id, count(*) from public.project_members
+   group by 1,2 having count(*) > 1;
+   ```
+
+   This is a real possibility worth checking, not something to just "try and see" — if it returns any rows,
+   those duplicate-role situations need to be resolved by hand before `0043` can apply.
+1. `node scripts/apply-migrations.mjs` — applies `0043` through `0047` in order (filenames below). The script
+   applies every pending migration in one run with no flag to pause between files, so treat the step below as
+   happening immediately after this one — as soon as `0044` has landed as part of it, before moving on to
+   step 2.
+
+   **Required immediately after `0044` applies — grant at least one real person `airport_admin` on the
+   legacy backfill project.** `0044` creates `APT-LEGACY-0001` and reassigns the 7 pre-existing, project-less
+   Airport Transfer cases onto it, but inserts no `project_members` row for anyone. Airport Transfer access is
+   now strictly project-scoped (see "Application layer" below), so the instant `0044` applies, those 7 real,
+   live cases become invisible to everyone except `super_admin` until someone is granted access on that
+   project. Do this via the new Settings tab's grant flow once this deploy is live, or by hand via SQL if
+   that's more practical at that moment — either way, this is a required step, not an optional nice-to-have.
 2. `node scripts/sync-supabase-migrations.mjs` — mirrors them into the Supabase-managed migration history.
 3. `node scripts/apply-migrations.mjs --dry-run` — confirm nothing is left pending.
 4. `node scripts/verify-schema.mjs` — confirm the live schema matches what the migrations describe.

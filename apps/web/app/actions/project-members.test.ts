@@ -15,6 +15,13 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/auth/rbac", () => ({
   requirePermission: vi.fn(async () => ({ allowed: false, reason: "permission-check-reached" }))
 }));
+// The compound-OR Airport Transfer fallback (Finding 1) must not change what
+// these tests are proving: mock it denied so every case below still reaches
+// requirePermission's "permission-check-reached" the same way it did before
+// that fallback existed.
+vi.mock("@/lib/airport-transfer/access", () => ({
+  getAirportTransferAccess: vi.fn(async () => ({ allowed: false, canManage: false, role: null, profileId: "p", signedIn: true }))
+}));
 
 const PROJECT_ID = "10000000-0000-4000-8000-000000000003";
 

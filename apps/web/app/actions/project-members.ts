@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
+import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { requirePermission } from "@/lib/auth/rbac";
 import { isRoleAllowedForSystem } from "@/lib/auth/system-roles";
 import { getProjectById } from "@/lib/data/projects";
@@ -13,6 +14,20 @@ import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 function generateTempPassword(): string {
   const bytes = randomBytes(12).toString("base64").replace(/[^a-zA-Z0-9]/g, "");
   return `Tomp-${bytes.slice(0, 14)}`;
+}
+
+// Compound OR with Airport Transfer's own project-scoped manager check —
+// same reasoning as the Settings page's entry gate (docs/11-codex/984
+// "Granting access"): requirePermission() can never approve an
+// airport_admin/airport_dispatcher since the 5 Airport Transfer roles hold
+// zero role_permissions rows on purpose (access.ts checks project_members
+// roles directly instead). Without this, an airport_admin could see the
+// grant form render (Settings page gate) but have every submit rejected.
+async function canManageProjectMembers(projectId: string): Promise<{ allowed: boolean; reason?: string }> {
+  const permission = await requirePermission(projectId, "project.manage_members");
+  if (permission.allowed) return permission;
+  const airportAccess = await getAirportTransferAccess(projectId);
+  return airportAccess.canManage ? { allowed: true } : permission;
 }
 
 // SECURITY: roleKey must be validated against the per-system allowlist, not
@@ -49,7 +64,7 @@ export async function addProjectMemberAction(input: unknown): Promise<ActionResu
   const parsed = addMemberSchema.safeParse(input);
   if (!parsed.success) return actionFailure("ข้อมูลไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
 
-  const permission = await requirePermission(parsed.data.projectId, "project.manage_members");
+  const permission = await canManageProjectMembers(parsed.data.projectId);
   if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์เพิ่มสมาชิกโครงการนี้");
 
   const { client, error } = getSupabaseWriteClient();
@@ -133,7 +148,7 @@ export async function issueProjectHelperAction(input: unknown): Promise<ActionRe
   const parsed = issueHelperSchema.safeParse(input);
   if (!parsed.success) return actionFailure("ข้อมูลไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
 
-  const permission = await requirePermission(parsed.data.projectId, "project.manage_members");
+  const permission = await canManageProjectMembers(parsed.data.projectId);
   if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์เพิ่มผู้ช่วยงานในโครงการนี้");
 
   const { client, error } = getSupabaseWriteClient();
