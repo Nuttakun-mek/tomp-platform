@@ -46,7 +46,9 @@ ship without the mobile app change landing in the same deploy.
 
 ## What shipped
 
-### Database (migrations `0043`–`0047`, `apps/web/supabase/migrations/`)
+### Database (migrations `0043`–`0047`, `database/migrations/` — the source of truth read by
+`scripts/apply-migrations.mjs`, mirrored into `supabase/migrations/` at the repo root by
+`scripts/sync-supabase-migrations.mjs` for the Supabase-managed migration history)
 
 - **`0043_central_permission_foundation.sql`** — the `systems` registry (two rows: `ground_transfer`,
   `airport_transfer`), `project_members.system_key` (generalizing membership across systems instead of a
@@ -172,6 +174,27 @@ surfaced and explicitly chose not to fix in-scope, in the ledger's own words whe
   including live driver GPS. The reviewer's words: "worth a deliberate product decision" — not flagged as
   obviously wrong, since there may be a legitimate case for a no-email project manager, but nobody has
   actually decided this is intended.
+- **Part B of `985` — the future Ground Transfer handoff — is fully deferred, on purpose, and nothing in
+  this plan builds toward it.** `985` sketched (not built) a future flow where an Airport Transfer case, at
+  a deliberate moment, hands operational ownership to a real Ground Transfer assignment under the same
+  `project_id` — because Airport Transfer has no live-tracking capability of its own and GPS can only attach
+  to a TOMP `assignment_id`/`call_sign_id`. None of that shipped in this plan: no handoff action, no status
+  bridge, no new column recording which assignment a case became. `985`'s own open questions (is the
+  handoff reversible; does a project's `ground_transfer` row get created automatically at first handoff or
+  must it be enabled beforehand; how much passenger/flight context should travel with a handed-off job) are
+  all still genuinely open. Whoever picks this up next should start from `985`'s Part B directly, not from
+  this doc.
+- **`role_permissions` wiring for the 5 new Airport Transfer roles was deliberately skipped.** Task 2
+  inserted `airport_admin`, `airport_dispatcher`, `airport_coordinator`, `airport_driver`, and
+  `airport_viewer` into the shared `public.roles` table (so `project_members.role_id`, a real FK, can hold
+  them) but gave them **zero `role_permissions` rows** — confirmed in `database/migrations/0044_airport_transfer_project_scoping.sql`
+  around line 31 ("No role_permissions rows yet — access.ts (Task 5) checks these directly") and in Task 2's
+  own completion report ("permission matrix wiring is future work"). This is deliberate, not a bug: Airport
+  Transfer's own `getAirportTransferAccess()` (Task 5) checks a viewer's project-scoped role directly rather
+  than going through the platform's normal `roleHasPermission()` mechanism. The practical consequence is
+  that these 5 roles don't show up in `/permission/roles`'s role×permission matrix today — `984`'s own
+  "Permission matrix" table anticipated this and explicitly scoped it out. Future work for whenever Airport
+  Transfer needs to appear in that matrix.
 
 ### Pre-existing, not introduced or swept by this plan
 
@@ -282,6 +305,6 @@ not shipped and not silently absent from this record.
 - Full task-by-task history, every review round, every fix loop:
   `.superpowers/sdd/2026-09-18-central-permission-system/progress.md`
 - The design docs this plan implements: `984` (the systems registry, three layers, granting model,
-  URL structure, `/permission`) and `985` (the shared-project model, `project_systems`, the deferred
-  Ground-Transfer handoff in its Part B).
+  URL structure, `/permission`) and `985` (the shared-project model, `project_systems`, and Part B — the
+  deferred Ground Transfer handoff flagged above under "Needs a product or security decision").
 - The Airport Transfer audit that started this whole thread: `983`.
