@@ -61,6 +61,7 @@ export async function createDriverAction(input: unknown): Promise<ActionResult> 
 
   revalidatePath("/resources");
   revalidatePath("/resources/drivers");
+  if (timelineProjectId) revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { mode, driver, timelineEvent: timelineResult.data },
@@ -119,6 +120,7 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
 
   revalidatePath("/resources");
   revalidatePath("/resources/vehicles");
+  if (timelineProjectId) revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { mode, vehicle, timelineEvent: timelineResult.data },
@@ -183,7 +185,10 @@ async function removeResource(table: Table, input: unknown): Promise<ActionResul
   const { error: deleteError } = await client.from(table).delete().eq("id", id);
   if (deleteError) return actionFailure(getDatabaseErrorMessage(deleteError, "ลบไม่สำเร็จ"));
 
-  if (projectId) revalidatePath(`/resources`);
+  if (projectId) {
+    revalidatePath(`/resources`);
+    revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+  }
   return actionSuccess({ deleted: id });
 }
 
@@ -242,6 +247,7 @@ async function importResources(table: Table, input: unknown): Promise<ActionResu
   }
 
   revalidatePath("/resources");
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
   return actionSuccess({ imported: inserted?.length ?? 0 });
 }
 

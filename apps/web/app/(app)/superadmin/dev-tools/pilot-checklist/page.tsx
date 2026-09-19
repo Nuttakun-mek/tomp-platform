@@ -9,8 +9,9 @@ import { demoProject } from "@/lib/demo/demo-kernel";
 export default async function PilotChecklistPage() {
   const [projects, latestLocationProjectId] = await Promise.all([getProjects(), getProjectIdWithLatestDriverLocation()]);
   const activeProject = projects.find((project) => project.id === latestLocationProjectId) ?? projects[0] ?? demoProject;
-  const projectDetailHref = `/projects/${activeProject.id}`;
-  const assignmentsHref = `/projects/${activeProject.id}/assignments`;
+  const projectDetailHref = `/projects/${activeProject.projectCode}/ground-transfer`;
+  const assignmentsHref = `/projects/${activeProject.projectCode}/ground-transfer/dispatch`;
+  const controlHref = `/projects/${activeProject.projectCode}/ground-transfer/control`;
 
   const steps = [
     { title: "สร้างโครงการ", detail: "ตั้งชื่อ รหัส วันที่ และพื้นที่ปฏิบัติการ", href: "/projects/new" },
@@ -19,8 +20,8 @@ export default async function PilotChecklistPage() {
     { title: "สร้าง QR", detail: "สร้างลิงก์เข้าหน้าปฏิบัติงานสำหรับคนขับแบบ assignment-scoped", href: assignmentsHref },
     { title: "คนขับยืนยันความพร้อม", detail: "เปิดหน้าคนขับ ยืนยันข้อมูล และพร้อมเริ่มงาน", href: "/ground-transfer/driver" },
     { title: "ส่งตำแหน่ง GPS", detail: "คนขับกดเริ่มส่งตำแหน่ง GPS จาก web app", href: "/superadmin/dev-tools/live-test" },
-    { title: "ศูนย์ควบคุมติดตามสถานะ", detail: "ดูหมุด สีสัญญาณ ความเสี่ยง และรายการที่ต้องติดตาม", href: `/mission-control?projectId=${activeProject.id}` },
-    { title: "ตรวจ Timeline", detail: "ยืนยันว่าลำดับเหตุการณ์สำคัญถูกบันทึก", href: `/mission-control?projectId=${activeProject.id}` },
+    { title: "ศูนย์ควบคุมติดตามสถานะ", detail: "ดูหมุด สีสัญญาณ ความเสี่ยง และรายการที่ต้องติดตาม", href: controlHref },
+    { title: "ตรวจ Timeline", detail: "ยืนยันว่าลำดับเหตุการณ์สำคัญถูกบันทึก", href: controlHref },
     { title: "สรุปข้อสังเกต", detail: "บันทึกสิ่งที่ต้องแก้ก่อน pilot รอบถัดไป", href: "/superadmin/dev-tools/pilot-checklist" }
   ];
 

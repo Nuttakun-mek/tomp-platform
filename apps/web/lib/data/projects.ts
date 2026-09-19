@@ -70,6 +70,31 @@ async function getProjectsViaPostgres(): Promise<Project[]> {
   }
 }
 
+export async function getProjectByCode(projectCode: string): Promise<Project | null> {
+  const { client: supabase } = await resolveReadClient();
+  if (!supabase) return getProjectByCodeViaPostgres(projectCode);
+
+  try {
+    const { data, error } = await withTimeout(supabase.from("projects").select("*").eq("project_code", projectCode).maybeSingle(), 2200, "project detail by code");
+    if (error || !data) return getProjectByCodeViaPostgres(projectCode);
+    return mapProject(data);
+  } catch {
+    return getProjectByCodeViaPostgres(projectCode);
+  }
+}
+
+async function getProjectByCodeViaPostgres(projectCode: string): Promise<Project | null> {
+  const sql = getPostgresClient();
+  if (!sql) return demoOr(demoKernel.projects.find((project) => project.projectCode === projectCode) ?? null, null);
+  try {
+    const data = await sql<Array<Record<string, unknown>>>`select * from projects where project_code = ${projectCode} limit 1`;
+    if (data[0]) return mapProject(data[0]);
+    return demoOr(demoKernel.projects.find((project) => project.projectCode === projectCode) ?? null, null);
+  } catch {
+    return demoOr(demoKernel.projects.find((project) => project.projectCode === projectCode) ?? null, null);
+  }
+}
+
 async function getProjectByIdViaPostgres(projectId: string): Promise<Project | null> {
   const sql = getPostgresClient();
   // Only ever return a demo project when its id actually matches the request.

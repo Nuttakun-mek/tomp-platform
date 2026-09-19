@@ -24,7 +24,7 @@ test("operator creates a project through to a QR token", async ({ page }) => {
   await page.getByPlaceholder(/TOMP-|รหัสโครงการ/i).fill(code).catch(() => {});
   await page.getByLabel(/ชื่อโครงการ|project name/i).fill(`${code} E2E`);
   await page.getByRole("button", { name: /บันทึกโครงการ|create project/i }).click();
-  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/projects\/[^/]+\/ground-transfer/, { timeout: 15_000 });
   const projectUrl = page.url();
 
   // mission
@@ -36,7 +36,7 @@ test("operator creates a project through to a QR token", async ({ page }) => {
   await expect(page.getByText(/บันทึกภารกิจแล้ว/)).toBeVisible({ timeout: 15_000 });
 
   // assignment + QR — navigate to the dispatch tab
-  await page.goto(`${projectUrl.replace(/\/projects\//, "/assignments?projectId=").replace(/\/projects\/([0-9a-f-]+)/, "$1")}`).catch(() => {});
+  await page.goto(`${projectUrl}/dispatch`).catch(() => {});
   await expect(page.getByText(/จัดงาน|บอร์ดจัดสรรงาน/)).toBeVisible({ timeout: 15_000 });
 
   // Timeline should record the project creation

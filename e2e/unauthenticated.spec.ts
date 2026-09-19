@@ -3,7 +3,17 @@ import { expect, test } from "@playwright/test";
 // The half of the release gate that needs no session: an anonymous browser must
 // never reach protected data, and the public pages must actually serve.
 
-const PROTECTED = ["/", "/projects", "/mission-control", "/assignments", "/recovery", "/superadmin", "/resources"];
+const PROTECTED = [
+  "/",
+  "/projects",
+  "/projects/DUMMY/ground-transfer",
+  "/projects/DUMMY/ground-transfer/dispatch",
+  "/projects/DUMMY/ground-transfer/control",
+  "/projects/DUMMY/ground-transfer/resources",
+  "/ground-transfer/recovery",
+  "/superadmin",
+  "/resources"
+];
 
 for (const path of PROTECTED) {
   test(`anonymous ${path} redirects to /login`, async ({ page }) => {

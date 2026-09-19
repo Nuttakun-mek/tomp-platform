@@ -171,8 +171,8 @@ export async function createPilotScenarioViaPostgres() {
     driverId: ids.driver,
     accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
     pin: smokePin,
-    missionControlUrl: `/mission-control?projectId=${ids.project}`,
-    assignmentsUrl: `/projects/${ids.project}/assignments`,
+    missionControlUrl: `/projects/${projectCode}/ground-transfer/control`,
+    assignmentsUrl: `/projects/${projectCode}/ground-transfer/dispatch`,
     packetId: ids.packet,
     tokenId: ids.token
   };

@@ -85,10 +85,8 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
   const assignment = mapAssignment(data);
   const timelineResult = await createAssignmentTimelineEvent(assignment.projectId, assignment.id, data);
 
-  revalidatePath("/assignments");
   revalidatePath("/resources/vehicles");
-  revalidatePath(`/projects/${assignment.projectId}`);
-  revalidatePath(`/projects/${assignment.projectId}/assignments`);
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { mode, assignment, timelineEvent: timelineResult.data },
@@ -150,10 +148,8 @@ export async function cancelAssignmentAction(input: unknown): Promise<ActionResu
     metadata: { action: "cancel_assignment" }
   });
 
-  revalidatePath("/assignments");
   revalidatePath("/resources/vehicles");
-  revalidatePath(`/projects/${data.projectId}`);
-  revalidatePath(`/projects/${data.projectId}/assignments`);
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { assignment: mapAssignment(updated), timelineEvent: timelineResult.data },
@@ -213,11 +209,8 @@ export async function parkAssignmentAction(input: unknown): Promise<ActionResult
     metadata: { action: "park_assignment" }
   });
 
-  revalidatePath("/assignments");
   revalidatePath("/resources/vehicles");
-  revalidatePath(`/projects/${data.projectId}`);
-  revalidatePath(`/projects/${data.projectId}/assignments`);
-  revalidatePath("/mission-control");
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { assignment: mapAssignment(updated), timelineEvent: timelineResult.data },
@@ -274,10 +267,7 @@ export async function setAssignmentOrderAction(input: unknown): Promise<ActionRe
 
   if (failures.length === valid.length) return actionFailure("บันทึกลำดับงานไม่สำเร็จ");
 
-  revalidatePath("/assignments");
-  revalidatePath(`/projects/${parsed.data.projectId}`);
-  revalidatePath(`/projects/${parsed.data.projectId}/assignments`);
-  revalidatePath("/mission-control");
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { mode, ordered: valid.length },

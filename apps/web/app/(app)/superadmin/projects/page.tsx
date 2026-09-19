@@ -29,7 +29,7 @@ export default async function SuperadminProjectsPage() {
               {projects.map((project) => (
                 <tr key={project.id} className="border-b border-border/60 last:border-0">
                   <td className="px-3 py-2.5">
-                    <Link href={`/projects/${project.id}`} className="font-semibold text-operation hover:underline">
+                    <Link href={`/projects/${project.projectCode}/ground-transfer`} className="font-semibold text-operation hover:underline">
                       {project.projectCode}
                     </Link>
                     <span className="block text-ink-soft">{project.projectName}</span>

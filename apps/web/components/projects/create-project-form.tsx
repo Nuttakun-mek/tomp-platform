@@ -68,10 +68,10 @@ export function CreateProjectForm() {
         return;
       }
 
-      const data = result.data as { project?: { id?: string } };
+      const data = result.data as { project?: { projectCode?: string } };
       toast.success(result.warning || "บันทึกโครงการสำเร็จ");
-      if (data.project?.id) {
-        router.push(`/projects/${data.project.id}`);
+      if (data.project?.projectCode) {
+        router.push(`/projects/${data.project.projectCode}/ground-transfer`);
       }
     });
   }

@@ -73,9 +73,11 @@ export function VehicleTaskCard({ task, allowCancel = false }: { task: VehicleOp
         </div>
       ) : null}
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <Link className="rounded-xl bg-operation px-3 py-2 text-center text-sm font-semibold text-white" href={`/projects/${assignment.projectId}/assignments`}>
-          เปิดบอร์ดงาน
-        </Link>
+        {task.project?.projectCode ? (
+          <Link className="rounded-xl bg-operation px-3 py-2 text-center text-sm font-semibold text-white" href={`/projects/${task.project.projectCode}/ground-transfer/dispatch`}>
+            เปิดบอร์ดงาน
+          </Link>
+        ) : null}
         {allowCancel ? <CancelAssignmentButton projectId={assignment.projectId} assignmentId={assignment.id} /> : null}
       </div>
     </article>

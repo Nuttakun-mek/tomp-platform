@@ -17,12 +17,12 @@ const runbookItems = [
   {
     title: "ติดตามศูนย์ควบคุม",
     detail: "Mission Control ต้องเห็นงาน, GPS freshness, Timeline และรายการที่ต้องติดตาม",
-    href: "/mission-control"
+    href: "/projects"
   },
   {
     title: "เปิดเหตุผิดปกติ",
     detail: "หาก GPS หาย รถมีปัญหา หรือคนขับไม่ตอบ ให้เปิดเหตุที่ Recovery เพื่อสร้าง Timeline",
-    href: "/recovery"
+    href: "/ground-transfer/recovery"
   }
 ];
 

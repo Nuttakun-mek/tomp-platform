@@ -3,6 +3,7 @@ import { ResourceQualityCard } from "@/components/resources/resource-quality-car
 import { VehicleOperationsBoard } from "@/components/resources/vehicle-operations-board";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { BackLink } from "@/components/ui/back-link";
+import { getProjectById } from "@/lib/data/projects";
 import { getVehicleOperationProfiles } from "@/lib/data/vehicle-operations";
 
 interface VehiclesPageProps {
@@ -11,6 +12,7 @@ interface VehiclesPageProps {
 
 export default async function VehiclesPage({ searchParams }: VehiclesPageProps) {
   const params = searchParams ? await searchParams : {};
+  const project = params.projectId ? await getProjectById(params.projectId) : null;
   const profiles = await getVehicleOperationProfiles();
   const vehicles = profiles.map((profile) => profile.vehicle);
   const activeVehicles = profiles.filter((profile) => profile.currentTasks.length > 0).length;
@@ -22,8 +24,8 @@ export default async function VehiclesPage({ searchParams }: VehiclesPageProps) 
 
   return (
     <>
-      {params.projectId ? (
-        <ProjectWorkspaceTabs projectId={params.projectId} active="resources" />
+      {project ? (
+        <ProjectWorkspaceTabs projectCode={project.projectCode} active="resources" />
       ) : (
         <BackLink href="/resources" label="ทรัพยากร" />
       )}

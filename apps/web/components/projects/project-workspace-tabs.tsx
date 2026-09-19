@@ -1,24 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { ArrowLeft, ClipboardList, LayoutDashboard, MapPinned, Settings, Users } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ArrowLeft, ClipboardList, LayoutDashboard, MapPinned, Users } from "lucide-react";
 
-type TabKey = "overview" | "dispatch" | "control" | "resources" | "settings";
+type TabKey = "overview" | "dispatch" | "control" | "resources";
 
-export function ProjectWorkspaceTabs({ projectId, active }: { projectId: string; active: TabKey }) {
+export function ProjectWorkspaceTabs({ projectCode, active }: { projectCode: string; active: TabKey }) {
   const pathname = usePathname();
-  const search = useSearchParams();
-  // when rendered inside the hub page, "settings" vs "overview" comes from ?tab
-  const resolvedActive: TabKey = pathname === `/projects/${projectId}` || pathname === "/project" ? (search.get("tab") === "settings" ? "settings" : "overview") : active;
+  const base = `/projects/${projectCode}/ground-transfer`;
 
   const tabs: Array<{ key: TabKey; label: string; href: string; icon: typeof LayoutDashboard }> = [
-    { key: "overview", label: "ภาพรวม", href: `/projects/${projectId}`, icon: LayoutDashboard },
-    { key: "dispatch", label: "จัดงาน", href: `/assignments?projectId=${projectId}`, icon: ClipboardList },
-    { key: "control", label: "ศูนย์ควบคุม", href: `/mission-control?projectId=${projectId}`, icon: MapPinned },
-    { key: "resources", label: "ทรัพยากร", href: `/resources?projectId=${projectId}`, icon: Users },
-    { key: "settings", label: "ตั้งค่า", href: `/projects/${projectId}?tab=settings`, icon: Settings }
+    { key: "overview", label: "ภาพรวม", href: base, icon: LayoutDashboard },
+    { key: "dispatch", label: "จัดงาน", href: `${base}/dispatch`, icon: ClipboardList },
+    { key: "control", label: "ศูนย์ควบคุม", href: `${base}/control`, icon: MapPinned },
+    { key: "resources", label: "ทรัพยากร", href: `${base}/resources`, icon: Users }
   ];
+
+  const resolvedActive: TabKey = tabs.find((tab) => tab.href === pathname)?.key ?? active;
 
   return (
     <div className="grid gap-2">
@@ -29,13 +28,7 @@ export function ProjectWorkspaceTabs({ projectId, active }: { projectId: string;
         {tabs.map((tab) => {
           const on = tab.key === resolvedActive;
           return (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition ${
-                on ? "bg-operation text-white" : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
+            <Link key={tab.key} href={tab.href} className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition ${on ? "bg-operation text-white" : "text-slate-600 hover:bg-slate-100"}`}>
               <tab.icon className="h-4 w-4" />
               {tab.label}
             </Link>

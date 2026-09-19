@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
 import { CommsConsole } from "@/components/mission-control/comms-console";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
@@ -10,64 +10,42 @@ import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exc
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
-import { EmptyState } from "@/components/ui/empty-state";
 import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getDriverCommsByProjectId } from "@/lib/data/driver-comms";
 import { getLatestDriverLocationsByProjectId } from "@/lib/data/locations";
-import { getProjects } from "@/lib/data/projects";
+import { getProjectByCode } from "@/lib/data/projects";
 import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { getTimelineEventsByProjectId } from "@/lib/data/timeline";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
-import Link from "next/link";
 import { JobStatusBoard } from "@/components/mission-control/job-status-board";
 import { getMissionsByProjectId } from "@/lib/data/missions";
 
-interface MissionControlPageProps {
-  searchParams?: Promise<{ projectId?: string }>;
+interface ControlPageProps {
+  params: Promise<{ projectCode: string }>;
 }
 
-export default async function MissionControlPage({ searchParams }: MissionControlPageProps) {
-  const params = searchParams ? await searchParams : {};
+export default async function ControlPage({ params }: ControlPageProps) {
+  const { projectCode } = await params;
   const viewer = await getCurrentUserProfile();
   if (!viewer.authUserId && !viewer.isDevelopmentFallback) redirect("/login");
-  const projects = await getProjects();
-
-  if (!projects.length) {
-    return (
-      <EmptyState
-        title="ยังไม่มีโครงการที่เข้าถึงได้"
-        description="ศูนย์ควบคุมทำงานต่อโครงการ เลือกหรือรอรับมอบหมายโครงการก่อน"
-        action={
-          <Link href="/projects" className="rounded-command bg-operation px-4 py-2 text-sm font-semibold text-white">
-            ไปหน้าโครงการ
-          </Link>
-        }
-      />
-    );
-  }
-
-  // project-centric: a control room always belongs to a project
-  const activeProject = projects.find((project) => project.id === params.projectId);
-  if (!activeProject) {
-    if (projects.length === 1) redirect(`/mission-control?projectId=${projects[0].id}`);
-    redirect("/projects");
-  }
+  const project = await getProjectByCode(projectCode);
+  if (!project) notFound();
 
   const [eventsResult, locations, assignmentsResult, assignmentStatuses, callSignsResult, comms, drivers, vehicles, evidence, missionsResult] = await Promise.all([
-    getTimelineEventsByProjectId(activeProject.id),
-    getLatestDriverLocationsByProjectId(activeProject.id),
-    getAssignmentsByProjectId(activeProject.id),
-    getLatestAssignmentStatuses(activeProject.id),
-    getCallSignsByProjectId(activeProject.id),
-    getDriverCommsByProjectId(activeProject.id),
-    getProjectDrivers(activeProject.id),
-    getProjectVehicles(activeProject.id),
-    getVehicleEvidenceByProjectId(activeProject.id),
-    getMissionsByProjectId(activeProject.id)
+    getTimelineEventsByProjectId(project.id),
+    getLatestDriverLocationsByProjectId(project.id),
+    getAssignmentsByProjectId(project.id),
+    getLatestAssignmentStatuses(project.id),
+    getCallSignsByProjectId(project.id),
+    getDriverCommsByProjectId(project.id),
+    getProjectDrivers(project.id),
+    getProjectVehicles(project.id),
+    getVehicleEvidenceByProjectId(project.id),
+    getMissionsByProjectId(project.id)
   ]);
 
   const missions = missionsResult.data;
@@ -84,15 +62,15 @@ export default async function MissionControlPage({ searchParams }: MissionContro
 
   return (
     <div className="grid gap-4">
-      <ProjectWorkspaceTabs projectId={activeProject.id} active="control" />
+      <ProjectWorkspaceTabs projectCode={project.projectCode} active="control" />
       {!load.ok ? <DataUnavailable description="โหลดข้อมูลศูนย์ควบคุมบางส่วนไม่สำเร็จ" detail={load.error} /> : null}
-      <CommandCenterHeader project={activeProject} liveCount={locations.length} issueCount={followUps} />
+      <CommandCenterHeader project={project} liveCount={locations.length} issueCount={followUps} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
 
       {/* One shared live feed for the map, the fleet board and the comms console —
           one poll of /locations + /comms per cycle instead of three. */}
       <MissionControlFeedProvider
-        projectId={activeProject.id}
+        projectId={project.id}
         initialLocations={locations}
         initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, evidence }}
       >
@@ -102,18 +80,18 @@ export default async function MissionControlPage({ searchParams }: MissionContro
           description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ"
           defaultOpen={locations.length > 0}
         >
-          <LiveLocationMap projectId={activeProject.id} initialLocations={locations} />
+          <LiveLocationMap projectId={project.id} initialLocations={locations} />
         </CollapsibleSection>
 
         <FleetBoard
-          projectId={activeProject.id}
+          projectId={project.id}
           assignments={assignments}
           callSigns={callSigns}
           drivers={drivers}
           vehicles={vehicles}
         />
 
-        <CommsConsole projectId={activeProject.id} assignments={assignments} callSigns={callSigns} />
+        <CommsConsole projectId={project.id} assignments={assignments} callSigns={callSigns} />
       </MissionControlFeedProvider>
 
       <CollapsibleSection title="สถานะงานทั้งหมด" storageKey="mc.jobstatus" defaultOpen>

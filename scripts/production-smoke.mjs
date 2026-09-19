@@ -14,9 +14,11 @@ const checks = [
   // Protected app routes — an anonymous request MUST redirect to login.
   { path: "/", expect: "redirect-login" },
   { path: "/projects", expect: "redirect-login" },
-  { path: "/mission-control", expect: "redirect-login" },
-  { path: "/assignments", expect: "redirect-login" },
-  { path: "/recovery", expect: "redirect-login" },
+  { path: "/projects/DUMMY/ground-transfer", expect: "redirect-login" },
+  { path: "/projects/DUMMY/ground-transfer/dispatch", expect: "redirect-login" },
+  { path: "/projects/DUMMY/ground-transfer/control", expect: "redirect-login" },
+  { path: "/projects/DUMMY/ground-transfer/resources", expect: "redirect-login" },
+  { path: "/ground-transfer/recovery", expect: "redirect-login" },
   { path: "/superadmin", expect: "redirect-login" },
   { path: "/resources", expect: "redirect-login" },
   // Driver entry with no token — should render its "no job" notice, not error.

@@ -1,51 +1,30 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
 import { DriverJobOrderPanel } from "@/components/assignments/driver-job-order-panel";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
-import { EmptyState } from "@/components/ui/empty-state";
 import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getObserverLinksByProjectId, getProjectObserverLinkByProjectId } from "@/lib/data/observer-access";
-import { getVisibleProjects } from "@/lib/data/projects";
+import { getProjectByCode } from "@/lib/data/projects";
 import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { getVehicleEvidenceByProjectId } from "@/lib/data/vehicle-evidence";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { DispatchWorkspace } from "@/components/assignments/dispatch-workspace";
 
-interface AssignmentsPageProps {
-  searchParams?: Promise<{ projectId?: string }>;
+interface DispatchPageProps {
+  params: Promise<{ projectCode: string }>;
 }
 
-export default async function AssignmentsPage({ searchParams }: AssignmentsPageProps) {
-  const params = searchParams ? await searchParams : {};
+export default async function DispatchPage({ params }: DispatchPageProps) {
+  const { projectCode } = await params;
   const viewer = await getCurrentUserProfile();
   if (!viewer.authUserId && !viewer.isDevelopmentFallback) redirect("/login");
-  const projects = await getVisibleProjects();
-
-  if (!projects.length) {
-    return (
-      <EmptyState
-        title="ยังไม่มีโครงการที่เข้าถึงได้"
-        description="บอร์ด Assignment ทำงานต่อโครงการ เลือกโครงการก่อนเพื่อจัดสรรงาน"
-        action={
-          <Link href="/projects" className="rounded-command bg-operation px-4 py-2 text-sm font-semibold text-white">
-            ไปหน้าโครงการ
-          </Link>
-        }
-      />
-    );
-  }
-
-  const activeProject = projects.find((project) => project.id === params.projectId);
-  if (!activeProject) {
-    if (projects.length === 1) redirect(`/assignments?projectId=${projects[0].id}`);
-    redirect("/projects");
-  }
-  const projectId = activeProject.id;
+  const project = await getProjectByCode(projectCode);
+  if (!project) notFound();
+  const projectId = project.id;
   const [assignmentsResult, missionsResult, callSignsResult, drivers, vehicles, observerLinks, projectObserverLink, vehicleEvidence] = await Promise.all([
     getAssignmentsByProjectId(projectId),
     getMissionsByProjectId(projectId),
@@ -66,12 +45,12 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
 
   return (
     <div className="grid gap-4">
-      <ProjectWorkspaceTabs projectId={projectId} active="dispatch" />
+      <ProjectWorkspaceTabs projectCode={project.projectCode} active="dispatch" />
       <section className="enterprise-panel overflow-hidden">
         <div className="enterprise-surface p-4 lg:p-5">
           <div className="min-w-0">
             <p className="section-label">จัดงาน</p>
-            <h1 className="page-title mt-2">{activeProject.projectName}</h1>
+            <h1 className="page-title mt-2">{project.projectName}</h1>
             <p className="page-description mt-2.5">สร้าง Assignment มอบให้ Call Sign คนขับ และรถ แล้วออก QR เฉพาะงาน</p>
           </div>
         </div>
@@ -82,7 +61,7 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
           two-column split put the form beside the board and left both narrow. */}
       <DispatchWorkspace
         projectId={projectId}
-        projectCode={activeProject.projectCode}
+        projectCode={project.projectCode}
         callSigns={callSigns}
         missions={missions}
         drivers={drivers}
@@ -91,8 +70,8 @@ export default async function AssignmentsPage({ searchParams }: AssignmentsPageP
         observerLinks={observerLinks}
         projectObserverLink={projectObserverLink}
         vehicleEvidence={vehicleEvidence}
-        projectStartDate={activeProject.startDate}
-        projectEndDate={activeProject.endDate}
+        projectStartDate={project.startDate}
+        projectEndDate={project.endDate}
         jobForm={
           <CreateAssignmentForm
             projectId={projectId}

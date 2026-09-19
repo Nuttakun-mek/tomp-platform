@@ -113,10 +113,7 @@ export async function updateCallSignCrewAction(input: unknown): Promise<ActionRe
     metadata: { action: "update_call_sign_crew", mode, auditError: auditError?.message || null }
   });
 
-  revalidatePath("/assignments");
-  revalidatePath(`/projects/${parsed.data.projectId}`);
-  revalidatePath(`/projects/${parsed.data.projectId}/assignments`);
-  revalidatePath("/mission-control");
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { mode, callSign: mapCallSign(updated), timelineEvent: timelineResult.data },
@@ -200,9 +197,7 @@ export async function createCallSignAction(input: unknown): Promise<ActionResult
     metadata: { action: "create_call_sign", mode }
   });
 
-  revalidatePath("/assignments");
-  revalidatePath(`/projects/${callSignRow.projectId}`);
-  revalidatePath(`/projects/${callSignRow.projectId}/assignments`);
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
     { mode, callSign: callSignRow, timelineEvent: timelineResult.data },
