@@ -67,6 +67,15 @@ describe("toggleProjectSystemAction ground_transfer guard", () => {
     expect(deleteEqMock).not.toHaveBeenCalled();
   });
 
+  it("rejects disabling ground_transfer when enabled field is omitted", async () => {
+    const result = await toggleProjectSystemAction({ projectId: PROJECT_ID, systemKey: "ground_transfer" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Ground Transfer");
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(deleteEqMock).not.toHaveBeenCalled();
+  });
+
   it("allows enabling ground_transfer (idempotent re-enable, not a disable)", async () => {
     const result = await toggleProjectSystemAction({ projectId: PROJECT_ID, systemKey: "ground_transfer", enabled: true });
 

@@ -23,7 +23,7 @@ export async function toggleProjectSystemAction(input: unknown): Promise<ActionR
   // creation time) — without this guard, this action could delete that
   // project_systems row on request and re-open the orphaned-project bug
   // 0047 was written to close.
-  if (systemKey === "ground_transfer" && data.enabled === false) {
+  if (systemKey === "ground_transfer" && !data.enabled) {
     return actionFailure("ไม่สามารถปิดใช้งาน Ground Transfer ได้ ทุกโครงการต้องมีระบบนี้เปิดอยู่เสมอ");
   }
 
