@@ -16,6 +16,7 @@ import { getProjectByCode } from "@/lib/data/projects";
 import { getProjectMembers } from "@/lib/data/project-members";
 import { getEnabledSystemKeys } from "@/lib/data/project-systems";
 import { getViewerAccess } from "@/lib/auth/access";
+import { requirePermission } from "@/lib/auth/rbac";
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ projectCode: string }> }) {
   const { projectCode } = await params;
@@ -23,7 +24,16 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   if (!project) notFound();
 
   const { permissions, roleKeys } = await getViewerAccess();
-  const canManageMembers = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.manage_members");
+  // Project-scoped, not permissions.includes(...): getViewerAccess() unions a
+  // profile's roles across EVERY project it holds any role on, so a
+  // project_manager of project A previously satisfied this check (and could
+  // read project B's member roster — names and emails) on project B despite
+  // holding no role there at all. requirePermission(project.id, ...) checks
+  // the membership on THIS project specifically, the same way every write
+  // action on this page already does (toggleProjectSystemAction,
+  // addProjectMemberAction, issueProjectHelperAction).
+  const memberPermission = await requirePermission(project.id, "project.manage_members");
+  const canManageMembers = memberPermission.allowed;
   const canManage = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.update");
   const canDelete = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.delete");
 

@@ -2,6 +2,7 @@ import { AirportTransferCaseCard } from "@/components/airport-transfer/case-card
 import { ProjectMissionBoard } from "@/components/projects/project-mission-board";
 import { ProjectOperationSummaryPanel } from "@/components/projects/project-operation-summary";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
+import { isManagerRoleForSystem } from "@/lib/auth/system-roles";
 import { combineResults } from "@/lib/data/data-result";
 import { getAirportTransferCases, getAirportTransferTasksByCaseIds, getLatestAirportTransferFlightSnapshots } from "@/lib/airport-transfer/data";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
@@ -60,15 +61,15 @@ export async function ProjectHelperView({ projectId, profileId }: { projectId: s
       </header>
 
       {membership.systemKey === "airport_transfer" ? (
-        <AirportTransferHelperView projectId={projectId} projectCode={project.projectCode} />
+        <AirportTransferHelperView projectId={projectId} projectCode={project.projectCode} roleKey={membership.roleKey} />
       ) : (
-        <GroundTransferHelperView projectId={projectId} />
+        <GroundTransferHelperView projectId={projectId} roleKey={membership.roleKey} />
       )}
     </div>
   );
 }
 
-async function AirportTransferHelperView({ projectId, projectCode }: { projectId: string; projectCode: string }) {
+async function AirportTransferHelperView({ projectId, projectCode, roleKey }: { projectId: string; projectCode: string; roleKey: string }) {
   const cases = await getAirportTransferCases({ projectId });
   const caseIds = cases.map((item) => item.id);
   const [snapshots, tasks] = await Promise.all([getLatestAirportTransferFlightSnapshots(caseIds), getAirportTransferTasksByCaseIds(caseIds)]);
@@ -78,29 +79,47 @@ async function AirportTransferHelperView({ projectId, projectCode }: { projectId
     return <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center text-sm text-slate-500">ยังไม่มีงานที่กำลังดำเนินการ</p>;
   }
 
+  // Same admin/dispatcher-only "canManage" split completeAirportTransferTask
+  // and getAirportTransferAccess already use — a viewer or coordinator
+  // helper must not see the edit-case affordance, and may only complete the
+  // checklist steps their own role_key owns (the card enforces that itself
+  // via viewerRoleKey, mirroring the Layer 3 owner_role check server-side).
+  const canManage = isManagerRoleForSystem("airport_transfer", roleKey);
+
   return (
     <section className="grid gap-2">
       {activeCases.map((item) => (
-        <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} projectCode={projectCode} />
+        <AirportTransferCaseCard key={item.id} item={item} snapshot={snapshots[item.id]} tasks={tasks[item.id]} projectCode={projectCode} canManage={canManage} viewerRoleKey={roleKey} />
       ))}
     </section>
   );
 }
 
-async function GroundTransferHelperView({ projectId }: { projectId: string }) {
-  const [missionsResult, callSignsResult, vehicles, drivers, locations] = await Promise.all([
-    getMissionsByProjectId(projectId),
-    getCallSignsByProjectId(projectId),
-    getProjectVehicles(projectId),
-    getProjectDrivers(projectId),
-    getLatestDriverLocationsByProjectId(projectId)
-  ]);
+async function GroundTransferHelperView({ projectId, roleKey }: { projectId: string; roleKey: string }) {
+  const [missionsResult, callSignsResult] = await Promise.all([getMissionsByProjectId(projectId), getCallSignsByProjectId(projectId)]);
 
   const load = combineResults(missionsResult, callSignsResult);
   if (!load.ok) {
     return <DataUnavailable description="โหลดข้อมูลภาพรวมโครงการไม่สำเร็จ" detail={load.error} />;
   }
 
+  // coordinator/customer_viewer helper roles get the mission list only, not
+  // the live operation summary — that panel's "กำลังส่งตำแหน่ง" figure is
+  // derived from every driver's current GPS ping (getLatestDriverLocationsByProjectId),
+  // which is operational detail meant for the people running the project
+  // (project_manager/dispatcher), not a one-project viewer role. Fetching
+  // locations only when they're actually shown keeps that data from even
+  // reaching this view for a role that shouldn't see it.
+  const canManage = isManagerRoleForSystem("ground_transfer", roleKey);
+  if (!canManage) {
+    return (
+      <div className="grid gap-4">
+        <ProjectMissionBoard missions={missionsResult.data} />
+      </div>
+    );
+  }
+
+  const [vehicles, drivers, locations] = await Promise.all([getProjectVehicles(projectId), getProjectDrivers(projectId), getLatestDriverLocationsByProjectId(projectId)]);
   const summary = summariseProjectOperation({
     vehicles,
     drivers,

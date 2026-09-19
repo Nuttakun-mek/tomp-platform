@@ -111,7 +111,43 @@ const flightTone = {
   neutral: "border-slate-200 bg-slate-50 text-slate-700"
 };
 
-export function AirportTransferCaseCard({ item, snapshot, tasks = [], projectCode }: { item: AirportTransferCase; snapshot?: AirportTransferFlightSnapshot; tasks?: AirportTransferTask[]; projectCode: string }) {
+export function AirportTransferCaseCard({
+  item,
+  snapshot,
+  tasks = [],
+  projectCode,
+  canManage = true,
+  viewerRoleKey = null
+}: {
+  item: AirportTransferCase;
+  snapshot?: AirportTransferFlightSnapshot;
+  tasks?: AirportTransferTask[];
+  projectCode: string;
+  /**
+   * Hides the edit link and the "เสร็จแล้ว" complete-task control. Defaults
+   * to true so this component's two existing callers (the signed-in cases
+   * pages, gated by getAirportTransferAccess at the layout level) render
+   * exactly as before. The project-helper claim view
+   * (components/project-helper/project-helper-view.tsx) is the one caller
+   * that passes false, for viewer/coordinator-tier helper roles — completing
+   * a task is already blocked server-side (completeAirportTransferTask
+   * requires a signed-in session a helper never has), so this is about not
+   * showing a management affordance to a role that was never meant to use
+   * one, not a second enforcement layer.
+   */
+  canManage?: boolean;
+  /**
+   * The viewer's own airport_* role_key, used ONLY to decide whether to show
+   * the "เสร็จแล้ว" button for a task that isn't owned by their role —
+   * mirrors completeAirportTransferTask's own Layer 3 check
+   * (task.owner_role must equal the caller's getAirportTransferProjectRole
+   * result unless they canManage). Irrelevant when canManage is true.
+   * Undefined (the two existing callers, which never pass it) preserves
+   * prior behaviour exactly: the button shows for every current task,
+   * because canManage already defaults to true for them.
+   */
+  viewerRoleKey?: string | null;
+}) {
   const DirectionIcon = item.direction === "arrival" ? PlaneLanding : PlaneTakeoff;
   const pickupAt = item.confirmedPickupAt || item.recommendedPickupAt;
   const flight = flightSummary(item, snapshot);
@@ -153,12 +189,12 @@ export function AirportTransferCaseCard({ item, snapshot, tasks = [], projectCod
             <div className="flex gap-2"><UsersRound className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">ผู้โดยสาร</p><p className="text-slate-600">{item.passengerCount} คน {item.fastTrack ? "· Fast Track" : ""}</p>{item.passengerMobile ? <p className="text-slate-600">{item.passengerMobile}</p> : null}</div></div>
             <div className="flex gap-2"><Luggage className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">สัมภาระ / หมายเหตุ</p><p className="text-slate-600">{item.luggageCount} กระเป๋า</p><p className="line-clamp-2 text-slate-600">{item.notes || "ไม่มีหมายเหตุ"}</p></div></div>
           </div>
-          <div className="flex items-center justify-between gap-6 border-t border-slate-100 pt-3"><div className="flex flex-wrap gap-1.5">{item.driverPhone ? <a href={`tel:${item.driverPhone}`} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><Phone className="h-3.5 w-3.5" />โทรหาคนขับ</a> : null}{item.pickupMapsUrl ? <a href={item.pickupMapsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><MapPin className="h-3.5 w-3.5" />แผนที่จุดรับ</a> : null}</div>{!item.deletedAt ? <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/${item.id}/edit`} variant="secondary" className="!min-h-8 shrink-0 gap-1.5 border-cyan-200 px-3 py-1 text-xs text-cyan-800"><Pencil className="h-3.5 w-3.5" />แก้ไขข้อมูล</ButtonLink> : null}</div>
+          <div className="flex items-center justify-between gap-6 border-t border-slate-100 pt-3"><div className="flex flex-wrap gap-1.5">{item.driverPhone ? <a href={`tel:${item.driverPhone}`} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><Phone className="h-3.5 w-3.5" />โทรหาคนขับ</a> : null}{item.pickupMapsUrl ? <a href={item.pickupMapsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><MapPin className="h-3.5 w-3.5" />แผนที่จุดรับ</a> : null}</div>{!item.deletedAt && canManage ? <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/${item.id}/edit`} variant="secondary" className="!min-h-8 shrink-0 gap-1.5 border-cyan-200 px-3 py-1 text-xs text-cyan-800"><Pencil className="h-3.5 w-3.5" />แก้ไขข้อมูล</ButtonLink> : null}</div>
         </section>
 
         <section className="p-3">
           <div className="mb-2 flex items-center justify-between gap-2 text-xs"><strong>Checklist การปฏิบัติงาน</strong><span className="font-semibold text-slate-500">{completedTasks}/{tasks.length}</span></div>
-          <div className="grid gap-1.5 sm:grid-cols-2">{tasks.map((task, index) => { const completed = task.status === "completed"; const isCurrent = index === currentTaskIndex; const action = completeAirportTransferTask.bind(null, item.id, task.id); return <div key={task.id} className={`flex h-9 items-center gap-2 rounded-lg border px-2 ${completed ? "border-emerald-200 bg-emerald-50 text-emerald-900" : isCurrent ? "border-cyan-400 bg-cyan-50 ring-1 ring-cyan-200" : "border-slate-200 bg-slate-50 text-slate-500"}`}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${completed ? "bg-emerald-600 text-white" : isCurrent ? "bg-cyan-700 text-white" : "bg-slate-200 text-slate-600"}`}>{completed ? <Check className="h-3 w-3" /> : task.sequence || index + 1}</span><span className="min-w-0 flex-1 text-[11px] font-semibold leading-4">{task.label}</span>{!completed && isCurrent && !item.deletedAt && item.operationalStatus !== "cancelled" ? <form action={action} className="shrink-0"><Button type="submit" variant="secondary" className="h-7 !min-h-7 px-2 py-0 text-[10px]">เสร็จแล้ว</Button></form> : null}</div>; })}</div>
+          <div className="grid gap-1.5 sm:grid-cols-2">{tasks.map((task, index) => { const completed = task.status === "completed"; const isCurrent = index === currentTaskIndex; const action = completeAirportTransferTask.bind(null, item.id, task.id); const mayComplete = canManage || task.ownerRole === viewerRoleKey; return <div key={task.id} className={`flex h-9 items-center gap-2 rounded-lg border px-2 ${completed ? "border-emerald-200 bg-emerald-50 text-emerald-900" : isCurrent ? "border-cyan-400 bg-cyan-50 ring-1 ring-cyan-200" : "border-slate-200 bg-slate-50 text-slate-500"}`}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${completed ? "bg-emerald-600 text-white" : isCurrent ? "bg-cyan-700 text-white" : "bg-slate-200 text-slate-600"}`}>{completed ? <Check className="h-3 w-3" /> : task.sequence || index + 1}</span><span className="min-w-0 flex-1 text-[11px] font-semibold leading-4">{task.label}</span>{!completed && isCurrent && !item.deletedAt && item.operationalStatus !== "cancelled" && mayComplete ? <form action={action} className="shrink-0"><Button type="submit" variant="secondary" className="h-7 !min-h-7 px-2 py-0 text-[10px]">เสร็จแล้ว</Button></form> : null}</div>; })}</div>
           {!tasks.length ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-xs text-slate-500"><Circle className="mx-auto mb-1 h-4 w-4" />ยังไม่มีเช็กลิสต์</div> : null}
         </section>
       </div>

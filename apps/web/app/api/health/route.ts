@@ -67,6 +67,10 @@ export function GET() {
         // would be hashed with the public development fallback — driver auth
         // is not trustworthy until this is true.
         driverTokenSecretConfigured: Boolean(readCleanEnv("DRIVER_ACCESS_TOKEN_SECRET")),
+        // Same idea, for project-helper PINs (lib/project-helper/tokens.ts).
+        // false means those PINs would be hashed with the public development
+        // fallback instead of a real pepper.
+        projectHelperPinSecretConfigured: Boolean(readCleanEnv("PROJECT_HELPER_PIN_SECRET")),
         webGpsMode: "foreground-browser",
         timelineImmutableUi: true
       }

@@ -249,11 +249,24 @@ export async function getProjectMembership(projectId: string): Promise<ProjectMe
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return null;
 
+  // system_key filter: since migration 0043/database/migrations/0046-era
+  // work, a profile can legitimately hold TWO project_members rows on the
+  // same project — one per system_key (e.g. Ground Transfer project_manager
+  // AND Airport Transfer airport_coordinator on the same project). Without
+  // this filter, .maybeSingle() below errors (PGRST116, "more than one row")
+  // the moment that happens, the error is swallowed, and this function
+  // returns null — silently locking that profile out of every
+  // requirePermission(projectId, ...) check on their OWN project. Every
+  // existing caller of getProjectMembership only ever cared about Ground
+  // Transfer's own permission model (this predates Airport Transfer's
+  // project_members integration entirely), so that is the system this
+  // resolves against.
   const { data } = await supabase
     .from("project_members")
     .select("project_id, profile_id, role_id")
     .eq("project_id", projectId)
     .eq("profile_id", profile.id)
+    .eq("system_key", "ground_transfer")
     .eq("status", "active")
     .maybeSingle();
 

@@ -5,23 +5,16 @@ import { addProjectMemberAction, issueProjectHelperAction } from "@/app/actions/
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { useToast } from "@/components/ui/toast";
+import { SYSTEM_ROLE_ALLOWLIST } from "@/lib/auth/system-roles";
 import { roleLabelTh } from "@/lib/i18n/role-th";
 
 const SYSTEM_LABEL: Record<string, string> = { ground_transfer: "Ground Transfer", airport_transfer: "Airport Transfer" };
 
-// "driver" is deliberately left out of ground_transfer's role list here: a
-// Ground Transfer driver is enrolled from ทรัพยากร (CreateDriverForm) and
-// gets their QR from a call sign, not a project_members grant — adding it
-// here would create a second, disconnected way to make the same kind of row.
-// Airport Transfer has no such separate enrollment path, so all five of its
-// roles — including airport_driver — grant the same way.
-const ROLE_OPTIONS: Record<string, string[]> = {
-  ground_transfer: ["project_manager", "dispatcher", "coordinator", "customer_viewer"],
-  airport_transfer: ["airport_admin", "airport_dispatcher", "airport_coordinator", "airport_driver", "airport_viewer"]
-};
-
+// The options offered here are the SAME allowlist the server actions enforce
+// (lib/auth/system-roles.ts) — imported, not duplicated, so this list can
+// never drift out of sync with what the server will actually accept.
 function RoleSelect({ systemKey, name, defaultValue }: { systemKey: string; name: string; defaultValue?: string }) {
-  const options = ROLE_OPTIONS[systemKey] ?? [];
+  const options = SYSTEM_ROLE_ALLOWLIST[systemKey] ?? [];
   return (
     <select className="field-input" name={name} defaultValue={defaultValue ?? options[0] ?? ""}>
       {options.map((role) => (

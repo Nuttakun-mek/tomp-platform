@@ -5,6 +5,7 @@ import { z } from "zod";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
+import { isRoleAllowedForSystem } from "@/lib/auth/system-roles";
 import { getProjectById } from "@/lib/data/projects";
 import { issueProjectHelperToken } from "@/lib/project-helper/tokens";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -14,13 +15,28 @@ function generateTempPassword(): string {
   return `Tomp-${bytes.slice(0, 14)}`;
 }
 
-const addMemberSchema = z.object({
-  projectId: z.string().uuid(),
-  systemKey: z.enum(["ground_transfer", "airport_transfer"]),
-  roleKey: z.string().min(1),
-  email: z.string().trim().email("อีเมลไม่ถูกต้อง"),
-  fullName: z.string().trim().optional()
-});
+// SECURITY: roleKey must be validated against the per-system allowlist, not
+// just "exists in the roles table" — `roles` also holds super_admin, and
+// getUserRoles() unions every project_members role a profile holds into that
+// profile's GLOBAL role set. Without this check, anyone with
+// project.manage_members on any project could grant themselves super_admin.
+// Checked with superRefine (not a plain z.enum on roleKey alone) because the
+// valid set depends on systemKey, which is itself part of this same object.
+const roleMatchesSystem = (data: { systemKey: string; roleKey: string }, ctx: z.RefinementCtx) => {
+  if (!isRoleAllowedForSystem(data.systemKey, data.roleKey)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "บทบาทนี้ใช้กับระบบนี้ไม่ได้", path: ["roleKey"] });
+  }
+};
+
+const addMemberSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    systemKey: z.enum(["ground_transfer", "airport_transfer"]),
+    roleKey: z.string().min(1),
+    email: z.string().trim().email("อีเมลไม่ถูกต้อง"),
+    fullName: z.string().trim().optional()
+  })
+  .superRefine(roleMatchesSystem);
 
 // Full-account path: an existing profile's email is looked up first, so
 // re-granting an already-known person never creates a duplicate account.
@@ -42,8 +58,11 @@ export async function addProjectMemberAction(input: unknown): Promise<ActionResu
   const { data: role, error: roleError } = await client.from("roles").select("id").eq("role_key", parsed.data.roleKey).maybeSingle();
   if (roleError || !role) return actionFailure("ไม่พบบทบาทนี้ในระบบ");
 
+  // .eq, not .ilike: `_` and `%` are LIKE wildcards zod's email validator
+  // permits in a local-part (e.g. "a_min@x.com" would match "admin@x.com"),
+  // which could attach this grant to the wrong person's account.
   const email = parsed.data.email.toLowerCase();
-  const { data: existingProfile } = await client.from("profiles").select("id").ilike("email", email).maybeSingle();
+  const { data: existingProfile } = await client.from("profiles").select("id").eq("email", email).maybeSingle();
 
   let profileId: string;
   let created = false;
@@ -98,15 +117,17 @@ export async function addProjectMemberAction(input: unknown): Promise<ActionResu
   return actionSuccess({ profileId, created, tempPassword });
 }
 
-const issueHelperSchema = z.object({
-  projectId: z.string().uuid(),
-  systemKey: z.enum(["ground_transfer", "airport_transfer"]),
-  roleKey: z.string().min(1),
-  fullName: z.string().trim().min(1, "กรุณาระบุชื่อ"),
-  nickname: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
-  pin: z.string().regex(/^\d{4,6}$/, "รหัส PIN ต้องเป็นตัวเลข 4-6 หลัก")
-});
+const issueHelperSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    systemKey: z.enum(["ground_transfer", "airport_transfer"]),
+    roleKey: z.string().min(1),
+    fullName: z.string().trim().min(1, "กรุณาระบุชื่อ"),
+    nickname: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    pin: z.string().regex(/^\d{4,6}$/, "รหัส PIN ต้องเป็นตัวเลข 4-6 หลัก")
+  })
+  .superRefine(roleMatchesSystem);
 
 export async function issueProjectHelperAction(input: unknown): Promise<ActionResult<{ profileId: string; helperUrl: string }>> {
   const parsed = issueHelperSchema.safeParse(input);
