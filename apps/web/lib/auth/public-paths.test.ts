@@ -6,6 +6,7 @@ describe("public path guard", () => {
     expect(isPublicPath("/ground-transfer/driver/abc")).toBe(true);
     expect(isPublicPath("/ground-transfer/fleet/abc")).toBe(true);
     expect(isPublicPath("/ground-transfer/track/abc")).toBe(true);
+    expect(isPublicPath("/helper/abc")).toBe(true);
   });
 
   it("keeps protected app routes protected and respects path boundaries", () => {

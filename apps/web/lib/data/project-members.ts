@@ -8,6 +8,7 @@ export interface ProjectMemberRow {
   fullName: string;
   email: string;
   roleKey: string;
+  systemKey: string;
   status: string;
 }
 
@@ -19,6 +20,7 @@ function mapNested(row: Row): ProjectMemberRow {
     fullName: rowLoose(profile, "full_name", "ไม่ทราบชื่อ"),
     email: rowLoose(profile, "email"),
     roleKey: rowLoose(role, "role_key"),
+    systemKey: rowLoose(row, "system_key", "ground_transfer"),
     status: rowLoose(row, "status", "active")
   };
 }
@@ -29,17 +31,22 @@ function mapFlat(row: Row): ProjectMemberRow {
     fullName: rowLoose(row, "full_name", "ไม่ทราบชื่อ"),
     email: rowLoose(row, "email"),
     roleKey: rowLoose(row, "role_key"),
+    systemKey: rowLoose(row, "system_key", "ground_transfer"),
     status: rowLoose(row, "status", "active")
   };
 }
 
 // cache(): one render often needs this list from several components; keep it to one query per request.
+// No system_key filter here on purpose: after migration 0035/0043 project_members
+// holds rows for every system a project has enabled, and this list is meant to
+// show all of them together — filtering by system is the caller's job, not this
+// query's.
 export const getProjectMembers = cache(async function getProjectMembers(projectId: string): Promise<ProjectMemberRow[]> {
   const { client } = await resolveReadClient();
   if (client) {
     const { data, error } = await client
       .from("project_members")
-      .select("profile_id, status, profiles(full_name, email), roles(role_key)")
+      .select("profile_id, status, system_key, profiles(full_name, email), roles(role_key)")
       .eq("project_id", projectId);
     if (!error && data) return (data as Row[]).map(mapNested);
   }
@@ -48,7 +55,7 @@ export const getProjectMembers = cache(async function getProjectMembers(projectI
   if (!sql) return [];
   try {
     const rows = await sql<Row[]>`
-      select pm.profile_id, pm.status, p.full_name, p.email, r.role_key
+      select pm.profile_id, pm.status, pm.system_key, p.full_name, p.email, r.role_key
       from project_members pm
       left join profiles p on p.id = pm.profile_id
       left join roles r on r.id = pm.role_id

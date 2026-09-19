@@ -4,7 +4,12 @@ const ROLE_LABELS_TH: Record<string, string> = {
   dispatcher: "ผู้จัดสรรงาน",
   coordinator: "ผู้ประสานงาน",
   customer_viewer: "ผู้ชมโครงการ",
-  driver: "คนขับ"
+  driver: "คนขับ",
+  airport_admin: "ผู้ดูแล Airport Transfer",
+  airport_dispatcher: "ผู้จัดสรรงาน Airport Transfer",
+  airport_coordinator: "ผู้ประสานงาน Airport Transfer",
+  airport_driver: "คนขับ Airport Transfer",
+  airport_viewer: "ผู้ชม Airport Transfer"
 };
 
 export function roleLabelTh(roleKey: string | null | undefined): string {

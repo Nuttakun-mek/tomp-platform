@@ -3,6 +3,7 @@ export const PUBLIC_PREFIXES = [
   "/no-access",
   "/auth/callback",
   "/ground-transfer/driver",
+  "/helper",
   "/api/driver",
   "/api/health",
   "/ground-transfer/fleet",
