@@ -1295,29 +1295,33 @@ git mv apps/web/app/airport-transfer/trash "apps/web/app/(app)/projects/[project
 git rm apps/web/app/airport-transfer/layout.tsx
 ```
 
-`apps/web/app/airport-transfer/settings/page.tsx` and a small layout for it are left where they are — add a minimal `apps/web/app/airport-transfer/layout.tsx` guarding just that one page with the account-level (`super_admin`/`airport_admin`-anywhere) check, since the old project-agnostic layout this file replaced is gone:
+**Correction found during Task 8's own review (not caught while writing this plan):** the layout code below originally wrapped the project-scoped pages in `AirportTransferShell` — copying the pre-move layout's behavior. That was wrong the moment these pages moved *inside* `(app)`: `(app)/layout.tsx` already supplies a full shell (`AppShell`/`WorkspaceShell`) to everything under it, so wrapping in `AirportTransferShell` too produced a doubled header and a `<main>` nested inside another `<main>`. `/airport-transfer/settings` stays *outside* `(app)` (it is genuinely system-wide, not project-scoped), so it still needs its own shell — the minimal layout below was wrong in the opposite direction, dropping chrome entirely. Fixed below to match the working precedent already set by `projects/[projectCode]/ground-transfer/layout.tsx` in Task 7 (`return children`, relying on `(app)`'s own shell).
+
+`apps/web/app/airport-transfer/settings/page.tsx` and a small layout for it are left where they are — add a minimal `apps/web/app/airport-transfer/layout.tsx` guarding just that one page with the account-level (`super_admin`/`airport_admin`-anywhere) check, keeping the same `AirportTransferShell` chrome this page has always had (it is `/airport-transfer`'s only remaining page and sits outside `(app)`, so nothing else supplies a shell here):
 
 ```typescript
 // apps/web/app/airport-transfer/layout.tsx (new, minimal — settings/ only)
 import { redirect } from "next/navigation";
+import { AirportTransferShell } from "@/components/airport-transfer/airport-transfer-shell";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 
 export default async function AirportTransferSystemLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const access = await getAirportTransferAccess();
+  const [access, profile] = await Promise.all([getAirportTransferAccess(), getCurrentUserProfile()]);
   if (!access.signedIn) redirect("/login?next=/airport-transfer/settings");
   if (!access.allowed) redirect("/no-access?module=airport-transfer");
-  return children;
+  return <AirportTransferShell userName={profile.fullName} roleLabel={access.role || "airport_transfer"}>{children}</AirportTransferShell>;
 }
 ```
 
 - [ ] **Step 2: Create the project-scoped layout**
 
+Unlike the settings layout above, this one does **not** wrap in `AirportTransferShell` — these pages live inside `(app)`, which already provides the shell (chrome comes from `(app)/layout.tsx` alone, exactly as `projects/[projectCode]/ground-transfer/layout.tsx` already does in Task 7). This layout's only job is the access gate.
+
 ```typescript
 // apps/web/app/(app)/projects/[projectCode]/airport-transfer/layout.tsx
 import { notFound, redirect } from "next/navigation";
-import { AirportTransferShell } from "@/components/airport-transfer/airport-transfer-shell";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
-import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getProjectByCode } from "@/lib/data/projects";
 
 export default async function ProjectAirportTransferLayout({
@@ -1331,13 +1335,15 @@ export default async function ProjectAirportTransferLayout({
   const project = await getProjectByCode(projectCode);
   if (!project) notFound();
 
-  const [access, profile] = await Promise.all([getAirportTransferAccess(project.id), getCurrentUserProfile()]);
+  const access = await getAirportTransferAccess(project.id);
   if (!access.signedIn) redirect(`/login?next=/projects/${projectCode}/airport-transfer`);
   if (!access.allowed) redirect(`/no-access?module=airport-transfer&project=${projectCode}`);
 
-  return <AirportTransferShell userName={profile.fullName} roleLabel={access.role || "airport_transfer"}>{children}</AirportTransferShell>;
+  return children;
 }
 ```
+
+A page under this layout that wants to show the viewer's role (the old shell's `roleLabel`) reads `getAirportTransferAccess(project.id)` itself and renders it inline — this layout no longer carries that concern, matching how Ground Transfer's own pages handle it.
 
 - [ ] **Step 3: Update every moved page to resolve `project.id` from `params.projectCode` instead of assuming a global scope**
 
