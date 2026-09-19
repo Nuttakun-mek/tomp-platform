@@ -13,6 +13,16 @@ export default defineConfig({
     // the tests ran.
     include: ["lib/**/*.test.ts", "app/**/*.test.ts"]
   },
+  // Next.js compiles .tsx with the automatic JSX runtime (no `import React`
+  // needed — none of this codebase's components do), but tsconfig.json's
+  // "jsx": "preserve" leaves that choice to whichever compiler runs, and
+  // esbuild's own default is the classic runtime, which needs a `React`
+  // identifier in scope. Only mattered once a test (settings/page.test.ts)
+  // started importing a page/component module and calling it directly
+  // instead of only importing plain lib functions.
+  esbuild: {
+    jsx: "automatic"
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL(".", import.meta.url)),

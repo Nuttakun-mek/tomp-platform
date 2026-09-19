@@ -15,7 +15,6 @@ import { getOperationDaysByProjectId } from "@/lib/data/operation-days";
 import { getProjectByCode } from "@/lib/data/projects";
 import { getProjectMembers } from "@/lib/data/project-members";
 import { getEnabledSystemKeys } from "@/lib/data/project-systems";
-import { getViewerAccess } from "@/lib/auth/access";
 import { requirePermission } from "@/lib/auth/rbac";
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ projectCode: string }> }) {
@@ -23,19 +22,29 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
   const project = await getProjectByCode(projectCode);
   if (!project) notFound();
 
-  const { permissions, roleKeys } = await getViewerAccess();
-  // Project-scoped, not permissions.includes(...): getViewerAccess() unions a
-  // profile's roles across EVERY project it holds any role on, so a
-  // project_manager of project A previously satisfied this check (and could
-  // read project B's member roster — names and emails) on project B despite
-  // holding no role there at all. requirePermission(project.id, ...) checks
-  // the membership on THIS project specifically, the same way every write
-  // action on this page already does (toggleProjectSystemAction,
-  // addProjectMemberAction, issueProjectHelperAction).
-  const memberPermission = await requirePermission(project.id, "project.manage_members");
+  // Project-scoped, not permissions.includes(...) off account-wide
+  // getViewerAccess(): that unions a profile's roles across EVERY project it
+  // holds any role on, so a project_manager of project A previously
+  // satisfied canManage/canDelete (and passed the entry gate below) on
+  // project B despite holding no role there at all — which meant this page
+  // rendered project B's full member roster (names + emails) and its
+  // coordinator/operation contact numbers to them, read-only but still
+  // disclosed. requirePermission(project.id, ...) checks the membership on
+  // THIS project specifically, the same way every write action on this page
+  // already does (toggleProjectSystemAction, addProjectMemberAction,
+  // issueProjectHelperAction). super_admin still passes every one of these:
+  // requirePermission falls through to getGlobalRoleKeys()'s project-id-null
+  // "super_admin" role, and roleHasPermission("super_admin", ...) is true
+  // for any permission via the "*" wildcard — the same bypass
+  // canManageMembers already relied on before this fix.
+  const [memberPermission, managePermission, deletePermission] = await Promise.all([
+    requirePermission(project.id, "project.manage_members"),
+    requirePermission(project.id, "project.update"),
+    requirePermission(project.id, "project.delete")
+  ]);
   const canManageMembers = memberPermission.allowed;
-  const canManage = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.update");
-  const canDelete = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.delete");
+  const canManage = managePermission.allowed;
+  const canDelete = deletePermission.allowed;
 
   if (!canManageMembers && !canManage && !canDelete) {
     return <AccessDenied title="เข้าตั้งค่าโครงการนี้ไม่ได้" reason="ต้องมีสิทธิ์จัดการโครงการนี้ก่อน ติดต่อผู้จัดการโครงการ" />;
