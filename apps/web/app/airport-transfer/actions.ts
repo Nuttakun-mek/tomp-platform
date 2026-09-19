@@ -11,6 +11,7 @@ import { flightNumberHelpMessage } from "@/lib/airport-transfer/flight-number";
 import { syncActiveAirportTransferFlights } from "@/lib/airport-transfer/flight-sync";
 import { getAirportTransferProjectRole } from "@/lib/airport-transfer/project-role";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
+import { getProjectById } from "@/lib/data/projects";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import type { AirportTransferOperationalStatus } from "@/lib/airport-transfer/types";
 
@@ -303,9 +304,12 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
       : Promise.resolve()
   ]);
 
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
-  redirect(`/airport-transfer/cases?created=${encodeURIComponent(caseCode)}`);
+  // The pages moved to /projects/<code>/airport-transfer (984): 'layout'
+  // revalidates every project's cases/dashboard under that dynamic segment
+  // without needing to know which one this case belongs to.
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
+  const project = await getProjectById(input.projectId);
+  redirect(project ? `/projects/${project.projectCode}/airport-transfer/cases?created=${encodeURIComponent(caseCode)}` : `/airport-transfer/cases?created=${encodeURIComponent(caseCode)}`);
 }
 
 export async function updateAirportTransferCase(_previous: UpdateTransferCaseState, formData: FormData): Promise<UpdateTransferCaseState> {
@@ -454,11 +458,11 @@ export async function updateAirportTransferCase(_previous: UpdateTransferCaseSta
     ]);
   }
 
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
-  revalidatePath(`/airport-transfer/cases/${input.caseId}`);
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
+  const project = current.project_id ? await getProjectById(String(current.project_id)) : null;
   const flightRefresh = await refreshAirportTransferFlight(input.caseId, { ok: false, message: "" });
-  redirect(`/airport-transfer/cases/${input.caseId}?updated=1&flightUpdated=${flightRefresh.ok ? "1" : "0"}`);
+  const basePath = project ? `/projects/${project.projectCode}/airport-transfer` : "/airport-transfer";
+  redirect(`${basePath}/cases/${input.caseId}?updated=1&flightUpdated=${flightRefresh.ok ? "1" : "0"}`);
 }
 
 export async function refreshAirportTransferFlight(caseId: string, _previous: RefreshFlightState): Promise<RefreshFlightState> {
@@ -561,9 +565,7 @@ export async function refreshAirportTransferFlight(caseId: string, _previous: Re
     }).eq("provider", FLIGHT_PROVIDER)
   ]);
 
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
-  revalidatePath(`/airport-transfer/cases/${caseId}`);
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
   return { ok: true, message: selected ? "อัปเดตข้อมูลเที่ยวบินล่าสุดแล้ว" : "พบหลายเที่ยวบิน กรุณาตรวจสอบเส้นทางก่อนเลือกข้อมูล" };
 }
 
@@ -588,8 +590,9 @@ export async function runAirportTransferFlightSync(_previous: RefreshFlightState
     if (!canManageAnyProject) return { ok: false, message: "บัญชีนี้ไม่มีสิทธิ์สั่งตรวจข้อมูลเที่ยวบิน" };
   }
   const result = await syncActiveAirportTransferFlights();
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
+  // This sync spans every project's active flights, not just one — the
+  // 'layout' form revalidates every project's airport-transfer pages at once.
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
   return { ok: result.ok, message: result.message };
 }
 
@@ -614,9 +617,7 @@ export async function cancelAirportTransferCase(caseId: string, _previous: CaseL
     supabase.from("airport_transfer_status_events").insert({ case_id: caseId, from_status: current.operational_status, to_status: "cancelled", event_type: "case_cancelled", note: reason, actor_profile_id: profile.id }),
     supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "cancelled", old_value: current, new_value: { operational_status: "cancelled", cancelled_at: cancelledAt, cancellation_reason: reason }, reason, actor_profile_id: profile.id })
   ]);
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
-  revalidatePath(`/airport-transfer/cases/${caseId}`);
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
   return { ok: true, message: "ยกเลิกงานแล้ว ระบบหยุดติดตามเที่ยวบินของเคสนี้" };
 }
 
@@ -635,10 +636,9 @@ export async function trashAirportTransferCase(caseId: string, _previous: CaseLi
   const { error } = await supabase.from("airport_transfer_cases").update({ deleted_at: deletedAt, deleted_by: profile.id, delete_reason: reason || null, next_action_at: null }).eq("id", caseId).is("deleted_at", null);
   if (error) return { ok: false, message: error.message };
   await supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "moved_to_trash", new_value: { deleted_at: deletedAt, delete_reason: reason || null }, reason: reason || null, actor_profile_id: profile.id });
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
-  revalidatePath("/airport-transfer/trash");
-  redirect("/airport-transfer/cases?trashed=1");
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
+  const project = current.project_id ? await getProjectById(String(current.project_id)) : null;
+  redirect(project ? `/projects/${project.projectCode}/airport-transfer/cases?trashed=1` : "/airport-transfer/cases?trashed=1");
 }
 
 export async function restoreAirportTransferCase(caseId: string, _previous: CaseLifecycleState): Promise<CaseLifecycleState> {
@@ -655,9 +655,7 @@ export async function restoreAirportTransferCase(caseId: string, _previous: Case
   const { error } = await supabase.from("airport_transfer_cases").update({ deleted_at: null, deleted_by: null, delete_reason: null }).eq("id", caseId).not("deleted_at", "is", null);
   if (error) return { ok: false, message: error.message };
   await supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "restored", new_value: { deleted_at: null }, actor_profile_id: profile.id });
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
-  revalidatePath("/airport-transfer/trash");
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
   return { ok: true, message: "กู้คืนงานแล้ว" };
 }
 
@@ -757,7 +755,5 @@ export async function completeAirportTransferTask(caseId: string, taskId: string
     new_value: { taskKey: task.task_key, completedAt },
     actor_profile_id: profile.id
   });
-  revalidatePath("/airport-transfer");
-  revalidatePath("/airport-transfer/cases");
-  revalidatePath(`/airport-transfer/cases/${caseId}`);
+  revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
 }

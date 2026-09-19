@@ -111,7 +111,7 @@ const flightTone = {
   neutral: "border-slate-200 bg-slate-50 text-slate-700"
 };
 
-export function AirportTransferCaseCard({ item, snapshot, tasks = [] }: { item: AirportTransferCase; snapshot?: AirportTransferFlightSnapshot; tasks?: AirportTransferTask[] }) {
+export function AirportTransferCaseCard({ item, snapshot, tasks = [], projectCode }: { item: AirportTransferCase; snapshot?: AirportTransferFlightSnapshot; tasks?: AirportTransferTask[]; projectCode: string }) {
   const DirectionIcon = item.direction === "arrival" ? PlaneLanding : PlaneTakeoff;
   const pickupAt = item.confirmedPickupAt || item.recommendedPickupAt;
   const flight = flightSummary(item, snapshot);
@@ -153,7 +153,7 @@ export function AirportTransferCaseCard({ item, snapshot, tasks = [] }: { item: 
             <div className="flex gap-2"><UsersRound className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">ผู้โดยสาร</p><p className="text-slate-600">{item.passengerCount} คน {item.fastTrack ? "· Fast Track" : ""}</p>{item.passengerMobile ? <p className="text-slate-600">{item.passengerMobile}</p> : null}</div></div>
             <div className="flex gap-2"><Luggage className="mt-0.5 h-4 w-4 text-cyan-700" /><div><p className="font-bold">สัมภาระ / หมายเหตุ</p><p className="text-slate-600">{item.luggageCount} กระเป๋า</p><p className="line-clamp-2 text-slate-600">{item.notes || "ไม่มีหมายเหตุ"}</p></div></div>
           </div>
-          <div className="flex items-center justify-between gap-6 border-t border-slate-100 pt-3"><div className="flex flex-wrap gap-1.5">{item.driverPhone ? <a href={`tel:${item.driverPhone}`} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><Phone className="h-3.5 w-3.5" />โทรหาคนขับ</a> : null}{item.pickupMapsUrl ? <a href={item.pickupMapsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><MapPin className="h-3.5 w-3.5" />แผนที่จุดรับ</a> : null}</div>{!item.deletedAt ? <ButtonLink href={`/airport-transfer/cases/${item.id}/edit`} variant="secondary" className="!min-h-8 shrink-0 gap-1.5 border-cyan-200 px-3 py-1 text-xs text-cyan-800"><Pencil className="h-3.5 w-3.5" />แก้ไขข้อมูล</ButtonLink> : null}</div>
+          <div className="flex items-center justify-between gap-6 border-t border-slate-100 pt-3"><div className="flex flex-wrap gap-1.5">{item.driverPhone ? <a href={`tel:${item.driverPhone}`} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><Phone className="h-3.5 w-3.5" />โทรหาคนขับ</a> : null}{item.pickupMapsUrl ? <a href={item.pickupMapsUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 font-semibold text-cyan-800"><MapPin className="h-3.5 w-3.5" />แผนที่จุดรับ</a> : null}</div>{!item.deletedAt ? <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/${item.id}/edit`} variant="secondary" className="!min-h-8 shrink-0 gap-1.5 border-cyan-200 px-3 py-1 text-xs text-cyan-800"><Pencil className="h-3.5 w-3.5" />แก้ไขข้อมูล</ButtonLink> : null}</div>
         </section>
 
         <section className="p-3">

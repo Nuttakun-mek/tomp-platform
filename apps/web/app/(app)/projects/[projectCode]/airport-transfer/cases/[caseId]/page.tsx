@@ -6,6 +6,7 @@ import { RefreshFlightButton } from "@/components/airport-transfer/refresh-fligh
 import { Button, ButtonLink } from "@/components/ui/button";
 import { getAirportTransferAuditLogs, getAirportTransferCase, getAirportTransferTasks, getLatestAirportTransferFlightSnapshot } from "@/lib/airport-transfer/data";
 import { operationalStatusLabel, verificationStatusLabel } from "@/lib/airport-transfer/labels";
+import { getProjectByCode } from "@/lib/data/projects";
 import type { AirportTransferAuditLog } from "@/lib/airport-transfer/types";
 
 function formatDateTime(value: string | null) {
@@ -43,10 +44,12 @@ function displayAuditValue(value: unknown) {
   return String(value);
 }
 
-export default async function AirportTransferCasePage({ params, searchParams }: { params: Promise<{ caseId: string }>; searchParams?: Promise<{ updated?: string; flightUpdated?: string }> }) {
-  const { caseId } = await params;
+export default async function AirportTransferCasePage({ params, searchParams }: { params: Promise<{ projectCode: string; caseId: string }>; searchParams?: Promise<{ updated?: string; flightUpdated?: string }> }) {
+  const { projectCode, caseId } = await params;
+  const project = await getProjectByCode(projectCode);
+  if (!project) notFound();
   const query = searchParams ? await searchParams : {};
-  const [item, tasks, auditLogs, latestFlight] = await Promise.all([getAirportTransferCase(caseId), getAirportTransferTasks(caseId), getAirportTransferAuditLogs(caseId), getLatestAirportTransferFlightSnapshot(caseId)]);
+  const [item, tasks, auditLogs, latestFlight] = await Promise.all([getAirportTransferCase(caseId, project.id), getAirportTransferTasks(caseId), getAirportTransferAuditLogs(caseId), getLatestAirportTransferFlightSnapshot(caseId)]);
   if (!item) notFound();
   const latestManualUpdate = query.updated === "1" ? auditLogs.find((log) => log.action === "updated") : undefined;
   const changedKeys = latestManualUpdate
@@ -58,14 +61,14 @@ export default async function AirportTransferCasePage({ params, searchParams }: 
     <>
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <ButtonLink href="/airport-transfer/cases" variant="quiet" className="mb-3 gap-2 px-0"><ArrowLeft className="h-4 w-4" />กลับไปรายการ</ButtonLink>
+          <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases`} variant="quiet" className="mb-3 gap-2 px-0"><ArrowLeft className="h-4 w-4" />กลับไปรายการ</ButtonLink>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">{item.caseCode}</p>
           <h1 className="mt-1 text-2xl font-semibold">{item.passengerName}</h1>
           <p className="mt-2 text-sm text-slate-500">{item.direction === "arrival" ? "รับเข้าจากสนามบิน" : "ส่งออกจากที่พัก"} · {item.flightNumber}</p>
         </div>
         <div className="grid justify-items-end gap-2">
           <div className="flex flex-wrap gap-2"><span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{verificationStatusLabel[item.verificationStatus]}</span><span className="rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800">{operationalStatusLabel[item.operationalStatus]}</span></div>
-          {!item.deletedAt ? <div className="flex flex-wrap justify-end gap-2"><ButtonLink href={`/airport-transfer/cases/${item.id}/edit`} variant="secondary" className="gap-2"><Pencil className="h-4 w-4" />แก้ไขข้อมูล</ButtonLink><RefreshFlightButton caseId={item.id} /></div> : null}
+          {!item.deletedAt ? <div className="flex flex-wrap justify-end gap-2"><ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/${item.id}/edit`} variant="secondary" className="gap-2"><Pencil className="h-4 w-4" />แก้ไขข้อมูล</ButtonLink><RefreshFlightButton caseId={item.id} /></div> : null}
         </div>
       </header>
 

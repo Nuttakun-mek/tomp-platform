@@ -1,6 +1,11 @@
+import { notFound } from "next/navigation";
 import { FileSpreadsheet, ShieldCheck, Upload } from "lucide-react";
+import { getProjectByCode } from "@/lib/data/projects";
 
-export default function AirportTransferImportsPage() {
+export default async function AirportTransferImportsPage({ params }: { params: Promise<{ projectCode: string }> }) {
+  const { projectCode } = await params;
+  const project = await getProjectByCode(projectCode);
+  if (!project) notFound();
   return (
     <>
       <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Import Center</p><h1 className="mt-1 text-2xl font-semibold">นำเข้าข้อมูล Excel</h1><p className="mt-2 text-sm text-slate-500">พื้นที่พักข้อมูลก่อนตรวจรูปแบบ ตรวจเที่ยวบิน ตรวจข้อมูลซ้ำ และยืนยันเข้าฐานข้อมูลจริง</p></header>

@@ -1,15 +1,8 @@
 import "server-only";
 
-import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import { FLIGHT_PROVIDER } from "./flight-provider";
 import type { AirportTransferApiHealth, AirportTransferAuditLog, AirportTransferCase, AirportTransferFlightSnapshot, AirportTransferSummary, AirportTransferTask } from "./types";
-
-export interface AirportTransferProjectOption {
-  projectId: string;
-  projectCode: string;
-  projectName: string;
-}
 
 type CaseRow = Record<string, unknown>;
 
@@ -144,14 +137,14 @@ export async function getLatestAirportTransferFlightSnapshots(caseIds: string[])
   }, {});
 }
 
-export async function getAirportTransferCases(filters?: { direction?: string; status?: string; query?: string }): Promise<AirportTransferCase[]> {
+export async function getAirportTransferCases(filters: { projectId: string; direction?: string; status?: string; query?: string }): Promise<AirportTransferCase[]> {
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return [];
 
-  let query = supabase.from("airport_transfer_cases").select("*").is("deleted_at", null).order("next_action_at", { ascending: true, nullsFirst: false }).limit(200);
-  if (filters?.direction === "arrival" || filters?.direction === "departure") query = query.eq("direction", filters.direction);
-  if (filters?.status) query = query.eq("operational_status", filters.status);
-  if (filters?.query?.trim()) {
+  let query = supabase.from("airport_transfer_cases").select("*").eq("project_id", filters.projectId).is("deleted_at", null).order("next_action_at", { ascending: true, nullsFirst: false }).limit(200);
+  if (filters.direction === "arrival" || filters.direction === "departure") query = query.eq("direction", filters.direction);
+  if (filters.status) query = query.eq("operational_status", filters.status);
+  if (filters.query?.trim()) {
     const term = filters.query.trim().replaceAll(",", "");
     query = query.or(`case_code.ilike.%${term}%,flight_number.ilike.%${term}%,passenger_first_name.ilike.%${term}%,passenger_last_name.ilike.%${term}%`);
   }
@@ -161,10 +154,10 @@ export async function getAirportTransferCases(filters?: { direction?: string; st
   return data.map((row) => mapCase(row as CaseRow));
 }
 
-export async function getDeletedAirportTransferCases(): Promise<AirportTransferCase[]> {
+export async function getDeletedAirportTransferCases(projectId: string): Promise<AirportTransferCase[]> {
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return [];
-  const { data, error } = await supabase.from("airport_transfer_cases").select("*").not("deleted_at", "is", null).order("deleted_at", { ascending: false }).limit(200);
+  const { data, error } = await supabase.from("airport_transfer_cases").select("*").eq("project_id", projectId).not("deleted_at", "is", null).order("deleted_at", { ascending: false }).limit(200);
   if (error || !data) return [];
   return data.map((row) => mapCase(row as CaseRow));
 }
@@ -190,10 +183,13 @@ export async function getAirportTransferApiHealth(): Promise<AirportTransferApiH
   };
 }
 
-export async function getAirportTransferCase(caseId: string): Promise<AirportTransferCase | null> {
+// Scoped by project_id as well as the case's own id: a case URL reached
+// under the wrong project code (e.g. copy-pasted, or guessed) must 404
+// rather than render another project's data inside this project's shell.
+export async function getAirportTransferCase(caseId: string, projectId: string): Promise<AirportTransferCase | null> {
   const supabase = getSupabaseServerDataClient();
   if (!supabase) return null;
-  const { data, error } = await supabase.from("airport_transfer_cases").select("*").eq("id", caseId).maybeSingle();
+  const { data, error } = await supabase.from("airport_transfer_cases").select("*").eq("id", caseId).eq("project_id", projectId).maybeSingle();
   if (error || !data) return null;
   return mapCase(data as CaseRow);
 }
@@ -238,35 +234,6 @@ export async function getAirportTransferTasksByCaseIds(caseIds: string[]): Promi
     });
     return groups;
   }, {});
-}
-
-/**
- * The projects the current profile can create an Airport Transfer case
- * under — every active project_members row they hold on system_key
- * 'airport_transfer' (docs/11-codex/984 Layer 2). Powers the required
- * project selector on the create-case form.
- */
-export async function getAirportTransferProjectOptions(): Promise<AirportTransferProjectOption[]> {
-  const supabase = getSupabaseServerDataClient();
-  if (!supabase) return [];
-  const profile = await getCurrentUserProfile();
-  const { data, error } = await supabase
-    .from("project_members")
-    .select("project_id, projects(project_code, project_name)")
-    .eq("system_key", "airport_transfer")
-    .eq("profile_id", profile.id)
-    .eq("status", "active");
-  if (error || !data) return [];
-  return data.flatMap((row) => {
-    const projectId = asNullableString(row.project_id);
-    const project = Array.isArray(row.projects) ? row.projects[0] : row.projects;
-    if (!projectId || !project || typeof project !== "object") return [];
-    return [{
-      projectId,
-      projectCode: String((project as { project_code?: unknown }).project_code || ""),
-      projectName: String((project as { project_name?: unknown }).project_name || "")
-    }];
-  });
 }
 
 export function summarizeAirportTransferCases(cases: AirportTransferCase[]): AirportTransferSummary {

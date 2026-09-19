@@ -1,17 +1,15 @@
 import { redirect } from "next/navigation";
-import { AirportTransferShell } from "@/components/airport-transfer/airport-transfer-shell";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
-import { getCurrentUserProfile } from "@/lib/auth/current-user";
 
-export const metadata = {
-  title: "Airport Transfer Control — TOMP",
-  description: "ศูนย์บริหารงานรับเข้าและส่งออกผู้โดยสารสนามบิน"
-};
-
-export default async function AirportTransferLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [access, profile] = await Promise.all([getAirportTransferAccess(), getCurrentUserProfile()]);
-  if (!access.signedIn) redirect("/login?next=/airport-transfer");
+// System-wide gate for what's left directly under /airport-transfer: the
+// AirLabs provider settings page. It configures the flight-data provider for
+// the whole system, not one project, so it stays account-scoped (super_admin
+// or airport_admin on any project) rather than moving under a project code.
+// Everything else that used to live here (cases, imports, trash, the
+// dashboard) moved to /projects/[projectCode]/airport-transfer per 984.
+export default async function AirportTransferSystemLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const access = await getAirportTransferAccess();
+  if (!access.signedIn) redirect("/login?next=/airport-transfer/settings");
   if (!access.allowed) redirect("/no-access?module=airport-transfer");
-  return <AirportTransferShell userName={profile.fullName} roleLabel={access.role || "airport_transfer"}>{children}</AirportTransferShell>;
+  return children;
 }
-

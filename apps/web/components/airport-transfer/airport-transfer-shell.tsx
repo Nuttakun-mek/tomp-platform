@@ -2,21 +2,22 @@ import Link from "next/link";
 import { ClipboardList, FileSpreadsheet, Gauge, PlaneTakeoff, Plus, Settings, Trash2 } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 
-const items = [
-  { href: "/airport-transfer", label: "ศูนย์ปฏิบัติการ", icon: Gauge },
-  { href: "/airport-transfer/cases", label: "ข้อมูลการเดินทาง", icon: ClipboardList },
-  { href: "/airport-transfer/cases/new", label: "สร้างการ์ดข้อมูล", icon: Plus },
-  { href: "/airport-transfer/imports", label: "นำเข้า Excel", icon: FileSpreadsheet },
-  { href: "/airport-transfer/trash", label: "ข้อมูลที่ลบแล้ว", icon: Trash2 },
-  { href: "/airport-transfer/settings", label: "ตั้งค่าระบบ", icon: Settings }
-];
-
-export function AirportTransferShell({ children, userName, roleLabel }: { children: React.ReactNode; userName: string; roleLabel: string }) {
+export function AirportTransferShell({ children, userName, roleLabel, projectCode }: { children: React.ReactNode; userName: string; roleLabel: string; projectCode: string }) {
+  const base = `/projects/${projectCode}/airport-transfer`;
+  const items = [
+    { href: base, label: "ศูนย์ปฏิบัติการ", icon: Gauge },
+    { href: `${base}/cases`, label: "ข้อมูลการเดินทาง", icon: ClipboardList },
+    { href: `${base}/cases/new`, label: "สร้างการ์ดข้อมูล", icon: Plus },
+    { href: `${base}/imports`, label: "นำเข้า Excel", icon: FileSpreadsheet },
+    { href: `${base}/trash`, label: "ข้อมูลที่ลบแล้ว", icon: Trash2 },
+    // Settings stays account-scoped, not project-scoped — see apps/web/app/airport-transfer/layout.tsx.
+    { href: "/airport-transfer/settings", label: "ตั้งค่าระบบ", icon: Settings }
+  ];
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
       <header className="border-b border-slate-200 bg-[#081f33] text-white">
         <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-          <Link href="/airport-transfer" className="flex items-center gap-3">
+          <Link href={base} className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-2xl bg-cyan-300 text-[#08243a]"><PlaneTakeoff className="h-6 w-6" /></span>
             <span>
               <span className="block text-[11px] font-bold uppercase tracking-[0.24em] text-cyan-200">TOMP</span>

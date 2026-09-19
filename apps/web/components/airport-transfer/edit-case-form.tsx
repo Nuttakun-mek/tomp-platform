@@ -37,7 +37,7 @@ function toBangkokDateTimeLocal(value: string | null) {
   return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
 }
 
-export function EditAirportTransferCaseForm({ item }: { item: AirportTransferCase }) {
+export function EditAirportTransferCaseForm({ item, projectCode }: { item: AirportTransferCase; projectCode: string }) {
   const [state, formAction, pending] = useActionState(updateAirportTransferCase, initialState);
   const formRef = useRef<HTMLFormElement>(null);
   const baselineRef = useRef("");
@@ -133,7 +133,7 @@ export function EditAirportTransferCaseForm({ item }: { item: AirportTransferCas
       </Section>
 
       {state.message ? <div role="status" className={`rounded-xl border px-4 py-3 text-sm ${state.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{state.message}</div> : null}
-      <div className="flex flex-col items-end gap-1"><div className="flex justify-end gap-2"><ButtonLink href={`/airport-transfer/cases/${item.id}`} variant="secondary">ยกเลิก</ButtonLink><Button type="submit" disabled={pending || !dirty}>{pending ? "กำลังบันทึก..." : dirty ? "บันทึกการแก้ไข" : "ยังไม่มีข้อมูลเปลี่ยนแปลง"}</Button></div>{!dirty ? <p className="text-xs text-slate-500">ปุ่มบันทึกจะเปิดเมื่อมีข้อมูลเปลี่ยนแปลง</p> : null}</div>
+      <div className="flex flex-col items-end gap-1"><div className="flex justify-end gap-2"><ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/${item.id}`} variant="secondary">ยกเลิก</ButtonLink><Button type="submit" disabled={pending || !dirty}>{pending ? "กำลังบันทึก..." : dirty ? "บันทึกการแก้ไข" : "ยังไม่มีข้อมูลเปลี่ยนแปลง"}</Button></div>{!dirty ? <p className="text-xs text-slate-500">ปุ่มบันทึกจะเปิดเมื่อมีข้อมูลเปลี่ยนแปลง</p> : null}</div>
     </form>
   );
 }
