@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
@@ -51,6 +52,12 @@ export async function toggleProjectSystemAction(input: unknown): Promise<ActionR
     const { error: deleteError } = await client.from("project_systems").delete().eq("project_id", projectId).eq("system_key", systemKey);
     if (deleteError) return actionFailure(getDatabaseErrorMessage(deleteError, "ปิดใช้ระบบไม่สำเร็จ"));
   }
+
+  // Without this, the outer project shell's tab bar (which decides whether a
+  // system's tab is a working link or a locked placeholder) keeps serving
+  // its stale cached render — the toggle succeeds in the database but looks
+  // like it did nothing until a hard reload.
+  revalidatePath("/projects/[projectCode]", "layout");
 
   return actionSuccess({ projectId, systemKey, enabled: Boolean(data.enabled) });
 }

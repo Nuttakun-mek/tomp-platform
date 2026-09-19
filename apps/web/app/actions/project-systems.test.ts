@@ -12,9 +12,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const PROJECT_ID = "10000000-0000-4000-8000-000000000003";
 
-const { upsertMock, deleteEqMock } = vi.hoisted(() => ({
+const { upsertMock, deleteEqMock, revalidatePathMock } = vi.hoisted(() => ({
   upsertMock: vi.fn(async () => ({ error: null })),
-  deleteEqMock: vi.fn(async () => ({ error: null }))
+  deleteEqMock: vi.fn(async () => ({ error: null })),
+  revalidatePathMock: vi.fn()
+}));
+
+// revalidatePath() throws outside a real Next.js request-scoped render (same
+// class of issue as next/headers' cookies() — see the getProjectByCode test
+// fix from the merge-verification pass). Mock it so this action can be
+// exercised as a plain unit test.
+vi.mock("next/cache", () => ({
+  revalidatePath: revalidatePathMock
 }));
 
 vi.mock("@/lib/auth/rbac", () => ({
@@ -56,6 +65,7 @@ describe("toggleProjectSystemAction ground_transfer guard", () => {
   beforeEach(() => {
     upsertMock.mockClear();
     deleteEqMock.mockClear();
+    revalidatePathMock.mockClear();
   });
 
   it("rejects disabling ground_transfer without touching the database", async () => {
@@ -95,5 +105,19 @@ describe("toggleProjectSystemAction ground_transfer guard", () => {
 
     expect(result.success).toBe(true);
     expect(upsertMock).toHaveBeenCalled();
+  });
+
+  it("revalidates the project shell layout on a successful toggle, so the tab bar isn't left showing stale locked/unlocked state", async () => {
+    const result = await toggleProjectSystemAction({ projectId: PROJECT_ID, systemKey: "airport_transfer", enabled: true });
+
+    expect(result.success).toBe(true);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/projects/[projectCode]", "layout");
+  });
+
+  it("does not revalidate when the ground_transfer guard rejects the request before any database call", async () => {
+    const result = await toggleProjectSystemAction({ projectId: PROJECT_ID, systemKey: "ground_transfer", enabled: false });
+
+    expect(result.success).toBe(false);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });
