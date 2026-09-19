@@ -39,11 +39,26 @@ on conflict (role_key) do nothing;
 
 -- Backfill: one project absorbs the 7 pre-existing live cases, tagged for
 -- Airport Transfer only (none of these ever touched TOMP's own side).
+--
+-- Guarded on there being anything to backfill at all: a database built
+-- 0001 -> latest from empty (CI's schema-verify job, a fresh dev/staging
+-- database) has zero airport_transfer_cases rows and, before any seed data
+-- runs, zero organizations — the unconditional version of this block raised
+-- "no organizations row exists" on exactly that path, since it assumed a
+-- pre-existing production database with real cases in it. Nothing to
+-- backfill means nothing to do; the legacy project and its org lookup only
+-- matter when there is at least one orphaned case to reassign.
 do $$
 declare
   v_org_id uuid;
   v_project_id uuid;
+  v_orphan_count integer;
 begin
+  select count(*) into v_orphan_count from public.airport_transfer_cases where project_id is null;
+  if v_orphan_count = 0 then
+    return;
+  end if;
+
   select id into v_org_id from public.organizations order by created_at asc limit 1;
 
   if v_org_id is null then
