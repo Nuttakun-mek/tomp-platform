@@ -1,14 +1,14 @@
 import { notFound, redirect } from "next/navigation";
-import { AirportTransferShell } from "@/components/airport-transfer/airport-transfer-shell";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
-import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getProjectByCode } from "@/lib/data/projects";
 
-export const metadata = {
-  title: "Airport Transfer Control — TOMP",
-  description: "ศูนย์บริหารงานรับเข้าและส่งออกผู้โดยสารสนามบิน"
-};
-
+// These pages live inside (app), which already supplies the full shell
+// (AppShell) via apps/web/app/(app)/layout.tsx — wrapping in
+// AirportTransferShell here as well produced a doubled header and a <main>
+// nested inside another <main>. This layout's only job is the access gate,
+// matching the precedent set by projects/[projectCode]/ground-transfer/layout.tsx.
+// A page that wants the viewer's role reads getAirportTransferAccess(project.id)
+// itself, the same way Ground Transfer's own pages do.
 export default async function ProjectAirportTransferLayout({
   children,
   params
@@ -20,13 +20,9 @@ export default async function ProjectAirportTransferLayout({
   const project = await getProjectByCode(projectCode);
   if (!project) notFound();
 
-  const [access, profile] = await Promise.all([getAirportTransferAccess(project.id), getCurrentUserProfile()]);
+  const access = await getAirportTransferAccess(project.id);
   if (!access.signedIn) redirect(`/login?next=/projects/${projectCode}/airport-transfer`);
   if (!access.allowed) redirect(`/no-access?module=airport-transfer&project=${projectCode}`);
 
-  return (
-    <AirportTransferShell projectCode={projectCode} userName={profile.fullName} roleLabel={access.role || "airport_transfer"}>
-      {children}
-    </AirportTransferShell>
-  );
+  return children;
 }

@@ -309,7 +309,11 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
   // without needing to know which one this case belongs to.
   revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
   const project = await getProjectById(input.projectId);
-  redirect(project ? `/projects/${project.projectCode}/airport-transfer/cases?created=${encodeURIComponent(caseCode)}` : `/airport-transfer/cases?created=${encodeURIComponent(caseCode)}`);
+  // The case was already created successfully at this point — a missing
+  // project lookup (should not happen; access was already checked against
+  // this same projectId above) must not redirect into the now-deleted bare
+  // /airport-transfer/cases route. /projects always exists.
+  redirect(project ? `/projects/${project.projectCode}/airport-transfer/cases?created=${encodeURIComponent(caseCode)}` : "/projects");
 }
 
 export async function updateAirportTransferCase(_previous: UpdateTransferCaseState, formData: FormData): Promise<UpdateTransferCaseState> {
@@ -461,8 +465,11 @@ export async function updateAirportTransferCase(_previous: UpdateTransferCaseSta
   revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
   const project = current.project_id ? await getProjectById(String(current.project_id)) : null;
   const flightRefresh = await refreshAirportTransferFlight(input.caseId, { ok: false, message: "" });
-  const basePath = project ? `/projects/${project.projectCode}/airport-transfer` : "/airport-transfer";
-  redirect(`${basePath}/cases/${input.caseId}?updated=1&flightUpdated=${flightRefresh.ok ? "1" : "0"}`);
+  // The update already succeeded — a case with no project_id (pre-984 data,
+  // or a credential-less dev/demo run) or an unresolvable project must not
+  // redirect into the now-deleted bare /airport-transfer/cases route.
+  // /projects always exists.
+  redirect(project ? `/projects/${project.projectCode}/airport-transfer/cases/${input.caseId}?updated=1&flightUpdated=${flightRefresh.ok ? "1" : "0"}` : "/projects");
 }
 
 export async function refreshAirportTransferFlight(caseId: string, _previous: RefreshFlightState): Promise<RefreshFlightState> {
@@ -638,7 +645,10 @@ export async function trashAirportTransferCase(caseId: string, _previous: CaseLi
   await supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "moved_to_trash", new_value: { deleted_at: deletedAt, delete_reason: reason || null }, reason: reason || null, actor_profile_id: profile.id });
   revalidatePath("/projects/[projectCode]/airport-transfer", "layout");
   const project = current.project_id ? await getProjectById(String(current.project_id)) : null;
-  redirect(project ? `/projects/${project.projectCode}/airport-transfer/cases?trashed=1` : "/airport-transfer/cases?trashed=1");
+  // The trash move already succeeded — same reasoning as the other redirects
+  // in this file: fall back to /projects (always exists) rather than the
+  // now-deleted bare /airport-transfer/cases route.
+  redirect(project ? `/projects/${project.projectCode}/airport-transfer/cases?trashed=1` : "/projects");
 }
 
 export async function restoreAirportTransferCase(caseId: string, _previous: CaseLifecycleState): Promise<CaseLifecycleState> {
