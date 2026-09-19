@@ -23,7 +23,12 @@ function today() {
 }
 
 
-export function CreateProjectForm() {
+interface CreateProjectFormProps {
+  /** Which system the creator arrived from — pre-checked, not exclusive. */
+  defaultSystemKey?: "ground_transfer" | "airport_transfer";
+}
+
+export function CreateProjectForm({ defaultSystemKey = "ground_transfer" }: CreateProjectFormProps) {
   const [projectCode, setProjectCode] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -42,6 +47,13 @@ export function CreateProjectForm() {
   function handleSubmit(formData: FormData) {
     setFieldErrors({});
 
+    const systemKeys = formData.getAll("systemKeys").map(String);
+    if (!systemKeys.length) {
+      setFieldErrors({ systemKeys: ["กรุณาเลือกอย่างน้อยหนึ่งระบบ"] });
+      toast.warning("กรุณาเลือกระบบที่จะใช้ในโครงการนี้");
+      return;
+    }
+
     const parsed = createProjectSchema.safeParse({
       projectCode: formData.get("projectCode"),
       projectName: formData.get("projectName"),
@@ -50,7 +62,8 @@ export function CreateProjectForm() {
       timezone: formData.get("timezone"),
       serviceLevel: formData.get("serviceLevel"),
       visibilityLevel: "internal",
-      metadata: { source: "pilot_ui" }
+      metadata: { source: "pilot_ui" },
+      systemKeys
     });
 
     if (!parsed.success) {
@@ -146,6 +159,32 @@ export function CreateProjectForm() {
           </select>
           <FieldError errors={fieldErrors.serviceLevel} />
         </label>
+        <fieldset className="field-label md:col-span-2">
+          <legend>ระบบที่จะใช้ในโครงการนี้</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <label className="inline-flex items-center gap-2 text-sm font-normal text-slate-700">
+              <input
+                type="checkbox"
+                name="systemKeys"
+                value="ground_transfer"
+                defaultChecked={defaultSystemKey === "ground_transfer"}
+                className="h-4 w-4 rounded border-slate-300 text-operation focus:ring-operation"
+              />
+              Ground Transfer
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm font-normal text-slate-700">
+              <input
+                type="checkbox"
+                name="systemKeys"
+                value="airport_transfer"
+                defaultChecked={defaultSystemKey === "airport_transfer"}
+                className="h-4 w-4 rounded border-slate-300 text-operation focus:ring-operation"
+              />
+              Airport Transfer
+            </label>
+          </div>
+          <FieldError errors={fieldErrors.systemKeys} />
+        </fieldset>
       </div>
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
         {isPending ? "กำลังบันทึก..." : "บันทึกโครงการ"}

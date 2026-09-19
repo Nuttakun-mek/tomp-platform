@@ -57,7 +57,8 @@ export async function createProjectAction(input: unknown): Promise<ActionResult>
     p_timezone: parsed.data.timezone,
     p_visibility: parsed.data.visibilityLevel,
     p_service_level: parsed.data.serviceLevel,
-    p_metadata: parsed.data.metadata
+    p_metadata: parsed.data.metadata,
+    p_system_keys: parsed.data.systemKeys?.length ? parsed.data.systemKeys : ["ground_transfer"]
   });
 
   if (rpcError) {

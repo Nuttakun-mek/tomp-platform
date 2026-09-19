@@ -15,7 +15,8 @@ export const createProjectSchema = z.object({
   timezone: z.string().trim().min(1).default("Asia/Bangkok"),
   visibilityLevel: z.string().trim().min(1).default("internal"),
   serviceLevel: z.string().trim().min(1).default("standard"),
-  metadata: metadataSchema
+  metadata: metadataSchema,
+  systemKeys: z.array(z.enum(["ground_transfer", "airport_transfer"])).optional()
 });
 
 export const updateProjectSchema = createProjectSchema.partial();
