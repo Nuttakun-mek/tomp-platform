@@ -16,7 +16,7 @@ npx playwright install chromium
 | `unauthenticated.spec.ts` | nothing (read-only vs prod) | ✅ `e2e-unauthenticated` job |
 | `operator-flow.spec.ts` | `E2E_OPERATOR_EMAIL` / `_PASSWORD`, staging | no — staging only |
 | `driver-flow.spec.ts` | `E2E_DRIVER_QR_URL` (+ `E2E_DRIVER_PIN`), staging | no — staging only |
-| `rbac-negative.spec.ts` | `E2E_DISPATCHER_EMAIL` / `_PASSWORD` / `E2E_FOREIGN_PROJECT_ID`, staging | no — staging only |
+| `rbac-negative.spec.ts` | `E2E_DISPATCHER_EMAIL` / `_PASSWORD` / `E2E_FOREIGN_PROJECT_ID` / `E2E_FOREIGN_PROJECT_CODE`, staging | no — staging only |
 
 `unauthenticated.spec.ts` also covers P0-2 directly: every `/api/driver/*`
 operational endpoint must return 401 with no session cookie and must ignore a
@@ -45,6 +45,7 @@ E2E_DRIVER_QR_URL="https://<staging>/driver?token=tomp_..." E2E_DRIVER_PIN=12345
 E2E_BASE_URL=https://<staging> \
 E2E_DISPATCHER_EMAIL=disp2@tomp.test E2E_DISPATCHER_PASSWORD=tomp-test-1234 \
 E2E_FOREIGN_PROJECT_ID=<uuid of a project disp2 is not on> \
+E2E_FOREIGN_PROJECT_CODE=<project_code of that same project — app URLs are keyed by code, not id> \
   npx playwright test --config e2e/playwright.config.ts rbac-negative
 ```
 

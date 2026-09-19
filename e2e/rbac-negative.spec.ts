@@ -9,11 +9,14 @@ import { expect, test } from "@playwright/test";
 
 const DISPATCHER_EMAIL = process.env.E2E_DISPATCHER_EMAIL;
 const DISPATCHER_PASSWORD = process.env.E2E_DISPATCHER_PASSWORD;
-const FOREIGN_PROJECT_ID = process.env.E2E_FOREIGN_PROJECT_ID; // a project the dispatcher is NOT a member of
+const FOREIGN_PROJECT_ID = process.env.E2E_FOREIGN_PROJECT_ID; // a project the dispatcher is NOT a member of — still a uuid, used by the API check below
+// App URLs are keyed by project_code, not id (/projects/<code>/ground-transfer/...,
+// since Task 7's route move) — a companion code for the same foreign project.
+const FOREIGN_PROJECT_CODE = process.env.E2E_FOREIGN_PROJECT_CODE;
 
 test.skip(
-  !DISPATCHER_EMAIL || !DISPATCHER_PASSWORD || !FOREIGN_PROJECT_ID,
-  "set E2E_DISPATCHER_EMAIL / E2E_DISPATCHER_PASSWORD / E2E_FOREIGN_PROJECT_ID"
+  !DISPATCHER_EMAIL || !DISPATCHER_PASSWORD || !FOREIGN_PROJECT_ID || !FOREIGN_PROJECT_CODE,
+  "set E2E_DISPATCHER_EMAIL / E2E_DISPATCHER_PASSWORD / E2E_FOREIGN_PROJECT_ID / E2E_FOREIGN_PROJECT_CODE"
 );
 
 async function login(page: import("@playwright/test").Page, email: string, password: string) {
@@ -26,7 +29,11 @@ async function login(page: import("@playwright/test").Page, email: string, passw
 
 test("dispatcher cannot publish (role lacks project.publish)", async ({ page }) => {
   await login(page, DISPATCHER_EMAIL!, DISPATCHER_PASSWORD!);
-  await page.goto(`/projects/${process.env.E2E_DISPATCHER_PROJECT_ID ?? FOREIGN_PROJECT_ID}`);
+  // E2E_DISPATCHER_PROJECT_CODE, when set, is the dispatcher's OWN project (they
+  // are a member but lack project.publish there); otherwise fall back to the
+  // foreign project, where the publish button simply won't render.
+  const projectCode = process.env.E2E_DISPATCHER_PROJECT_CODE ?? FOREIGN_PROJECT_CODE;
+  await page.goto(`/projects/${projectCode}/ground-transfer`);
   const publishButton = page.getByRole("button", { name: /ประกาศใช้แผน/ });
   if (await publishButton.count()) {
     await publishButton.first().click();
@@ -36,7 +43,7 @@ test("dispatcher cannot publish (role lacks project.publish)", async ({ page }) 
 
 test("dispatcher gets no data for a project they are not a member of", async ({ page }) => {
   await login(page, DISPATCHER_EMAIL!, DISPATCHER_PASSWORD!);
-  await page.goto(`/projects/${FOREIGN_PROJECT_ID}`);
+  await page.goto(`/projects/${FOREIGN_PROJECT_CODE}/ground-transfer`);
   await expect(page.getByText(/ไม่ได้เป็นสมาชิก|เข้าโครงการนี้ไม่ได้|ไม่มีสิทธิ์/)).toBeVisible({ timeout: 10_000 });
 });
 
