@@ -17,7 +17,7 @@ export default function PilotSmokeTestPage() {
         </div>
         <Link
           className="inline-flex min-h-11 items-center justify-center rounded-panel bg-operation px-5 text-sm font-semibold text-white transition hover:bg-operation-deep"
-          href="/superadmin/dev-tools/live-test"
+          href="/ground-transfer/superadmin/dev-tools/live-test"
         >
           ไปหน้า ทดสอบ QR + GPS
         </Link>

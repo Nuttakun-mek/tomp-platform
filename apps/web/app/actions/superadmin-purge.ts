@@ -17,6 +17,6 @@ export async function purgeTestDataAction(input: unknown): Promise<ActionResult>
   const result = await purgeSmokeTestRows();
   if (!result.ok) return actionFailure(result.error);
 
-  revalidatePath("/superadmin/dev-tools/purge-test-data");
+  revalidatePath("/ground-transfer/superadmin/dev-tools/purge-test-data");
   return actionSuccess({ deleted: result.deleted });
 }

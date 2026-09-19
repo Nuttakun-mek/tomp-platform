@@ -170,7 +170,7 @@ async function main() {
     console.log("\nReset completed. Schema, migration tracking, roles, permissions, and auth users were not truncated.");
     console.log(`Kept so you can still sign in : ${IDENTITY_TABLES.join(", ")}`);
     console.log("Apple's App Review demo job was business data and is now gone.");
-    console.log("Rebuild it at /superadmin/dev-tools/apple-review and send Apple the new link and PIN");
+    console.log("Rebuild it at /ground-transfer/superadmin/dev-tools/apple-review and send Apple the new link and PIN");
     console.log("BEFORE submitting any build for review — a reviewer who opens a dead link is a rejection.");
   } finally {
     await sql.end({ timeout: 5 });

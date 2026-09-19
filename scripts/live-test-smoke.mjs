@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Drives the /superadmin/dev-tools/live-test page end to end with a real browser:
+// Drives the /ground-transfer/superadmin/dev-tools/live-test page end to end with a real browser:
 //   check infrastructure -> create Project/Mission/Assignment -> render QR.
 // Prints the driver access URL and saves the QR PNG.
 //
@@ -46,7 +46,7 @@ if (!chromePath) {
 }
 
 console.log(`Browser : ${chromePath}`);
-const liveTestPath = "/superadmin/dev-tools/live-test";
+const liveTestPath = "/ground-transfer/superadmin/dev-tools/live-test";
 
 console.log(`Target  : ${baseUrl}${liveTestPath}\n`);
 

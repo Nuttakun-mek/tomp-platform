@@ -18,12 +18,12 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/admin", destination: "/superadmin", permanent: false },
-      { source: "/admin/pilot-smoke-test", destination: "/superadmin/dev-tools/smoke-test", permanent: false },
-      { source: "/admin/data-quality", destination: "/superadmin/dev-tools/data-quality", permanent: false },
-      { source: "/admin/enterprise-readiness", destination: "/superadmin/dev-tools/readiness", permanent: false },
-      { source: "/admin/operations", destination: "/superadmin/dev-tools/runbook", permanent: false },
-      { source: "/live-test", destination: "/superadmin/dev-tools/live-test", permanent: false },
-      { source: "/pilot-checklist", destination: "/superadmin/dev-tools/pilot-checklist", permanent: false }
+      { source: "/admin/pilot-smoke-test", destination: "/ground-transfer/superadmin/dev-tools/smoke-test", permanent: false },
+      { source: "/admin/data-quality", destination: "/ground-transfer/superadmin/dev-tools/data-quality", permanent: false },
+      { source: "/admin/enterprise-readiness", destination: "/ground-transfer/superadmin/dev-tools/readiness", permanent: false },
+      { source: "/admin/operations", destination: "/ground-transfer/superadmin/dev-tools/runbook", permanent: false },
+      { source: "/live-test", destination: "/ground-transfer/superadmin/dev-tools/live-test", permanent: false },
+      { source: "/pilot-checklist", destination: "/ground-transfer/superadmin/dev-tools/pilot-checklist", permanent: false }
     ];
   }
 };

@@ -18,14 +18,14 @@ export default function SuperadminPage() {
           <h2 className="card-title mt-3">ผู้ใช้และสิทธิ์</h2>
           <p className="section-description mt-1">เพิ่มผู้ใช้ และกำหนดบทบาทในแต่ละโครงการ</p>
         </Link>
-        <Link className="smart-card" href="/superadmin/roles">
+        <Link className="smart-card" href="/permission/roles">
           <span className="grid h-10 w-10 place-items-center rounded-panel bg-command text-white">
             <ShieldCheck className="h-5 w-5" />
           </span>
           <h2 className="card-title mt-3">บทบาทและสิทธิ์</h2>
           <p className="section-description mt-1">ดูว่าแต่ละบทบาททำอะไรได้บ้าง ก่อนมอบหมายให้ผู้ใช้</p>
         </Link>
-        <Link className="smart-card" href="/superadmin/dev-tools">
+        <Link className="smart-card" href="/ground-transfer/superadmin/dev-tools">
           <span className="grid h-10 w-10 place-items-center rounded-panel bg-command text-white">
             <Wrench className="h-5 w-5" />
           </span>

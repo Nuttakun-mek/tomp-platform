@@ -12,13 +12,13 @@ describe("filterNav", () => {
     });
     const hrefs = flat(dispatcher);
     expect(hrefs).toContain("/projects");
-    expect(hrefs).not.toContain("/superadmin");
+    expect(hrefs).not.toContain("/permission");
     expect(hrefs).not.toContain("/portal");
   });
 
   it("wildcard permission unlocks everything", () => {
     const superAdmin = filterNav(NAV_SECTIONS, { permissions: ["*"], roleKeys: ["super_admin"] });
-    expect(flat(superAdmin)).toContain("/superadmin");
+    expect(flat(superAdmin)).toContain("/permission");
     expect(flat(superAdmin)).toContain("/projects");
   });
 

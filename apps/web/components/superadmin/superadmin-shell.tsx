@@ -7,10 +7,10 @@ import { ShieldAlert } from "lucide-react";
 const TABS = [
   { href: "/superadmin", label: "ภาพรวม" },
   { href: "/superadmin/users", label: "ผู้ใช้และสิทธิ์" },
-  { href: "/superadmin/roles", label: "บทบาท" },
-  { href: "/superadmin/projects", label: "โครงการ" },
-  { href: "/superadmin/audit", label: "บันทึกกิจกรรม" },
-  { href: "/superadmin/dev-tools", label: "เครื่องมือพัฒนา" }
+  { href: "/permission/roles", label: "บทบาท" },
+  { href: "/permission/projects", label: "โครงการ" },
+  { href: "/permission/audit", label: "บันทึกกิจกรรม" },
+  { href: "/ground-transfer/superadmin/dev-tools", label: "เครื่องมือพัฒนา" }
 ];
 
 export function SuperadminShell({ children }: { children: React.ReactNode }) {

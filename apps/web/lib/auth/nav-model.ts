@@ -56,7 +56,7 @@ export const NAV_SECTIONS: NavSection[] = [
     titleKey: "nav.sections.system",
     items: [
       {
-        href: "/superadmin",
+        href: "/permission",
         labelKey: "nav.superadmin.label",
         descriptionKey: "nav.superadmin.description",
         icon: "ShieldAlert",
