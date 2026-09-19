@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 import { getProjectByCode } from "@/lib/data/projects";
 import { getEnabledSystemKeys, getViewerSystemKeys } from "@/lib/data/project-systems";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
+import { getViewerAccess } from "@/lib/auth/access";
 import { ProjectSystemTabs } from "@/components/projects/project-system-tabs";
+
+// Same set ProjectSystemTabs itself renders — kept in one place there
+// (`SYSTEM_LABEL`'s keys) and mirrored here rather than round-tripping to
+// the `systems` table just to learn a list this component already hardcodes.
+const ALL_SYSTEM_KEYS = ["ground_transfer", "airport_transfer"];
 
 // The outer system-switcher shell (docs/11-codex/984/985): renders Ground
 // Transfer / Airport Transfer / ตั้งค่า above whichever facet's own layout
@@ -22,10 +28,11 @@ export default async function ProjectShellLayout({
   const project = await getProjectByCode(projectCode);
   if (!project) notFound();
 
-  const profile = await getCurrentUserProfile();
+  const [profile, { roleKeys }] = await Promise.all([getCurrentUserProfile(), getViewerAccess()]);
+  const isSuperAdmin = roleKeys.includes("super_admin");
   const [enabledSystems, viewerSystems] = await Promise.all([
     getEnabledSystemKeys(project.id),
-    getViewerSystemKeys(profile.id)
+    isSuperAdmin ? Promise.resolve(ALL_SYSTEM_KEYS) : getViewerSystemKeys(profile.id)
   ]);
 
   return (
