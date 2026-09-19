@@ -35,7 +35,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-ink">โครงการของคุณ</h1>
-            <p className="mt-1 text-sm text-slate-600">แต่ละโครงการมีภารกิจ งาน คนขับ รถ QR และศูนย์ควบคุมแยกกัน · เลือกโครงการเพื่อเข้าไปทำงาน</p>
+            <p className="mt-1 text-sm text-slate-600">แต่ละโครงการมีการทำงานและสิทธิ์แยกกัน · เลือกโครงการเพื่อเข้าไปทำงาน</p>
           </div>
           {canCreate ? (
             <Link href="/projects/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-operation px-4 py-2.5 text-sm font-semibold text-white hover:bg-operation-deep">

@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 // Only ever bounce to a path on this site, so `?next=` cannot be used to send a
 // signed-in viewer somewhere else.
 function safeNext(value: string | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/projects";
-  return value === "/login" ? "/projects" : value;
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
+  return value === "/login" ? "/" : value;
 }
 
 interface LoginPageProps {

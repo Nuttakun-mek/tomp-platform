@@ -18,10 +18,10 @@ describe("resolvePrimaryRole", () => {
 
 describe("resolveRedirectPath", () => {
   it("maps roles to their landing route", () => {
-    expect(resolveRedirectPath("super_admin")).toBe("/projects");
-    expect(resolveRedirectPath("project_manager")).toBe("/projects");
-    expect(resolveRedirectPath("dispatcher")).toBe("/projects");
-    expect(resolveRedirectPath("coordinator")).toBe("/projects");
+    expect(resolveRedirectPath("super_admin")).toBe("/");
+    expect(resolveRedirectPath("project_manager")).toBe("/");
+    expect(resolveRedirectPath("dispatcher")).toBe("/");
+    expect(resolveRedirectPath("coordinator")).toBe("/");
     expect(resolveRedirectPath("customer_viewer")).toBe("/portal");
   });
   it("sends unknown/null/driver to /no-access", () => {

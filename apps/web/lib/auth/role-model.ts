@@ -5,10 +5,10 @@ export const PRIMARY_ROLE_ORDER = ["super_admin", "project_manager", "dispatcher
 export type PrimaryRole = (typeof PRIMARY_ROLE_ORDER)[number];
 
 const REDIRECT_BY_ROLE: Record<string, string> = {
-  super_admin: "/projects", // เลือกโครงการก่อน (project-centric)
-  project_manager: "/projects",
-  dispatcher: "/projects",
-  coordinator: "/projects",
+  super_admin: "/",
+  project_manager: "/",
+  dispatcher: "/",
+  coordinator: "/",
   customer_viewer: "/portal"
   // driver ไม่ redirect ผ่าน callback (ใช้ QR) — ตกไป /no-access ถ้า login ปกติ
 };
