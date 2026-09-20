@@ -10,6 +10,7 @@ import { metaString } from "@/lib/data/location-meta";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
+import { estimateVehicleUsageCost, formatVehicleUsageCost } from "@/lib/domain/vehicle-cost";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -309,25 +310,37 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         โทรหาคนขับ button below. */}
                     <div className="grid gap-1.5">
                       <p className="text-xs font-semibold text-slate-600">งานของคนขับคนนี้ ({group.jobs.length})</p>
-                      {group.jobs.map((job) => (
-                        <div key={job.assignment.id} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-bold text-ink">{job.label}</span>
-                            {nextAssignmentIds.has(job.assignment.id) ? (
-                              <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
-                            ) : null}
-                            {job.reported ? (
-                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">
-                                {formatStatusTh(job.reported.status)} / {formatRelativeTh(job.reported.at, effectiveNow)}
+                      {group.jobs.map((job) => {
+                        const cost = estimateVehicleUsageCost({
+                          assignmentStart: job.assignment.startTime,
+                          assignmentEnd: job.assignment.endTime,
+                          vehicleMetadata: job.vehicle?.metadata
+                        });
+                        return (
+                          <div key={job.assignment.id} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-bold text-ink">{job.label}</span>
+                              {nextAssignmentIds.has(job.assignment.id) ? (
+                                <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
+                              ) : null}
+                              {job.reported ? (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">
+                                  {formatStatusTh(job.reported.status)} / {formatRelativeTh(job.reported.at, effectiveNow)}
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">ยังไม่แจ้งสถานะ</span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-slate-600">{job.pickup} → {job.dropoff}</p>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">สถานะงาน: {formatStatusTh(job.assignment.status)}</span>
+                              <span className={`rounded-full px-2 py-0.5 font-semibold ${cost.estimatedCost != null ? "bg-teal-50 text-operation" : "bg-amber-50 text-amber-800"}`}>
+                                {formatVehicleUsageCost(cost)}
                               </span>
-                            ) : (
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">ยังไม่แจ้งสถานะ</span>
-                            )}
+                            </div>
                           </div>
-                          <p className="mt-1 text-slate-600">{job.pickup} → {job.dropoff}</p>
-                          <p className="mt-0.5 text-slate-400">สถานะงาน: {formatStatusTh(job.assignment.status)}</p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <div className="flex flex-wrap gap-2">

@@ -26,6 +26,7 @@ export interface DriverOutboundMessage {
   priority: string;
   status: string;
   at: string;
+  attachment?: DriverMessageAttachment | null;
 }
 
 export interface DriverComms {
@@ -51,6 +52,7 @@ function mapInbound(row: Row): DriverInboundMessage {
 }
 
 function mapOutbound(row: Row): DriverOutboundMessage {
+  const meta = rowObject(row);
   return {
     id: rowLoose(row, "id"),
     assignmentId: rowLoose(row, "assignment_id"),
@@ -59,7 +61,8 @@ function mapOutbound(row: Row): DriverOutboundMessage {
     body: rowLoose(row, "body"),
     priority: rowLoose(row, "priority", "normal"),
     status: rowLoose(row, "status", "unread"),
-    at: rowLoose(row, "sent_at", rowLoose(row, "created_at", new Date().toISOString()))
+    at: rowLoose(row, "sent_at", rowLoose(row, "created_at", new Date().toISOString())),
+    attachment: attachmentFromMetadata(meta)
   };
 }
 
@@ -76,7 +79,7 @@ export const getDriverCommsByProjectId = cache(async function getDriverCommsByPr
     if (!inbound.error && !outbound.error) {
       return {
         inbound: await signDriverMessageAttachments(((inbound.data as Row[] | null) ?? []).map(mapInbound)),
-        outbound: ((outbound.data as Row[] | null) ?? []).map(mapOutbound)
+        outbound: await signDriverMessageAttachments(((outbound.data as Row[] | null) ?? []).map(mapOutbound))
       };
     }
   }
@@ -90,7 +93,10 @@ async function getDriverCommsByProjectIdViaPostgres(projectId: string): Promise<
       sql<Row[]>`select * from driver_issue_reports where project_id = ${projectId} order by created_at desc limit 60`,
       sql<Row[]>`select * from driver_notifications where project_id = ${projectId} order by sent_at desc nulls last limit 60`
     ]);
-    return { inbound: await signDriverMessageAttachments(inbound.map(mapInbound)), outbound: outbound.map(mapOutbound) };
+    return {
+      inbound: await signDriverMessageAttachments(inbound.map(mapInbound)),
+      outbound: await signDriverMessageAttachments(outbound.map(mapOutbound))
+    };
   } catch {
     return { inbound: [], outbound: [] };
   }

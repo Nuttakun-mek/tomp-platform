@@ -14,6 +14,16 @@ export function originOf(rawUrl: string): string {
 export const TOMP_WEB_ORIGIN = originOf(TOMP_API_BASE_URL);
 export const TOMP_DRIVER_APP_VERSION = "0.2.0";
 
+function normalizePathPrefix(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "/ground-transfer/driver";
+  return `/${trimmed.replace(/^\/+|\/+$/g, "")}`;
+}
+
+export const DRIVER_WEB_PATH_PREFIX = normalizePathPrefix(
+  process.env.EXPO_PUBLIC_TOMP_DRIVER_WEB_PATH_PREFIX || "/ground-transfer/driver"
+);
+
 // Background GPS needs RECEIVE_BOOT_COMPLETED in the manifest: expo-task-manager
 // schedules a *persisted* JobScheduler job to deliver locations, and Android
 // throws IllegalArgumentException on the main thread without that permission —
@@ -28,6 +38,10 @@ export const EAS_PROJECT_ID = "ea9c91b8-049d-4287-bfcd-dad4ecc7981b";
 
 export type DriverWebViewKey = "home" | "next" | "messages" | "gps";
 
+export function isDriverWebPath(pathname: string) {
+  return pathname === DRIVER_WEB_PATH_PREFIX || pathname.startsWith(`${DRIVER_WEB_PATH_PREFIX}/`);
+}
+
 export function buildDriverWebUrl(token: string, locale: "th" | "en" = "th", view: DriverWebViewKey = "home") {
-  return `${TOMP_WEB_ORIGIN}/driver/${encodeURIComponent(token)}?lang=${locale}&view=${encodeURIComponent(view)}`;
+  return `${TOMP_WEB_ORIGIN}${DRIVER_WEB_PATH_PREFIX}/${encodeURIComponent(token)}?lang=${locale}&view=${encodeURIComponent(view)}`;
 }

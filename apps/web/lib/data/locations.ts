@@ -3,6 +3,7 @@ import type { DriverLocation } from "@tomp/types/domain";
 import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
+import { inferVehicleIcon } from "@/lib/domain/vehicle-icon";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
@@ -62,7 +63,7 @@ async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getS
     projectIds.length ? client.from("projects").select("id, project_code, project_name").in("id", projectIds) : Promise.resolve({ data: [] }),
     assignmentIds.length ? client.from("assignments").select("id, mission_id, call_sign_id, status").in("id", assignmentIds) : Promise.resolve({ data: [] }),
     driverIds.length ? client.from("drivers").select("id, full_name, phone").in("id", driverIds) : Promise.resolve({ data: [] }),
-    vehicleIds.length ? client.from("vehicles").select("id, plate_number, vehicle_type").in("id", vehicleIds) : Promise.resolve({ data: [] })
+    vehicleIds.length ? client.from("vehicles").select("id, plate_number, vehicle_type, capacity, metadata").in("id", vehicleIds) : Promise.resolve({ data: [] })
   ]), 3000, "location metadata");
 
   const callSignIds = Array.from(
@@ -104,6 +105,8 @@ async function enrichLocationMetadata(client: NonNullable<ReturnType<typeof getS
         driverPhone: driver ? text(driver, "phone") : undefined,
         vehiclePlate: vehicle ? text(vehicle, "plate_number") : undefined,
         vehicleType: vehicle ? text(vehicle, "vehicle_type") : undefined,
+        vehicleCapacity: vehicle ? numberValue(vehicle, "capacity") : undefined,
+        vehicleIcon: vehicle ? inferVehicleIcon({ icon: metadata(vehicle).icon, vehicleType: text(vehicle, "vehicle_type"), capacity: numberValue(vehicle, "capacity") }) : undefined,
         missionCode: mission ? text(mission, "mission_code") : undefined,
         missionName: mission ? text(mission, "mission_name") : undefined
       }
@@ -142,7 +145,7 @@ async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
     projectIds.length ? sql<LocationRow[]>`select id, project_code, project_name from projects where id in ${sql(projectIds)}` : Promise.resolve([]),
     assignmentIds.length ? sql<LocationRow[]>`select id, mission_id, call_sign_id, status from assignments where id in ${sql(assignmentIds)}` : Promise.resolve([]),
     driverIds.length ? sql<LocationRow[]>`select id, full_name, phone from drivers where id in ${sql(driverIds)}` : Promise.resolve([]),
-    vehicleIds.length ? sql<LocationRow[]>`select id, plate_number, vehicle_type from vehicles where id in ${sql(vehicleIds)}` : Promise.resolve([])
+    vehicleIds.length ? sql<LocationRow[]>`select id, plate_number, vehicle_type, capacity, metadata from vehicles where id in ${sql(vehicleIds)}` : Promise.resolve([])
   ]);
 
   const callSignIds = Array.from(new Set(assignments.map((assignment) => assignment.call_sign_id).filter((id): id is string => typeof id === "string")));
@@ -180,6 +183,8 @@ async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
         driverPhone: driver ? text(driver, "phone") : undefined,
         vehiclePlate: vehicle ? text(vehicle, "plate_number") : undefined,
         vehicleType: vehicle ? text(vehicle, "vehicle_type") : undefined,
+        vehicleCapacity: vehicle ? numberValue(vehicle, "capacity") : undefined,
+        vehicleIcon: vehicle ? inferVehicleIcon({ icon: metadata(vehicle).icon, vehicleType: text(vehicle, "vehicle_type"), capacity: numberValue(vehicle, "capacity") }) : undefined,
         missionCode: mission ? text(mission, "mission_code") : undefined,
         missionName: mission ? text(mission, "mission_name") : undefined
       }

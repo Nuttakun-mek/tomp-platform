@@ -34,6 +34,13 @@ function mapNotification(row: Row): DriverNotification {
     createdAt: text(row, "sent_at", text(row, "created_at", new Date().toISOString())),
     expiresAt: text(row, "expires_at") || null,
     metadata: metadata(row)
+  } as DriverNotification & { attachment?: DriverMessageAttachment | null };
+}
+
+function mapNotificationWithAttachment(row: Row): DriverNotification & { attachment?: DriverMessageAttachment | null } {
+  return {
+    ...mapNotification(row),
+    attachment: attachmentFromMetadata(metadata(row))
   };
 }
 
@@ -95,7 +102,7 @@ export async function getDriverNotificationsByAssignmentId(assignmentId: string)
     return getDriverNotificationsByAssignmentIdViaPostgres(assignmentId);
   }
   if (error || !data?.length) return getDriverNotificationsByAssignmentIdViaPostgres(assignmentId);
-  return data.map(mapNotification);
+  return signDriverMessageAttachments(data.map(mapNotificationWithAttachment));
 }
 
 // Notifications for many assignments in one query, grouped by assignment id.
@@ -124,7 +131,7 @@ export async function getDriverNotificationsByAssignmentIds(assignmentIds: reado
         "driver notifications (multi-assignment)"
       );
       if (!result.error && Array.isArray(result.data)) {
-        push((result.data as Row[]).map(mapNotification));
+        push(await signDriverMessageAttachments((result.data as Row[]).map(mapNotificationWithAttachment)));
         return grouped;
       }
     } catch {
@@ -262,7 +269,7 @@ async function getDriverNotificationsByAssignmentIdViaPostgres(assignmentId: str
   if (!sql) return [];
   try {
     const data = await sql<Row[]>`select * from driver_notifications where assignment_id = ${assignmentId} order by sent_at desc limit 10`;
-    return data.map(mapNotification);
+    return signDriverMessageAttachments(data.map(mapNotificationWithAttachment));
   } catch {
     return [];
   }

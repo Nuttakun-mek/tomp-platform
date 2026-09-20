@@ -303,6 +303,39 @@ button:disabled {
   background: #10b981;
 }
 
+.tomp-map-marker {
+  align-items: center;
+  background: #ffffff;
+  border: 3px solid var(--marker-color, var(--operation));
+  border-radius: 13px;
+  box-shadow: 0 12px 26px rgba(16, 32, 51, 0.2);
+  color: var(--ink);
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  position: relative;
+  width: 38px;
+}
+
+.tomp-map-marker::after {
+  background: var(--marker-color, var(--operation));
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  content: "";
+  height: 10px;
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  width: 10px;
+}
+
+.tomp-map-marker > span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
 @keyframes tomp-pulse {
   0%,
   100% {

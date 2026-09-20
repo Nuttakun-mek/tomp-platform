@@ -1,6 +1,7 @@
 import type { Assignment, CallSign, Driver, DriverAssignmentPacket, DriverNotification, Project, RouteChangeInstruction, Vehicle } from "@tomp/types/domain";
 import { hashDriverAccessToken } from "@/lib/driver-access/token";
 import { getDriverAssignmentPacketByAssignmentId, getDriverIssueMessagesByAssignmentId, getDriverNotificationsByAssignmentId, getRouteChangesByAssignmentId, type DriverIssueMessage } from "@/lib/data/driver-operations";
+import { attachmentFromMetadata, signDriverMessageAttachments, type DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import { resolveDriverCurrentAssignment } from "@/lib/data/driver-current-assignment";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { getPostgresClient } from "@/lib/db/postgres";
@@ -204,6 +205,42 @@ function buildDayAssignments(rows: Row[], currentAssignmentId: string, resolveCa
       urgent: job.urgent
     };
   });
+}
+
+function mapDriverIssueMessage(row: Row): DriverIssueMessage {
+  const meta = metadata(row);
+  return {
+    id: text(row, "id"),
+    text: text(row, "message"),
+    at: text(row, "created_at", new Date().toISOString()),
+    issueType: text(row, "issue_type", "message"),
+    severity: text(row, "severity", "info"),
+    clientEventId: typeof meta.clientEventId === "string" ? String(meta.clientEventId) : null,
+    deliveryStatus: "sent",
+    attachment: attachmentFromMetadata(meta)
+  };
+}
+
+function mapDriverNotification(row: Row): DriverNotification & { attachment?: DriverMessageAttachment | null } {
+  const meta = metadata(row);
+  return {
+    id: text(row, "id"),
+    projectId: text(row, "project_id"),
+    assignmentId: nullableText(row, "assignment_id"),
+    driverId: nullableText(row, "driver_id"),
+    notificationType: text(row, "notification_type"),
+    priority: text(row, "priority", "normal") as DriverNotification["priority"],
+    title: text(row, "title"),
+    body: text(row, "body"),
+    action: "acknowledge",
+    actionLabel: nullableText(row, "action_label"),
+    actionUrl: nullableText(row, "action_url"),
+    status: text(row, "status", "unread") as DriverNotification["status"],
+    createdAt: text(row, "sent_at", text(row, "created_at", new Date().toISOString())),
+    expiresAt: nullableText(row, "expires_at"),
+    metadata: meta,
+    attachment: attachmentFromMetadata(meta)
+  };
 }
 
 export async function getDriverAssignmentByToken(token: string): Promise<DriverAccessAssignment | null> {
@@ -617,32 +654,8 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     activated: checkinRows.length > 0,
     latestStatus: latestStatusRows[0] ? { status: text(latestStatusRows[0], "status"), at: text(latestStatusRows[0], "created_at") } : null,
     dayAssignments,
-    messages: messageRows.map((row) => ({
-      id: text(row, "id"),
-      text: text(row, "message"),
-      at: text(row, "created_at", new Date().toISOString()),
-      issueType: text(row, "issue_type", "message"),
-      severity: text(row, "severity", "info"),
-      clientEventId: typeof metadata(row).clientEventId === "string" ? String(metadata(row).clientEventId) : null,
-      deliveryStatus: "sent"
-    })),
-    notifications: notificationRows.map((row) => ({
-      id: text(row, "id"),
-      projectId: text(row, "project_id"),
-      assignmentId: nullableText(row, "assignment_id"),
-      driverId: nullableText(row, "driver_id"),
-      notificationType: text(row, "notification_type"),
-      priority: text(row, "priority", "normal") as DriverNotification["priority"],
-      title: text(row, "title"),
-      body: text(row, "body"),
-      action: "acknowledge",
-      actionLabel: nullableText(row, "action_label"),
-      actionUrl: nullableText(row, "action_url"),
-      status: text(row, "status", "unread") as DriverNotification["status"],
-      createdAt: text(row, "sent_at", text(row, "created_at", new Date().toISOString())),
-      expiresAt: nullableText(row, "expires_at"),
-      metadata: metadata(row)
-    })),
+    messages: await signDriverMessageAttachments(messageRows.map(mapDriverIssueMessage)),
+    notifications: await signDriverMessageAttachments(notificationRows.map(mapDriverNotification)),
     routeChanges: routeChangeRows.map((row) => ({
       id: text(row, "id"),
       assignmentId: text(row, "assignment_id"),
@@ -792,32 +805,8 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
     activated: checkinRows.length > 0,
     latestStatus: latestStatusRows[0] ? { status: text(latestStatusRows[0], "status"), at: text(latestStatusRows[0], "created_at") } : null,
     dayAssignments: buildDayAssignments(visibleDayRows, current.id, (id) => dayCallSignById.get(id)),
-    messages: messageRows.map((row) => ({
-      id: text(row, "id"),
-      text: text(row, "message"),
-      at: text(row, "created_at", new Date().toISOString()),
-      issueType: text(row, "issue_type", "message"),
-      severity: text(row, "severity", "info"),
-      clientEventId: typeof metadata(row).clientEventId === "string" ? String(metadata(row).clientEventId) : null,
-      deliveryStatus: "sent"
-    })),
-    notifications: notificationRows.map((row) => ({
-      id: text(row, "id"),
-      projectId: text(row, "project_id"),
-      assignmentId: nullableText(row, "assignment_id"),
-      driverId: nullableText(row, "driver_id"),
-      notificationType: text(row, "notification_type"),
-      priority: text(row, "priority", "normal") as DriverNotification["priority"],
-      title: text(row, "title"),
-      body: text(row, "body"),
-      action: "acknowledge",
-      actionLabel: nullableText(row, "action_label"),
-      actionUrl: nullableText(row, "action_url"),
-      status: text(row, "status", "unread") as DriverNotification["status"],
-      createdAt: text(row, "sent_at", text(row, "created_at", new Date().toISOString())),
-      expiresAt: nullableText(row, "expires_at"),
-      metadata: metadata(row)
-    })),
+    messages: await signDriverMessageAttachments(messageRows.map(mapDriverIssueMessage)),
+    notifications: await signDriverMessageAttachments(notificationRows.map(mapDriverNotification)),
     routeChanges: routeChangeRows.map((row) => ({
       id: text(row, "id"),
       assignmentId: text(row, "assignment_id"),

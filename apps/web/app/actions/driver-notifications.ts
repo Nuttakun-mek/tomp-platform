@@ -4,6 +4,8 @@ import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/a
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { sendDriverPush } from "@/lib/driver-access/push";
+import type { DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
+import { requirePermission } from "@/lib/auth/rbac";
 import { createTimelineEvent } from "@/lib/timeline";
 
 async function recordAcknowledgement(input: {
@@ -130,13 +132,32 @@ export async function sendDriverNotificationAction(input: {
   priority?: "low" | "normal" | "high" | "critical";
   actionLabel?: string | null;
   actionUrl?: string | null;
+  attachment?: DriverMessageAttachment | null;
 }): Promise<ActionResult> {
   if (!input.projectId || !input.assignmentId || !input.title.trim() || !input.body.trim()) {
     return actionFailure("กรุณากรอกหัวข้อและข้อความให้ครบก่อนส่ง");
   }
 
+  const permission = await requirePermission(input.projectId, "assignment.update");
+  if (!permission.allowed) return actionFailure(permission.reason || "คุณไม่มีสิทธิ์ส่งข้อความถึงคนขับในโครงการนี้");
+
   const { client, error } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const attachment = input.attachment
+    ? {
+        type: "photo",
+        storagePath: input.attachment.storagePath,
+        capturedAt: input.attachment.capturedAt ?? null,
+        latitude: input.attachment.latitude ?? null,
+        longitude: input.attachment.longitude ?? null,
+        accuracy: input.attachment.accuracy ?? null,
+        hasLocation: Boolean(input.attachment.hasLocation),
+        stampApplied: input.attachment.stampApplied !== false
+      }
+    : null;
+  const body = input.body.trim();
+  const pushBody = attachment ? `${body}\n(มีรูปแนบจากศูนย์ควบคุม)` : body;
 
   const { data, error: insertError } = await client
     .from("driver_notifications")
@@ -147,12 +168,12 @@ export async function sendDriverNotificationAction(input: {
       notification_type: "control_message",
       priority: input.priority || "normal",
       title: input.title.trim(),
-      body: input.body.trim(),
+      body,
       action_label: input.actionLabel || "รับทราบ",
       action_url: input.actionUrl || null,
       status: "unread",
       sent_at: new Date().toISOString(),
-      metadata: { source: "mission_control" }
+      metadata: { source: "mission_control", attachment }
     })
     .select()
     .single();
@@ -164,9 +185,9 @@ export async function sendDriverNotificationAction(input: {
   // banner, never the message.
   const push = await sendDriverPush(input.assignmentId, {
     title: input.title.trim(),
-    body: input.body.trim(),
+    body: pushBody,
     priority: input.priority,
-    data: { projectId: input.projectId, type: "control_message" }
+    data: { projectId: input.projectId, type: "control_message", hasAttachment: attachment ? "true" : "false" }
   }).catch(() => ({ sent: 0 }));
 
   const timelineResult = await createTimelineEvent({

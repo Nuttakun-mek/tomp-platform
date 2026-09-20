@@ -1,4 +1,4 @@
-import { buildDriverWebUrl, originOf, TOMP_WEB_ORIGIN } from "../config";
+import { buildDriverWebUrl, DRIVER_WEB_PATH_PREFIX, isDriverWebPath, originOf, TOMP_WEB_ORIGIN } from "../config";
 import { normalizeMobileLocale, type MobileLocale } from "../i18n";
 
 export interface DriverLinkParseResult {
@@ -12,6 +12,13 @@ function normalizeToken(value: string) {
   return value.trim().replace(/^\/+|\/+$/g, "");
 }
 
+function tokenFromCurrentDriverPath(pathname: string) {
+  if (!isDriverWebPath(pathname)) return "";
+  const prefixParts = DRIVER_WEB_PATH_PREFIX.split("/").filter(Boolean);
+  const parts = pathname.split("/").filter(Boolean);
+  return normalizeToken(parts[prefixParts.length] ?? "");
+}
+
 export function extractDriverToken(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -19,15 +26,18 @@ export function extractDriverToken(value: string): string {
 
   try {
     const url = new URL(trimmed);
+    if (url.protocol === "tompdriver:") {
+      const tokenParam = url.searchParams.get("token");
+      return tokenParam ? normalizeToken(tokenParam) : "";
+    }
+
+    if (originOf(trimmed) !== TOMP_WEB_ORIGIN || !isDriverWebPath(url.pathname)) return "";
+
     const tokenParam = url.searchParams.get("token");
     if (tokenParam) return normalizeToken(tokenParam);
-
-    const parts = url.pathname.split("/").filter(Boolean);
-    const driverIndex = parts.findIndex((part) => part === "driver");
-    if (driverIndex >= 0 && parts[driverIndex + 1]) return normalizeToken(parts[driverIndex + 1]);
-    return normalizeToken(parts[parts.length - 1] ?? "");
+    return tokenFromCurrentDriverPath(url.pathname);
   } catch {
-    return normalizeToken(trimmed);
+    return trimmed.includes("/") ? "" : normalizeToken(trimmed);
   }
 }
 
@@ -56,7 +66,7 @@ export function parseDriverLink(value: string, fallbackLocale: MobileLocale = "t
 export function isTompDriverWebUrl(value: string) {
   try {
     const url = new URL(value);
-    return originOf(value) === TOMP_WEB_ORIGIN && (url.pathname === "/driver" || url.pathname.startsWith("/driver/"));
+    return originOf(value) === TOMP_WEB_ORIGIN && isDriverWebPath(url.pathname);
   } catch {
     return false;
   }

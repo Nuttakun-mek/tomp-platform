@@ -26,7 +26,9 @@ const QUICK_MESSAGES = [
   "ถึงจุดส่งแล้ว"
 ];
 
-export function buildBubbles(messages: DriverIssueMessage[], notifications: DriverNotification[]): ChatBubble[] {
+type DriverNotificationWithAttachment = DriverNotification & { attachment?: DriverMessageAttachment | null };
+
+export function buildBubbles(messages: DriverIssueMessage[], notifications: DriverNotificationWithAttachment[]): ChatBubble[] {
   const fromDriver: ChatBubble[] = messages.map((m) => ({
     id: `m-${m.id}`,
     from: "driver",
@@ -41,7 +43,8 @@ export function buildBubbles(messages: DriverIssueMessage[], notifications: Driv
     from: "centre",
     text: n.body || n.title,
     at: n.createdAt,
-    tone: n.priority === "critical" ? "critical" : "info"
+    tone: n.priority === "critical" ? "critical" : "info",
+    attachment: n.attachment ?? null
   }));
   return [...fromDriver, ...fromCentre].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 }
@@ -284,7 +287,7 @@ export function DriverChatThread({
                 {b.attachment?.signedUrl ? (
                   <a href={b.attachment.signedUrl} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-xl border border-white/40 bg-black/5">
                     {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL preview */}
-                    <img src={b.attachment.signedUrl} alt="รูปจากคนขับ" className="max-h-56 w-full object-cover" />
+                    <img src={b.attachment.signedUrl} alt={b.from === "driver" ? "รูปจากคนขับ" : "รูปจากศูนย์ควบคุม"} className="max-h-56 w-full object-cover" />
                   </a>
                 ) : null}
                 {b.attachment ? (
@@ -300,7 +303,7 @@ export function DriverChatThread({
             </div>
           ))
         ) : (
-          <p className="px-2 py-5 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ สามารถส่งข้อความถึงศูนย์ควบคุมได้จากช่องด้านบน</p>
+          <p className="px-2 py-5 text-center text-[12px] text-ink-faint">ยังไม่มีข้อความ สามารถส่งข้อความถึงศูนย์ควบคุมได้จากช่องพิมพ์ด้านล่าง</p>
         )}
         <div ref={endRef} />
       </div>

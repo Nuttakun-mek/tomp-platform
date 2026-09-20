@@ -78,15 +78,22 @@ const DriverWebView = WebView as unknown as ComponentType<WebViewProps & RefAttr
 type ShellMode = "activation" | "web";
 type DriverMenuKey = "home" | "next" | "messages" | "location";
 
-const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; view?: DriverWebViewKey }> = [
-  { key: "home", label: "ปฏิบัติงาน", view: "home" },
-  { key: "next", label: "ลำดับงาน", view: "next" },
-  { key: "messages", label: "ข้อความ", view: "messages" },
-  { key: "location", label: "ตำแหน่ง", view: "gps" }
+const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; shortLabel: string; view?: DriverWebViewKey }> = [
+  { key: "home", label: "หน้างาน", shortLabel: "งาน", view: "home" },
+  { key: "next", label: "แผนงาน", shortLabel: "แผนงาน", view: "next" },
+  { key: "messages", label: "ข้อความ", shortLabel: "ข้อความ", view: "messages" },
+  { key: "location", label: "ตำแหน่ง", shortLabel: "ตำแหน่ง", view: "gps" }
 ];
 
 const bridgeBootstrap = `
   (function () {
+    var viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) {
+      viewport = document.createElement('meta');
+      viewport.setAttribute('name', 'viewport');
+      document.head.appendChild(viewport);
+    }
+    viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
     window.TOMP_MOBILE_SHELL = {
       namespace: "${BRIDGE_NAMESPACE}",
       version: ${BRIDGE_VERSION},
@@ -104,6 +111,7 @@ const bridgeBootstrap = `
 
 function DriverShell() {
   const insets = useSafeAreaInsets();
+  const bottomSafeInset = Math.max(insets.bottom, Platform.OS === "android" ? 24 : 0);
   const [fontsLoaded] = useFonts({
     NotoSansThai_400Regular,
     NotoSansThai_600SemiBold,
@@ -142,10 +150,10 @@ function DriverShell() {
     // "ยังไม่ได้ส่ง GPS" read as a fault to drivers, when it is simply the
     // normal state before a shift starts. Say what is true and what is next.
     networkConnected === false
-      ? "ออฟไลน์ · ข้อมูลจะส่งเมื่อสัญญาณกลับมา"
+      ? "ออฟไลน์"
       : locationSharingActive
-        ? "กำลังส่งตำแหน่งให้ศูนย์ควบคุม"
-        : "พร้อมใช้งาน · ยังไม่เริ่มส่งตำแหน่ง";
+        ? "กำลังส่ง GPS"
+        : "ยังไม่ได้ส่ง GPS";
   const currentScreenLabel = mode === "web"
     ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
     : `เวอร์ชัน ${TOMP_DRIVER_APP_VERSION}`;
@@ -586,40 +594,49 @@ function DriverShell() {
       <View style={styles.shell}>
         {/* The bar owns the status-bar area itself, so its colour runs to the
             top of the screen instead of leaving a pale strip above it. */}
-        <View style={[styles.topbar, { paddingTop: insets.top + space.md }]}>
+        <View style={[styles.topbar, { paddingTop: insets.top + space.xs }]}>
           <View style={styles.identity}>
-            <Text style={styles.product}>TOMP Driver</Text>
-            <Text style={styles.title}>{currentScreenLabel}</Text>
+            <Text numberOfLines={1} style={styles.product}>TOMP Driver</Text>
+            <Text numberOfLines={1} style={styles.title}>{currentScreenLabel}</Text>
           </View>
           <View style={styles.statusGroup}>
             <View style={styles.localeSwitch}>
               {(["th", "en"] as const).map((item) => (
-                <Pressable key={item} onPress={() => changeLocale(item)} style={[styles.localeButton, locale === item && styles.localeButtonActive]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: locale === item }}
+                  key={item}
+                  onPress={() => changeLocale(item)}
+                  style={({ pressed }) => [styles.localeButton, locale === item && styles.localeButtonActive, pressed && styles.pressablePressed]}
+                >
                   <Text style={[styles.localeButtonText, locale === item && styles.localeButtonTextActive]}>{item.toUpperCase()}</Text>
                 </Pressable>
               ))}
             </View>
-            <Text
-              style={[
-                styles.network,
-                networkTone === "live" ? styles.networkLive : networkTone === "offline" ? styles.networkOffline : styles.networkIdle
-              ]}
-            >
-              {networkDisplayLabel || networkLabel}
-            </Text>
           </View>
         </View>
 
         {mode === "web" && effectiveWebUrl ? (
           <View style={styles.webContainer}>
             <View style={styles.operationStrip}>
+              <View
+                style={[
+                  styles.networkBadge,
+                  networkTone === "live" ? styles.networkLive : networkTone === "offline" ? styles.networkOffline : styles.networkIdle
+                ]}
+              >
+                <View style={[styles.networkDot, networkTone === "live" ? styles.networkDotLive : networkTone === "offline" ? styles.networkDotOffline : styles.networkDotIdle]} />
+                <Text numberOfLines={1} style={[styles.networkText, networkTone === "live" ? styles.networkTextLive : networkTone === "offline" ? styles.networkTextOffline : styles.networkTextIdle]}>
+                  {networkDisplayLabel || networkLabel}
+                </Text>
+              </View>
               <View style={styles.operationStatusItem}>
                 <View style={[styles.statusDot, sessionReady ? styles.statusDotOk : styles.statusDotPending]} />
                 <View style={styles.operationStatusCopy}>
                   <Text style={styles.operationStatusTitle}>{sessionReady ? "พร้อมส่งข้อมูลให้ศูนย์ควบคุม" : "รอการยืนยันงาน"}</Text>
                 </View>
               </View>
-              <Text style={styles.webVersionText}>เวอร์ชัน {TOMP_DRIVER_APP_VERSION}</Text>
+              <Text numberOfLines={1} style={styles.webVersionText}>เวอร์ชัน {TOMP_DRIVER_APP_VERSION}</Text>
             </View>
             {outboxCount > 0 || syncLabel ? (
               <View style={styles.syncNotice}>
@@ -641,14 +658,16 @@ function DriverShell() {
                 <View style={styles.locationActionGroup}>
                   <Pressable
                     accessibilityLabel="เปิดหน้าตั้งค่าอุปกรณ์"
-                    style={styles.locationSettingsButton}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.locationSettingsButton, pressed && styles.pressablePressed]}
                     onPress={() => Linking.openSettings()}
                   >
                     <Text style={styles.locationSettingsButtonText}>ตั้งค่าอุปกรณ์</Text>
                   </Pressable>
                   <Pressable
                     accessibilityLabel="ออกจากงานนี้และกลับไปสแกน QR ใหม่"
-                    style={styles.locationResetButton}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.locationResetButton, pressed && styles.pressablePressed]}
                     onPress={confirmResetAssignment}
                   >
                     <Text style={styles.locationResetButtonText}>ออกจากงานนี้</Text>
@@ -668,6 +687,10 @@ function DriverShell() {
                 thirdPartyCookiesEnabled
                 javaScriptEnabled
                 domStorageEnabled
+                scalesPageToFit={false}
+                setBuiltInZoomControls={false}
+                setDisplayZoomControls={false}
+                textZoom={100}
                 // Android WebView ships with Geolocation OFF, so navigator.geolocation
                 // was silently dead inside the shell while the app's own GPS kept
                 // reporting normally over the bridge. The driver page uses it directly
@@ -684,19 +707,23 @@ function DriverShell() {
                 )}
               />
             </View>
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + space.md }]}>
+            <View style={[styles.bottomBar, { paddingBottom: bottomSafeInset + space.sm }]}>
               {DRIVER_MENU_ITEMS.map((item) => (
                 <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: activeDriverMenu === item.key }}
                   key={item.key}
-                  style={[
+                  style={({ pressed }) => [
                     styles.menuButton,
                     item.key === "messages" && hasUnreadMessages && activeDriverMenu !== item.key && styles.menuButtonUnread,
-                    activeDriverMenu === item.key && styles.menuButtonActive
+                    activeDriverMenu === item.key && styles.menuButtonActive,
+                    pressed && styles.pressablePressed
                   ]}
                   onPress={() => openDriverMenu(item)}
                 >
                   {item.key === "messages" && hasUnreadMessages ? <View style={styles.menuBadge} /> : null}
-                  <Text style={[styles.menuButtonText, activeDriverMenu === item.key && styles.menuButtonTextActive]}>{item.label}</Text>
+                  <View style={[styles.menuIndicator, activeDriverMenu === item.key && styles.menuIndicatorActive]} />
+                  <Text numberOfLines={1} style={[styles.menuButtonText, activeDriverMenu === item.key && styles.menuButtonTextActive]}>{item.shortLabel}</Text>
                 </Pressable>
               ))}
             </View>
@@ -704,14 +731,17 @@ function DriverShell() {
         ) : (
           <ScrollView
             style={styles.activationScroller}
-            contentContainerStyle={[styles.activation, { paddingBottom: insets.bottom + space.xxl }]}
+            contentContainerStyle={[styles.activation, { paddingBottom: bottomSafeInset + space.xxl }]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.heroCard}>
-              <Text style={styles.kicker}>พื้นที่ปฏิบัติงานคนขับ</Text>
-              <Text style={styles.heroTitle}>สแกน QR เพื่อรับงาน</Text>
+              <View style={styles.heroMetaRow}>
+                <Text style={styles.kicker}>พื้นที่ปฏิบัติงานคนขับ</Text>
+                <Text style={styles.heroVersion}>v{TOMP_DRIVER_APP_VERSION}</Text>
+              </View>
+              <Text style={styles.heroTitle}>รับงานจากศูนย์ควบคุม</Text>
               <Text style={styles.heroCopy}>
-                ใช้ QR ที่ได้รับจากศูนย์ควบคุมเพื่อเปิดรายละเอียดงาน ยืนยันความพร้อม และส่งตำแหน่ง GPS ระหว่างปฏิบัติงาน
+                สแกน QR งานที่ได้รับ ตรวจสอบรายละเอียด ยืนยันความพร้อม และเปิดส่งตำแหน่ง GPS ระหว่างปฏิบัติงาน
               </Text>
             </View>
 
@@ -729,10 +759,24 @@ function DriverShell() {
             ) : null}
 
             <View style={styles.formCard}>
-              <Pressable style={styles.primaryButton} onPress={openScanner}>
+              <View style={styles.readyCard}>
+                <View style={styles.readyDot} />
+                <View style={styles.readyCopy}>
+                  <Text style={styles.readyTitle}>พร้อมรับงาน</Text>
+                  <Text numberOfLines={2} style={styles.readyText}>{message}</Text>
+                </View>
+              </View>
+              <Text style={styles.formTitle}>เริ่มต้นงาน</Text>
+              <Text style={styles.formDescription}>ใช้ QR ที่ออกจากศูนย์ควบคุมเท่านั้น หาก QR ไม่พร้อมจึงกรอกลิงก์ด้วยตนเอง</Text>
+              <Pressable accessibilityRole="button" style={({ pressed }) => [styles.primaryButton, pressed && styles.pressablePressed]} onPress={openScanner}>
                 <Text style={styles.primaryButtonText}>{scannerOpen ? mt(locale, "closeCamera") : mt(locale, "scanQr")}</Text>
               </Pressable>
-              <Pressable style={styles.manualToggle} onPress={() => setManualEntryOpen((value) => !value)}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: manualEntryOpen }}
+                style={({ pressed }) => [styles.manualToggle, pressed && styles.pressablePressed]}
+                onPress={() => setManualEntryOpen((value) => !value)}
+              >
                 <Text style={styles.manualToggleText}>{manualEntryOpen ? mt(locale, "hideManualEntry") : mt(locale, "manualEntry")}</Text>
               </Pressable>
               {manualEntryOpen ? (
@@ -742,12 +786,12 @@ function DriverShell() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     onChangeText={setTokenInput}
-                    placeholder="เช่น https://.../driver/..."
+                    placeholder="เช่น https://.../ground-transfer/driver/..."
                     placeholderTextColor={colors.placeholder}
                     style={styles.input}
                     value={tokenInput}
                   />
-                  <Pressable style={styles.secondaryButton} onPress={() => openDriverLink(tokenInput)}>
+                  <Pressable accessibilityRole="button" style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressablePressed]} onPress={() => openDriverLink(tokenInput)}>
                     <Text style={styles.secondaryButtonText}>{mt(locale, "openJob")}</Text>
                   </Pressable>
                 </View>
@@ -755,22 +799,21 @@ function DriverShell() {
             </View>
 
             <View style={styles.noteCard}>
-              <Text style={styles.noteTitle}>แนวทางการใช้งาน</Text>
+              <Text style={styles.noteTitle}>ขั้นตอนที่ควรปฏิบัติ</Text>
               <View style={styles.instructionList}>
                 <View style={styles.instructionRow}>
                   <Text style={styles.instructionNumber}>1</Text>
-                  <Text style={styles.instructionText}>สแกน QR ที่ได้รับจากศูนย์ควบคุมเพื่อเปิดงานของคุณ</Text>
+                  <Text style={styles.instructionText}>สแกน QR ที่ได้รับจากศูนย์ควบคุมเพื่อเปิดข้อมูลงาน</Text>
                 </View>
                 <View style={styles.instructionRow}>
                   <Text style={styles.instructionNumber}>2</Text>
-                  <Text style={styles.instructionText}>ตรวจสอบรายละเอียดงาน คนขับ รถ จุดรับ จุดส่ง และเวลาปฏิบัติงานให้ถูกต้อง</Text>
+                  <Text style={styles.instructionText}>ตรวจสอบคนขับ รถ จุดรับ จุดส่ง และเวลาปฏิบัติงานให้ถูกต้อง</Text>
                 </View>
                 <View style={styles.instructionRow}>
                   <Text style={styles.instructionNumber}>3</Text>
-                  <Text style={styles.instructionText}>กดยืนยันตามขั้นตอนในหน้าคนขับ และอนุญาต GPS เมื่อระบบร้องขอ</Text>
+                  <Text style={styles.instructionText}>ยืนยันความพร้อมและเปิดสิทธิ์ GPS เมื่อระบบร้องขอ</Text>
                 </View>
               </View>
-              <Text style={styles.versionText}>เวอร์ชันระบบ {TOMP_DRIVER_APP_VERSION}</Text>
               {outboxCount > 0 ? <Text style={styles.noteText}>รายการที่รอส่งซ้ำ: {outboxCount}</Text> : null}
               {syncLabel ? <Text style={styles.noteText}>{syncLabel}</Text> : null}
             </View>
@@ -807,12 +850,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center"
   },
+  pressablePressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.99 }]
+  },
   topbar: {
     alignItems: "center",
     backgroundColor: colors.command,
+    borderBottomColor: colors.commandMid,
+    borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingBottom: space.md,
+    minHeight: 68,
+    paddingBottom: space.xs,
     paddingHorizontal: space.lg
   },
   identity: {
@@ -823,7 +873,7 @@ const styles = StyleSheet.create({
   product: {
     color: colors.accent,
     fontFamily: font.bold,
-    ...text.display
+    ...text.strong
   },
   title: {
     color: colors.onCommand,
@@ -833,7 +883,7 @@ const styles = StyleSheet.create({
   statusGroup: {
     alignItems: "flex-end",
     flexShrink: 0,
-    gap: space.xs
+    maxWidth: 96
   },
   localeSwitch: {
     backgroundColor: overlay.faint,
@@ -849,8 +899,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radius.pill,
     justifyContent: "center",
-    minHeight: 36,
-    paddingHorizontal: space.md
+    minHeight: 30,
+    paddingHorizontal: space.sm
   },
   localeButtonActive: {
     backgroundColor: colors.accent
@@ -872,25 +922,53 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     ...text.caption
   },
-  network: {
+  networkBadge: {
+    alignItems: "center",
+    alignSelf: "center",
     borderRadius: radius.pill,
-    color: colors.onCommandMuted,
-    fontFamily: font.semibold,
+    flexDirection: "row",
+    gap: space.xs,
+    flexShrink: 1,
+    maxWidth: 148,
     overflow: "hidden",
     paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
-    ...text.micro
+    paddingVertical: space.xs
   },
   networkLive: {
-    backgroundColor: overlay.successFill,
-    color: colors.successOnDark
+    backgroundColor: overlay.successFill
   },
   networkIdle: {
-    backgroundColor: overlay.warningFill,
-    color: colors.warningOnDark
+    backgroundColor: overlay.warningFill
   },
   networkOffline: {
-    backgroundColor: overlay.dangerFill,
+    backgroundColor: overlay.dangerFill
+  },
+  networkDot: {
+    borderRadius: radius.pill,
+    height: 7,
+    width: 7
+  },
+  networkDotLive: {
+    backgroundColor: colors.successOnDark
+  },
+  networkDotIdle: {
+    backgroundColor: colors.warningOnDark
+  },
+  networkDotOffline: {
+    backgroundColor: colors.dangerOnDark
+  },
+  networkText: {
+    flexShrink: 1,
+    fontFamily: font.semibold,
+    ...text.micro
+  },
+  networkTextLive: {
+    color: colors.successOnDark
+  },
+  networkTextIdle: {
+    color: colors.warningOnDark
+  },
+  networkTextOffline: {
     color: colors.dangerOnDark
   },
   outboxText: {
@@ -911,11 +989,11 @@ const styles = StyleSheet.create({
   activation: {
     gap: space.md,
     paddingHorizontal: space.lg,
-    paddingTop: space.lg
+    paddingTop: space.md
   },
   heroCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.operationSoft,
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 3,
@@ -925,10 +1003,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 18
   },
+  heroMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: space.sm,
+    justifyContent: "space-between"
+  },
   kicker: {
     color: colors.operationDeep,
     fontFamily: font.bold,
     ...text.caption
+  },
+  heroVersion: {
+    backgroundColor: colors.operationSoft,
+    borderRadius: radius.pill,
+    color: colors.operationDeep,
+    fontFamily: font.semibold,
+    overflow: "hidden",
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    ...text.micro
   },
   heroTitle: {
     color: colors.ink,
@@ -955,6 +1049,46 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 14
   },
+  readyCard: {
+    alignItems: "center",
+    backgroundColor: colors.operationSoft,
+    borderColor: colors.operationSoft,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: space.sm,
+    padding: space.md
+  },
+  readyDot: {
+    backgroundColor: colors.operation,
+    borderRadius: radius.pill,
+    height: 10,
+    width: 10
+  },
+  readyCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  readyTitle: {
+    color: colors.operationDeep,
+    fontFamily: font.bold,
+    ...text.caption
+  },
+  readyText: {
+    color: colors.muted,
+    fontFamily: font.regular,
+    ...text.micro
+  },
+  formTitle: {
+    color: colors.ink,
+    fontFamily: font.bold,
+    ...text.title
+  },
+  formDescription: {
+    color: colors.muted,
+    fontFamily: font.regular,
+    ...text.caption
+  },
   primaryButton: {
     alignItems: "center",
     backgroundColor: colors.operation,
@@ -975,8 +1109,11 @@ const styles = StyleSheet.create({
   },
   manualToggle: {
     alignItems: "center",
+    backgroundColor: colors.operationSoft,
+    borderRadius: radius.lg,
     justifyContent: "center",
-    minHeight: TOUCH_MIN
+    minHeight: TOUCH_MIN,
+    paddingHorizontal: space.md
   },
   manualToggleText: {
     color: colors.operationDeep,
@@ -1051,7 +1188,7 @@ const styles = StyleSheet.create({
     ...text.body
   },
   noteCard: {
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.surfaceRaised,
     borderColor: colors.operationSoft,
     borderRadius: radius.xl,
     borderWidth: 1,
@@ -1111,25 +1248,26 @@ const styles = StyleSheet.create({
     ...text.caption
   },
   webContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.canvas,
     flex: 1
   },
   operationStrip: {
     alignItems: "center",
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.surface,
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
     flexDirection: "row",
-    gap: space.sm,
+    gap: space.xs,
     justifyContent: "space-between",
     paddingHorizontal: space.md,
-    paddingVertical: space.sm
+    paddingVertical: space.xs
   },
   operationStatusItem: {
     alignItems: "center",
-    flex: 1,
     flexDirection: "row",
-    gap: space.sm
+    flexShrink: 1,
+    gap: space.xs,
+    minWidth: 0
   },
   statusDot: {
     borderRadius: radius.pill,
@@ -1148,7 +1286,7 @@ const styles = StyleSheet.create({
   operationStatusTitle: {
     color: colors.ink,
     fontFamily: font.bold,
-    ...text.caption
+    ...text.micro
   },
   operationStatusText: {
     color: colors.muted,
@@ -1181,7 +1319,7 @@ const styles = StyleSheet.create({
     ...text.micro
   },
   locationAssist: {
-    backgroundColor: colors.operationSoft,
+    backgroundColor: colors.surfaceRaised,
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
     gap: space.sm,
@@ -1240,6 +1378,7 @@ const styles = StyleSheet.create({
     ...text.micro
   },
   webFrame: {
+    backgroundColor: colors.surface,
     flex: 1
   },
   loading: {
@@ -1259,14 +1398,16 @@ const styles = StyleSheet.create({
     ...text.body
   },
   bottomBar: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.line,
-    borderTopWidth: 1,
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.line,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderWidth: 1,
     elevation: 14,
     flexDirection: "row",
     gap: space.xs,
     paddingHorizontal: space.sm,
-    paddingTop: space.md,
+    paddingTop: space.sm,
     shadowColor: colors.ink,
     shadowOffset: { height: -4, width: 0 },
     shadowOpacity: 0.08,
@@ -1274,20 +1415,32 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     alignItems: "center",
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     flex: 1,
+    gap: 2,
     justifyContent: "center",
     minHeight: TOUCH_MIN,
-    paddingHorizontal: 2,
+    paddingHorizontal: space.xs,
+    paddingVertical: 2,
     position: "relative"
   },
   menuButtonActive: {
-    backgroundColor: colors.operation
+    backgroundColor: colors.operationSoft
   },
   menuButtonUnread: {
     backgroundColor: colors.dangerSoft,
     borderColor: colors.dangerLine,
     borderWidth: 1
+  },
+  menuIndicator: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    height: 3,
+    width: 16
+  },
+  menuIndicatorActive: {
+    backgroundColor: colors.operation,
+    width: 24
   },
   menuButtonText: {
     color: colors.muted,
@@ -1296,7 +1449,8 @@ const styles = StyleSheet.create({
     ...text.micro
   },
   menuButtonTextActive: {
-    color: colors.surface
+    color: colors.operationDeep,
+    fontFamily: font.bold
   },
   menuBadge: {
     backgroundColor: colors.danger,

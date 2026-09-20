@@ -1,4 +1,4 @@
-import { originOf, TOMP_WEB_ORIGIN } from "../config";
+import { isDriverWebPath, originOf, TOMP_WEB_ORIGIN } from "../config";
 
 const EXTERNAL_ALLOWED_HOSTS = new Set(["www.google.com", "google.com", "maps.google.com"]);
 
@@ -16,7 +16,7 @@ export function decideWebViewNavigation(rawUrl: string): NavigationDecision {
   }
 
   if (originOf(rawUrl) === TOMP_WEB_ORIGIN) {
-    if (url.pathname === "/driver" || url.pathname.startsWith("/driver/") || url.pathname.startsWith("/auth/")) {
+    if (isDriverWebPath(url.pathname) || url.pathname.startsWith("/auth/")) {
       return { action: "allow" };
     }
     return { action: "external", url: rawUrl };

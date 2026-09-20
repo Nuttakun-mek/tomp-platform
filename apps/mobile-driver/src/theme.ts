@@ -9,6 +9,7 @@ export const colors = {
   surface: "#ffffff",
   /** Cards and inputs that need to sit just off white. */
   surfaceSoft: "#f8fbfd",
+  surfaceRaised: "#fbfdff",
   line: "#d7e3ed",
   lineSoft: "#cbd7e3",
   placeholder: "#7d8b99",
@@ -24,6 +25,7 @@ export const colors = {
   dangerSoft: "#fff1f2",
   dangerLine: "#fecdd3",
   command: "#0b2538",
+  commandMid: "#123852",
   /** The dark scanner backdrop, deeper than `command` so the frame reads. */
   commandDeep: "#061421",
   /** Brand mint — the wordmark and the active locale chip on the dark bar. */

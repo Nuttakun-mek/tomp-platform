@@ -3,8 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CarFront, Library } from "lucide-react";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
-import { CreateDriverForm } from "@/components/resources/create-driver-form";
-import { CreateVehicleForm } from "@/components/resources/create-vehicle-form";
+import { CreateResourcePairForm } from "@/components/resources/create-resource-pair-form";
 import { ProjectResourceManager } from "@/components/resources/project-resource-manager";
 import { getProjectByCode } from "@/lib/data/projects";
 import { getLibraryDrivers, getLibraryVehicles, getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
@@ -53,12 +52,13 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
 
       <ProjectResourceManager projectId={projectId} drivers={drivers} vehicles={vehicles} libraryDrivers={libraryDrivers} libraryVehicles={libraryVehicles} />
 
-      <CollapsibleSection title="เพิ่มคนขับใหม่เข้าโครงการนี้" storageKey={`res.${projectId}.newdriver`} defaultOpen={drivers.length === 0}>
-        <CreateDriverForm projectId={projectId} />
-      </CollapsibleSection>
-
-      <CollapsibleSection title="เพิ่มรถใหม่เข้าโครงการนี้" storageKey={`res.${projectId}.newvehicle`} defaultOpen={vehicles.length === 0}>
-        <CreateVehicleForm projectId={projectId} />
+      <CollapsibleSection
+        title="เพิ่มคนขับและรถเข้าโครงการนี้"
+        description="สร้างข้อมูลเป็นคู่เดียวกันก่อนนำไปจัดเป็น Call Sign และออก QR ในหน้าจัดงาน"
+        storageKey={`res.${projectId}.newpair`}
+        defaultOpen={drivers.length === 0 || vehicles.length === 0}
+      >
+        <CreateResourcePairForm projectId={projectId} />
       </CollapsibleSection>
 
       <Link className="smart-card group flex items-center justify-between gap-3 p-4" href={`/resources/vehicles?projectId=${encodeURIComponent(projectId)}`}>

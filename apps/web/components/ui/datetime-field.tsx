@@ -146,37 +146,37 @@ function CalendarGrid({
   };
 
   return (
-    <div className="grid gap-2">
-      <div className="flex items-center justify-between">
+    <div className="grid gap-3">
+      <div className="flex items-center justify-between rounded-xl bg-canvas px-1.5 py-1">
         <button
           type="button"
           onClick={() => shift(-1)}
-          className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+          className="grid h-8 w-8 place-items-center rounded-lg text-ink-faint transition hover:bg-white hover:text-operation hover:shadow-sm focus-ring"
           aria-label="เดือนก่อนหน้า"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="text-[13px] font-bold text-ink">
+        <span className="px-2 text-center text-[13px] font-semibold leading-5 text-ink">
           {TH_MONTHS[view.month]} {view.year + 543}
         </span>
         <button
           type="button"
           onClick={() => shift(1)}
-          className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+          className="grid h-8 w-8 place-items-center rounded-lg text-ink-faint transition hover:bg-white hover:text-operation hover:shadow-sm focus-ring"
           aria-label="เดือนถัดไป"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5">
+      <div className="grid grid-cols-7 gap-1">
         {TH_WEEKDAYS.map((day) => (
-          <span key={day} className="grid h-6 place-items-center text-[10px] font-bold text-slate-400">
+          <span key={day} className="grid h-7 place-items-center text-[10px] font-semibold text-ink-faint">
             {day}
           </span>
         ))}
         {cells.map((date, index) => {
-          if (!date) return <span key={`pad-${index}`} />;
+          if (!date) return <span key={`pad-${index}`} className="h-9" />;
           const day = Number(date.slice(8, 10));
           const isSelected = date === selected;
           const isToday = date === today;
@@ -187,14 +187,14 @@ function CalendarGrid({
               type="button"
               disabled={isBlocked}
               onClick={() => onPick(date)}
-              className={`grid h-8 place-items-center rounded-lg text-[12px] font-semibold transition ${
+              className={`grid h-9 min-w-0 place-items-center rounded-xl text-[12px] font-semibold transition focus-ring ${
                 isSelected
-                  ? "bg-operation text-white shadow-sm"
+                  ? "bg-operation text-white shadow-[0_10px_22px_rgba(8,123,115,0.24)]"
                   : isBlocked
-                    ? "cursor-not-allowed text-slate-300 line-through"
+                    ? "cursor-not-allowed bg-slate-50 text-slate-300 line-through"
                     : isToday
-                      ? "bg-teal-50 text-operation ring-1 ring-inset ring-teal-200 hover:bg-teal-100"
-                      : "text-ink-soft hover:bg-slate-100"
+                      ? "bg-operation-soft text-operation ring-1 ring-inset ring-operation/20 hover:bg-operation-soft/80"
+                      : "text-ink-soft hover:bg-canvas hover:text-ink"
               }`}
             >
               {day}
@@ -203,7 +203,7 @@ function CalendarGrid({
         })}
       </div>
 
-      <div className="flex flex-wrap gap-1 border-t border-slate-100 pt-2">
+      <div className="flex flex-wrap gap-1.5 border-t border-border/70 pt-3">
         {[
           { label: "วันนี้", offset: 0 },
           { label: "พรุ่งนี้", offset: 1 },
@@ -218,7 +218,7 @@ function CalendarGrid({
               key={label}
               type="button"
               onClick={() => onPick(value)}
-              className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-ink-soft transition hover:bg-slate-200"
+              className="rounded-full border border-border/70 bg-white px-3 py-1.5 text-[11px] font-semibold text-ink-soft shadow-sm transition hover:border-operation/30 hover:bg-operation-soft hover:text-operation focus-ring"
             >
               {label}
             </button>
@@ -233,25 +233,27 @@ function TimeGrid({ value, onPick }: { value: string; onPick: (time: string) => 
   const [hour, minute] = value ? value.split(":") : ["", ""];
 
   return (
-    <div className="grid gap-2">
-      <div className="flex flex-wrap gap-1">
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-1.5">
         {TIME_PRESETS.map((preset) => (
           <button
             key={preset}
             type="button"
             onClick={() => onPick(preset)}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-              value === preset ? "bg-operation text-white" : "bg-slate-100 text-ink-soft hover:bg-slate-200"
+            className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition focus-ring ${
+              value === preset
+                ? "border-operation bg-operation text-white shadow-[0_10px_22px_rgba(8,123,115,0.22)]"
+                : "border-border/70 bg-white text-ink-soft shadow-sm hover:border-operation/30 hover:bg-operation-soft hover:text-operation"
             }`}
           >
             {preset}
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2 border-t border-slate-100 pt-2">
-        <span className="text-[11px] font-semibold text-slate-500">กำหนดเอง</span>
+      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-canvas/70 px-2.5 py-2">
+        <span className="text-[11px] font-semibold text-ink-faint">กำหนดเอง</span>
         <select
-          className="rounded-lg border border-slate-300 px-2 py-1 text-[12px] font-semibold text-ink"
+          className="rounded-lg border border-border bg-white px-2 py-1 text-[12px] font-semibold text-ink outline-none focus-visible:border-operation focus-visible:ring-2 focus-visible:ring-operation/20"
           value={hour}
           onChange={(event) => onPick(`${event.target.value}:${minute || "00"}`)}
         >
@@ -262,9 +264,9 @@ function TimeGrid({ value, onPick }: { value: string; onPick: (time: string) => 
             </option>
           ))}
         </select>
-        <span className="font-bold text-slate-400">:</span>
+        <span className="font-bold text-ink-faint">:</span>
         <select
-          className="rounded-lg border border-slate-300 px-2 py-1 text-[12px] font-semibold text-ink"
+          className="rounded-lg border border-border bg-white px-2 py-1 text-[12px] font-semibold text-ink outline-none focus-visible:border-operation focus-visible:ring-2 focus-visible:ring-operation/20"
           value={minute}
           onChange={(event) => onPick(`${hour || "00"}:${event.target.value}`)}
         >
@@ -321,10 +323,10 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
 
   return (
     <div className="grid gap-1.5" ref={ref}>
-      <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-        <Icon className="h-3.5 w-3.5 text-slate-400" />
+      <label htmlFor={id} className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-ink-soft">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-operation" />
         {label}
-        {required ? <span className="text-rose-500">*</span> : <span className="font-normal text-slate-400">(ไม่บังคับ)</span>}
+        {required ? <span className="text-danger">*</span> : <span className="font-normal text-ink-faint">(ไม่บังคับ)</span>}
       </label>
 
       {/* The real field, kept for anything that reads the form by name. */}
@@ -336,22 +338,22 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
           type="button"
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
-          className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition ${
+          className={`flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-left text-[14px] shadow-sm transition focus-ring ${
             open
-              ? "border-operation bg-white ring-4 ring-teal-50"
+              ? "border-operation bg-white ring-4 ring-operation/10"
               : value
-                ? "border-slate-300 bg-white text-ink hover:border-slate-400"
-                : "border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-slate-400"
+                ? "border-border bg-white text-ink hover:border-operation/45"
+                : "border-dashed border-border bg-canvas/70 text-ink-faint hover:border-operation/45 hover:bg-white"
           }`}
         >
           <span className={`truncate font-semibold ${value ? "text-ink" : "text-slate-400"}`}>
             {echo || (timeOnly ? "เลือกเวลา" : "เลือกวันที่")}
           </span>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+          <ChevronDown className={`h-4 w-4 shrink-0 text-ink-faint transition ${open ? "rotate-180 text-operation" : ""}`} />
         </button>
 
         {open ? (
-          <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[268px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+          <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[min(20rem,calc(100vw-2rem))] rounded-[18px] border border-border/90 bg-white/95 p-3.5 shadow-[0_24px_70px_rgba(16,32,51,0.16)] backdrop-blur">
             {timeOnly ? (
               <TimeGrid value={value} onPick={pickTime} />
             ) : (
@@ -368,7 +370,7 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-operation py-2 text-[12px] font-semibold text-white"
+                className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-operation text-[13px] font-semibold text-white shadow-[0_12px_28px_rgba(8,123,115,0.22)] transition hover:bg-operation-deep focus-ring"
               >
                 <Check className="h-3.5 w-3.5" /> เสร็จสิ้น
               </button>
@@ -378,7 +380,7 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
       </div>
 
       {/* The echo is the point: it is what the operator checks, not the control. */}
-      <p className={`min-h-4 text-[11px] leading-4 ${echo ? "font-semibold text-operation" : "text-slate-400"}`}>
+      <p className={`min-h-4 text-[11px] leading-4 ${echo ? "font-semibold text-operation" : "text-ink-faint"}`}>
         {echo || hint || "ยังไม่ได้เลือก"}
       </p>
     </div>
@@ -425,8 +427,8 @@ export function DateRangeFields({
   const backwards = isBackwards(start, end);
 
   return (
-    <fieldset className="grid gap-2 rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white p-3">
-      {legend ? <legend className="px-1 text-xs font-bold text-slate-600">{legend}</legend> : null}
+    <fieldset className="grid gap-3 rounded-2xl border border-border/80 bg-gradient-to-b from-white to-canvas/45 p-3 shadow-sm">
+      {legend ? <legend className="px-1 text-xs font-semibold text-ink-soft">{legend}</legend> : null}
       {/* The summary keeps its own column, reserved whether or not there is
           anything to say. Letting it wrap underneath meant the whole form
           jumped a line the moment a second date was chosen. */}
@@ -460,11 +462,11 @@ export function DateRangeFields({
               วันสิ้นสุดอยู่ก่อนวันเริ่ม กรุณาตรวจสอบ
             </p>
           ) : duration ? (
-            <p className="w-fit rounded-full bg-teal-50 px-3 py-1 text-[12px] font-semibold text-operation ring-1 ring-inset ring-teal-100">
+            <p className="w-fit rounded-full bg-operation-soft px-3 py-1 text-[12px] font-semibold text-operation ring-1 ring-inset ring-operation/15">
               รวม {duration}
             </p>
           ) : (
-            <p className="text-[11px] leading-4 text-slate-400">เลือกครบทั้งสองช่องเพื่อดูจำนวนวัน</p>
+            <p className="text-[11px] leading-4 text-ink-faint">เลือกครบทั้งสองช่องเพื่อดูจำนวนวัน</p>
           )}
         </div>
       </div>

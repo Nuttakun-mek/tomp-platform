@@ -32,6 +32,7 @@ describe("the shell spends the theme instead of inventing values", () => {
     expect(shell).not.toContain("ANDROID_NAVIGATION_BAR_GUARD");
     expect(shell).toContain("useSafeAreaInsets");
     expect(shell).toContain("SafeAreaProvider");
+    expect(shell).toContain("bottomSafeInset");
   });
 
   it("tells the web page the real platform and background capability", () => {
@@ -49,6 +50,14 @@ describe("the shell keeps the web page in touch with the phone", () => {
     // bridge. The driver page calls it directly to stamp a photo, so every
     // picture waited out an 8s timeout and then printed no coordinates at all.
     expect(shell).toContain("geolocationEnabled");
+  });
+
+  it("locks the WebView to the device frame instead of allowing full-page pinch zoom", () => {
+    expect(shell).toContain("user-scalable=no");
+    expect(shell).toContain("scalesPageToFit={false}");
+    expect(shell).toContain("setBuiltInZoomControls={false}");
+    expect(shell).toContain("setDisplayZoomControls={false}");
+    expect(shell).toContain("textZoom={100}");
   });
 
   it("repeats the GPS status after a load instead of answering once", () => {

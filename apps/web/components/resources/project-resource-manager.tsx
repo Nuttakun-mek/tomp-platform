@@ -11,6 +11,7 @@ import {
   importVehiclesFromLibraryAction
 } from "@/app/actions/resources";
 import { ActionFeedback } from "@/components/ui/action-feedback";
+import { inferVehicleIcon, vehicleIconLabel } from "@/lib/domain/vehicle-icon";
 
 // A project staffs itself: it holds its own copies of the people and vehicles it
 // uses, taken from the central library or typed fresh. Copies rather than shared
@@ -39,7 +40,15 @@ const asDriverRow = (driver: Driver): Row => ({
 const asVehicleRow = (vehicle: Vehicle): Row => ({
   id: vehicle.id,
   primary: vehicle.plateNumber,
-  secondary: [vehicle.vehicleType, vehicle.capacity ? `${vehicle.capacity} ที่นั่ง` : ""].filter(Boolean).join(" · "),
+  secondary: [
+    vehicleIconLabel(inferVehicleIcon({ icon: vehicle.metadata.icon, vehicleType: vehicle.vehicleType, capacity: vehicle.capacity })),
+    vehicle.vehicleType,
+    vehicle.capacity ? `${vehicle.capacity} ที่นั่ง` : "",
+    typeof vehicle.metadata.defaultDutyStart === "string" && typeof vehicle.metadata.defaultDutyEnd === "string"
+      ? `${vehicle.metadata.defaultDutyStart}-${vehicle.metadata.defaultDutyEnd}`
+      : "",
+    typeof vehicle.metadata.hourlyRate === "number" ? `${vehicle.metadata.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : ""
+  ].filter(Boolean).join(" · "),
   missing: !vehicle.plateNumber ? "ยังไม่มีทะเบียน" : !vehicle.capacity ? "ยังไม่ระบุจำนวนที่นั่ง" : ""
 });
 

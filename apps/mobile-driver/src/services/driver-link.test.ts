@@ -6,8 +6,12 @@ describe("driver link parser", () => {
     expect(extractDriverToken(" tomp_live_123 ")).toBe("tomp_live_123");
   });
 
-  it("extracts a token from the web driver URL", () => {
-    expect(extractDriverToken("https://tomp-platform.vercel.app/driver/tomp_live_abc")).toBe("tomp_live_abc");
+  it("extracts a token from the current web driver URL", () => {
+    expect(extractDriverToken("https://tomp-platform.vercel.app/ground-transfer/driver/tomp_live_abc")).toBe("tomp_live_abc");
+  });
+
+  it("rejects legacy web driver URLs after the route migration", () => {
+    expect(extractDriverToken("https://tomp-platform.vercel.app/driver/tomp_live_abc")).toBe("");
   });
 
   it("extracts a token from deep link query params", () => {
@@ -15,18 +19,26 @@ describe("driver link parser", () => {
   });
 
   it("builds a canonical home URL for the WebView", () => {
-    expect(parseDriverLink("tomp_live_123")?.webUrl).toBe("https://tomp-platform.vercel.app/driver/tomp_live_123?lang=th&view=home");
+    expect(parseDriverLink("tomp_live_123")?.webUrl).toBe(
+      "https://tomp-platform.vercel.app/ground-transfer/driver/tomp_live_123?lang=th&view=home"
+    );
   });
 
   it("preserves a supported language hint without changing the token", () => {
-    const result = parseDriverLink("https://tomp-platform.vercel.app/driver/tomp_live_abc?lang=en");
+    const result = parseDriverLink("https://tomp-platform.vercel.app/ground-transfer/driver/tomp_live_abc?lang=en");
     expect(result?.token).toBe("tomp_live_abc");
     expect(result?.locale).toBe("en");
-    expect(result?.webUrl).toBe("https://tomp-platform.vercel.app/driver/tomp_live_abc?lang=en&view=home");
+    expect(result?.webUrl).toBe("https://tomp-platform.vercel.app/ground-transfer/driver/tomp_live_abc?lang=en&view=home");
+  });
+
+  it("does not canonicalize a legacy web driver URL", () => {
+    const result = parseDriverLink("https://tomp-platform.vercel.app/driver/tomp_live_abc?lang=th");
+    expect(result).toBeNull();
   });
 
   it("recognizes allowed TOMP driver web paths", () => {
-    expect(isTompDriverWebUrl("https://tomp-platform.vercel.app/driver/tomp_live_123")).toBe(true);
+    expect(isTompDriverWebUrl("https://tomp-platform.vercel.app/ground-transfer/driver/tomp_live_123")).toBe(true);
+    expect(isTompDriverWebUrl("https://tomp-platform.vercel.app/driver/tomp_live_123")).toBe(false);
     expect(isTompDriverWebUrl("https://example.com/driver/tomp_live_123")).toBe(false);
   });
 });

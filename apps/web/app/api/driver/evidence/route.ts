@@ -4,6 +4,12 @@ import { uploadPlatePhoto, uploadVehiclePhoto } from "@/lib/storage/checkin-phot
 
 export const maxDuration = 30;
 
+function numberFromForm(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 // Token-authed evidence upload for the QR driver page. Project/assignment come
 // from the token, never the client. Photos are compressed client-side first.
 export async function POST(request: Request) {
@@ -31,5 +37,13 @@ export async function POST(request: Request) {
   if (!upload.success) {
     return NextResponse.json({ success: false, error: upload.error || "อัปโหลดรูปไม่สำเร็จ" }, { status: 500 });
   }
-  return NextResponse.json({ success: true, kind, path: upload.path });
+  return NextResponse.json({
+    success: true,
+    kind,
+    path: upload.path,
+    capturedAt: typeof form.get("capturedAt") === "string" ? form.get("capturedAt") : null,
+    latitude: numberFromForm(form.get("latitude")),
+    longitude: numberFromForm(form.get("longitude")),
+    accuracy: numberFromForm(form.get("accuracy"))
+  });
 }

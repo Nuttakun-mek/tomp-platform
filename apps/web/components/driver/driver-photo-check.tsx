@@ -8,6 +8,7 @@ type Kind = "vehicle" | "plate";
 const LABELS: Record<Kind, string> = { vehicle: "ถ่ายรูปรถ", plate: "ถ่ายรูปป้ายทะเบียน" };
 
 const MAX_INPUT_BYTES = 10 * 1024 * 1024;
+type CaptureLocation = { latitude: number; longitude: number; accuracy: number | null; recordedAt: string };
 
 function toBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality));
@@ -37,6 +38,65 @@ async function compressImage(file: File): Promise<Blob> {
   return blob ?? file;
 }
 
+function getCaptureLocation(): Promise<CaptureLocation | null> {
+  return new Promise((resolve) => {
+    if (!("geolocation" in navigator)) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy ?? null,
+          recordedAt: new Date(position.timestamp).toISOString()
+        }),
+      () => resolve(null),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 8000 }
+    );
+  });
+}
+
+async function stampEvidencePhoto(file: File, capturedAt: string, location: CaptureLocation | null): Promise<Blob> {
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return compressImage(file);
+
+  const maxEdge = 1600;
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close?.();
+    return compressImage(file);
+  }
+
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+
+  const stampHeight = Math.max(92, Math.round(canvas.height * 0.12));
+  const top = canvas.height - stampHeight;
+  const gradient = ctx.createLinearGradient(0, top, 0, canvas.height);
+  gradient.addColorStop(0, "rgba(7, 24, 39, 0.1)");
+  gradient.addColorStop(1, "rgba(7, 24, 39, 0.82)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, top, canvas.width, stampHeight);
+
+  const pad = Math.max(18, Math.round(canvas.width * 0.025));
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 ${Math.max(22, Math.round(canvas.width * 0.026))}px sans-serif`;
+  ctx.fillText(`TOMP · ${new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(capturedAt))}`, pad, top + pad + 18);
+  ctx.font = `600 ${Math.max(18, Math.round(canvas.width * 0.02))}px sans-serif`;
+  const coordinate = location
+    ? `GPS ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}${location.accuracy ? ` · ±${Math.round(location.accuracy)} ม.` : ""}`
+    : "GPS ไม่มีพิกัด ณ เวลาถ่ายภาพ";
+  ctx.fillText(coordinate, pad, top + pad + 52);
+
+  return (await toBlob(canvas, 0.76)) ?? compressImage(file);
+}
+
 export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: string; plate?: string }) => void }) {
   const [paths, setPaths] = useState<{ vehicle?: string; plate?: string }>({});
   const [previews, setPreviews] = useState<{ vehicle?: string; plate?: string }>({});
@@ -53,10 +113,18 @@ export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: s
     setBusy(kind);
     setPreviews((p) => ({ ...p, [kind]: URL.createObjectURL(file) }));
     try {
-      const blob = await compressImage(file);
+      const capturedAt = new Date().toISOString();
+      const location = await getCaptureLocation();
+      const blob = await stampEvidencePhoto(file, capturedAt, location);
       const form = new FormData();
       form.set("kind", kind);
       form.set("file", new File([blob], `${kind}.jpg`, { type: "image/jpeg" }));
+      form.set("capturedAt", capturedAt);
+      if (location) {
+        form.set("latitude", String(location.latitude));
+        form.set("longitude", String(location.longitude));
+        if (location.accuracy !== null) form.set("accuracy", String(location.accuracy));
+      }
       const res = await fetch("/api/driver/evidence", { method: "POST", body: form });
       const json = (await res.json()) as { success?: boolean; path?: string; error?: string };
       if (res.ok && json.success && json.path) {

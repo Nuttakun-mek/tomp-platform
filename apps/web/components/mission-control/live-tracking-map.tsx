@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import type { DriverLocation } from "@tomp/types/domain";
 import { spreadOverlappingMapPoints } from "@/lib/map/marker-overlap";
+import { inferVehicleIcon, vehicleIconShortLabel, type VehicleIconKey } from "@/lib/domain/vehicle-icon";
 
 export type MarkerFreshness = "live" | "idle" | "slow" | "offline" | "stopped";
 
@@ -17,6 +18,8 @@ export interface TrackedPoint {
   subtitle: string;
   ageLabel: string;
   accuracy: number | null;
+  vehicleIcon?: VehicleIconKey;
+  vehicleType?: string | null;
 }
 
 export const TRACKING_MARKER_COLORS: Record<MarkerFreshness, string> = {
@@ -103,12 +106,14 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
           (point.accuracy ? `<br/>ความแม่นยำ ${Math.round(point.accuracy)} ม.` : "") +
           (spread.isOffset ? `<br/>พิกัดจริงซ้อนกับ ${spread.overlapCount} คัน จึงแยกหมุดบนแผนที่เพื่อให้อ่านง่าย` : "");
 
-        L.circleMarker([spread.displayLatitude, spread.displayLongitude], {
-          radius: 9,
-          color: "#ffffff",
-          weight: 2,
-          fillColor: color,
-          fillOpacity: 1
+        L.marker([spread.displayLatitude, spread.displayLongitude], {
+          icon: L.divIcon({
+            className: "",
+            html: `<span class="tomp-map-marker" style="--marker-color:${color}"><span>${escapeHtml(vehicleIconShortLabel(point.vehicleIcon ?? "sedan"))}</span></span>`,
+            iconSize: [38, 38],
+            iconAnchor: [19, 19],
+            popupAnchor: [0, -18]
+          })
         })
           .bindPopup(popup)
           .addTo(layer);
@@ -126,6 +131,8 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
 }
 
 export function toTrackedPoint(location: DriverLocation, freshness: MarkerFreshness, title: string, subtitle: string, ageLabel: string): TrackedPoint {
+  const vehicleType = typeof location.metadata.vehicleType === "string" ? location.metadata.vehicleType : null;
+  const capacity = typeof location.metadata.vehicleCapacity === "number" ? location.metadata.vehicleCapacity : null;
   return {
     id: location.assignmentId || location.driverId || location.id,
     latitude: location.latitude,
@@ -134,6 +141,8 @@ export function toTrackedPoint(location: DriverLocation, freshness: MarkerFreshn
     title,
     subtitle,
     ageLabel,
-    accuracy: location.accuracy ?? null
+    accuracy: location.accuracy ?? null,
+    vehicleIcon: inferVehicleIcon({ icon: location.metadata.vehicleIcon, vehicleType, capacity }),
+    vehicleType
   };
 }

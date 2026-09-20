@@ -21,8 +21,8 @@ export type DriverTaskViewMode = "home" | "next" | "messages" | "gps";
 type TripStatus = "arrived_pickup" | "passenger_onboard" | "completed";
 
 const WEB_DRIVER_TABS: Array<{ view: DriverTaskViewMode; label: string; icon: typeof Home }> = [
-  { view: "home", label: "ปฏิบัติงาน", icon: Home },
-  { view: "next", label: "ลำดับงาน", icon: ListChecks },
+  { view: "home", label: "หน้างาน", icon: Home },
+  { view: "next", label: "แผนงาน", icon: ListChecks },
   { view: "messages", label: "ข้อความ", icon: MessageCircle },
   { view: "gps", label: "ตำแหน่ง", icon: Satellite }
 ];
@@ -311,7 +311,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const showComms = view === "messages";
   const viewTitle =
     view === "next"
-      ? "ลำดับงานถัดไป"
+      ? "แผนงานถัดไป"
       : view === "messages"
         ? "ข้อความจากศูนย์ควบคุม"
         : view === "gps"
@@ -323,19 +323,25 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
       id="driver-home"
       className={`grid gap-3 ${insideNativeShell ? "pb-6" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"}`}
     >
-      <header className="grid gap-3 rounded-[1.35rem] bg-[linear-gradient(145deg,#0d344c_0%,#0b2538_58%,#071827_100%)] p-4 text-white shadow-[0_16px_38px_rgba(7,24,39,0.2)]">
+      <header className="grid gap-2.5 rounded-[1.15rem] bg-[linear-gradient(145deg,#0d344c_0%,#0b2538_58%,#071827_100%)] p-3 text-white shadow-[0_12px_28px_rgba(7,24,39,0.18)]">
         <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.16em] text-teal-100">{driverAccess.project.projectName}</p>
+          <p className="min-w-0 truncate text-[11px] font-semibold text-teal-100">{driverAccess.project.projectName}</p>
           <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80">
             <span className={`h-2 w-2 rounded-full ${gpsDot}`} />
             {gpsLabel}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="min-w-0 truncate text-[1.75rem] font-black leading-tight tracking-normal text-white">Call Sign {driverAccess.callSign.callSign}</h1>
-          <span className="shrink-0 rounded-full bg-teal-300/15 px-2.5 py-1 text-[11px] font-bold text-teal-100">
-            {formatStatusTh(driverAccess.assignment.status)}
-          </span>
+        <div className="grid gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="shrink-0 rounded-full bg-teal-300/15 px-2.5 py-1 text-[11px] font-bold text-teal-100">
+              Call Sign {driverAccess.callSign.callSign}
+            </span>
+            <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/80">
+              {formatStatusTh(driverAccess.assignment.status)}
+            </span>
+          </div>
+          <h1 className="min-w-0 break-words text-[1.15rem] font-bold leading-7 tracking-normal text-white">{pickup}</h1>
+          <p className="min-w-0 truncate text-[12px] font-semibold text-white/70">ไป {dropoff}</p>
         </div>
         <p className="text-[13px] font-semibold text-white/75">{viewTitle}</p>
       </header>
@@ -378,7 +384,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         </button>
       ) : null}
 
-      {showTask ? <section id="driver-current-task" className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-white/95 p-3.5 shadow-[0_12px_30px_rgba(16,32,51,0.07)] scroll-mt-3">
+      {showTask ? <section id="driver-current-task" className="grid gap-3 rounded-[1.15rem] border border-border/70 bg-white/95 p-3 shadow-[0_10px_24px_rgba(16,32,51,0.06)] scroll-mt-3">
         <p className="text-[13px] font-bold text-ink">รายการปฏิบัติงาน</p>
         <div className="grid gap-2 rounded-[1rem] bg-canvas/70 p-3">
           <div className="flex items-start gap-2">
@@ -491,7 +497,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
                   >
                     <div className="min-w-0">
                       <p className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
-                        <span>{item.sequence}. Call Sign {item.callSign}</span>
+                        <span>{item.sequence}. หน่วย {item.callSign}</span>
                         {item.urgent ? <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">ด่วน</span> : null}
                         {item.isNext ? <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">ทำต่อไป</span> : null}
                       </p>

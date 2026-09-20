@@ -9,6 +9,22 @@ import { mapDriver, mapVehicle } from "@/lib/data/mappers";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
+const VEHICLE_ICON_KEYS = new Set(["sedan", "suv", "van", "minibus", "bus", "pickup", "truck", "motorcycle"]);
+
+function cleanText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function numberOrNull(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function timeOrNull(value: unknown) {
+  const text = cleanText(value);
+  return /^\d{2}:\d{2}$/.test(text) ? text : null;
+}
+
 export async function createDriverAction(input: unknown): Promise<ActionResult> {
   const parsed = createDriverSchema.safeParse(input);
   if (!parsed.success) {
@@ -125,6 +141,129 @@ export async function createVehicleAction(input: unknown): Promise<ActionResult>
   return actionSuccess(
     { mode, vehicle, timelineEvent: timelineResult.data },
     timelineResult.success ? timelineResult.warning : `สร้างข้อมูลรถแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
+  );
+}
+
+export async function createProjectResourcePairAction(input: unknown): Promise<ActionResult> {
+  const data = (input ?? {}) as Record<string, unknown>;
+  const projectId = cleanText(data.projectId);
+  if (!projectId) return actionFailure("ไม่พบโครงการ");
+
+  const driverParsed = createDriverSchema.safeParse({
+    fullName: data.fullName,
+    phone: data.phone,
+    licenseType: cleanText(data.licenseType) || null,
+    languages: [],
+    projectId,
+    metadata: {
+      nickname: cleanText(data.nickname),
+      note: cleanText(data.driverNote),
+      preparedAsPair: true
+    }
+  });
+  if (!driverParsed.success) return actionFailure("กรอกชื่อคนขับและเบอร์โทรศัพท์ให้ครบ", driverParsed.error.flatten().fieldErrors);
+
+  const icon = cleanText(data.vehicleIcon);
+  const vehicleParsed = createVehicleSchema.safeParse({
+    plateNumber: data.plateNumber,
+    vehicleType: data.vehicleType,
+    capacity: data.capacity,
+    projectId,
+    metadata: {
+      brand: cleanText(data.brand),
+      model: cleanText(data.model),
+      colour: cleanText(data.colour),
+      icon: VEHICLE_ICON_KEYS.has(icon) ? icon : "van",
+      hourlyRate: numberOrNull(data.hourlyRate),
+      minimumHours: numberOrNull(data.minimumHours),
+      defaultDutyStart: timeOrNull(data.defaultDutyStart),
+      defaultDutyEnd: timeOrNull(data.defaultDutyEnd),
+      costNote: cleanText(data.costNote),
+      preparedAsPair: true
+    }
+  });
+  if (!vehicleParsed.success) return actionFailure("กรอกทะเบียนรถ ประเภทรถ และจำนวนที่นั่งให้ครบ", vehicleParsed.error.flatten().fieldErrors);
+
+  const driverPermission = await requirePermission(projectId, "driver.create");
+  if (!driverPermission.allowed) return actionFailure(driverPermission.reason || "ไม่มีสิทธิ์สร้างข้อมูลคนขับ");
+  const vehiclePermission = await requirePermission(projectId, "vehicle.create");
+  if (!vehiclePermission.allowed) return actionFailure(vehiclePermission.reason || "ไม่มีสิทธิ์สร้างข้อมูลรถ");
+
+  const { client, error, mode } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const { data: driverRow, error: driverError } = await client
+    .from("drivers")
+    .insert({
+      organization_id: driverParsed.data.organizationId || null,
+      vendor_id: driverParsed.data.vendorId || null,
+      project_id: projectId,
+      full_name: driverParsed.data.fullName,
+      phone: driverParsed.data.phone,
+      license_type: driverParsed.data.licenseType || null,
+      languages: driverParsed.data.languages,
+      status: "available",
+      metadata: driverParsed.data.metadata
+    })
+    .select()
+    .single();
+
+  if (driverError || !driverRow) return actionFailure(getDatabaseErrorMessage(driverError, "บันทึกข้อมูลคนขับไม่สำเร็จ"));
+
+  const { data: vehicleRow, error: vehicleError } = await client
+    .from("vehicles")
+    .insert({
+      organization_id: vehicleParsed.data.organizationId || null,
+      vendor_id: vehicleParsed.data.vendorId || null,
+      project_id: projectId,
+      plate_number: vehicleParsed.data.plateNumber,
+      vehicle_type: vehicleParsed.data.vehicleType,
+      capacity: vehicleParsed.data.capacity,
+      status: "available",
+      metadata: vehicleParsed.data.metadata
+    })
+    .select()
+    .single();
+
+  if (vehicleError || !vehicleRow) {
+    await client.from("drivers").delete().eq("id", driverRow.id);
+    return actionFailure(getDatabaseErrorMessage(vehicleError, "บันทึกข้อมูลรถไม่สำเร็จ"));
+  }
+
+  const driverMeta = { ...(driverParsed.data.metadata as Record<string, unknown>), pairedVehicleId: vehicleRow.id };
+  const vehicleMeta = { ...(vehicleParsed.data.metadata as Record<string, unknown>), pairedDriverId: driverRow.id };
+  await Promise.all([
+    client.from("drivers").update({ metadata: driverMeta }).eq("id", driverRow.id),
+    client.from("vehicles").update({ metadata: vehicleMeta }).eq("id", vehicleRow.id)
+  ]);
+
+  const [driverTimeline, vehicleTimeline] = await Promise.all([
+    createTimelineEvent({
+      projectId,
+      objectType: "driver",
+      objectId: String(driverRow.id),
+      eventType: TIMELINE_EVENTS.DRIVER_CREATED,
+      source: "operation_user",
+      reason: "สร้างข้อมูลคนขับพร้อมรถจากหน้าทรัพยากรโครงการ",
+      afterData: { ...driverRow, metadata: driverMeta }
+    }),
+    createTimelineEvent({
+      projectId,
+      objectType: "vehicle",
+      objectId: String(vehicleRow.id),
+      eventType: TIMELINE_EVENTS.VEHICLE_CREATED,
+      source: "operation_user",
+      reason: "สร้างข้อมูลรถพร้อมคนขับจากหน้าทรัพยากรโครงการ",
+      afterData: { ...vehicleRow, metadata: vehicleMeta }
+    })
+  ]);
+
+  revalidatePath("/resources");
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+
+  return actionSuccess(
+    { mode, driver: mapDriver({ ...driverRow, metadata: driverMeta }), vehicle: mapVehicle({ ...vehicleRow, metadata: vehicleMeta }), timelineEvents: [driverTimeline.data, vehicleTimeline.data].filter(Boolean) },
+    driverTimeline.success && vehicleTimeline.success ? undefined : "บันทึกข้อมูลแล้ว แต่ Timeline บางรายการบันทึกไม่สำเร็จ"
   );
 }
 

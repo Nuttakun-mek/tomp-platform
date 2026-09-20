@@ -3,7 +3,14 @@ import { decideWebViewNavigation } from "./webview-navigation";
 
 describe("webview navigation allow-list", () => {
   it("allows TOMP driver pages", () => {
-    expect(decideWebViewNavigation("https://tomp-platform.vercel.app/driver/tomp_live_123")).toEqual({ action: "allow" });
+    expect(decideWebViewNavigation("https://tomp-platform.vercel.app/ground-transfer/driver/tomp_live_123")).toEqual({ action: "allow" });
+  });
+
+  it("does not allow legacy driver pages inside the shell", () => {
+    expect(decideWebViewNavigation("https://tomp-platform.vercel.app/driver/tomp_live_123")).toEqual({
+      action: "external",
+      url: "https://tomp-platform.vercel.app/driver/tomp_live_123"
+    });
   });
 
   it("opens same-origin non-driver pages outside the shell", () => {
