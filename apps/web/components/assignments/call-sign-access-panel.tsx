@@ -9,6 +9,7 @@ import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
 import { createObserverAccessTokenAction } from "@/app/actions/observer-access";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { DateTimeField } from "@/components/ui/datetime-field";
 import { UnitCredentialSheet, type UnitCredentials } from "./unit-credential-sheet";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
@@ -64,6 +65,11 @@ function dateInputValue(value: string | null | undefined) {
 
 function endOfBangkokDate(value: string) {
   return value ? `${value}T16:59:59.999Z` : null;
+}
+
+function callSignMissionId(callSign: CallSign): string {
+  const value = (callSign.metadata as Record<string, unknown> | undefined)?.missionId;
+  return typeof value === "string" ? value : "";
 }
 
 function ProjectFleetAccessCard({
@@ -178,16 +184,14 @@ function ProjectFleetAccessCard({
             </label>
           </div>
 
-          <div className="grid min-w-0 gap-1.5 sm:grid-cols-[minmax(11rem,14rem)_minmax(0,1fr)] sm:items-center">
-            <label className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-ink-soft">
-              <span className="shrink-0">หมดอายุ</span>
-              <input
-                type="date"
-                value={expiresOn}
-                onChange={(event) => setExpiresOn(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-[13px] font-bold text-ink outline-none"
-              />
-            </label>
+          <div className="grid min-w-0 gap-1.5 sm:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)] sm:items-start">
+            <DateTimeField
+              label="วันหมดอายุ"
+              name="projectObserverExpiresOn"
+              value={expiresOn}
+              onChange={setExpiresOn}
+              hint="เว้นว่างได้ หากต้องการให้ระบบกำหนดอายุใช้งานให้"
+            />
             <p className="min-w-0 text-[12px] leading-5 text-ink-soft">
               {expiresOn
                 ? `ใช้ได้ถึง ${formatObserverExpiryLabel(endOfBangkokDate(expiresOn))}`
@@ -492,7 +496,7 @@ export function CallSignAccessPanel({
       .sort((a, b) => a.callSign.callSign.localeCompare(b.callSign.callSign, "th"));
   }, [assignments, callSigns, drivers, vehicleEvidence, vehicles]);
 
-  const ready = units.filter((u) => u.driver && u.vehicle);
+  const ready = units.filter((u) => u.driver && u.vehicle && callSignMissionId(u.callSign));
 
   /**
    * Both halves of a unit's handover, in one press.
@@ -503,8 +507,7 @@ export function CallSignAccessPanel({
    * and "สร้าง QR ผู้โดยสาร/ผู้ติดตาม" returned one carrying only the
    * passenger's — and an operator with a driver standing in front of them had
    * to know to press both, in the right order, to get a complete handover.
-   * unit-setup-form has issued the pair together since the day it was written;
-   * this is that same thing for a unit that already exists.
+   * The handover is now a single action for a unit that already exists.
    */
   function issueUnitCredentials(unit: Unit, replaceDriverQr: boolean) {
     setMessage(null);
@@ -691,6 +694,7 @@ export function CallSignAccessPanel({
 
         {units.map((unit) => {
           const crewed = Boolean(unit.driver && unit.vehicle);
+          const missionReady = Boolean(callSignMissionId(unit.callSign));
           const needsConfirm = confirmReissue === unit.callSign.id;
           const hasIssuedSheet = Boolean(issued[unit.callSign.id]);
           const sheet = sheetFor(unit);
@@ -787,7 +791,7 @@ export function CallSignAccessPanel({
                       and an order to remember; the handover is one thing. */}
                   <button
                     type="button"
-                    disabled={isPending || !crewed}
+                    disabled={isPending || !crewed || !missionReady}
                     onClick={() => issueUnitCredentials(unit, needsConfirm)}
                     title={
                       needsConfirm
@@ -830,7 +834,11 @@ export function CallSignAccessPanel({
                 </div>
               </div>
 
-              {!crewed ? (
+              {!missionReady ? (
+                <p className="mt-2 rounded-card bg-amber-50 px-2.5 py-1.5 text-[12px] font-semibold text-amber-800">
+                  ยังออก QR ไม่ได้ — ต้องกำหนดภารกิจหลักให้ Call Sign นี้ในขั้นที่ 1 ก่อน
+                </p>
+              ) : !crewed ? (
                 <p className="mt-2 rounded-card bg-amber-50 px-2.5 py-1.5 text-[12px] font-semibold text-amber-800">
                   ยังออก QR ไม่ได้ — ต้องผูก{!unit.driver ? "คนขับ" : ""}
                   {!unit.driver && !unit.vehicle ? " และ" : ""}

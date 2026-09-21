@@ -6,6 +6,7 @@ import { UserRoundCheck, Van } from "lucide-react";
 import { createProjectResourcePairAction } from "@/app/actions/resources";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
+import { DateRangeFields } from "@/components/ui/datetime-field";
 import { estimateVehicleUsageCost, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { ServiceTimeSummary } from "./service-time-summary";
 import { VehicleIconPicker } from "./vehicle-icon-picker";
@@ -63,12 +64,12 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
             </div>
           </div>
           <label className="field-label">
-            ชื่อ-นามสกุล <span className="field-required">*</span>
+            <span className="field-title">ชื่อ-นามสกุล <span className="field-required-badge">จำเป็น</span></span>
             <input className="field-input" name="fullName" placeholder="เช่น สมชาย ใจดี" required />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="field-label">
-              เบอร์โทรศัพท์ <span className="field-required">*</span>
+              <span className="field-title">เบอร์โทรศัพท์ <span className="field-required-badge">จำเป็น</span></span>
               <input className="field-input" name="phone" inputMode="tel" placeholder="08x-xxx-xxxx" required />
               <span className="field-hint">ใช้สำหรับโทรและส่งข้อมูลปฏิบัติงานให้คนขับ</span>
             </label>
@@ -98,11 +99,11 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
           </div>
           <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7rem,0.62fr)]">
             <label className="field-label">
-              ทะเบียนรถ <span className="field-required">*</span>
+              <span className="field-title">ทะเบียนรถ <span className="field-required-badge">จำเป็น</span></span>
               <input className="field-input" name="plateNumber" placeholder="เช่น 1กข 1234" required />
             </label>
             <label className="field-label">
-              ประเภทรถ <span className="field-required">*</span>
+              <span className="field-title">ประเภทรถ <span className="field-required-badge">จำเป็น</span></span>
               <select className="field-input" name="vehicleType" defaultValue="" required>
                 <option value="" disabled>เลือกประเภทรถ</option>
                 {VEHICLE_TYPE_OPTIONS.map((type) => (
@@ -112,7 +113,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
               <span className="field-hint">เลือกให้ตรงกับลักษณะรถจริง เพื่อช่วยแยกสัญลักษณ์ในศูนย์ควบคุม</span>
             </label>
             <label className="field-label">
-              จำนวนที่นั่ง <span className="field-required">*</span>
+              <span className="field-title">จำนวนที่นั่ง <span className="field-required-badge">จำเป็น</span></span>
               <input className="field-input" name="capacity" min={0} max={80} type="number" placeholder="เช่น 10" required />
             </label>
           </div>
@@ -144,14 +145,14 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
 
       <section className="form-section-white">
         <div>
-          <p className="text-sm font-semibold text-ink">ชื่อหน่วยรถ</p>
+          <p className="text-sm font-semibold text-ink">Call Sign</p>
           <p className="text-xs leading-5 text-ink-faint">กำหนด Call Sign ตั้งแต่หน้าทรัพยากร เพื่อให้หน่วยรถพร้อมรับมอบภารกิจในหน้าจัดการโครงการ</p>
         </div>
         <div className="grid items-start gap-3 md:grid-cols-2">
           <label className="field-label">
-            ชื่อหน่วยรถ (Call Sign)
+            Call Sign
             <input className="field-input" name="callSign" placeholder="เว้นว่างให้ระบบตั้งให้" />
-            <span className="field-hint">ใช้เป็นชื่อประจำคันในศูนย์ควบคุม QR และหน้าคนขับ</span>
+            <span className="field-hint">ใช้เป็นรหัสประจำรถและคนขับในศูนย์ควบคุม QR และหน้าคนขับ</span>
           </label>
           <p className="rounded-2xl border border-slate-200 bg-canvas/60 px-3 py-2 text-xs leading-5 text-ink-soft">
             ภารกิจและงานย่อยของรถแต่ละคันจะกำหนดในหน้า “จัดการโครงการ” หลังจากหน่วยรถนี้พร้อมใช้งานแล้ว
@@ -165,16 +166,20 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
           <p className="text-xs leading-5 text-ink-faint">ใช้เป็นข้อมูลอ้างอิงสำหรับศูนย์ควบคุมในการคำนวณชั่วโมงใช้งานและค่าล่วงเวลา</p>
         </div>
         <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="field-label">
-            เวลาเริ่มต้นปกติ
-            <input className="field-input" name="defaultDutyStart" type="time" value={defaultDutyStart} onChange={(event) => setDefaultDutyStart(event.target.value)} />
-            <span className="field-hint">ใช้เป็นเวลาเริ่มอ้างอิงเมื่อจ่ายงาน</span>
-          </label>
-          <label className="field-label">
-            เวลาสิ้นสุดปกติ
-            <input className="field-input" name="defaultDutyEnd" type="time" value={defaultDutyEnd} onChange={(event) => setDefaultDutyEnd(event.target.value)} />
-            <span className="field-hint">ใช้คำนวณชั่วโมงใช้งานเบื้องต้น</span>
-          </label>
+          <div className="md:col-span-2">
+            <DateRangeFields
+              legend="เวลามาตรฐาน"
+              startLabel="เวลาเริ่มต้น"
+              endLabel="เวลาสิ้นสุด"
+              startName="defaultDutyStart"
+              endName="defaultDutyEnd"
+              start={defaultDutyStart}
+              end={defaultDutyEnd}
+              onStart={setDefaultDutyStart}
+              onEnd={setDefaultDutyEnd}
+              timeOnly
+            />
+          </div>
           <label className="field-label">
             ค่าใช้จ่ายในการบริการ (บาท)
             <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />

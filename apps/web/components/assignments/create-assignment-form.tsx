@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { createAssignmentAction } from "@/app/actions/assignments";
 import { DateRangeFields, DateTimeField, describeThai } from "@/components/ui/datetime-field";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
+import { ServiceTimeSummary } from "@/components/resources/service-time-summary";
 import { describeAssignmentConflicts } from "@/lib/domain/assignment-rules";
 import { isCallSignCrewed } from "@/lib/domain/call-sign-rules";
 import { createAssignmentSchema } from "@/lib/validation";
-import { ServiceTimeSummary } from "@/components/resources/service-time-summary";
 
 export interface ExistingAssignmentWindow {
   id: string;
@@ -23,12 +23,16 @@ export interface ExistingAssignmentWindow {
 
 interface CreateAssignmentFormProps {
   projectId: string;
-  projectCode?: string;
   missions: Mission[];
   callSigns: CallSign[];
   drivers: Driver[];
   vehicles: Vehicle[];
   existingAssignments?: ExistingAssignmentWindow[];
+}
+
+function callSignMissionId(callSign?: CallSign): string {
+  const value = (callSign?.metadata as Record<string, unknown> | undefined)?.missionId;
+  return typeof value === "string" ? value : "";
 }
 
 function driverLabel(driver?: Driver) {
@@ -41,8 +45,6 @@ function vehicleLabel(vehicle?: Vehicle) {
   return `${vehicle.plateNumber}${vehicle.vehicleType ? ` / ${vehicle.vehicleType}` : ""}`;
 }
 
-
-/** The window of days a mission covers, as plain YYYY-MM-DD bounds. */
 function missionWindow(mission: Mission): { from: string; to: string } {
   const meta = (mission.metadata ?? {}) as Record<string, unknown>;
   const metaFrom = typeof meta.operationStartDate === "string" ? meta.operationStartDate : typeof meta.operationDate === "string" ? meta.operationDate : "";
@@ -52,11 +54,10 @@ function missionWindow(mission: Mission): { from: string; to: string } {
   return { from, to: to || from };
 }
 
-/** "15 ก.ย." or "15–17 ก.ย.", for the mission dropdown. */
 function windowLabel(mission: Mission): string {
   const { from, to } = missionWindow(mission);
   if (!from) return "";
-  return from === to ? describeThai(from, false) : `${describeThai(from, false)} – ${describeThai(to, false)}`;
+  return from === to ? describeThai(from, false) : `${describeThai(from, false)} ถึง ${describeThai(to, false)}`;
 }
 
 export function CreateAssignmentForm({
@@ -68,16 +69,14 @@ export function CreateAssignmentForm({
   existingAssignments = []
 }: CreateAssignmentFormProps) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
-  const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
-  const [isPending, startTransition] = useTransition();
-  const availableCallSigns = callSigns;
-  const [selectedCallSignId, setSelectedCallSignId] = useState(callSigns[0]?.id || "");
+  const availableCallSigns = useMemo(() => callSigns.filter((callSign) => Boolean(callSignMissionId(callSign))), [callSigns]);
+  const [selectedCallSignId, setSelectedCallSignId] = useState(() => availableCallSigns[0]?.id || "");
   const [jobDate, setJobDate] = useState("");
   const [startClock, setStartClock] = useState("");
   const [endClock, setEndClock] = useState("");
-  const [manualMissionId, setManualMissionId] = useState("");
-
+  const [message, setMessage] = useState<string | null>(null);
+  const [tone, setTone] = useState<"success" | "warning" | "danger">("warning");
+  const [isPending, startTransition] = useTransition();
 
   const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
   const vehicleById = useMemo(() => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle])), [vehicles]);
@@ -87,26 +86,15 @@ export function CreateAssignmentForm({
   );
   const selectedDriver = selectedCallSign?.driverId ? driverById.get(selectedCallSign.driverId) : undefined;
   const selectedVehicle = selectedCallSign?.vehicleId ? vehicleById.get(selectedCallSign.vehicleId) : undefined;
-  // The unit carries its mission, so choosing the unit chooses the mission.
   const mission = useMemo(() => {
-    const linked = (selectedCallSign?.metadata as Record<string, unknown> | undefined)?.missionId;
-    return typeof linked === "string" ? missions.find((item) => item.id === linked) : undefined;
+    const missionId = callSignMissionId(selectedCallSign);
+    return missionId ? missions.find((item) => item.id === missionId) : undefined;
   }, [missions, selectedCallSign]);
 
-  const manualMission = useMemo(() => missions.find((item) => item.id === manualMissionId), [manualMissionId, missions]);
-  const effectiveMission = mission ?? manualMission;
-  const missionId = effectiveMission?.id ?? "";
-
-
-  const window = useMemo(() => (effectiveMission ? missionWindow(effectiveMission) : { from: "", to: "" }), [effectiveMission]);
-  // The mission owns the window; the job owns the day inside it and the clock.
-  // One source for the date, so the two cannot contradict each other.
-  // A single-day mission needs no choice at all — take its only day.
+  const window = useMemo(() => (mission ? missionWindow(mission) : { from: "", to: "" }), [mission]);
   const operationDate = window.from && window.from === window.to ? window.from : jobDate;
-
   const startTime = operationDate && startClock ? `${operationDate}T${startClock}` : "";
   const endTime = operationDate && endClock ? `${operationDate}T${endClock}` : "";
-
   const selectedCrewReady = Boolean(selectedCallSign && isCallSignCrewed(selectedCallSign));
 
   const conflicts = useMemo(() => {
@@ -119,20 +107,36 @@ export function CreateAssignmentForm({
     return describeAssignmentConflicts({ startTime, endTime }, relevant);
   }, [existingAssignments, selectedCallSign, startTime, endTime]);
 
-  const canCreate = missions.length > 0 && selectedCrewReady && Boolean(missionId);
+  const canCreate = Boolean(availableCallSigns.length && selectedCrewReady && mission?.id);
 
-
-
+  useEffect(() => {
+    if (selectedCallSignId && availableCallSigns.some((callSign) => callSign.id === selectedCallSignId)) return;
+    setSelectedCallSignId(availableCallSigns[0]?.id || "");
+  }, [availableCallSigns, selectedCallSignId]);
 
   function handleSubmit(formData: FormData) {
     setMessage(null);
 
-    if (!selectedCrewReady) {
+    if (!availableCallSigns.length) {
       setTone("warning");
-      setMessage("กรุณาผูกคนขับและรถให้ Call Sign ก่อนเปิดงานใหม่");
+      setMessage("ยังไม่มี Call Sign ที่ผ่านขั้นที่ 1 กรุณากำหนดภารกิจหลักก่อนเปิดงานย่อย");
       return;
     }
-
+    if (!selectedCrewReady || !selectedCallSign) {
+      setTone("warning");
+      setMessage("เลือก Call Sign ที่มีคนขับและรถครบถ้วนก่อนเปิดงานย่อย");
+      return;
+    }
+    if (!mission?.id) {
+      setTone("warning");
+      setMessage("Call Sign นี้ยังไม่มีภารกิจหลัก กรุณากลับไปดำเนินการขั้นที่ 1");
+      return;
+    }
+    if (!operationDate || !startClock || !endClock) {
+      setTone("warning");
+      setMessage("เลือกวันและช่วงเวลาของงานย่อยให้ครบถ้วน");
+      return;
+    }
     if (conflicts.length && !String(formData.get("overrideReason") || "").trim()) {
       setTone("danger");
       setMessage("ช่วงเวลาซ้ำกับงานเดิม กรุณาระบุเหตุผลก่อนเปิดงาน");
@@ -141,10 +145,10 @@ export function CreateAssignmentForm({
 
     const parsed = createAssignmentSchema.safeParse({
       projectId,
-      missionId,
+      missionId: mission.id,
       callSignId: selectedCallSignId || formData.get("callSignId"),
-      startTime: startTime || null,
-      endTime: endTime || null,
+      startTime,
+      endTime,
       metadata: {
         pickupLocation: formData.get("pickupLocation") || "ยังไม่ระบุจุดรับ",
         dropoffLocation: formData.get("dropoffLocation") || "ยังไม่ระบุจุดส่ง",
@@ -155,7 +159,7 @@ export function CreateAssignmentForm({
 
     if (!parsed.success) {
       setTone("warning");
-      setMessage("กรุณาเลือกภารกิจ Call Sign และช่วงเวลางานให้ถูกต้อง");
+      setMessage("กรุณาตรวจสอบ Call Sign และช่วงเวลางานอีกครั้ง");
       return;
     }
 
@@ -163,11 +167,11 @@ export function CreateAssignmentForm({
       const result = await createAssignmentAction(parsed.data);
       if (!result.success) {
         setTone("danger");
-        setMessage(result.error || "เปิดงานใหม่ไม่สำเร็จ");
+        setMessage(result.error || "เปิดงานย่อยไม่สำเร็จ");
         return;
       }
       setTone("success");
-      setMessage(result.warning || "เปิดงานใหม่สำเร็จ ระบบบันทึกคนขับและรถจาก Call Sign แล้ว");
+      setMessage(result.warning || "เปิดงานย่อยสำเร็จ ระบบบันทึกคนขับและรถจาก Call Sign แล้ว");
       router.refresh();
     });
   }
@@ -175,7 +179,9 @@ export function CreateAssignmentForm({
   return (
     <form action={handleSubmit} className="grid content-start gap-5">
       <label className="field-label">
-        หน่วยรถ
+        <span className="field-title">
+          Call Sign <span className="field-required-badge">จำเป็น</span>
+        </span>
         <select
           className="field-input"
           name="callSignId"
@@ -183,7 +189,7 @@ export function CreateAssignmentForm({
           onChange={(event) => setSelectedCallSignId(event.target.value)}
           required
         >
-          <option value="">เลือกหน่วยรถ</option>
+          <option value="">เลือก Call Sign ที่ผ่านขั้นที่ 1</option>
           {availableCallSigns.map((callSign) => (
             <option key={callSign.id} value={callSign.id}>
               {callSign.callSign} - {driverLabel(driverById.get(callSign.driverId || ""))} - {vehicleLabel(vehicleById.get(callSign.vehicleId || ""))}
@@ -192,9 +198,7 @@ export function CreateAssignmentForm({
         </select>
         {selectedCallSign ? (
           <span className="mt-1 grid gap-2 text-xs">
-            <span className="field-hint">
-              ระบบจะใช้คนขับและรถจากหน่วยนี้โดยอัตโนมัติ ไม่ต้องเลือกซ้ำในขั้นตอนเปิดงาน
-            </span>
+            <span className="field-hint">ระบบใช้คนขับและรถจาก Call Sign นี้โดยอัตโนมัติ ไม่ต้องจับคู่ซ้ำในขั้นตอนเปิดงาน</span>
             <span className="grid gap-2 sm:grid-cols-3">
               <span className="rounded-xl border border-border bg-canvas/60 px-3 py-2">
                 <span className="block text-[11px] font-semibold text-ink-faint">Call Sign</span>
@@ -211,37 +215,20 @@ export function CreateAssignmentForm({
             </span>
             {mission ? (
               <span className="font-semibold text-operation">
-                ภารกิจ {mission.missionName}
-                {windowLabel(mission) ? ` · ${windowLabel(mission)}` : ""}
+                ภารกิจหลัก: {mission.missionName}
+                {windowLabel(mission) ? ` / ${windowLabel(mission)}` : ""}
               </span>
-            ) : (
-              <span className="font-semibold text-amber-700">หน่วยนี้พร้อมใช้งานแล้ว เลือกภารกิจด้านล่างเพื่อเปิดงาน</span>
-            )}
+            ) : null}
           </span>
         ) : (
-          <span className="field-hint mt-1">ยังไม่มีหน่วยรถ ให้สร้างหรือจับคู่ที่หน้าทรัพยากรโครงการก่อน</span>
+          <span className="field-hint mt-1">ยังไม่มี Call Sign ที่พร้อมเปิดงานย่อย กรุณาดำเนินการขั้นที่ 1 ก่อน</span>
         )}
       </label>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {!mission ? (
-          <label className="field-label md:col-span-2">
-            ภารกิจของงานนี้
-            <select className="field-input" value={manualMissionId} onChange={(event) => setManualMissionId(event.target.value)} required>
-              <option value="">เลือกภารกิจ</option>
-              {missions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.missionName}{windowLabel(item) ? ` · ${windowLabel(item)}` : ""}
-                </option>
-              ))}
-            </select>
-            <span className="field-hint">จำเป็นเฉพาะหน่วยรถที่ยังไม่ได้ผูกภารกิจ ระบบจะใช้ภารกิจนี้เป็นวันอ้างอิงของงาน</span>
-          </label>
-        ) : null}
-        {/* Only asked when the mission actually spans more than one day. */}
         {window.from && window.from !== window.to ? (
           <DateTimeField
-            label="วันของงานนี้"
+            label="วันที่ของงานย่อย"
             name="jobDate"
             value={jobDate}
             onChange={setJobDate}
@@ -251,11 +238,10 @@ export function CreateAssignmentForm({
             hint={`เลือกได้ระหว่าง ${describeThai(window.from, false)} ถึง ${describeThai(window.to, false)}`}
           />
         ) : null}
+
         <div className="md:col-span-2">
-          {/* Only the clock: the day comes from the mission, so a job can no
-              longer be scheduled on a different date than the mission it serves. */}
           <DateRangeFields
-            legend={operationDate ? `ช่วงเวลางาน ในวันที่ ${describeThai(operationDate, false)}` : "ช่วงเวลางาน"}
+            legend={operationDate ? `ช่วงเวลางาน วันที่ ${describeThai(operationDate, false)}` : "ช่วงเวลางาน"}
             startLabel="เวลาเริ่ม"
             endLabel="เวลาสิ้นสุด"
             startName="startClock"
@@ -265,25 +251,25 @@ export function CreateAssignmentForm({
             onStart={setStartClock}
             onEnd={setEndClock}
             timeOnly
+            required
           />
           {startClock && endClock ? (
             <div className="mt-2">
               <ServiceTimeSummary start={startClock} end={endClock} packageHours="" />
             </div>
           ) : null}
-          {!operationDate ? (
-            <p className="field-hint mt-1">เลือกภารกิจก่อน เพื่อให้ระบบรู้ว่างานนี้อยู่วันไหน</p>
-          ) : null}
+          {!operationDate ? <p className="field-hint mt-1">ระบบต้องทราบวันที่ของงานก่อนจึงจะบันทึกช่วงเวลาได้</p> : null}
         </div>
+
         <label className="field-label">
           จุดรับ
           <input className="field-input" name="pickupLocation" placeholder="เช่น ประตู 3 อาคารผู้โดยสาร" />
-          <span className="field-hint">ถ้าไม่ระบุ ระบบจะแสดงว่า “ยังไม่ระบุจุดรับ”</span>
+          <span className="field-hint">หากไม่ระบุ ระบบจะแสดงว่า “ยังไม่ระบุจุดรับ”</span>
         </label>
         <label className="field-label">
           จุดส่ง
           <input className="field-input" name="dropoffLocation" placeholder="เช่น หน้าโรงแรมหรือสถานที่จัดงาน" />
-          <span className="field-hint">ถ้าไม่ระบุ ระบบจะแสดงว่า “ยังไม่ระบุจุดส่ง”</span>
+          <span className="field-hint">หากไม่ระบุ ระบบจะแสดงว่า “ยังไม่ระบุจุดส่ง”</span>
         </label>
         <label className="field-label md:col-span-2">
           คำสั่งสำหรับคนขับ
@@ -295,7 +281,7 @@ export function CreateAssignmentForm({
       {!canCreate ? (
         <ActionFeedback
           tone="warning"
-          message="ต้องมีภารกิจ และต้องผูก Call Sign กับคนขับและรถก่อน จึงจะเปิดงานและสร้าง QR สำหรับคนขับได้"
+          message="ต้องกำหนดภารกิจหลักให้ Call Sign ในขั้นที่ 1 และต้องมีคนขับกับรถครบถ้วนก่อน จึงจะเปิดงานย่อยและออก QR ได้"
         />
       ) : null}
       <ConflictWarning conflicts={conflicts} />
@@ -307,7 +293,7 @@ export function CreateAssignmentForm({
       ) : null}
       <ActionFeedback message={message} tone={tone} />
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={!canCreate || isPending} type="submit">
-        {isPending ? "กำลังเปิดงาน..." : "เปิดงานใหม่"}
+        {isPending ? "กำลังเปิดงาน..." : "เปิดงานย่อย"}
       </button>
     </form>
   );

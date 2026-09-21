@@ -316,9 +316,9 @@ function ExistingResourcePairingPanel({
             <span className="field-hint">แสดงเฉพาะรถที่ยังไม่ได้ผูกกับหน่วยรถในโครงการนี้</span>
           </label>
           <label className="field-label">
-            ชื่อหน่วย
+            Call Sign
             <input className="field-input" value={callSign} onChange={(event) => setCallSign(event.target.value)} placeholder="เว้นว่างให้ระบบตั้งให้" />
-            <span className="field-hint">ใช้เป็นชื่อประจำคันในศูนย์ควบคุมและ QR คนขับ</span>
+            <span className="field-hint">ใช้เป็นรหัสประจำรถและคนขับในศูนย์ควบคุม หน้าคนขับ และ QR</span>
           </label>
           <button
             type="button"
@@ -326,7 +326,7 @@ function ExistingResourcePairingPanel({
             disabled={isPending || !driverId || !vehicleId}
             className="min-h-11 rounded-command bg-operation px-4 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300 lg:w-fit xl:w-auto"
           >
-            {isPending ? "กำลังสร้าง..." : "สร้างหน่วยรถ"}
+            {isPending ? "กำลังสร้าง..." : "สร้าง Call Sign"}
           </button>
         </div>
       )}

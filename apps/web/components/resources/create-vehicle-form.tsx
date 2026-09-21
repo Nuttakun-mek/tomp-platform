@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createVehicleAction } from "@/app/actions/resources";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
+import { DateRangeFields } from "@/components/ui/datetime-field";
 import { estimateVehicleUsageCost, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { createVehicleSchema } from "@/lib/validation";
 import { ServiceTimeSummary } from "./service-time-summary";
@@ -103,11 +104,11 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
       <fieldset className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7rem,0.62fr)]">
         <legend className="px-1 text-xs font-bold text-slate-600">ข้อมูลที่ต้องมี</legend>
         <label className="field-label">
-          ทะเบียนรถ <span className="field-required">*</span>
+          <span className="field-title">ทะเบียนรถ <span className="field-required-badge">จำเป็น</span></span>
           <input className="field-input" name="plateNumber" placeholder="เช่น 1กข 1234" required />
         </label>
         <label className="field-label">
-          ประเภทรถ <span className="field-required">*</span>
+          <span className="field-title">ประเภทรถ <span className="field-required-badge">จำเป็น</span></span>
           <select className="field-input" name="vehicleType" defaultValue="" required>
             <option value="" disabled>เลือกประเภทรถ</option>
             {VEHICLE_TYPE_OPTIONS.map((type) => (
@@ -117,7 +118,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
           <span className="field-hint">ใช้จัดกลุ่มสัญลักษณ์รถในศูนย์ควบคุม</span>
         </label>
         <label className="field-label">
-          จำนวนที่นั่ง <span className="field-required">*</span>
+          <span className="field-title">จำนวนที่นั่ง <span className="field-required-badge">จำเป็น</span></span>
           <input className="field-input" min={0} max={80} name="capacity" placeholder="เช่น 4" type="number" required />
         </label>
       </fieldset>
@@ -173,14 +174,20 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
 
       <fieldset className="form-section md:grid-cols-2 xl:grid-cols-4">
         <legend className="px-1 text-xs font-bold text-slate-600">เวลามาตรฐานและค่าใช้จ่ายในการบริการ</legend>
-        <label className="field-label">
-          เวลาเริ่มต้นปกติ
-          <input className="field-input" name="defaultDutyStart" type="time" value={defaultDutyStart} onChange={(event) => setDefaultDutyStart(event.target.value)} />
-        </label>
-        <label className="field-label">
-          เวลาสิ้นสุดปกติ
-          <input className="field-input" name="defaultDutyEnd" type="time" value={defaultDutyEnd} onChange={(event) => setDefaultDutyEnd(event.target.value)} />
-        </label>
+        <div className="xl:col-span-2">
+          <DateRangeFields
+            legend="เวลามาตรฐาน"
+            startLabel="เวลาเริ่มต้น"
+            endLabel="เวลาสิ้นสุด"
+            startName="defaultDutyStart"
+            endName="defaultDutyEnd"
+            start={defaultDutyStart}
+            end={defaultDutyEnd}
+            onStart={setDefaultDutyStart}
+            onEnd={setDefaultDutyEnd}
+            timeOnly
+          />
+        </div>
         <label className="field-label">
           ค่าใช้จ่ายในการบริการ (บาท)
           <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />

@@ -24,6 +24,12 @@ const createAutoCallSignSchema = z.object({
   missionId: z.string().uuid().optional().nullable()
 });
 
+const assignMissionToCallSignsSchema = z.object({
+  projectId: z.string().uuid(),
+  missionId: z.string().uuid(),
+  callSignIds: z.array(z.string().uuid()).min(1)
+});
+
 function normalizeCallSignSeed(value?: string | null) {
   const cleaned = String(value || "UNIT")
     .toUpperCase()
@@ -203,6 +209,88 @@ export async function createCallSignAction(input: unknown): Promise<ActionResult
     { mode, callSign: callSignRow, timelineEvent: timelineResult.data },
     timelineResult.success ? undefined : `สร้าง Call Sign แล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
+}
+
+export async function assignMissionToCallSignsAction(input: unknown): Promise<ActionResult> {
+  const parsed = assignMissionToCallSignsSchema.safeParse(input);
+  if (!parsed.success) {
+    return actionFailure("ข้อมูลการกำหนดภารกิจให้ Call Sign ไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
+  }
+
+  const { client, error, mode } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูลจริง");
+
+  const permission = await requirePermission(parsed.data.projectId, "assignment.update");
+  if (!permission.allowed) {
+    return actionFailure(permission.reason || "ไม่มีสิทธิ์กำหนดภารกิจให้ Call Sign ในโครงการนี้");
+  }
+
+  const { data: mission, error: missionError } = await client
+    .from("missions")
+    .select("id, mission_name")
+    .eq("id", parsed.data.missionId)
+    .eq("project_id", parsed.data.projectId)
+    .maybeSingle();
+
+  if (missionError) return actionFailure(getDatabaseErrorMessage(missionError, "ตรวจสอบภารกิจไม่สำเร็จ"));
+  if (!mission) return actionFailure("ไม่พบภารกิจหลักในโครงการนี้");
+
+  const { data: rows, error: readError } = await client
+    .from("call_signs")
+    .select("*")
+    .eq("project_id", parsed.data.projectId)
+    .in("id", parsed.data.callSignIds);
+
+  if (readError) return actionFailure(getDatabaseErrorMessage(readError, "อ่านข้อมูล Call Sign ไม่สำเร็จ"));
+  if (!rows?.length) return actionFailure("ไม่พบ Call Sign ที่ต้องกำหนดภารกิจ");
+
+  const now = new Date().toISOString();
+  const updatedRows: Array<Record<string, unknown>> = [];
+
+  for (const row of rows as Array<Record<string, unknown>>) {
+    const previousMeta = row.metadata && typeof row.metadata === "object" ? row.metadata as Record<string, unknown> : {};
+    const { data: updated, error: updateError } = await client
+      .from("call_signs")
+      .update({
+        metadata: {
+          ...previousMeta,
+          missionId: parsed.data.missionId,
+          missionName: mission.mission_name,
+          missionAssignedAt: now
+        },
+        updated_at: now
+      })
+      .eq("id", String(row.id))
+      .eq("project_id", parsed.data.projectId)
+      .select()
+      .single();
+
+    if (updateError) {
+      return actionFailure(getDatabaseErrorMessage(updateError, "กำหนดภารกิจให้ Call Sign ไม่สำเร็จ"));
+    }
+
+    updatedRows.push(updated as Record<string, unknown>);
+
+    await createTimelineEvent({
+      projectId: parsed.data.projectId,
+      objectType: "call_sign",
+      objectId: String(row.id),
+      eventType: "CALL_SIGN_MISSION_ASSIGNED",
+      source: "operation_user",
+      reason: `กำหนดภารกิจหลัก ${mission.mission_name} ให้ Call Sign`,
+      beforeData: row,
+      afterData: updated as Record<string, unknown>,
+      metadata: { action: "assign_mission_to_call_sign", missionId: parsed.data.missionId, mode }
+    });
+  }
+
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+
+  return actionSuccess({
+    mode,
+    missionId: parsed.data.missionId,
+    callSigns: updatedRows.map((row) => mapCallSign(row))
+  });
 }
 
 /**
