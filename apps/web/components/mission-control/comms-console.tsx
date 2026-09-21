@@ -389,6 +389,9 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
                           รูปแนบมีตราประทับเวลา{item.attachment.hasLocation ? "และพิกัด GPS" : " แต่ไม่มีพิกัด GPS ณ เวลาถ่ายภาพ"}
                         </p>
                       ) : null}
+                      {item.attachment?.placeName ? (
+                        <p className="mt-0.5 text-[10px] text-white/70">สถานที่: {item.attachment.placeName}</p>
+                      ) : null}
                     </article>
                   );
                 }

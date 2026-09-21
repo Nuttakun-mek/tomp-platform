@@ -241,7 +241,7 @@ export function MissionAssignmentStep({
 
         <label className="field-label">
           <span className="field-title">
-            ชื่อภารกิจหลัก <span className="field-required-badge">จำเป็น</span>
+            ชื่อภารกิจหลัก <span className="field-required-badge">*</span>
           </span>
           <input
             className="field-input"

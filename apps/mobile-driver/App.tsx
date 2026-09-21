@@ -152,8 +152,8 @@ function DriverShell() {
     networkConnected === false
       ? "ออฟไลน์"
       : locationSharingActive
-        ? "กำลังส่ง GPS"
-        : "ยังไม่ได้ส่ง GPS";
+        ? "กำลังแชร์ตำแหน่ง"
+        : "ยังไม่แชร์ตำแหน่ง";
   const currentScreenLabel = mode === "web"
     ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
     : `เวอร์ชัน ${TOMP_DRIVER_APP_VERSION}`;
@@ -240,11 +240,11 @@ function DriverShell() {
       currentTokenRef.current = parsed.token;
       setCurrentToken(parsed.token);
       setTokenInput(parsed.token);
-      setWebUrl(buildDriverWebUrl(parsed.token, parsed.locale, "home"));
+      setWebUrl(buildDriverWebUrl(parsed.token, parsed.locale, "gps"));
       setScannerOpen(false);
       setQrLocked(false);
-      activeDriverMenuRef.current = "home";
-      setActiveDriverMenu("home");
+      activeDriverMenuRef.current = "location";
+      setActiveDriverMenu("location");
       setMode("web");
       setMessage(parsed.source === "raw-token" ? "กำลังเปิดข้อมูลจาก token" : "กำลังเปิดข้อมูลจาก QR");
     },

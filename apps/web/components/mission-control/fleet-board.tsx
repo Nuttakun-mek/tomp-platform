@@ -55,6 +55,43 @@ const SERVICE_ALERT_CLASS = {
   danger: "bg-rose-50 text-rose-700"
 } as const;
 
+const SERVICE_ALERT_COMPACT_CLASS = {
+  neutral: "border-slate-200 bg-slate-50 text-slate-600",
+  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  warning: "border-amber-200 bg-amber-50 text-amber-900",
+  danger: "border-rose-200 bg-rose-50 text-rose-700"
+} as const;
+
+function formatTime(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat("th-TH", { day: "2-digit", month: "short" }).format(date);
+}
+
+function formatAssignmentWindow(start?: string | null, end?: string | null) {
+  const date = formatDate(start ?? end);
+  const startTime = formatTime(start);
+  const endTime = formatTime(end);
+  if (date && startTime && endTime) return `${date} ${startTime}-${endTime}`;
+  if (date && startTime) return `${date} ${startTime}`;
+  if (date && endTime) return `${date} ถึง ${endTime}`;
+  return "ยังไม่ระบุเวลา";
+}
+
+function formatShortCost(cost: ReturnType<typeof estimateVehicleUsageCost>) {
+  if (cost.estimatedCost == null) return "ยังไม่ระบุค่าใช้จ่าย";
+  const hours = cost.billableHours ?? cost.packageHours;
+  return `${hours != null ? `${hours.toLocaleString("th-TH")} ชม. / ` : ""}${cost.estimatedCost.toLocaleString("th-TH")} บ.`;
+}
+
 function freshnessOf(location: DriverLocation | undefined, now: number): Freshness {
   if (!location) return "none";
   return gpsFreshness(location.recordedAt, location.sharingEvent, now, location.metadata);
@@ -285,6 +322,15 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
             const open = expanded === group.key;
             const phone = group.driver?.phone ?? "";
             const hasNext = group.jobs.some((job) => nextAssignmentIds.has(job.assignment.id));
+            const primaryJob = group.jobs[0];
+            const serviceFocus =
+              group.jobs.find((job) => job.serviceAlert.tone === "danger") ??
+              group.jobs.find((job) => job.serviceAlert.tone === "warning") ??
+              primaryJob;
+            const routeSummary = primaryJob ? `${primaryJob.pickup} → ${primaryJob.dropoff}` : "ยังไม่มีงานที่เปิดใช้งาน";
+            const windowSummary = primaryJob ? formatAssignmentWindow(primaryJob.assignment.startTime, primaryJob.assignment.endTime) : "ยังไม่ระบุเวลา";
+            const primaryStatus = primaryJob?.reported ? formatStatusTh(primaryJob.reported.status) : primaryJob ? formatStatusTh(primaryJob.assignment.status) : "ยังไม่มีงาน";
+            const gpsSummary = group.location ? formatRelativeTh(group.location.recordedAt, effectiveNow) : FRESH_LABEL[group.freshness];
             return (
               <article
                 key={group.key}
@@ -295,12 +341,15 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                 <button
                   type="button"
                   onClick={() => setExpanded(open ? null : group.key)}
-                  className="flex w-full items-start gap-3 px-4 py-3 text-left"
+                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 text-left sm:grid-cols-[auto_minmax(0,1fr)_minmax(9rem,auto)_auto]"
                 >
                   <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${FRESH_DOT[group.freshness]}`} />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-[15px] font-bold text-ink">{group.title}</span>
+                  <span className="min-w-0">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="truncate text-[15px] font-bold text-ink">{group.title}</span>
+                      {primaryJob ? (
+                        <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">{primaryJob.label}</span>
+                      ) : null}
                       {group.jobs.length > 1 ? (
                         <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
                           {group.jobs.length} งาน
@@ -320,9 +369,51 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         every job label onto a card that lists those same jobs in
                         full the moment it opens, and the line below it repeated
                         the freshness the coloured dot already carries. */}
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                    <span className="hidden">
                       {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · {FRESH_LABEL[group.freshness]}
                       {group.location ? ` · ${formatRelativeTh(group.location.recordedAt, effectiveNow)}` : ""}
+                    </span>
+                    <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+                      <span className="font-semibold text-slate-700">{group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"}</span>
+                      <span>{FRESH_LABEL[group.freshness]}{group.location ? ` · ${formatRelativeTh(group.location.recordedAt, effectiveNow)}` : ""}</span>
+                      <span className="font-semibold text-slate-700">{windowSummary}</span>
+                    </span>
+                    <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="max-w-full truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                        {routeSummary}
+                      </span>
+                      {serviceFocus ? (
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-bold sm:hidden ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
+                          title={serviceFocus.serviceAlert.detail}
+                        >
+                          {serviceFocus.serviceAlert.label}
+                        </span>
+                      ) : null}
+                      {primaryJob ? (
+                        <span
+                          className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-operation"
+                          title={vehicleUsageCostBreakdown(primaryJob.cost)}
+                        >
+                          {formatShortCost(primaryJob.cost)}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className="hidden min-w-0 justify-items-end gap-1 text-right sm:grid">
+                    {serviceFocus ? (
+                      <span
+                        className={`max-w-[12rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
+                        title={serviceFocus.serviceAlert.detail}
+                      >
+                        {serviceFocus.serviceAlert.label}
+                      </span>
+                    ) : null}
+                    <span className="max-w-[12rem] truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                      {primaryStatus}
+                    </span>
+                    <span className="max-w-[12rem] truncate text-[11px] font-medium text-slate-500">
+                      GPS: {gpsSummary}
                     </span>
                   </span>
                   <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />

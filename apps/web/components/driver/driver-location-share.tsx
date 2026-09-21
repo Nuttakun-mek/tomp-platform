@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, MapPin } from "lucide-react";
 import { LiveTrackingMap, type TrackedPoint } from "@/components/mission-control/live-tracking-map";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
+import { inferVehicleIcon } from "@/lib/domain/vehicle-icon";
 
 type ShareState = "idle" | "requesting" | "sharing" | "stale" | "error";
 type TrackingEvent = "sharing_started" | "location_ping" | "sharing_stopped";
@@ -56,11 +57,52 @@ function createLocationClientEventId(recordedAt: string, trackingEvent: Tracking
   return `web:${trackingEvent}:${compactTime}:${randomPart}`;
 }
 
+function shareStateClasses(state: ShareState) {
+  if (state === "sharing") {
+    return {
+      card: "border-emerald-200 bg-emerald-50/70",
+      header: "active:bg-emerald-100/60",
+      badge: "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200",
+      dot: "bg-emerald-500 shadow-[0_0_0_5px_rgba(16,185,129,0.14)]"
+    };
+  }
+  if (state === "requesting") {
+    return {
+      card: "border-blue-200 bg-blue-50/70",
+      header: "active:bg-blue-100/60",
+      badge: "bg-blue-100 text-blue-800 ring-1 ring-blue-200",
+      dot: "bg-blue-500 shadow-[0_0_0_5px_rgba(59,130,246,0.14)]"
+    };
+  }
+  if (state === "stale") {
+    return {
+      card: "border-amber-200 bg-amber-50/70",
+      header: "active:bg-amber-100/60",
+      badge: "bg-amber-100 text-amber-800 ring-1 ring-amber-200",
+      dot: "bg-amber-500 shadow-[0_0_0_5px_rgba(245,158,11,0.16)]"
+    };
+  }
+  if (state === "error") {
+    return {
+      card: "border-rose-200 bg-rose-50/70",
+      header: "active:bg-rose-100/60",
+      badge: "bg-rose-100 text-rose-700 ring-1 ring-rose-200",
+      dot: "bg-rose-500 shadow-[0_0_0_5px_rgba(244,63,94,0.14)]"
+    };
+  }
+  return {
+    card: "border-border/70 bg-white/95",
+    header: "active:bg-canvas/60",
+    badge: "bg-canvas text-ink-soft ring-1 ring-border/70",
+    dot: "bg-slate-300"
+  };
+}
+
 export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLocationShareProps) {
   const [state, setState] = useState<ShareState>("idle");
   const [message, setMessage] = useState("ยังไม่ได้ส่งตำแหน่ง GPS");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
-  const [mapOpen, setMapOpen] = useState(true);
+  const [mapOpen, setMapOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(true);
   const [canResume, setCanResume] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
@@ -145,6 +187,12 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
             driverName: driverAccess.driver.fullName,
             driverPhone: driverAccess.driver.phone,
             vehiclePlate: driverAccess.vehicle.plateNumber,
+            vehicleType: driverAccess.vehicle.vehicleType,
+            vehicleCapacity: driverAccess.vehicle.capacity,
+            vehicleIcon: inferVehicleIcon({
+              vehicleType: driverAccess.vehicle.vehicleType,
+              capacity: driverAccess.vehicle.capacity
+            }),
             assignmentStatus: driverAccess.assignment.status,
             // Read by lib/domain/gps-freshness: judge "overdue" against the
             // cadence this device promised, not the browser-tuned constants.
@@ -403,36 +451,42 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
           ? "เริ่มส่งตำแหน่ง GPS อีกครั้ง"
           : "เริ่มส่งตำแหน่ง GPS";
 
+  const visualState = shareStateClasses(state);
+  const vehicleIcon = inferVehicleIcon({
+    vehicleType: driverAccess.vehicle.vehicleType,
+    capacity: driverAccess.vehicle.capacity
+  });
+
   const mapPoint: TrackedPoint | null = lastLocation
     ? {
         id: driverAccess.assignment.id,
         latitude: lastLocation.latitude,
         longitude: lastLocation.longitude,
-        freshness: state === "sharing" ? "live" : "slow",
+        freshness: state === "sharing" ? "live" : state === "stale" ? "slow" : state === "error" ? "offline" : "stopped",
         title: `Call Sign ${driverAccess.callSign.callSign}`,
         subtitle: driverAccess.vehicle.plateNumber || "รถของฉัน",
         ageLabel: `ส่งเมื่อ ${formatTime(lastLocation.sentAt)}`,
-        accuracy: lastLocation.accuracy
+        accuracy: lastLocation.accuracy,
+        vehicleIcon,
+        vehicleType: driverAccess.vehicle.vehicleType
       }
     : null;
 
   return (
-    <section className="overflow-hidden rounded-[1.25rem] border border-border/70 bg-white/95 shadow-[0_12px_30px_rgba(16,32,51,0.07)]">
+    <section className={`overflow-hidden rounded-[1.25rem] border shadow-[0_12px_30px_rgba(16,32,51,0.07)] ${visualState.card}`}>
       {/* Whole card collapses while the sharing process continues. */}
       <button
         type="button"
         onClick={() => setCardOpen((value) => !value)}
         aria-expanded={cardOpen}
-        className="flex w-full items-start justify-between gap-2 p-3.5 text-left transition active:bg-canvas/60"
+        className={`flex w-full items-start justify-between gap-2 p-3.5 text-left transition ${visualState.header}`}
       >
-        <span className="min-w-0">
+        <span className="min-w-0 border-l-4 border-current pl-2.5" style={{ borderColor: state === "sharing" ? "#10b981" : state === "requesting" ? "#3b82f6" : state === "stale" ? "#f59e0b" : state === "error" ? "#f43f5e" : "#cbd5e1" }}>
           <span className="block text-[13px] font-bold text-ink">การส่งตำแหน่ง GPS</span>
           <span className="block text-[12px] leading-5 text-ink-faint">{cardOpen ? message : statusLabel}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-            state === "sharing" ? "bg-emerald-100 text-emerald-800" : state === "stale" ? "bg-amber-100 text-amber-800" : state === "error" ? "bg-rose-100 text-rose-700" : "bg-canvas text-ink-soft"
-          }`}>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${visualState.badge}`}>
             {statusLabel}
           </span>
           <ChevronDown className={`h-4 w-4 text-ink-faint transition ${cardOpen ? "rotate-180" : ""}`} />

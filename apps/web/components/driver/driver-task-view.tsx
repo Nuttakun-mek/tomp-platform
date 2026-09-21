@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, ChevronDown, Clock3, Home, ListChecks, LogIn, LogOut, MapPin, MessageCircle, Navigation, Phone, RotateCcw, Satellite, TriangleAlert } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock3, Home, ListChecks, LogIn, LogOut, MapPin, MessageCircle, Navigation, Phone, RotateCcw, TriangleAlert } from "lucide-react";
 import { assignmentStatusUpdateAction, driverIssueReportAction } from "@/app/actions/driver";
 import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
@@ -20,13 +20,13 @@ type DriverGpsLight = "off" | "live" | "stale";
 export type DriverTaskViewMode = "home" | "next" | "messages" | "gps";
 type TripStatus = "arrived_pickup" | "passenger_onboard" | "completed";
 type WorkSessionStatus = "work_started" | "work_ended";
-type StatusIcon = typeof Satellite;
+type StatusIcon = typeof Home;
 
 const WEB_DRIVER_TABS: Array<{ view: DriverTaskViewMode; label: string; icon: typeof Home }> = [
   { view: "home", label: "หน้าหลัก", icon: Home },
   { view: "next", label: "แผนงาน", icon: ListChecks },
   { view: "messages", label: "ข้อความ", icon: MessageCircle },
-  { view: "gps", label: "ตำแหน่ง", icon: Satellite }
+  { view: "gps", label: "ตำแหน่ง", icon: MapPin }
 ];
 
 const TRIP_STEPS: Array<{ status: TripStatus; label: string }> = [
@@ -79,7 +79,7 @@ function gpsStatusPresentation(light: DriverGpsLight): { label: string; Icon: St
   if (light === "live") {
     return {
       label: "กำลังส่ง GPS",
-      Icon: Satellite,
+      Icon: MapPin,
       className: "bg-emerald-400/18 text-emerald-50 ring-emerald-300/30"
     };
   }
@@ -105,7 +105,7 @@ function assignmentStatusPresentation(status: string): { Icon: StatusIcon; class
     return { Icon: TriangleAlert, className: "bg-rose-400/18 text-rose-50 ring-rose-300/30" };
   }
   if (["active", "operating"].includes(status)) {
-    return { Icon: Satellite, className: "bg-teal-300/18 text-teal-50 ring-teal-200/30" };
+    return { Icon: Navigation, className: "bg-teal-300/18 text-teal-50 ring-teal-200/30" };
   }
   return { Icon: Clock3, className: "bg-sky-300/16 text-sky-50 ring-sky-200/25" };
 }
@@ -346,6 +346,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           latitude: attachment.latitude ?? null,
           longitude: attachment.longitude ?? null,
           accuracy: attachment.accuracy ?? null,
+          placeName: attachment.placeName ?? null,
           hasLocation: Boolean(attachment.hasLocation),
           stampApplied: attachment.stampApplied !== false
         }
@@ -435,7 +436,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         </button>
       ) : null}
 
-      {showTask ? <section id="driver-work-session" className="grid gap-3 rounded-[1.15rem] border border-teal-100 bg-white/95 p-3 shadow-[0_10px_24px_rgba(16,32,51,0.06)] scroll-mt-3">
+      {showGps ? <section id="driver-work-session" className="grid gap-3 rounded-[1.15rem] border border-teal-100 bg-white/95 p-3 shadow-[0_10px_24px_rgba(16,32,51,0.06)] scroll-mt-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[13px] font-bold text-ink">เวลาปฏิบัติงาน</p>

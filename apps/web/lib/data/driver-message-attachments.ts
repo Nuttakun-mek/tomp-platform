@@ -8,6 +8,7 @@ export interface DriverMessageAttachment {
   latitude?: number | null;
   longitude?: number | null;
   accuracy?: number | null;
+  placeName?: string | null;
   hasLocation?: boolean;
   stampApplied?: boolean;
 }
@@ -28,6 +29,7 @@ export function attachmentFromMetadata(metadata: Record<string, unknown>): Drive
     latitude: numberOrNull(attachment.latitude),
     longitude: numberOrNull(attachment.longitude),
     accuracy: numberOrNull(attachment.accuracy),
+    placeName: typeof attachment.placeName === "string" ? attachment.placeName : null,
     hasLocation: attachment.hasLocation === true,
     stampApplied: attachment.stampApplied !== false
   };

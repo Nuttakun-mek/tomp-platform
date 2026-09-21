@@ -27,9 +27,6 @@ const TH_MONTHS = [
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
 ];
 const TH_WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
-/** Times an operation actually starts at, so the common case is one tap. */
-const TIME_PRESETS = ["06:00", "07:00", "08:00", "09:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
-
 export function todayLocalDate(): string {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -209,52 +206,101 @@ function CalendarGrid({
 
 function TimeGrid({ value, onPick }: { value: string; onPick: (time: string) => void }) {
   const [hour, minute] = value ? value.split(":") : ["", ""];
+  const [hourDraft, setHourDraft] = useState(hour);
+  const [minuteDraft, setMinuteDraft] = useState(minute);
+
+  useEffect(() => {
+    setHourDraft(hour);
+    setMinuteDraft(minute);
+  }, [hour, minute]);
+
+  const digits = (input: string) => input.replace(/\D/g, "").slice(0, 2);
+  const clamp = (input: string, max: number) => {
+    if (!input) return "";
+    return String(Math.min(max, Number(input))).padStart(2, "0");
+  };
+  const commit = (nextHour = hourDraft, nextMinute = minuteDraft) => {
+    onPick(`${clamp(nextHour || "0", 23)}:${clamp(nextMinute || "0", 59)}`);
+  };
+  const step = (part: "hour" | "minute", by: number) => {
+    const currentHour = Number(hourDraft || hour || "0");
+    const currentMinute = Number(minuteDraft || minute || "0");
+    const nextHour = part === "hour" ? (currentHour + by + 24) % 24 : currentHour;
+    const nextMinute = part === "minute" ? (currentMinute + by + 60) % 60 : currentMinute;
+    const nextHourText = String(nextHour).padStart(2, "0");
+    const nextMinuteText = String(nextMinute).padStart(2, "0");
+    setHourDraft(nextHourText);
+    setMinuteDraft(nextMinuteText);
+    onPick(`${nextHourText}:${nextMinuteText}`);
+  };
 
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap gap-1.5">
-        {TIME_PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => onPick(preset)}
-            className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition focus-ring ${
-              value === preset
-                ? "border-operation bg-operation text-white shadow-[0_10px_22px_rgba(8,123,115,0.22)]"
-                : "border-border/70 bg-white text-ink-soft shadow-sm hover:border-operation/30 hover:bg-operation-soft hover:text-operation"
-            }`}
-          >
-            {preset}
-          </button>
-        ))}
+    <div className="rounded-2xl border border-border/80 bg-canvas/70 p-3 shadow-inner">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+        <TimePartControl
+          label="ชั่วโมง"
+          value={hourDraft}
+          onChange={(next) => {
+            const clean = digits(next);
+            setHourDraft(clean);
+            if (clean.length === 2) commit(clean, minuteDraft);
+          }}
+          onBlur={() => {
+            const clean = clamp(hourDraft, 23);
+            setHourDraft(clean);
+            if (clean || minuteDraft) commit(clean, minuteDraft);
+          }}
+          onStep={(by) => step("hour", by)}
+        />
+        <span className="pb-4 text-center text-xl font-bold text-ink-faint">:</span>
+        <TimePartControl
+          label="นาที"
+          value={minuteDraft}
+          onChange={(next) => {
+            const clean = digits(next);
+            setMinuteDraft(clean);
+            if (clean.length === 2) commit(hourDraft, clean);
+          }}
+          onBlur={() => {
+            const clean = clamp(minuteDraft, 59);
+            setMinuteDraft(clean);
+            if (hourDraft || clean) commit(hourDraft, clean);
+          }}
+          onStep={(by) => step("minute", by)}
+        />
       </div>
-      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-canvas/70 px-2.5 py-2">
-        <span className="text-[11px] font-semibold text-ink-faint">กำหนดเอง</span>
-        <select
-          className="rounded-lg border border-border bg-white px-2 py-1 text-[12px] font-semibold text-ink outline-none focus-visible:border-operation focus-visible:ring-2 focus-visible:ring-operation/20"
-          value={hour}
-          onChange={(event) => onPick(`${event.target.value}:${minute || "00"}`)}
-        >
-          <option value="">ชม.</option>
-          {Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0")).map((h) => (
-            <option key={h} value={h}>
-              {h}
-            </option>
-          ))}
-        </select>
-        <span className="font-bold text-ink-faint">:</span>
-        <select
-          className="rounded-lg border border-border bg-white px-2 py-1 text-[12px] font-semibold text-ink outline-none focus-visible:border-operation focus-visible:ring-2 focus-visible:ring-operation/20"
-          value={minute}
-          onChange={(event) => onPick(`${hour || "00"}:${event.target.value}`)}
-        >
-          <option value="">นาที</option>
-          {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
+    </div>
+  );
+}
+
+function TimePartControl({
+  label,
+  value,
+  onChange,
+  onBlur,
+  onStep
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  onStep: (by: number) => void;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <span className="text-[11px] font-semibold text-ink-faint">{label}</span>
+      <div className="grid grid-cols-[1.9rem_1fr_1.9rem] items-center overflow-hidden rounded-xl border border-border bg-white shadow-sm focus-within:border-operation focus-within:ring-4 focus-within:ring-operation/10">
+        <button type="button" onClick={() => onStep(-1)} className="grid h-10 place-items-center text-lg font-bold text-ink-faint transition hover:bg-operation-soft hover:text-operation focus-ring" aria-label={`ลด${label}`}>-</button>
+        <input
+          className="h-10 min-w-0 border-x border-border/70 bg-white text-center text-base font-bold tabular-nums text-ink outline-none"
+          inputMode="numeric"
+          maxLength={2}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          placeholder="00"
+        />
+        <button type="button" onClick={() => onStep(1)} className="grid h-10 place-items-center text-lg font-bold text-ink-faint transition hover:bg-operation-soft hover:text-operation focus-ring" aria-label={`เพิ่ม${label}`}>+</button>
       </div>
     </div>
   );

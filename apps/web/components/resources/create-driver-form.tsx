@@ -61,7 +61,7 @@ export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid content-start gap-4 self-start p-4">
+    <form action={handleSubmit} className="enterprise-panel clean-form grid content-start gap-4 self-start p-4">
       <div>
         <h2 className="text-lg font-semibold text-ink">เพิ่มคนขับ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -71,11 +71,11 @@ export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="field-label sm:col-span-2">
-          <span className="field-title">ชื่อ-นามสกุล <span className="field-required-badge">จำเป็น</span></span>
+          <span className="field-title">ชื่อ-นามสกุล <span className="field-required-badge">*</span></span>
           <input className="field-input" name="fullName" placeholder="เช่น สมชาย ใจดี" required />
         </label>
         <label className="field-label">
-          <span className="field-title">เบอร์โทรศัพท์ <span className="field-required-badge">จำเป็น</span></span>
+          <span className="field-title">เบอร์โทรศัพท์ <span className="field-required-badge">*</span></span>
           <input className="field-input" name="phone" inputMode="tel" placeholder="08x-xxx-xxxx" required />
           <span className="field-hint">ใช้สำหรับติดต่อและส่งข้อมูลปฏิบัติงาน</span>
         </label>

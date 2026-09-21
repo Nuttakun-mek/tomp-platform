@@ -186,7 +186,7 @@ export function CreateAssignmentForm({
     <form action={handleSubmit} className="grid content-start gap-5">
       <label className="field-label">
         <span className="field-title">
-          Call Sign <span className="field-required-badge">จำเป็น</span>
+          Call Sign <span className="field-required-badge">*</span>
         </span>
         <select
           className="field-input"

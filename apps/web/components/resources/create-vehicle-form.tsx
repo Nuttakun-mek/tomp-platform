@@ -85,7 +85,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
   }
 
   return (
-    <form action={handleSubmit} className="enterprise-panel grid content-start gap-4 p-4">
+    <form action={handleSubmit} className="enterprise-panel clean-form grid content-start gap-4 p-4">
       <div>
         <h2 className="text-lg font-semibold text-ink">เพิ่มรถ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -96,11 +96,11 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
       <fieldset className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7rem,0.62fr)]">
         <legend className="px-1 text-xs font-bold text-slate-600">ข้อมูลที่ต้องมี</legend>
         <label className="field-label">
-          <span className="field-title">ทะเบียนรถ <span className="field-required-badge">จำเป็น</span></span>
+          <span className="field-title">ทะเบียนรถ <span className="field-required-badge">*</span></span>
           <input className="field-input" name="plateNumber" placeholder="เช่น 1กข 1234" required />
         </label>
         <label className="field-label">
-          <span className="field-title">ประเภทรถ <span className="field-required-badge">จำเป็น</span></span>
+          <span className="field-title">ประเภทรถ <span className="field-required-badge">*</span></span>
           <select className="field-input" name="vehicleType" defaultValue="" required>
             <option value="" disabled>เลือกประเภทรถ</option>
             {VEHICLE_TYPE_OPTIONS.map((type) => (
@@ -110,7 +110,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
           <span className="field-hint">ใช้จัดกลุ่มสัญลักษณ์รถในศูนย์ควบคุม</span>
         </label>
         <label className="field-label">
-          <span className="field-title">จำนวนที่นั่ง <span className="field-required-badge">จำเป็น</span></span>
+          <span className="field-title">จำนวนที่นั่ง <span className="field-required-badge">*</span></span>
           <input className="field-input" min={0} max={80} name="capacity" placeholder="เช่น 4" type="number" required />
         </label>
       </fieldset>
@@ -176,10 +176,10 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
           <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
           <span className="field-hint">ใช้คำนวณอัตราเฉลี่ยและค่าใช้จ่ายเพิ่มเติมเมื่อเกินเวลาที่กำหนดในงาน</span>
         </label>
-        <div className="rounded-2xl border border-slate-200 bg-canvas/60 p-3 md:col-span-2">
-          <p className="text-sm font-semibold text-ink">ตัวอย่างการคำนวณ</p>
-          <p className="mt-1 text-xs leading-5 text-ink-soft">{vehicleUsageCostBreakdown(costPreview)}</p>
-          <p className="mt-1 text-[11px] leading-4 text-ink-faint">
+        <div className="rounded-2xl border border-slate-200 bg-canvas/60 px-3 py-2 md:col-span-2">
+          <p className="text-xs font-semibold text-ink">ตัวอย่างการคำนวณ</p>
+          <p className="mt-0.5 text-xs leading-5 text-ink-soft">{vehicleUsageCostBreakdown(costPreview)}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-4 text-ink-faint">
             หากคนขับบันทึกเวลาเข้าก่อนเวลาเริ่ม ระบบจะไม่คำนวณค่าใช้จ่ายก่อนเวลาแผน และจะคำนวณค่าล่วงเวลาเมื่อบันทึกเวลาออกเกินเวลาที่กำหนด
           </p>
         </div>

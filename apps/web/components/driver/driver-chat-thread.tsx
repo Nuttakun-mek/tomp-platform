@@ -90,6 +90,32 @@ function getCaptureLocation(): Promise<CaptureLocation | null> {
   });
 }
 
+async function resolvePlaceName(location: CaptureLocation | null): Promise<string | null> {
+  if (!location) return null;
+  const lat = location.latitude.toFixed(6);
+  const lon = location.longitude.toFixed(6);
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=18&accept-language=th,en`,
+      { headers: { Accept: "application/json" } }
+    );
+    if (!response.ok) return null;
+    const data = (await response.json()) as { name?: unknown; display_name?: unknown; address?: Record<string, unknown> };
+    const address = data.address ?? {};
+    const parts = [
+      typeof data.name === "string" ? data.name : null,
+      typeof address.road === "string" ? address.road : null,
+      typeof address.suburb === "string" ? address.suburb : null,
+      typeof address.city === "string" ? address.city : typeof address.town === "string" ? address.town : null
+    ].filter((part): part is string => Boolean(part?.trim()));
+    if (parts.length) return Array.from(new Set(parts)).slice(0, 3).join(", ");
+    if (typeof data.display_name === "string") return data.display_name.split(",").slice(0, 3).join(",").trim();
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function canvasBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality));
 }
@@ -130,6 +156,10 @@ async function stampPhoto(file: File, capturedAt: string, location: PendingPhoto
       ? `GPS ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}${location.accuracy ? ` · ±${Math.round(location.accuracy)} ม.` : ""}`
       : "GPS ไม่มีพิกัด ณ เวลาถ่ายภาพ";
   ctx.fillText(coordinate, pad, top + pad + 52);
+  if (location.placeName) {
+    ctx.font = `600 ${Math.max(16, Math.round(canvas.width * 0.018))}px sans-serif`;
+    ctx.fillText(location.placeName.slice(0, 90), pad, top + pad + 78);
+  }
 
   const blob = await canvasBlob(canvas, 0.78);
   return {
@@ -233,6 +263,7 @@ export function DriverChatThread({
       const capturedAt = new Date().toISOString();
       const nativeSnapshot = requestNativeLocationSnapshot();
       const location = (await getCaptureLocation()) ?? (await nativeSnapshot);
+      const placeName = await resolvePlaceName(location);
       const base: PendingPhoto = {
         type: "photo",
         storagePath: "",
@@ -240,6 +271,7 @@ export function DriverChatThread({
         latitude: location?.latitude ?? null,
         longitude: location?.longitude ?? null,
         accuracy: location?.accuracy ?? null,
+        placeName,
         hasLocation: Boolean(location),
         stampApplied: true
       };
@@ -294,6 +326,11 @@ export function DriverChatThread({
                 {b.attachment ? (
                   <span className={`mt-1 block text-[10px] ${b.from === "driver" ? "text-white/70" : "text-ink-faint"}`}>
                     รูปแนบ: {b.attachment.hasLocation ? "มีเวลาและพิกัด GPS" : "มีเวลา แต่ไม่มีพิกัด GPS"}
+                  </span>
+                ) : null}
+                {b.attachment?.placeName ? (
+                  <span className={`mt-0.5 block text-[10px] ${b.from === "driver" ? "text-white/70" : "text-ink-faint"}`}>
+                    สถานที่: {b.attachment.placeName}
                   </span>
                 ) : null}
                 <span className={`mt-0.5 block text-[10px] ${b.from === "driver" ? "text-white/70" : "text-ink-faint"}`}>
