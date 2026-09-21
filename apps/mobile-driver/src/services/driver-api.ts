@@ -102,7 +102,7 @@ export async function submitStatusUpdate(input: AssignmentStatusUpdateInput, mob
 
 export async function submitIssueReport(input: DriverIssueReportInput, mobileSession?: MobileDriverSession | null) {
   if (!mobileSession?.session) {
-    return { success: false, error: "ยังไม่มี mobile session สำหรับแจ้งปัญหา", statusCode: 401 };
+    return { success: false, error: "ยังไม่มี mobile session สำหรับแจ้งเหตุขัดข้อง", statusCode: 401 };
   }
 
   return requestJson<unknown>("/api/driver/issue", {

@@ -39,7 +39,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-teal-300 text-[13px] font-bold text-teal-950">T</span>
                 <span className="min-w-0">
                   <span className="block text-[11px] font-bold tracking-[0.28em] text-teal-200">TOMP</span>
-                  <span className="block text-[12px] font-semibold leading-tight text-white">{t(locale, "app.productDescription")}</span>
+                  <span className="block text-[12px] font-semibold leading-tight text-white">{t(locale, "app.productShortDescription")}</span>
                 </span>
               </Link>
 
@@ -66,7 +66,7 @@ export async function AppShell({ children }: Readonly<{ children: React.ReactNod
               <div className="flex items-center justify-between gap-3">
                 <Link href="/" className="min-w-0">
                   <p className="text-[11px] font-bold tracking-[0.28em] text-operation">TOMP</p>
-                  <p className="text-[13px] font-semibold leading-tight text-ink">{t(locale, "app.productDescription")}</p>
+                  <p className="hidden truncate text-[13px] font-semibold leading-tight text-ink min-[430px]:block">{t(locale, "app.productShortDescription")}</p>
                 </Link>
                 <div className="flex shrink-0 items-center gap-2">
                   <LanguageSwitcher locale={locale} variant="light" />

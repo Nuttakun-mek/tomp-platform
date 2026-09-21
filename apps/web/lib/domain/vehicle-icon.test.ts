@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferVehicleIcon, normaliseVehicleIcon, vehicleIconShortLabel } from "./vehicle-icon";
+import { inferVehicleIcon, normaliseVehicleIcon, vehicleIconShortLabel, vehicleIconSvgMarkup } from "./vehicle-icon";
 
 describe("vehicle icon helpers", () => {
   it("accepts only known explicit vehicle icons", () => {
@@ -29,5 +29,11 @@ describe("vehicle icon helpers", () => {
   it("returns compact labels for map markers", () => {
     expect(vehicleIconShortLabel("suv")).toBe("SUV");
     expect(vehicleIconShortLabel("motorcycle")).toBe("MC");
+  });
+
+  it("returns svg markup for visual map markers", () => {
+    expect(vehicleIconSvgMarkup("van")).toContain("<svg");
+    expect(vehicleIconSvgMarkup("van")).toContain("tomp-map-marker-icon");
+    expect(vehicleIconSvgMarkup("van")).not.toContain(">ตู้<");
   });
 });

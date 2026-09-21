@@ -203,28 +203,6 @@ function CalendarGrid({
         })}
       </div>
 
-      <div className="flex flex-wrap gap-1.5 border-t border-border/70 pt-3">
-        {[
-          { label: "วันนี้", offset: 0 },
-          { label: "พรุ่งนี้", offset: 1 },
-          { label: "มะรืนนี้", offset: 2 }
-        ].map(({ label, offset }) => {
-          const base = new Date();
-          base.setDate(base.getDate() + offset);
-          const value = iso(base.getFullYear(), base.getMonth(), base.getDate());
-          if (blocked(value)) return null;
-          return (
-            <button
-              key={label}
-              type="button"
-              onClick={() => onPick(value)}
-              className="rounded-full border border-border/70 bg-white px-3 py-1.5 text-[11px] font-semibold text-ink-soft shadow-sm transition hover:border-operation/30 hover:bg-operation-soft hover:text-operation focus-ring"
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

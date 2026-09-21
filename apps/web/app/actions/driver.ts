@@ -208,22 +208,25 @@ export async function assignmentStatusUpdateAction(input: unknown, trusted?: Tru
   // Reflect the driver's progress on the assignment itself so every control-centre
   // view (task cards, dispatch board, project overview) shows a live status —
   // the detailed step still lives in assignment_status_updates.
-  if (parsed.data.status !== "completed" && parsed.data.status !== "blocked" && await hasOtherActiveJob(scope, client)) {
+  const isWorkSessionEvent = parsed.data.status === "work_started" || parsed.data.status === "work_ended";
+  if (!isWorkSessionEvent && parsed.data.status !== "completed" && parsed.data.status !== "blocked" && await hasOtherActiveJob(scope, client)) {
     return actionFailure("Call Sign นี้มีงานที่กำลังปฏิบัติการอยู่แล้ว กรุณาให้ศูนย์ควบคุมพักหรือปิดงานเดิมก่อน");
   }
 
-  const planStatus = parsed.data.status === "completed"
-    ? "completed"
-    : parsed.data.status === "acknowledged"
-      ? "acknowledged"
-      : parsed.data.status === "blocked"
-        ? "parked"
-        : "active";
-  await client
-    .from("assignments")
-    .update({ status: planStatus })
-    .eq("id", scope.assignmentId)
-    .in("status", ["draft", "planned", "published", "acknowledged", "active", "parked"]);
+  if (parsed.data.status !== "work_ended") {
+    const planStatus = parsed.data.status === "completed"
+      ? "completed"
+      : parsed.data.status === "acknowledged"
+        ? "acknowledged"
+        : parsed.data.status === "blocked"
+          ? "parked"
+          : "active";
+    await client
+      .from("assignments")
+      .update({ status: planStatus })
+      .eq("id", scope.assignmentId)
+      .in("status", ["draft", "planned", "published", "acknowledged", "active", "parked"]);
+  }
 
   if (parsed.data.status === "acknowledged") {
     await client.from("driver_acknowledgements").insert({

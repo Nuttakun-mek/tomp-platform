@@ -21,6 +21,8 @@ export type DriverTaskStatus =
   | "assigned"
   | "acknowledged"
   | "ready"
+  | "work_started"
+  | "work_ended"
   | "en_route_pickup"
   | "arrived_pickup"
   | "passenger_onboard"

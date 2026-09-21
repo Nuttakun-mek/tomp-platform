@@ -49,9 +49,9 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
       <section className="enterprise-panel overflow-hidden">
         <div className="enterprise-surface p-4 lg:p-5">
           <div className="min-w-0">
-            <p className="section-label">จัดงาน</p>
+            <p className="section-label">จัดการโครงการ</p>
             <h1 className="page-title mt-2">{project.projectName}</h1>
-            <p className="page-description mt-2.5">สร้าง Assignment มอบให้ Call Sign คนขับ และรถ แล้วออก QR เฉพาะงาน</p>
+            <p className="page-description mt-2.5">จัดการหน่วยรถ เปิดงานให้คนขับ และออก QR สำหรับการปฏิบัติงาน ส่วนการติดตามเวลาและความเสี่ยง OT อยู่ที่ศูนย์ควบคุม</p>
           </div>
         </div>
       </section>

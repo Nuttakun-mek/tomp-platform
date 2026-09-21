@@ -17,7 +17,7 @@ export function getDriverNotificationActionLabel(action: DriverNotificationActio
     acknowledge: "รับทราบ",
     call_control: "โทรศูนย์ควบคุม",
     open_maps: "เปิด Google Maps",
-    report_issue: "แจ้งปัญหา",
+    report_issue: "แจ้งเหตุขัดข้อง",
     none: "ไม่มี action"
   };
   return labels[action];

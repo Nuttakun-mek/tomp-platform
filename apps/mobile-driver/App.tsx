@@ -79,7 +79,7 @@ type ShellMode = "activation" | "web";
 type DriverMenuKey = "home" | "next" | "messages" | "location";
 
 const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; shortLabel: string; view?: DriverWebViewKey }> = [
-  { key: "home", label: "หน้างาน", shortLabel: "งาน", view: "home" },
+  { key: "home", label: "หน้าหลัก", shortLabel: "หน้าหลัก", view: "home" },
   { key: "next", label: "แผนงาน", shortLabel: "แผนงาน", view: "next" },
   { key: "messages", label: "ข้อความ", shortLabel: "ข้อความ", view: "messages" },
   { key: "location", label: "ตำแหน่ง", shortLabel: "ตำแหน่ง", view: "gps" }
@@ -126,7 +126,7 @@ function DriverShell() {
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [qrLocked, setQrLocked] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [message, setMessage] = useState("สแกน QR หรือวาง URL งานที่ได้รับจากศูนย์ควบคุม");
+  const [message, setMessage] = useState("สแกน QR งานที่ได้รับจากศูนย์ควบคุม");
   const [locale, setLocale] = useState<MobileLocale>("th");
   const localeRef = useRef<MobileLocale>("th");
   const [sessionReady, setSessionReady] = useState(false);
@@ -458,7 +458,7 @@ function DriverShell() {
     setManualEntryOpen(false);
     setQrLocked(false);
     setActiveDriverMenu("home");
-    setMessage("ออกจากงานแล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
+    setMessage("ออกจากงานนี้แล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
   }, []);
 
   const confirmResetAssignment = useCallback(() => {

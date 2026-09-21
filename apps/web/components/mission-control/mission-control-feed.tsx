@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { DriverLocation } from "@tomp/types/domain";
-import type { AssignmentStatusUpdate } from "@/lib/data/assignment-status";
+import type { AssignmentStatusUpdate, AssignmentWorkSession } from "@/lib/data/assignment-status";
 import type { DriverInboundMessage, DriverOutboundMessage } from "@/lib/data/driver-comms";
 import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
@@ -19,6 +19,7 @@ export interface MissionControlComms {
   inbound: DriverInboundMessage[];
   outbound: DriverOutboundMessage[];
   statuses: Record<string, AssignmentStatusUpdate>;
+  workSessions: Record<string, AssignmentWorkSession>;
   evidence: Record<string, VehicleEvidence>;
 }
 
@@ -72,6 +73,7 @@ export function MissionControlFeedProvider({ projectId, initialLocations, initia
           inbound: Array.isArray(commsRes.data.inbound) ? (commsRes.data.inbound as DriverInboundMessage[]) : prev.inbound,
           outbound: Array.isArray(commsRes.data.outbound) ? (commsRes.data.outbound as DriverOutboundMessage[]) : prev.outbound,
           statuses: commsRes.data.statuses ? { ...prev.statuses, ...(commsRes.data.statuses as Record<string, AssignmentStatusUpdate>) } : prev.statuses,
+          workSessions: commsRes.data.workSessions ? { ...prev.workSessions, ...(commsRes.data.workSessions as Record<string, AssignmentWorkSession>) } : prev.workSessions,
           evidence: commsRes.data.evidence ? { ...prev.evidence, ...(commsRes.data.evidence as Record<string, VehicleEvidence>) } : prev.evidence
         }));
       } else if (commsRes?.success === false) {

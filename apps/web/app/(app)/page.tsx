@@ -5,6 +5,10 @@ import { getViewerAccess } from "@/lib/auth/access";
 import { getViewerSystemKeys } from "@/lib/data/project-systems";
 
 const ICONS: Record<string, typeof CarFront> = { CarFront, PlaneTakeoff };
+const SYSTEM_COPY: Record<string, { label: string; description: string }> = {
+  ground_transfer: { label: "ระบบจัดการรถรับส่ง", description: "จัดงานรถ คนขับ QR และศูนย์ควบคุม" },
+  airport_transfer: { label: "ระบบรับส่งสนามบิน", description: "จัดเคสรับส่งผู้โดยสารตามเที่ยวบิน" }
+};
 
 interface SystemRow {
   key: string;
@@ -17,8 +21,8 @@ async function getActiveSystems(): Promise<SystemRow[]> {
   const { resolveReadClient } = await import("@/lib/supabase/scoped-client");
   const { client } = await resolveReadClient();
   if (!client) return [
-    { key: "ground_transfer", labelTh: "Ground Transfer", icon: "CarFront", route: "ground-transfer" },
-    { key: "airport_transfer", labelTh: "Airport Transfer", icon: "PlaneTakeoff", route: "airport-transfer" }
+    { key: "ground_transfer", labelTh: SYSTEM_COPY.ground_transfer.label, icon: "CarFront", route: "ground-transfer" },
+    { key: "airport_transfer", labelTh: SYSTEM_COPY.airport_transfer.label, icon: "PlaneTakeoff", route: "airport-transfer" }
   ];
   const { data } = await client.from("systems").select("key, label_th, icon, route").eq("is_active", true).order("sort_order");
   return (data ?? []).map((row) => ({ key: String(row.key), labelTh: String(row.label_th), icon: String(row.icon), route: String(row.route) }));
@@ -32,18 +36,21 @@ export default async function RootPage() {
   return (
     <div className="grid min-h-[70vh] content-center gap-6 px-4">
       <div className="text-center">
-        <h1 className="text-xl font-bold text-ink">Transportation Operations Management Platform</h1>
-        <p className="mt-1 text-sm text-slate-500">เลือกระบบที่ต้องการเข้าใช้งาน</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-operation">TOMP</p>
+        <h1 className="mt-1 text-xl font-bold text-ink">ศูนย์ปฏิบัติการขนส่ง</h1>
+        <p className="mt-1 text-sm text-slate-500">เลือกระบบงานที่ต้องการเข้าใช้งาน</p>
       </div>
       <div className="mx-auto flex flex-wrap justify-center gap-4">
         {systems.map((system) => {
           const Icon = ICONS[system.icon] ?? CarFront;
           const unlocked = viewerSystems.includes(system.key);
+          const copy = SYSTEM_COPY[system.key] ?? { label: system.labelTh, description: "เข้าใช้งานระบบ" };
           if (!unlocked) {
             return (
               <div key={system.key} className="grid w-48 place-items-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center opacity-60">
                 <Icon className="h-8 w-8 text-slate-400" />
-                <p className="font-semibold text-slate-500">{system.labelTh}</p>
+                <p className="font-semibold text-slate-500">{copy.label}</p>
+                <p className="text-xs leading-5 text-slate-400">{copy.description}</p>
                 <p className="text-xs text-slate-400">🔒 ติดต่อผู้ดูแลระบบ</p>
               </div>
             );
@@ -51,8 +58,9 @@ export default async function RootPage() {
           return (
             <Link key={system.key} href={`/${system.route}`} className="grid w-48 place-items-center gap-2 rounded-2xl border border-border bg-white p-6 text-center shadow-sm transition hover:border-operation hover:shadow-md">
               <Icon className="h-8 w-8 text-operation" />
-              <p className="font-semibold text-ink">{system.labelTh}</p>
-              <p className="text-xs text-slate-500">เข้าใช้งาน</p>
+              <p className="font-semibold text-ink">{copy.label}</p>
+              <p className="text-xs leading-5 text-slate-500">{copy.description}</p>
+              <p className="text-xs font-semibold text-operation">เข้าใช้งาน</p>
             </Link>
           );
         })}

@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import type { DriverLocation } from "@tomp/types/domain";
 import { spreadOverlappingMapPoints } from "@/lib/map/marker-overlap";
-import { inferVehicleIcon, vehicleIconShortLabel, type VehicleIconKey } from "@/lib/domain/vehicle-icon";
+import { inferVehicleIcon, vehicleIconSvgMarkup, type VehicleIconKey } from "@/lib/domain/vehicle-icon";
 
 export type MarkerFreshness = "live" | "idle" | "slow" | "offline" | "stopped";
 
@@ -28,6 +28,14 @@ export const TRACKING_MARKER_COLORS: Record<MarkerFreshness, string> = {
   slow: "#f59e0b",
   offline: "#f43f5e",
   stopped: "#64748b"
+};
+
+const TRACKING_MARKER_STATUS_ICON: Record<MarkerFreshness, string> = {
+  live: "✓",
+  idle: "●",
+  slow: "!",
+  offline: "×",
+  stopped: "■"
 };
 
 function escapeHtml(value: string) {
@@ -109,7 +117,7 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
         L.marker([spread.displayLatitude, spread.displayLongitude], {
           icon: L.divIcon({
             className: "",
-            html: `<span class="tomp-map-marker" style="--marker-color:${color}"><span>${escapeHtml(vehicleIconShortLabel(point.vehicleIcon ?? "sedan"))}</span></span>`,
+            html: `<span class="tomp-map-marker" style="--marker-color:${color}">${vehicleIconSvgMarkup(point.vehicleIcon ?? "sedan")}<span class="tomp-map-marker-status">${TRACKING_MARKER_STATUS_ICON[point.freshness]}</span></span>`,
             iconSize: [38, 38],
             iconAnchor: [19, 19],
             popupAnchor: [0, -18]

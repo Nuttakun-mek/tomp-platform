@@ -319,13 +319,26 @@ function ProjectFleetAccessCard({
 }
 
 
-/** "09:30 – 12:00", or a dash when the job has no times yet. */
-function clockRange(start?: string | null, end?: string | null) {
-  const time = (value?: string | null) => (value ? String(value).slice(11, 16) : "");
-  const from = time(start);
-  const to = time(end);
-  if (from && to) return `${from} – ${to}`;
-  return from || to || "ยังไม่ระบุเวลา";
+/** "20 ก.ย. 2569 09:30 – 12:00", or a clear empty state when the job has no times yet. */
+function jobDateTimeRange(start?: string | null, end?: string | null) {
+  const parse = (value?: string | null) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return null;
+    return date;
+  };
+  const dateFormatter = new Intl.DateTimeFormat("th-TH", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Bangkok" });
+  const timeFormatter = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
+  const from = parse(start);
+  const to = parse(end);
+  if (!from && !to) return "ยังไม่ระบุวันและเวลา";
+  if (from && !to) return `${dateFormatter.format(from)} ${timeFormatter.format(from)}`;
+  if (!from && to) return `${dateFormatter.format(to)} ${timeFormatter.format(to)}`;
+  const fromDate = dateFormatter.format(from!);
+  const toDate = dateFormatter.format(to!);
+  const fromTime = timeFormatter.format(from!);
+  const toTime = timeFormatter.format(to!);
+  return fromDate === toDate ? `${fromDate} ${fromTime} – ${toTime}` : `${fromDate} ${fromTime} – ${toDate} ${toTime}`;
 }
 
 
@@ -470,7 +483,7 @@ export function CallSignAccessPanel({
             return {
               id: job.id,
               status: job.status,
-              clock: clockRange(row?.startTime, row?.endTime),
+              clock: jobDateTimeRange(row?.startTime, row?.endTime),
               route: `${pickup} → ${dropoff}`
             };
           })

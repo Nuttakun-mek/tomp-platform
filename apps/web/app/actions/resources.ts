@@ -1,15 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createDriverSchema, createVehicleSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
-import { mapDriver, mapVehicle } from "@/lib/data/mappers";
+import { mapCallSign, mapDriver, mapVehicle } from "@/lib/data/mappers";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
 const VEHICLE_ICON_KEYS = new Set(["sedan", "suv", "van", "minibus", "bus", "pickup", "truck", "motorcycle"]);
+
+const createExistingProjectResourcePairSchema = z.object({
+  projectId: z.string().uuid(),
+  callSign: z.string().trim().max(40).optional().nullable(),
+  driverId: z.string().uuid(),
+  vehicleId: z.string().uuid()
+});
 
 function cleanText(value: unknown) {
   return String(value || "").trim();
@@ -23,6 +31,14 @@ function numberOrNull(value: unknown) {
 function timeOrNull(value: unknown) {
   const text = cleanText(value);
   return /^\d{2}:\d{2}$/.test(text) ? text : null;
+}
+
+function callSignSeed(value: string) {
+  const cleaned = value
+    .toUpperCase()
+    .replace(/[^A-Z0-9ก-ฮ]/g, "")
+    .slice(-6);
+  return cleaned || "UNIT";
 }
 
 export async function createDriverAction(input: unknown): Promise<ActionResult> {
@@ -164,6 +180,9 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
   if (!driverParsed.success) return actionFailure("กรอกชื่อคนขับและเบอร์โทรศัพท์ให้ครบ", driverParsed.error.flatten().fieldErrors);
 
   const icon = cleanText(data.vehicleIcon);
+  const packageHours = numberOrNull(data.packageHours);
+  const packageAmount = numberOrNull(data.packageAmount);
+  const derivedHourlyRate = packageHours && packageAmount ? Math.round((packageAmount / packageHours) * 100) / 100 : null;
   const vehicleParsed = createVehicleSchema.safeParse({
     plateNumber: data.plateNumber,
     vehicleType: data.vehicleType,
@@ -174,8 +193,10 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
       model: cleanText(data.model),
       colour: cleanText(data.colour),
       icon: VEHICLE_ICON_KEYS.has(icon) ? icon : "van",
-      hourlyRate: numberOrNull(data.hourlyRate),
-      minimumHours: numberOrNull(data.minimumHours),
+      packageHours,
+      packageAmount,
+      hourlyRate: derivedHourlyRate,
+      minimumHours: packageHours,
       defaultDutyStart: timeOrNull(data.defaultDutyStart),
       defaultDutyEnd: timeOrNull(data.defaultDutyEnd),
       costNote: cleanText(data.costNote),
@@ -230,14 +251,46 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
     return actionFailure(getDatabaseErrorMessage(vehicleError, "บันทึกข้อมูลรถไม่สำเร็จ"));
   }
 
-  const driverMeta = { ...(driverParsed.data.metadata as Record<string, unknown>), pairedVehicleId: vehicleRow.id };
-  const vehicleMeta = { ...(vehicleParsed.data.metadata as Record<string, unknown>), pairedDriverId: driverRow.id };
+  const seed = callSignSeed(String(vehicleRow.plate_number || vehicleParsed.data.plateNumber));
+  const { count } = await client
+    .from("call_signs")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId);
+  const generatedCallSign = `${seed}-${String((count || 0) + 1).padStart(2, "0")}`;
+  const { data: callSignRow, error: callSignError } = await client
+    .from("call_signs")
+    .insert({
+      project_id: projectId,
+      call_sign: generatedCallSign,
+      group_name: "ปฏิบัติการ",
+      driver_id: driverRow.id,
+      vehicle_id: vehicleRow.id,
+      status: "active",
+      metadata: {
+        source: "project_resource_pair_form",
+        generated: true,
+        preparedAsPair: true
+      }
+    })
+    .select()
+    .single();
+
+  if (callSignError || !callSignRow) {
+    await Promise.all([
+      client.from("vehicles").delete().eq("id", vehicleRow.id),
+      client.from("drivers").delete().eq("id", driverRow.id)
+    ]);
+    return actionFailure(getDatabaseErrorMessage(callSignError, "สร้างหน่วยรถจากคู่คนขับและรถไม่สำเร็จ"));
+  }
+
+  const driverMeta = { ...(driverParsed.data.metadata as Record<string, unknown>), pairedVehicleId: vehicleRow.id, pairedCallSignId: callSignRow.id };
+  const vehicleMeta = { ...(vehicleParsed.data.metadata as Record<string, unknown>), pairedDriverId: driverRow.id, pairedCallSignId: callSignRow.id };
   await Promise.all([
     client.from("drivers").update({ metadata: driverMeta }).eq("id", driverRow.id),
     client.from("vehicles").update({ metadata: vehicleMeta }).eq("id", vehicleRow.id)
   ]);
 
-  const [driverTimeline, vehicleTimeline] = await Promise.all([
+  const [driverTimeline, vehicleTimeline, callSignTimeline] = await Promise.all([
     createTimelineEvent({
       projectId,
       objectType: "driver",
@@ -255,6 +308,16 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
       source: "operation_user",
       reason: "สร้างข้อมูลรถพร้อมคนขับจากหน้าทรัพยากรโครงการ",
       afterData: { ...vehicleRow, metadata: vehicleMeta }
+    }),
+    createTimelineEvent({
+      projectId,
+      objectType: "call_sign",
+      objectId: String(callSignRow.id),
+      eventType: "CALL_SIGN_CREATED",
+      source: "operation_user",
+      reason: "สร้างหน่วยรถอัตโนมัติจากคู่คนขับและรถ",
+      afterData: callSignRow,
+      metadata: { action: "create_call_sign_from_resource_pair" }
     })
   ]);
 
@@ -262,8 +325,131 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
   revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
 
   return actionSuccess(
-    { mode, driver: mapDriver({ ...driverRow, metadata: driverMeta }), vehicle: mapVehicle({ ...vehicleRow, metadata: vehicleMeta }), timelineEvents: [driverTimeline.data, vehicleTimeline.data].filter(Boolean) },
-    driverTimeline.success && vehicleTimeline.success ? undefined : "บันทึกข้อมูลแล้ว แต่ Timeline บางรายการบันทึกไม่สำเร็จ"
+    {
+      mode,
+      driver: mapDriver({ ...driverRow, metadata: driverMeta }),
+      vehicle: mapVehicle({ ...vehicleRow, metadata: vehicleMeta }),
+      callSign: mapCallSign(callSignRow),
+      timelineEvents: [driverTimeline.data, vehicleTimeline.data, callSignTimeline.data].filter(Boolean)
+    },
+    driverTimeline.success && vehicleTimeline.success && callSignTimeline.success ? undefined : "บันทึกข้อมูลแล้ว แต่ Timeline บางรายการบันทึกไม่สำเร็จ"
+  );
+}
+
+export async function createExistingProjectResourcePairAction(input: unknown): Promise<ActionResult> {
+  const parsed = createExistingProjectResourcePairSchema.safeParse(input);
+  if (!parsed.success) {
+    return actionFailure("เลือกคนขับและรถให้ครบก่อนสร้างหน่วยรถ", parsed.error.flatten().fieldErrors);
+  }
+
+  const permission = await requirePermission(parsed.data.projectId, "assignment.create");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์สร้างหน่วยรถในโครงการนี้");
+
+  const { client, error, mode } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const requestedCallSign = parsed.data.callSign?.trim();
+  let nextCallSign = requestedCallSign || "";
+  const [{ data: driverRow, error: driverReadError }, { data: vehicleRow, error: vehicleReadError }] = await Promise.all([
+    client
+      .from("drivers")
+      .select("id, metadata")
+      .eq("id", parsed.data.driverId)
+      .eq("project_id", parsed.data.projectId)
+      .maybeSingle(),
+    client
+      .from("vehicles")
+      .select("id, plate_number, metadata")
+      .eq("id", parsed.data.vehicleId)
+      .eq("project_id", parsed.data.projectId)
+      .maybeSingle()
+  ]);
+
+  if (driverReadError || !driverRow) return actionFailure(getDatabaseErrorMessage(driverReadError, "ไม่พบข้อมูลคนขับในโครงการนี้"));
+  if (vehicleReadError || !vehicleRow) return actionFailure(getDatabaseErrorMessage(vehicleReadError, "ไม่พบข้อมูลรถในโครงการนี้"));
+
+  const { data: existingUnit, error: existingUnitError } = await client
+    .from("call_signs")
+    .select("call_sign, driver_id, vehicle_id")
+    .eq("project_id", parsed.data.projectId)
+    .neq("status", "archived")
+    .or(`driver_id.eq.${parsed.data.driverId},vehicle_id.eq.${parsed.data.vehicleId}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingUnitError) return actionFailure(getDatabaseErrorMessage(existingUnitError, "ตรวจสอบการจับคู่หน่วยรถไม่สำเร็จ"));
+  if (existingUnit) {
+    if (existingUnit.driver_id === parsed.data.driverId) return actionFailure(`คนขับนี้ถูกจับคู่อยู่แล้วในหน่วยรถ ${existingUnit.call_sign}`);
+    if (existingUnit.vehicle_id === parsed.data.vehicleId) return actionFailure(`รถคันนี้ถูกจับคู่อยู่แล้วในหน่วยรถ ${existingUnit.call_sign}`);
+    return actionFailure(`ทรัพยากรนี้ถูกจับคู่อยู่แล้วในหน่วยรถ ${existingUnit.call_sign}`);
+  }
+
+  if (!nextCallSign) {
+    const seed = callSignSeed(String(vehicleRow.plate_number || "UNIT"));
+    const { count } = await client
+      .from("call_signs")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", parsed.data.projectId);
+    nextCallSign = `${seed}-${String((count || 0) + 1).padStart(2, "0")}`;
+  }
+
+  const { data: callSignRow, error: callSignError } = await client
+    .from("call_signs")
+    .insert({
+      project_id: parsed.data.projectId,
+      call_sign: nextCallSign,
+      group_name: "ปฏิบัติการ",
+      driver_id: parsed.data.driverId,
+      vehicle_id: parsed.data.vehicleId,
+      status: "active",
+      metadata: {
+        source: "project_resource_existing_pair_form",
+        generated: !requestedCallSign,
+        preparedAsPair: true
+      }
+    })
+    .select()
+    .single();
+
+  if (callSignError || !callSignRow) {
+    return actionFailure(getDatabaseErrorMessage(callSignError, "สร้างหน่วยรถจากทรัพยากรที่มีอยู่ไม่สำเร็จ"));
+  }
+
+  const now = new Date().toISOString();
+  const driverMeta = {
+    ...((driverRow.metadata && typeof driverRow.metadata === "object" ? driverRow.metadata : {}) as Record<string, unknown>),
+    pairedVehicleId: parsed.data.vehicleId,
+    pairedCallSignId: callSignRow.id,
+    pairedAt: now
+  };
+  const vehicleMeta = {
+    ...((vehicleRow.metadata && typeof vehicleRow.metadata === "object" ? vehicleRow.metadata : {}) as Record<string, unknown>),
+    pairedDriverId: parsed.data.driverId,
+    pairedCallSignId: callSignRow.id,
+    pairedAt: now
+  };
+  await Promise.all([
+    client.from("drivers").update({ metadata: driverMeta }).eq("id", parsed.data.driverId).eq("project_id", parsed.data.projectId),
+    client.from("vehicles").update({ metadata: vehicleMeta }).eq("id", parsed.data.vehicleId).eq("project_id", parsed.data.projectId)
+  ]);
+
+  const timelineResult = await createTimelineEvent({
+    projectId: parsed.data.projectId,
+    objectType: "call_sign",
+    objectId: String(callSignRow.id),
+    eventType: "CALL_SIGN_CREATED",
+    source: "operation_user",
+    reason: "สร้างหน่วยรถจากทรัพยากรที่มีอยู่ในโครงการ",
+    afterData: callSignRow,
+    metadata: { action: "create_existing_project_resource_pair", mode }
+  });
+
+  revalidatePath("/resources");
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+
+  return actionSuccess(
+    { mode, callSign: mapCallSign(callSignRow), timelineEvent: timelineResult.data },
+    timelineResult.success ? undefined : `สร้างหน่วยรถแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
 }
 

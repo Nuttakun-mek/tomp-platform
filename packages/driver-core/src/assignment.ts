@@ -15,6 +15,8 @@ export function getNextDriverAction(status: DriverTaskStatus) {
     assigned: "กดรับทราบงาน",
     acknowledged: "ยืนยันความพร้อม",
     ready: "เริ่มเดินทางไปจุดรับ",
+    work_started: "เริ่มดำเนินงานตามรายการ",
+    work_ended: "สิ้นสุดเวลาปฏิบัติงาน",
     en_route_pickup: "แจ้งเมื่อถึงจุดรับ",
     arrived_pickup: "แจ้งเมื่อรับผู้โดยสาร",
     passenger_onboard: "เดินทางไปจุดส่ง",

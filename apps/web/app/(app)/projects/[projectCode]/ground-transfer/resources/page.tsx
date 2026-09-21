@@ -5,6 +5,7 @@ import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-ta
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { CreateResourcePairForm } from "@/components/resources/create-resource-pair-form";
 import { ProjectResourceManager } from "@/components/resources/project-resource-manager";
+import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getProjectByCode } from "@/lib/data/projects";
 import { getLibraryDrivers, getLibraryVehicles, getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 
@@ -14,12 +15,14 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
   if (!project) notFound();
   const projectId = project.id;
 
-  const [drivers, vehicles, libraryDrivers, libraryVehicles] = await Promise.all([
+  const [drivers, vehicles, libraryDrivers, libraryVehicles, callSignsResult] = await Promise.all([
     getProjectDrivers(projectId),
     getProjectVehicles(projectId),
     getLibraryDrivers(projectId),
-    getLibraryVehicles(projectId)
+    getLibraryVehicles(projectId),
+    getCallSignsByProjectId(projectId)
   ]);
+  const callSigns = callSignsResult.data;
 
   return (
     <div className="grid gap-4">
@@ -29,7 +32,7 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
         <h1 className="text-lg font-semibold text-ink">ทรัพยากรของโครงการนี้</h1>
         <p className="mt-1 text-sm leading-6 text-slate-600">
           คนขับ {drivers.length} คน · รถ {vehicles.length} คัน — นำเข้าจากคลังกลางหรือเพิ่มใหม่ก็ได้
-          แล้วไปจับคู่เป็นหน่วยรถที่เมนู “จัดงาน”
+          หากเพิ่มเป็นคู่ ระบบจะสร้างหน่วยรถให้พร้อมใช้ในเมนู “จัดการโครงการ”
         </p>
       </section>
 
@@ -50,11 +53,11 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
         </section>
       ) : null}
 
-      <ProjectResourceManager projectId={projectId} drivers={drivers} vehicles={vehicles} libraryDrivers={libraryDrivers} libraryVehicles={libraryVehicles} />
+      <ProjectResourceManager projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} libraryDrivers={libraryDrivers} libraryVehicles={libraryVehicles} />
 
       <CollapsibleSection
         title="เพิ่มคนขับและรถเข้าโครงการนี้"
-        description="สร้างข้อมูลเป็นคู่เดียวกันก่อนนำไปจัดเป็น Call Sign และออก QR ในหน้าจัดงาน"
+        description="สร้างข้อมูลเป็นคู่เดียวกัน แล้วระบบจะสร้างหน่วยรถให้พร้อมเปิดงานและออก QR ในหน้าจัดการโครงการ"
         storageKey={`res.${projectId}.newpair`}
         defaultOpen={drivers.length === 0 || vehicles.length === 0}
       >

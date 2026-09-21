@@ -4,6 +4,8 @@ const statusThai: Record<DriverTaskStatus, string> = {
   assigned: "ได้รับงานแล้ว",
   acknowledged: "รับทราบงานแล้ว",
   ready: "พร้อมเริ่มงาน",
+  work_started: "เริ่มปฏิบัติงานแล้ว",
+  work_ended: "สิ้นสุดปฏิบัติงานแล้ว",
   en_route_pickup: "กำลังไปจุดรับ",
   arrived_pickup: "ถึงจุดรับแล้ว",
   passenger_onboard: "รับผู้โดยสารแล้ว",
@@ -16,7 +18,9 @@ const statusThai: Record<DriverTaskStatus, string> = {
 const transitions: Record<DriverTaskStatus, DriverTaskStatus[]> = {
   assigned: ["acknowledged", "ready", "blocked", "cancelled"],
   acknowledged: ["ready", "blocked", "cancelled"],
-  ready: ["en_route_pickup", "arrived_pickup", "blocked"],
+  ready: ["work_started", "en_route_pickup", "arrived_pickup", "blocked"],
+  work_started: ["arrived_pickup", "blocked", "work_ended"],
+  work_ended: [],
   en_route_pickup: ["arrived_pickup", "blocked"],
   arrived_pickup: ["passenger_onboard", "blocked"],
   passenger_onboard: ["en_route_dropoff", "completed", "blocked"],
@@ -35,7 +39,7 @@ export function getAllowedDriverStatusTransitions(status: DriverTaskStatus) {
 }
 
 export function canDriverStartTask(status: DriverTaskStatus) {
-  return ["assigned", "acknowledged", "ready"].includes(status);
+  return ["assigned", "acknowledged", "ready", "work_started"].includes(status);
 }
 
 export function canDriverCompleteTask(status: DriverTaskStatus) {

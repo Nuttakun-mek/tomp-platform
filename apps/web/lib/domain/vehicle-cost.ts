@@ -1,9 +1,23 @@
 export interface VehicleUsageCost {
   plannedHours: number | null;
+  countedHours: number | null;
+  includedHours: number | null;
+  extraHours: number | null;
   billableHours: number | null;
+  packageHours: number | null;
+  packageAmount: number | null;
   hourlyRate: number | null;
+  baseAmount: number | null;
+  extraAmount: number | null;
   estimatedCost: number | null;
-  source: "assignment_window" | "vehicle_default" | "missing";
+  source: "actual_session" | "assignment_window" | "vehicle_default" | "missing";
+}
+
+export interface VehicleServiceTimeAlert {
+  tone: "neutral" | "warning" | "danger" | "success";
+  label: string;
+  detail: string;
+  minutesRemaining: number | null;
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -36,34 +50,143 @@ function hoursBetweenIso(start?: string | null, end?: string | null): number | n
   return Math.round(((to - from) / 36e5) * 100) / 100;
 }
 
+function laterIso(a?: string | null, b?: string | null): string | null {
+  if (!a) return b || null;
+  if (!b) return a;
+  return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+}
+
+function earlierIso(a?: string | null, b?: string | null): string | null {
+  if (!a) return b || null;
+  if (!b) return a;
+  return new Date(a).getTime() <= new Date(b).getTime() ? a : b;
+}
+
 export function estimateVehicleUsageCost(input: {
   assignmentStart?: string | null;
   assignmentEnd?: string | null;
+  actualStart?: string | null;
+  actualEnd?: string | null;
   vehicleMetadata?: Record<string, unknown> | null;
 }): VehicleUsageCost {
   const meta = input.vehicleMetadata ?? {};
-  const hourlyRate = numberOrNull(meta.hourlyRate);
-  const minimumHours = numberOrNull(meta.minimumHours) ?? 0;
+  const packageHours = numberOrNull(meta.packageHours) ?? numberOrNull(meta.minimumHours);
+  const packageAmount = numberOrNull(meta.packageAmount);
+  const legacyHourlyRate = numberOrNull(meta.hourlyRate);
+  const hourlyRate = packageAmount != null && packageHours ? Math.round((packageAmount / packageHours) * 100) / 100 : legacyHourlyRate;
+  const includedPackageHours = packageHours ?? 0;
   const assignmentHours = hoursBetweenIso(input.assignmentStart, input.assignmentEnd);
+  const effectiveActualStart = laterIso(input.actualStart, input.assignmentStart);
+  const effectiveActualEnd = input.actualEnd ? earlierIso(input.actualEnd, null) : null;
+  const actualHours = hoursBetweenIso(effectiveActualStart, effectiveActualEnd);
   const defaultHours = hoursBetweenTimeOnly(meta.defaultDutyStart, meta.defaultDutyEnd);
   const plannedHours = assignmentHours ?? defaultHours;
-  const billableHours = plannedHours == null ? null : Math.max(plannedHours, minimumHours);
+  const countedHours = actualHours ?? plannedHours;
+  const includedHours = plannedHours == null ? (includedPackageHours || null) : Math.max(plannedHours, includedPackageHours);
+  const billableHours = countedHours == null ? null : Math.max(countedHours, includedHours ?? includedPackageHours);
+  const extraHours = billableHours != null && includedHours != null ? Math.max(Math.round((billableHours - includedHours) * 100) / 100, 0) : 0;
+  const baseAmount = packageAmount != null && packageHours != null
+    ? packageAmount
+    : includedHours != null && hourlyRate != null ? Math.round(includedHours * hourlyRate * 100) / 100 : null;
+  const extraAmount = extraHours != null && hourlyRate != null ? Math.round(extraHours * hourlyRate * 100) / 100 : null;
 
   return {
     plannedHours,
+    countedHours,
+    includedHours,
+    extraHours,
     billableHours,
+    packageHours: packageHours ?? null,
+    packageAmount,
     hourlyRate,
+    baseAmount,
+    extraAmount,
     estimatedCost: billableHours != null && hourlyRate != null ? Math.round(billableHours * hourlyRate * 100) / 100 : null,
-    source: assignmentHours != null ? "assignment_window" : defaultHours != null ? "vehicle_default" : "missing"
+    source: actualHours != null ? "actual_session" : assignmentHours != null ? "assignment_window" : defaultHours != null ? "vehicle_default" : "missing"
   };
 }
 
 export function formatVehicleUsageCost(cost: VehicleUsageCost): string {
-  if (cost.billableHours == null && cost.hourlyRate == null) return "ยังไม่ระบุเวลาและอัตราค่าจ้าง";
+  if (cost.billableHours == null && cost.hourlyRate == null && cost.packageAmount == null) return "ยังไม่ระบุเวลาและค่าใช้จ่ายในการบริการ";
   const parts = [
-    cost.billableHours != null ? `${cost.billableHours.toLocaleString("th-TH")} ชม.` : null,
-    cost.hourlyRate != null ? `${cost.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : null,
+    cost.packageHours != null && cost.packageAmount != null ? `ค่าใช้จ่ายในการบริการ ${cost.packageHours.toLocaleString("th-TH")} ชม. ${cost.packageAmount.toLocaleString("th-TH")} บ.` : null,
+    cost.billableHours != null ? `ชั่วโมงที่ใช้คำนวณ ${cost.billableHours.toLocaleString("th-TH")} ชม.` : null,
+    cost.hourlyRate != null ? `อัตราเฉลี่ย ${cost.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : null,
     cost.estimatedCost != null ? `ประมาณ ${cost.estimatedCost.toLocaleString("th-TH")} บ.` : null
   ].filter(Boolean);
   return parts.join(" · ");
+}
+
+export function vehicleUsageCostBreakdown(cost: VehicleUsageCost): string {
+  if (cost.billableHours == null || cost.hourlyRate == null || cost.estimatedCost == null) {
+    return formatVehicleUsageCost(cost);
+  }
+  const extra = cost.extraHours && cost.extraHours > 0
+    ? `มีค่าล่วงเวลา (OT) ${cost.extraHours.toLocaleString("th-TH")} ชม.`
+    : "ไม่เกินเวลาที่กำหนด";
+  const base = cost.packageHours != null && cost.packageAmount != null
+    ? `ค่าใช้จ่ายในการบริการ ${cost.packageHours.toLocaleString("th-TH")} ชม. ${cost.packageAmount.toLocaleString("th-TH")} บ.`
+    : `${cost.billableHours.toLocaleString("th-TH")} ชม. × ${cost.hourlyRate.toLocaleString("th-TH")} บ./ชม.`;
+  return `${base} = ${cost.estimatedCost.toLocaleString("th-TH")} บ. · ${extra}`;
+}
+
+export function evaluateVehicleServiceTimeAlert(input: {
+  assignmentEnd?: string | null;
+  workSessionStatus?: "pending" | "active" | "ended" | string | null;
+  actualEnd?: string | null;
+  extraHours?: number | null;
+  now?: number;
+  warnBeforeMinutes?: number;
+}): VehicleServiceTimeAlert {
+  const warnBeforeMinutes = input.warnBeforeMinutes ?? 30;
+  const extraHours = input.extraHours ?? 0;
+  if (input.workSessionStatus === "ended") {
+    if (extraHours > 0) {
+      return {
+        tone: "danger",
+        label: "มีค่าล่วงเวลา",
+        detail: `เกินเวลาบริการ ${extraHours.toLocaleString("th-TH")} ชม.`,
+        minutesRemaining: null
+      };
+    }
+    return { tone: "success", label: "ปิดเวลาบริการแล้ว", detail: "ไม่เกินเวลาที่กำหนด", minutesRemaining: null };
+  }
+
+  if (input.workSessionStatus !== "active") {
+    return { tone: "neutral", label: "ยังไม่เริ่มเวลาบริการ", detail: "รอคนขับบันทึกเวลาเข้า", minutesRemaining: null };
+  }
+
+  if (!input.assignmentEnd) {
+    return { tone: "neutral", label: "ยังไม่ระบุเวลาสิ้นสุด", detail: "ไม่สามารถประเมินค่าล่วงเวลาได้", minutesRemaining: null };
+  }
+
+  const end = new Date(input.assignmentEnd).getTime();
+  const now = input.now ?? Date.now();
+  if (!Number.isFinite(end)) {
+    return { tone: "neutral", label: "เวลาสิ้นสุดไม่ถูกต้อง", detail: "ไม่สามารถประเมินค่าล่วงเวลาได้", minutesRemaining: null };
+  }
+
+  const minutesRemaining = Math.ceil((end - now) / 60000);
+  if (minutesRemaining < 0) {
+    return {
+      tone: "danger",
+      label: "เกินเวลาบริการ",
+      detail: `เกินเวลาที่กำหนด ${Math.abs(minutesRemaining).toLocaleString("th-TH")} นาที`,
+      minutesRemaining
+    };
+  }
+  if (minutesRemaining <= warnBeforeMinutes) {
+    return {
+      tone: "warning",
+      label: "ใกล้ครบเวลาบริการ",
+      detail: `เหลือ ${minutesRemaining.toLocaleString("th-TH")} นาที ก่อนเริ่มคิดค่าล่วงเวลา`,
+      minutesRemaining
+    };
+  }
+  return {
+    tone: "success",
+    label: "อยู่ในเวลาบริการ",
+    detail: `เหลือ ${minutesRemaining.toLocaleString("th-TH")} นาที`,
+    minutesRemaining
+  };
 }

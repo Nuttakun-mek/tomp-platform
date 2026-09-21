@@ -5,6 +5,7 @@ export const en = {
   app: {
     productName: "TOMP",
     productDescription: "Transportation Operations Management Platform",
+    productShortDescription: "Transport command center",
     workspaceLabel: "Transportation operations workspace",
     menu: "System menu",
     mainNav: "Main navigation",

@@ -82,7 +82,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           <FolderKanban className="mx-auto h-8 w-8 text-slate-400" />
           <p className="mt-2 font-semibold text-ink">{showArchived ? "ไม่มีโครงการที่เก็บถาวร" : "ยังไม่มีโครงการ"}</p>
           <p className="mt-1 text-sm text-slate-600">
-            {showArchived ? "โครงการที่เก็บถาวรจะแสดงที่นี่" : canCreate ? "สร้างโครงการแรกเพื่อเริ่มจัดงาน" : "ยังไม่ได้รับมอบหมายให้เข้าโครงการใด ติดต่อผู้ดูแล"}
+            {showArchived ? "โครงการที่เก็บถาวรจะแสดงที่นี่" : canCreate ? "สร้างโครงการแรกเพื่อเริ่มจัดการงานปฏิบัติการ" : "ยังไม่ได้รับมอบหมายให้เข้าโครงการใด ติดต่อผู้ดูแล"}
           </p>
         </div>
       )}

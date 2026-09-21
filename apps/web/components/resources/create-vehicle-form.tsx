@@ -1,10 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createVehicleAction } from "@/app/actions/resources";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
+import { estimateVehicleUsageCost, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { createVehicleSchema } from "@/lib/validation";
 
 // This describes the vehicle and nothing else. Who drives it is decided when the
@@ -32,7 +33,19 @@ function text(form: FormData, key: string) {
 export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const toast = useToast();
+  const [defaultDutyStart, setDefaultDutyStart] = useState("08:00");
+  const [defaultDutyEnd, setDefaultDutyEnd] = useState("18:00");
+  const [packageHours, setPackageHours] = useState("10");
+  const [packageAmount, setPackageAmount] = useState("3000");
   const [isPending, startTransition] = useTransition();
+  const costPreview = useMemo(() => estimateVehicleUsageCost({
+    vehicleMetadata: {
+      defaultDutyStart,
+      defaultDutyEnd,
+      packageHours: packageHours === "" ? null : Number(packageHours),
+      packageAmount: packageAmount === "" ? null : Number(packageAmount)
+    }
+  }), [defaultDutyEnd, defaultDutyStart, packageAmount, packageHours]);
 
   function handleSubmit(formData: FormData) {
     const parsed = createVehicleSchema.safeParse({
@@ -47,6 +60,12 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         year: text(formData, "year"),
         photoUrl: text(formData, "photoUrl"),
         luggageCapacity: text(formData, "luggageCapacity"),
+        defaultDutyStart: text(formData, "defaultDutyStart"),
+        defaultDutyEnd: text(formData, "defaultDutyEnd"),
+        packageHours: packageHours === "" ? null : Number(packageHours),
+        packageAmount: packageAmount === "" ? null : Number(packageAmount),
+        hourlyRate: costPreview.hourlyRate,
+        minimumHours: packageHours === "" ? null : Number(packageHours),
         requirements: splitRequirements(formData.get("requirements")),
         operationNote: text(formData, "operationNote")
       }
@@ -73,35 +92,36 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
       <div>
         <h2 className="text-lg font-semibold text-ink">เพิ่มรถ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          รายละเอียดของรถอย่างเดียว คนขับจะจับคู่ทีหลังตอนสร้างหน่วยรถ กรอกเท่าที่มี ไม่บังคับทั้งหมด
+          บันทึกรายละเอียดรถเพื่อเตรียมใช้งานในโครงการ คนขับจะถูกจับคู่ในขั้นตอนสร้างหน่วยรถ
         </p>
       </div>
 
       <fieldset className="grid gap-3 sm:grid-cols-3">
         <legend className="px-1 text-xs font-bold text-slate-600">ข้อมูลที่ต้องมี</legend>
         <label className="field-label">
-          ทะเบียนรถ <span className="text-rose-500">*</span>
+          ทะเบียนรถ <span className="field-required">*</span>
           <input className="field-input" name="plateNumber" placeholder="เช่น 1กข 1234" required />
         </label>
         <label className="field-label">
-          ประเภทรถ <span className="text-rose-500">*</span>
-          <input className="field-input" name="vehicleType" list="vehicle-types" placeholder="เช่น Van, SUV, Sedan" required />
+          ประเภทรถ <span className="field-required">*</span>
+          <input className="field-input" name="vehicleType" list="vehicle-types" placeholder="เช่น รถตู้, SUV, รถเก๋ง" required />
+          <span className="field-hint">ใช้จัดกลุ่มสัญลักษณ์รถในศูนย์ควบคุม</span>
           <datalist id="vehicle-types">
-            <option value="Sedan" />
+            <option value="รถเก๋ง" />
             <option value="SUV" />
-            <option value="Van" />
-            <option value="Minibus" />
-            <option value="Bus" />
-            <option value="Pickup" />
+            <option value="รถตู้" />
+            <option value="มินิบัส" />
+            <option value="รถบัส" />
+            <option value="กระบะ" />
           </datalist>
         </label>
         <label className="field-label">
-          จำนวนที่นั่ง <span className="text-rose-500">*</span>
+          จำนวนที่นั่ง <span className="field-required">*</span>
           <input className="field-input" min={0} max={80} name="capacity" placeholder="เช่น 4" type="number" required />
         </label>
       </fieldset>
 
-      <fieldset className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-2">
+      <fieldset className="form-section sm:grid-cols-2">
         <legend className="px-1 text-xs font-bold text-slate-600">รายละเอียดรถ (ไม่บังคับ)</legend>
         <label className="field-label">
           ยี่ห้อ
@@ -114,6 +134,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         <label className="field-label">
           สี
           <input className="field-input" name="colour" list="vehicle-colours" placeholder="เช่น ขาว" />
+          <span className="field-hint">ใช้แยกรถประเภทเดียวกันระหว่างปฏิบัติงาน</span>
           <datalist id="vehicle-colours">
             {COLOUR_OPTIONS.map((colour) => (
               <option key={colour} value={colour} />
@@ -139,7 +160,34 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         </label>
       </fieldset>
 
-      <fieldset className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+      <fieldset className="form-section sm:grid-cols-4">
+        <legend className="px-1 text-xs font-bold text-slate-600">เวลามาตรฐานและค่าใช้จ่ายในการบริการ</legend>
+        <label className="field-label">
+          เวลาเริ่มต้นปกติ
+          <input className="field-input" name="defaultDutyStart" type="time" value={defaultDutyStart} onChange={(event) => setDefaultDutyStart(event.target.value)} />
+        </label>
+        <label className="field-label">
+          เวลาสิ้นสุดปกติ
+          <input className="field-input" name="defaultDutyEnd" type="time" value={defaultDutyEnd} onChange={(event) => setDefaultDutyEnd(event.target.value)} />
+        </label>
+        <label className="field-label">
+          ค่าใช้จ่ายในการบริการ (บาท)
+          <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />
+        </label>
+        <label className="field-label">
+          จำนวนชั่วโมงที่ครอบคลุม
+          <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
+        </label>
+        <div className="rounded-2xl border border-slate-200 bg-canvas/60 p-3 sm:col-span-4">
+          <p className="text-sm font-semibold text-ink">ตัวอย่างการคำนวณ</p>
+          <p className="mt-1 text-xs leading-5 text-ink-soft">{vehicleUsageCostBreakdown(costPreview)}</p>
+          <p className="mt-1 text-[11px] leading-4 text-ink-faint">
+            หากคนขับบันทึกเวลาเข้าก่อนเวลาเริ่ม ระบบจะไม่คำนวณค่าใช้จ่ายก่อนเวลาแผน และจะคำนวณค่าล่วงเวลาเมื่อบันทึกเวลาออกเกินเวลาที่กำหนด
+          </p>
+        </div>
+      </fieldset>
+
+      <fieldset className="form-section">
         <legend className="px-1 text-xs font-bold text-slate-600">ก่อนรับงาน (ไม่บังคับ)</legend>
         <label className="field-label">
           <span className="flex items-center gap-2">

@@ -12,6 +12,7 @@ export interface VehicleOperationTask {
   assignment: Assignment;
   project?: Project;
   mission?: Mission;
+  vehicle?: Vehicle;
   driver?: Driver;
   location?: DriverLocation;
   reportedStatus?: AssignmentStatusUpdate;
@@ -78,6 +79,7 @@ async function buildProfiles(vehicles: Vehicle[], assignments: Assignment[]): Pr
         assignment,
         project: projectById.get(assignment.projectId),
         mission: assignment.missionId ? missionById.get(assignment.missionId) : undefined,
+        vehicle,
         driver: assignment.driverId ? driverById.get(assignment.driverId) : undefined,
         location,
         reportedStatus: reportedStatuses[assignment.id],

@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createDriverAction } from "@/app/actions/resources";
+import { DateTimeField } from "@/components/ui/datetime-field";
 import { useToast } from "@/components/ui/toast";
 import { createDriverSchema } from "@/lib/validation";
 
@@ -21,6 +22,7 @@ function text(form: FormData, key: string) {
 export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const toast = useToast();
+  const [licenseExpiry, setLicenseExpiry] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
@@ -63,26 +65,27 @@ export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
       <div>
         <h2 className="text-lg font-semibold text-ink">เพิ่มคนขับ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          กรอกชื่อและเบอร์ก็บันทึกได้ ส่วนอื่นเติมทีหลังได้ ไม่บังคับ
+          กรอกข้อมูลจำเป็นเพื่อให้ศูนย์ควบคุมติดต่อได้ทันที รายละเอียดอื่นสามารถปรับปรุงภายหลัง
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="field-label sm:col-span-2">
-          ชื่อ-นามสกุล <span className="text-rose-500">*</span>
+          ชื่อ-นามสกุล <span className="field-required">*</span>
           <input className="field-input" name="fullName" placeholder="เช่น สมชาย ใจดี" required />
         </label>
         <label className="field-label">
-          เบอร์โทรศัพท์ <span className="text-rose-500">*</span>
+          เบอร์โทรศัพท์ <span className="field-required">*</span>
           <input className="field-input" name="phone" inputMode="tel" placeholder="08x-xxx-xxxx" required />
+          <span className="field-hint">ใช้สำหรับติดต่อและส่งข้อมูลปฏิบัติงาน</span>
         </label>
         <label className="field-label">
-          ชื่อเล่น <span className="font-normal text-slate-400">(ไม่บังคับ)</span>
+          ชื่อเล่น <span className="field-hint inline">(ไม่บังคับ)</span>
           <input className="field-input" name="nickname" placeholder="ใช้เรียกทางวิทยุ" />
         </label>
       </div>
 
-      <fieldset className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-3">
+      <fieldset className="form-section sm:grid-cols-3">
         <legend className="px-1 text-xs font-bold text-slate-600">ใบขับขี่</legend>
         <label className="field-label">
           ประเภท
@@ -92,13 +95,10 @@ export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
           เลขที่
           <input className="field-input" name="licenseNumber" placeholder="เลขใบขับขี่" />
         </label>
-        <label className="field-label">
-          วันหมดอายุ
-          <input className="field-input" name="licenseExpiry" type="date" />
-        </label>
+        <DateTimeField label="วันหมดอายุ" name="licenseExpiry" value={licenseExpiry} onChange={setLicenseExpiry} hint="ใช้ตรวจความพร้อมก่อนมอบหมายงาน" />
       </fieldset>
 
-      <fieldset className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+      <fieldset className="form-section">
         <legend className="px-1 text-xs font-bold text-slate-600">ภาษาที่สื่อสารได้</legend>
         <div className="flex flex-wrap gap-3">
           {LANGUAGE_OPTIONS.map((language) => (
@@ -110,7 +110,7 @@ export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
         </div>
       </fieldset>
 
-      <fieldset className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-2">
+      <fieldset className="form-section sm:grid-cols-2">
         <legend className="px-1 text-xs font-bold text-slate-600">ผู้ติดต่อฉุกเฉิน</legend>
         <label className="field-label">
           ชื่อ
@@ -123,7 +123,7 @@ export function CreateDriverForm({ projectId }: { projectId?: string } = {}) {
       </fieldset>
 
       <label className="field-label">
-        หมายเหตุ <span className="font-normal text-slate-400">(ไม่บังคับ)</span>
+        หมายเหตุ <span className="field-hint inline">(ไม่บังคับ)</span>
         <textarea className="field-input min-h-20" name="note" placeholder="เช่น ชำนาญเส้นทางสนามบิน, ขับรถตู้ได้" />
       </label>
 

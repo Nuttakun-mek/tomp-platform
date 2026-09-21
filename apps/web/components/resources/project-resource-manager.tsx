@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Library, Trash2, UserRoundCheck, CarFront } from "lucide-react";
-import type { Driver, Vehicle } from "@tomp/types/domain";
+import type { CallSign, Driver, Vehicle } from "@tomp/types/domain";
 import {
+  createExistingProjectResourcePairAction,
   deleteDriverAction,
   deleteVehicleAction,
   importDriversFromLibraryAction,
@@ -47,7 +48,9 @@ const asVehicleRow = (vehicle: Vehicle): Row => ({
     typeof vehicle.metadata.defaultDutyStart === "string" && typeof vehicle.metadata.defaultDutyEnd === "string"
       ? `${vehicle.metadata.defaultDutyStart}-${vehicle.metadata.defaultDutyEnd}`
       : "",
-    typeof vehicle.metadata.hourlyRate === "number" ? `${vehicle.metadata.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : ""
+    typeof vehicle.metadata.packageHours === "number" && typeof vehicle.metadata.packageAmount === "number"
+      ? `ค่าใช้จ่ายในการบริการ ${vehicle.metadata.packageHours.toLocaleString("th-TH")} ชม. ${vehicle.metadata.packageAmount.toLocaleString("th-TH")} บ.`
+      : typeof vehicle.metadata.hourlyRate === "number" ? `${vehicle.metadata.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : ""
   ].filter(Boolean).join(" · "),
   missing: !vehicle.plateNumber ? "ยังไม่มีทะเบียน" : !vehicle.capacity ? "ยังไม่ระบุจำนวนที่นั่ง" : ""
 });
@@ -219,10 +222,123 @@ function Section({
   );
 }
 
+function ExistingResourcePairingPanel({
+  projectId,
+  drivers,
+  vehicles,
+  callSigns
+}: {
+  projectId: string;
+  drivers: Driver[];
+  vehicles: Vehicle[];
+  callSigns: CallSign[];
+}) {
+  const router = useRouter();
+  const [driverId, setDriverId] = useState("");
+  const [vehicleId, setVehicleId] = useState("");
+  const [callSign, setCallSign] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
+  const [isPending, startTransition] = useTransition();
+  const pairedDrivers = new Set(callSigns.filter((item) => item.status !== "archived").map((item) => item.driverId).filter(Boolean) as string[]);
+  const pairedVehicles = new Set(callSigns.filter((item) => item.status !== "archived").map((item) => item.vehicleId).filter(Boolean) as string[]);
+  const freeDrivers = drivers.filter((driver) => !pairedDrivers.has(driver.id));
+  const freeVehicles = vehicles.filter((vehicle) => !pairedVehicles.has(vehicle.id));
+  const disabled = !freeDrivers.length || !freeVehicles.length;
+
+  function submit() {
+    setMessage(null);
+    if (!driverId || !vehicleId) {
+      setTone("warning");
+      setMessage("เลือกคนขับและรถให้ครบก่อนสร้างหน่วยรถ");
+      return;
+    }
+    startTransition(async () => {
+      const result = await createExistingProjectResourcePairAction({
+        projectId,
+        callSign: callSign.trim() || null,
+        driverId,
+        vehicleId
+      });
+      setTone(result.success ? "success" : "danger");
+      setMessage(result.success ? "สร้างหน่วยรถจากทรัพยากรที่มีอยู่แล้ว" : result.error || "สร้างหน่วยรถไม่สำเร็จ");
+      if (result.success) {
+        setDriverId("");
+        setVehicleId("");
+        setCallSign("");
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <section className="enterprise-panel grid gap-3 p-4 xl:col-span-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-ink">สร้างหน่วยรถจากทรัพยากรที่มีอยู่</h2>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
+            ใช้สำหรับคนขับและรถที่นำเข้าจากคลังกลาง หรือรายการที่สร้างแยกไว้แล้ว จับคู่ให้เสร็จในหน้าทรัพยากรโครงการนี้
+          </p>
+        </div>
+        <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">
+          เหลือ {freeDrivers.length} คน / {freeVehicles.length} รถ
+        </span>
+      </div>
+      {message ? <ActionFeedback tone={tone} message={message} /> : null}
+      {disabled ? (
+        <p className="rounded-card border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-[13px] text-ink-soft">
+          ไม่มีคนขับหรือรถที่ยังว่างให้จับคู่ หากต้องการเพิ่มหน่วยใหม่ ให้เพิ่มชุดคนขับและรถด้านล่าง หรือนำเข้าจากคลังกลางก่อน
+        </p>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_0.8fr_auto] md:items-end">
+          <label className="field-label">
+            คนขับ
+            <select className="field-input" value={driverId} onChange={(event) => setDriverId(event.target.value)}>
+              <option value="">เลือกคนขับ</option>
+              {freeDrivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.fullName}{driver.phone ? ` / ${driver.phone}` : ""}
+                </option>
+              ))}
+            </select>
+            <span className="field-hint">แสดงเฉพาะคนขับที่ยังไม่ได้ผูกกับหน่วยรถในโครงการนี้</span>
+          </label>
+          <label className="field-label">
+            รถ
+            <select className="field-input" value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>
+              <option value="">เลือกรถ</option>
+              {freeVehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.plateNumber} / {vehicle.vehicleType}
+                </option>
+              ))}
+            </select>
+            <span className="field-hint">แสดงเฉพาะรถที่ยังไม่ได้ผูกกับหน่วยรถในโครงการนี้</span>
+          </label>
+          <label className="field-label">
+            ชื่อหน่วย
+            <input className="field-input" value={callSign} onChange={(event) => setCallSign(event.target.value)} placeholder="เว้นว่างให้ระบบตั้งให้" />
+            <span className="field-hint">ใช้เป็นชื่อประจำคันในศูนย์ควบคุมและ QR คนขับ</span>
+          </label>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={isPending || !driverId || !vehicleId}
+            className="min-h-11 rounded-command bg-operation px-4 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300"
+          >
+            {isPending ? "กำลังสร้าง..." : "สร้างหน่วยรถ"}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function ProjectResourceManager({
   projectId,
   drivers,
   vehicles,
+  callSigns = [],
   libraryDrivers = [],
   libraryVehicles = [],
   driverUsage,
@@ -232,6 +348,7 @@ export function ProjectResourceManager({
   projectId: string;
   drivers: Driver[];
   vehicles: Vehicle[];
+  callSigns?: CallSign[];
   libraryDrivers?: Driver[];
   libraryVehicles?: Vehicle[];
   driverUsage?: Map<string, number>;
@@ -241,6 +358,7 @@ export function ProjectResourceManager({
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
+      {inProject ? <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} /> : null}
       <Section
         kind="driver"
         title={inProject ? "คนขับในโครงการนี้" : "คนขับในคลังกลาง"}

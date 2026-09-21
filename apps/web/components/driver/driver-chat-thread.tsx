@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Loader2, Send, X } from "lucide-react";
+import { Camera, ChevronDown, Loader2, Send, X } from "lucide-react";
 import type { DriverNotification } from "@tomp/types/domain";
 import { buildBridgeMessage, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail } from "@tomp/driver-core";
 import type { DriverIssueMessage } from "@/lib/data/driver-operations";
@@ -154,6 +154,7 @@ export function DriverChatThread({
   const [photo, setPhoto] = useState<PendingPhoto | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -282,7 +283,7 @@ export function DriverChatThread({
                       : "border border-border bg-white text-ink"
                 }`}
               >
-                {b.tone === "issue" && b.from === "driver" ? <span className="font-semibold">[แจ้งปัญหา] </span> : null}
+                {b.tone === "issue" && b.from === "driver" ? <span className="font-semibold">[เหตุขัดข้อง] </span> : null}
                 {b.text}
                 {b.attachment?.signedUrl ? (
                   <a href={b.attachment.signedUrl} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-xl border border-white/40 bg-black/5">
@@ -308,17 +309,33 @@ export function DriverChatThread({
         <div ref={endRef} />
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {QUICK_MESSAGES.map((phrase) => (
-          <button
-            key={phrase}
-            type="button"
-            onClick={() => setText(phrase)}
-            className="rounded-full border border-border/80 bg-white px-2.5 py-1 text-[12px] font-semibold text-ink-soft shadow-sm transition active:scale-[0.98]"
-          >
-            {phrase}
-          </button>
-        ))}
+      <div className="rounded-[1rem] border border-border/70 bg-white/80">
+        <button
+          type="button"
+          onClick={() => setQuickOpen((value) => !value)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-[12px] font-bold text-ink-soft"
+          aria-expanded={quickOpen}
+        >
+          <span>ข้อความสำเร็จรูป</span>
+          <ChevronDown className={`h-4 w-4 transition ${quickOpen ? "rotate-180" : ""}`} />
+        </button>
+        {quickOpen ? (
+          <div className="grid gap-1.5 border-t border-border/70 p-2">
+            {QUICK_MESSAGES.map((phrase) => (
+              <button
+                key={phrase}
+                type="button"
+                onClick={() => {
+                  setText(phrase);
+                  setQuickOpen(false);
+                }}
+                className="rounded-xl border border-border/80 bg-canvas/60 px-2.5 py-2 text-left text-[12px] font-semibold text-ink-soft shadow-sm transition active:scale-[0.98]"
+              >
+                {phrase}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-2 rounded-[1rem] border border-border/80 bg-white p-2 shadow-sm">

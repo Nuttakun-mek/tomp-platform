@@ -2,7 +2,7 @@ import { mapRecoveryActionToThai } from "@/lib/domain/recovery-rules";
 
 const recoveryScenarios = [
   { title: "GPS หาย", detail: "ตรวจสัญญาณล่าสุด โทรคนขับ และติดตามอีกครั้งใน 5 นาที", actions: ["contact_driver", "monitor"] as const },
-  { title: "รถมีปัญหา", detail: "ประเมินผลกระทบต่อ Assignment และเตรียมรถสำรอง", actions: ["replace_vehicle", "notify_organizer"] as const },
+  { title: "เหตุขัดข้องเกี่ยวกับรถ", detail: "ประเมินผลกระทบต่อ Assignment และเตรียมรถสำรอง", actions: ["replace_vehicle", "notify_organizer"] as const },
   { title: "คนขับไม่ตอบ", detail: "โทรซ้ำ ติดต่อผู้ประสานงาน และยกระดับหากเกินเวลาที่กำหนด", actions: ["contact_driver", "contact_coordinator"] as const }
 ];
 

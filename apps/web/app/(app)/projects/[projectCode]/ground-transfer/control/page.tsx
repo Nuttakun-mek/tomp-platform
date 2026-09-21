@@ -12,7 +12,7 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
-import { getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
+import { getAssignmentWorkSessions, getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getDriverCommsByProjectId } from "@/lib/data/driver-comms";
 import { getLatestDriverLocationsByProjectId } from "@/lib/data/locations";
@@ -35,11 +35,12 @@ export default async function ControlPage({ params }: ControlPageProps) {
   const project = await getProjectByCode(projectCode);
   if (!project) notFound();
 
-  const [eventsResult, locations, assignmentsResult, assignmentStatuses, callSignsResult, comms, drivers, vehicles, evidence, missionsResult] = await Promise.all([
+  const [eventsResult, locations, assignmentsResult, assignmentStatuses, workSessions, callSignsResult, comms, drivers, vehicles, evidence, missionsResult] = await Promise.all([
     getTimelineEventsByProjectId(project.id),
     getLatestDriverLocationsByProjectId(project.id),
     getAssignmentsByProjectId(project.id),
     getLatestAssignmentStatuses(project.id),
+    getAssignmentWorkSessions(project.id),
     getCallSignsByProjectId(project.id),
     getDriverCommsByProjectId(project.id),
     getProjectDrivers(project.id),
@@ -72,7 +73,7 @@ export default async function ControlPage({ params }: ControlPageProps) {
       <MissionControlFeedProvider
         projectId={project.id}
         initialLocations={locations}
-        initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, evidence }}
+        initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, workSessions, evidence }}
       >
         <CollapsibleSection
           title="แผนที่ติดตามตำแหน่ง"

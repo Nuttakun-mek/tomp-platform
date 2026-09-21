@@ -21,7 +21,7 @@ const runbookItems = [
   },
   {
     title: "เปิดเหตุผิดปกติ",
-    detail: "หาก GPS หาย รถมีปัญหา หรือคนขับไม่ตอบ ให้เปิดเหตุที่ Recovery เพื่อสร้าง Timeline",
+    detail: "หาก GPS หาย เกิดเหตุขัดข้องเกี่ยวกับรถ หรือคนขับไม่ตอบ ให้เปิดเหตุที่ Recovery เพื่อสร้าง Timeline",
     href: "/ground-transfer/recovery"
   }
 ];

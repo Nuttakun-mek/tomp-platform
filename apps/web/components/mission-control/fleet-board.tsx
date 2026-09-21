@@ -10,7 +10,7 @@ import { metaString } from "@/lib/data/location-meta";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
-import { estimateVehicleUsageCost, formatVehicleUsageCost } from "@/lib/domain/vehicle-cost";
+import { estimateVehicleUsageCost, evaluateVehicleServiceTimeAlert, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -48,6 +48,12 @@ const FRESH_LABEL: Record<Freshness, string> = {
 };
 
 const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, stopped: 1, slow: 2, idle: 3, live: 3 };
+const SERVICE_ALERT_CLASS = {
+  neutral: "bg-slate-100 text-slate-600",
+  success: "bg-emerald-50 text-emerald-800",
+  warning: "bg-amber-50 text-amber-800",
+  danger: "bg-rose-50 text-rose-700"
+} as const;
 
 function freshnessOf(location: DriverLocation | undefined, now: number): Freshness {
   if (!location) return "none";
@@ -56,7 +62,7 @@ function freshnessOf(location: DriverLocation | undefined, now: number): Freshne
 
 export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicles }: FleetBoardProps) {
   const { locations, comms, now } = useMissionControlFeed();
-  const { statuses, evidence, inbound } = comms;
+  const { statuses, workSessions, evidence, inbound } = comms;
   const [expanded, setExpanded] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [, startResolve] = useTransition();
@@ -132,16 +138,35 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         const messages = inboundByAssignment.get(assignment.id) ?? [];
         const openMessages = messages.filter((message) => message.status !== "closed" && !resolvedIds.has(message.id));
         const meta = assignment.metadata;
+        const vehicle = assignment.vehicleId ? vehicleById.get(assignment.vehicleId) : undefined;
+        const workSession = workSessions[assignment.id];
+        const cost = estimateVehicleUsageCost({
+          assignmentStart: assignment.startTime,
+          assignmentEnd: assignment.endTime,
+          actualStart: workSession?.startedAt,
+          actualEnd: workSession?.endedAt,
+          vehicleMetadata: vehicle?.metadata
+        });
+        const serviceAlert = evaluateVehicleServiceTimeAlert({
+          assignmentEnd: assignment.endTime,
+          workSessionStatus: workSession?.status,
+          actualEnd: workSession?.endedAt,
+          extraHours: cost.extraHours,
+          now: effectiveNow
+        });
         return {
           assignment,
           label: callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`,
           driver: assignment.driverId ? driverById.get(assignment.driverId) : undefined,
-          vehicle: assignment.vehicleId ? vehicleById.get(assignment.vehicleId) : undefined,
+          vehicle,
           pickup: metaString(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ"),
           dropoff: metaString(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง"),
           location,
           freshness,
           reported: statuses[assignment.id],
+          workSession,
+          cost,
+          serviceAlert,
           messages,
           unread: openMessages.length,
           hasIssue: openMessages.some((message) => message.kind === "issue"),
@@ -154,7 +179,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         if (rank !== 0) return rank;
         return a.label.localeCompare(b.label, "th");
       });
-  }, [assignments, callSignById, driverById, effectiveNow, evidence, inboundByAssignment, locationByAssignment, resolvedIds, statuses, vehicleById]);
+  }, [assignments, callSignById, driverById, effectiveNow, evidence, inboundByAssignment, locationByAssignment, resolvedIds, statuses, vehicleById, workSessions]);
 
   // One card per driver, not per assignment. A driver with several jobs used to
   // fill the board with near-identical cards; GPS and phone are the driver's
@@ -224,6 +249,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
   const alertCount = groups.filter((group) => group.unread).length;
   const liveCount = groups.filter((group) => group.freshness === "live").length;
   const needsAttention = groups.filter((group) => group.unread || group.freshness !== "live").length;
+  const serviceTimeAlertCount = rows.filter((row) => row.serviceAlert.tone === "warning" || row.serviceAlert.tone === "danger").length;
 
   // Attention-ranked groups are already on top, so a cap never hides something urgent.
   const { visible: visibleGroups, hidden, hasMore, expanded: allShown, showAll, reset } = useVisibleSlice(groups, 15);
@@ -245,6 +271,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
             <MetricChip label="GPS สด" value={liveCount} tone="success" />
             <MetricChip label="ต้องติดตาม" value={needsAttention} tone="warning" />
             <MetricChip label="มีข้อความใหม่" value={alertCount} tone={alertCount ? "warning" : "neutral"} />
+            <MetricChip label="ใกล้/เกินเวลาบริการ" value={serviceTimeAlertCount} tone={serviceTimeAlertCount ? "warning" : "neutral"} />
             <Tooltip content="รายการที่ต้องติดตามรวมรถที่ไม่มี GPS สด รถที่ยังไม่ได้ส่งตำแหน่ง GPS และรถที่มีข้อความยังไม่รับทราบ">
               <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-300 text-xs font-semibold text-slate-500">?</span>
             </Tooltip>
@@ -311,11 +338,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                     <div className="grid gap-1.5">
                       <p className="text-xs font-semibold text-slate-600">งานของคนขับคนนี้ ({group.jobs.length})</p>
                       {group.jobs.map((job) => {
-                        const cost = estimateVehicleUsageCost({
-                          assignmentStart: job.assignment.startTime,
-                          assignmentEnd: job.assignment.endTime,
-                          vehicleMetadata: job.vehicle?.metadata
-                        });
+                        const hasOt = Boolean(job.cost.extraHours && job.cost.extraHours > 0);
                         return (
                           <div key={job.assignment.id} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -330,13 +353,33 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                               ) : (
                                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">ยังไม่แจ้งสถานะ</span>
                               )}
+                              {job.workSession?.status === "active" ? (
+                                <span className="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-800">บันทึกเวลาเข้าแล้ว</span>
+                              ) : job.workSession?.status === "ended" ? (
+                                <span className={`rounded-full px-2 py-0.5 font-semibold ${hasOt ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-600"}`}>
+                                  {hasOt ? "มีค่าล่วงเวลา" : "บันทึกเวลาออกแล้ว"}
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">ยังไม่บันทึกเวลาเข้า</span>
+                              )}
+                              <Tooltip content={job.serviceAlert.detail}>
+                                <span className={`rounded-full px-2 py-0.5 font-semibold ${SERVICE_ALERT_CLASS[job.serviceAlert.tone]}`}>
+                                  {job.serviceAlert.label}
+                                </span>
+                              </Tooltip>
                             </div>
                             <p className="mt-1 text-slate-600">{job.pickup} → {job.dropoff}</p>
                             <div className="mt-1 flex flex-wrap gap-1.5">
                               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">สถานะงาน: {formatStatusTh(job.assignment.status)}</span>
-                              <span className={`rounded-full px-2 py-0.5 font-semibold ${cost.estimatedCost != null ? "bg-teal-50 text-operation" : "bg-amber-50 text-amber-800"}`}>
-                                {formatVehicleUsageCost(cost)}
+                              <span className={`rounded-full px-2 py-0.5 font-semibold ${job.cost.estimatedCost != null ? "bg-teal-50 text-operation" : "bg-amber-50 text-amber-800"}`}>
+                                {vehicleUsageCostBreakdown(job.cost)}
                               </span>
+                              {job.workSession?.startedAt ? (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">เข้า {formatRelativeTh(job.workSession.startedAt, effectiveNow)}</span>
+                              ) : null}
+                              {job.workSession?.endedAt ? (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">ออก {formatRelativeTh(job.workSession.endedAt, effectiveNow)}</span>
+                              ) : null}
                             </div>
                           </div>
                         );
@@ -391,7 +434,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                               }`}
                             >
                               <span>
-                                {message.kind === "issue" ? <span className="font-semibold">[แจ้งปัญหา] </span> : null}
+                                {message.kind === "issue" ? <span className="font-semibold">[เหตุขัดข้อง] </span> : null}
                                 {message.message || "(ไม่มีข้อความ)"}
                                 <span className="ml-1 text-slate-400">/ {formatRelativeTh(message.at, effectiveNow)}</span>
                               </span>
@@ -433,7 +476,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
           ) : null}
         </div>
       ) : (
-        <div className="p-5 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้ โปรดสร้างงานที่หน้า “จัดงาน” ก่อน</div>
+        <div className="p-5 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้ โปรดเปิดงานที่หน้า “จัดการโครงการ” ก่อน</div>
       )}
     </section>
   );

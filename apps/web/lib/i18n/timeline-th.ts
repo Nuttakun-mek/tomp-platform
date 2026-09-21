@@ -15,7 +15,7 @@ const TIMELINE_EVENT_LABELS_TH: Record<string, string> = {
   CHANGE_REQUEST_REJECTED: "ปฏิเสธคำขอเปลี่ยนแปลง",
   DRIVER_CHECKED_IN: "คนขับเช็คอิน",
   VEHICLE_CHECKED_IN: "รถเช็คอิน",
-  DRIVER_ISSUE_REPORTED: "คนขับแจ้งปัญหา",
+  DRIVER_ISSUE_REPORTED: "คนขับแจ้งเหตุขัดข้อง",
   DRIVER_ACCESS_TOKEN_CREATED: "สร้างลิงก์ QR ให้คนขับ",
   DRIVER_ACCESS_TOKEN_REVOKED: "ยกเลิกลิงก์ QR",
   DRIVER_ACCESS_TOKEN_USED: "คนขับเปิดลิงก์ QR",

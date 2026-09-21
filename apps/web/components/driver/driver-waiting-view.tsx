@@ -22,7 +22,7 @@ export function DriverWaitingView({ context }: { context: DriverWaitingContext }
         </span>
         <h1 className="mt-2 text-lg font-bold text-ink">ยืนยันตัวเรียบร้อย รอรับงาน</h1>
         <p className="mx-auto max-w-xs text-[13px] leading-6 text-ink-soft">
-          QR ของคุณใช้งานได้ปกติ ศูนย์ควบคุมยังไม่ได้จัดงานให้หน่วยนี้
+          QR ของคุณใช้งานได้ปกติ ศูนย์ควบคุมยังไม่ได้เปิดงานให้หน่วยนี้
           เมื่อมีงานเข้ามา หน้านี้จะแสดงรายละเอียดให้ทันที
         </p>
       </div>

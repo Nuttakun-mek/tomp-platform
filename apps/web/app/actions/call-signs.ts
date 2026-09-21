@@ -192,7 +192,7 @@ export async function createCallSignAction(input: unknown): Promise<ActionResult
     objectId: callSignRow.id,
     eventType: "CALL_SIGN_CREATED",
     source: "operation_user",
-    reason: "สร้าง Call Sign สำหรับจัดงานให้คนขับ",
+    reason: "สร้าง Call Sign สำหรับจัดการโครงการให้คนขับ",
     afterData: data,
     metadata: { action: "create_call_sign", mode }
   });

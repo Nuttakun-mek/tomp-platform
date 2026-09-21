@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth/rbac";
 import { mapAssignment } from "@/lib/data/mappers";
 import { assertAssignmentCrewMatchesCallSign } from "@/lib/domain/call-sign-rules";
 import { assertPlanEditable } from "@/lib/domain/publish-locking";
+import { estimateVehicleUsageCost } from "@/lib/domain/vehicle-cost";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createAssignmentTimelineEvent, createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
 
@@ -56,6 +57,24 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
     return actionFailure(crewCheck.reason);
   }
 
+  let vehicleMetadata: Record<string, unknown> = {};
+  if (inheritedVehicleId) {
+    const { data: vehicleRow, error: vehicleError } = await client
+      .from("vehicles")
+      .select("metadata")
+      .eq("id", inheritedVehicleId)
+      .maybeSingle();
+    if (vehicleError) {
+      return actionFailure(getDatabaseErrorMessage(vehicleError, "อ่านอัตราค่าจ้างของรถไม่สำเร็จ"));
+    }
+    vehicleMetadata = vehicleRow?.metadata && typeof vehicleRow.metadata === "object" ? vehicleRow.metadata as Record<string, unknown> : {};
+  }
+  const costEstimate = estimateVehicleUsageCost({
+    assignmentStart: parsed.data.startTime || null,
+    assignmentEnd: parsed.data.endTime || null,
+    vehicleMetadata
+  });
+
   const { data, error: insertError } = await client
     .from("assignments")
     .insert({
@@ -72,7 +91,9 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
       metadata: {
         ...parsed.data.metadata,
         crewSnapshotSource: "call_sign",
-        inheritedCallSign: typeof callSign.call_sign === "string" ? callSign.call_sign : null
+        inheritedCallSign: typeof callSign.call_sign === "string" ? callSign.call_sign : null,
+        costEstimate,
+        costSnapshotSource: "vehicle_metadata_at_assignment_create"
       }
     })
     .select()

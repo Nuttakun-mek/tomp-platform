@@ -12,7 +12,7 @@ export function ProjectWorkspaceTabs({ projectCode, active }: { projectCode: str
 
   const tabs: Array<{ key: TabKey; label: string; href: string; icon: typeof LayoutDashboard }> = [
     { key: "overview", label: "ภาพรวม", href: base, icon: LayoutDashboard },
-    { key: "dispatch", label: "จัดงาน", href: `${base}/dispatch`, icon: ClipboardList },
+    { key: "dispatch", label: "จัดการโครงการ", href: `${base}/dispatch`, icon: ClipboardList },
     { key: "control", label: "ศูนย์ควบคุม", href: `${base}/control`, icon: MapPinned },
     { key: "resources", label: "ทรัพยากร", href: `${base}/resources`, icon: Users }
   ];

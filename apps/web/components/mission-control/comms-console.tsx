@@ -375,7 +375,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
                         <span className="opacity-70">{formatRelativeTh(item.at, now)}</span>
                       </div>
                       <p className="mt-1">
-                        {item.kind === "issue" ? <span className="font-semibold">[แจ้งปัญหา] </span> : null}
+                        {item.kind === "issue" ? <span className="font-semibold">[เหตุขัดข้อง] </span> : null}
                         {item.message || "(ไม่มีข้อความ)"}
                       </p>
                       {item.attachment?.signedUrl ? (

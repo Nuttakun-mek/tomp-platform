@@ -75,6 +75,7 @@ export function CreateAssignmentForm({
   const [jobDate, setJobDate] = useState("");
   const [startClock, setStartClock] = useState("");
   const [endClock, setEndClock] = useState("");
+  const [manualMissionId, setManualMissionId] = useState("");
 
 
   const driverById = useMemo(() => new Map(drivers.map((driver) => [driver.id, driver])), [drivers]);
@@ -83,16 +84,20 @@ export function CreateAssignmentForm({
     () => availableCallSigns.find((callSign) => callSign.id === selectedCallSignId),
     [availableCallSigns, selectedCallSignId]
   );
+  const selectedDriver = selectedCallSign?.driverId ? driverById.get(selectedCallSign.driverId) : undefined;
+  const selectedVehicle = selectedCallSign?.vehicleId ? vehicleById.get(selectedCallSign.vehicleId) : undefined;
   // The unit carries its mission, so choosing the unit chooses the mission.
   const mission = useMemo(() => {
     const linked = (selectedCallSign?.metadata as Record<string, unknown> | undefined)?.missionId;
     return typeof linked === "string" ? missions.find((item) => item.id === linked) : undefined;
   }, [missions, selectedCallSign]);
 
-  const missionId = mission?.id ?? "";
+  const manualMission = useMemo(() => missions.find((item) => item.id === manualMissionId), [manualMissionId, missions]);
+  const effectiveMission = mission ?? manualMission;
+  const missionId = effectiveMission?.id ?? "";
 
 
-  const window = useMemo(() => (mission ? missionWindow(mission) : { from: "", to: "" }), [mission]);
+  const window = useMemo(() => (effectiveMission ? missionWindow(effectiveMission) : { from: "", to: "" }), [effectiveMission]);
   // The mission owns the window; the job owns the day inside it and the clock.
   // One source for the date, so the two cannot contradict each other.
   // A single-day mission needs no choice at all — take its only day.
@@ -113,7 +118,7 @@ export function CreateAssignmentForm({
     return describeAssignmentConflicts({ startTime, endTime }, relevant);
   }, [existingAssignments, selectedCallSign, startTime, endTime]);
 
-  const canCreate = missions.length > 0 && selectedCrewReady;
+  const canCreate = missions.length > 0 && selectedCrewReady && Boolean(missionId);
 
 
 
@@ -169,7 +174,7 @@ export function CreateAssignmentForm({
   return (
     <form action={handleSubmit} className="grid content-start gap-5">
       <label className="field-label">
-        หน่วยรถ (Call Sign)
+        หน่วยรถ
         <select
           className="field-input"
           name="callSignId"
@@ -185,9 +190,23 @@ export function CreateAssignmentForm({
           ))}
         </select>
         {selectedCallSign ? (
-          <span className="mt-1 grid gap-0.5 text-xs">
-            <span className="text-slate-500">
-              คนขับและรถของงานนี้จะถูกบันทึกจากหน่วย {selectedCallSign.callSign} โดยอัตโนมัติ
+          <span className="mt-1 grid gap-2 text-xs">
+            <span className="field-hint">
+              ระบบจะใช้คนขับและรถจากหน่วยนี้โดยอัตโนมัติ ไม่ต้องเลือกซ้ำในขั้นตอนเปิดงาน
+            </span>
+            <span className="grid gap-2 sm:grid-cols-3">
+              <span className="rounded-xl border border-border bg-canvas/60 px-3 py-2">
+                <span className="block text-[11px] font-semibold text-ink-faint">Call Sign</span>
+                <span className="block truncate font-semibold text-ink">{selectedCallSign.callSign}</span>
+              </span>
+              <span className="rounded-xl border border-border bg-canvas/60 px-3 py-2">
+                <span className="block text-[11px] font-semibold text-ink-faint">คนขับ</span>
+                <span className="block truncate font-semibold text-ink">{driverLabel(selectedDriver)}</span>
+              </span>
+              <span className="rounded-xl border border-border bg-canvas/60 px-3 py-2">
+                <span className="block text-[11px] font-semibold text-ink-faint">รถ</span>
+                <span className="block truncate font-semibold text-ink">{vehicleLabel(selectedVehicle)}</span>
+              </span>
             </span>
             {mission ? (
               <span className="font-semibold text-operation">
@@ -195,15 +214,29 @@ export function CreateAssignmentForm({
                 {windowLabel(mission) ? ` · ${windowLabel(mission)}` : ""}
               </span>
             ) : (
-              <span className="font-semibold text-amber-700">หน่วยนี้ยังไม่ได้ผูกภารกิจ กรุณาสร้างหน่วยใหม่พร้อมภารกิจ</span>
+              <span className="font-semibold text-amber-700">หน่วยนี้พร้อมใช้งานแล้ว เลือกภารกิจด้านล่างเพื่อเปิดงาน</span>
             )}
           </span>
         ) : (
-          <span className="mt-1 text-xs text-slate-500">ยังไม่มีหน่วยรถ? สร้างที่ “ขั้นที่ 1” ด้านบนก่อน</span>
+          <span className="field-hint mt-1">ยังไม่มีหน่วยรถ ให้สร้างหรือจับคู่ที่หน้าทรัพยากรโครงการก่อน</span>
         )}
       </label>
 
       <div className="grid gap-4 md:grid-cols-2">
+        {!mission ? (
+          <label className="field-label md:col-span-2">
+            ภารกิจของงานนี้
+            <select className="field-input" value={manualMissionId} onChange={(event) => setManualMissionId(event.target.value)} required>
+              <option value="">เลือกภารกิจ</option>
+              {missions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.missionName}{windowLabel(item) ? ` · ${windowLabel(item)}` : ""}
+                </option>
+              ))}
+            </select>
+            <span className="field-hint">จำเป็นเฉพาะหน่วยรถที่ยังไม่ได้ผูกภารกิจ ระบบจะใช้ภารกิจนี้เป็นวันอ้างอิงของงาน</span>
+          </label>
+        ) : null}
         {/* Only asked when the mission actually spans more than one day. */}
         {window.from && window.from !== window.to ? (
           <DateTimeField
@@ -233,20 +266,23 @@ export function CreateAssignmentForm({
             timeOnly
           />
           {!operationDate ? (
-            <p className="mt-1 text-xs text-slate-500">เลือกภารกิจก่อน เพื่อให้ระบบรู้ว่างานนี้อยู่วันไหน</p>
+            <p className="field-hint mt-1">เลือกภารกิจก่อน เพื่อให้ระบบรู้ว่างานนี้อยู่วันไหน</p>
           ) : null}
         </div>
         <label className="field-label">
           จุดรับ
           <input className="field-input" name="pickupLocation" placeholder="เช่น ประตู 3 อาคารผู้โดยสาร" />
+          <span className="field-hint">ถ้าไม่ระบุ ระบบจะแสดงว่า “ยังไม่ระบุจุดรับ”</span>
         </label>
         <label className="field-label">
           จุดส่ง
           <input className="field-input" name="dropoffLocation" placeholder="เช่น หน้าโรงแรมหรือสถานที่จัดงาน" />
+          <span className="field-hint">ถ้าไม่ระบุ ระบบจะแสดงว่า “ยังไม่ระบุจุดส่ง”</span>
         </label>
         <label className="field-label md:col-span-2">
           คำสั่งสำหรับคนขับ
           <textarea className="field-input min-h-24" name="driverInstruction" placeholder="เช่น โทรหาผู้ประสานงานก่อนถึงจุดรับ 10 นาที" />
+          <span className="field-hint">ข้อความนี้จะแสดงในหน้าคนขับ ควรสั้น ชัดเจน และเป็นคำสั่งที่ปฏิบัติได้จริง</span>
         </label>
       </div>
 

@@ -14,7 +14,6 @@ export function VehicleTaskCard({ task, allowCancel = false }: { task: VehicleOp
   const assignment = task.assignment;
   const pickup = typeof assignment.metadata.pickupLocation === "string" ? assignment.metadata.pickupLocation : "ยังไม่ระบุจุดรับ";
   const dropoff = typeof assignment.metadata.dropoffLocation === "string" ? assignment.metadata.dropoffLocation : "ยังไม่ระบุจุดส่ง";
-
   return (
     <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -50,7 +49,7 @@ export function VehicleTaskCard({ task, allowCancel = false }: { task: VehicleOp
         </div>
         <div className="flex justify-between gap-3">
           <dt className="font-semibold">เวลา</dt>
-          <dd className="text-right">{timeLabel(assignment.startTime)}</dd>
+          <dd className="text-right">{assignment.endTime ? `${timeLabel(assignment.startTime)} – ${timeLabel(assignment.endTime)}` : timeLabel(assignment.startTime)}</dd>
         </div>
       </dl>
       {task.evidence && (task.evidence.vehiclePhotoUrl || task.evidence.platePhotoUrl) ? (
@@ -75,7 +74,7 @@ export function VehicleTaskCard({ task, allowCancel = false }: { task: VehicleOp
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         {task.project?.projectCode ? (
           <Link className="rounded-xl bg-operation px-3 py-2 text-center text-sm font-semibold text-white" href={`/projects/${task.project.projectCode}/ground-transfer/dispatch`}>
-            เปิดบอร์ดงาน
+            เปิดจัดการโครงการ
           </Link>
         ) : null}
         {allowCancel ? <CancelAssignmentButton projectId={assignment.projectId} assignmentId={assignment.id} /> : null}

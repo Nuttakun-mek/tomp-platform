@@ -19,6 +19,8 @@ const statusTh: Record<string, string> = {
   archived: "เก็บถาวร",
   pending: "รอดำเนินการ",
   acknowledged: "รับทราบแล้ว",
+  work_started: "เริ่มปฏิบัติงานแล้ว",
+  work_ended: "สิ้นสุดปฏิบัติงานแล้ว",
   arrived_pickup: "ถึงจุดรับแล้ว",
   passenger_onboard: "รับผู้โดยสารแล้ว",
   en_route_pickup: "กำลังไปจุดรับ",
