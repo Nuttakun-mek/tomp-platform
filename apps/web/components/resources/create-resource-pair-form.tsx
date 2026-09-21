@@ -2,22 +2,14 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Bike, BusFront, CarFront, Truck, UserRoundCheck, Van } from "lucide-react";
+import { UserRoundCheck, Van } from "lucide-react";
 import { createProjectResourcePairAction } from "@/app/actions/resources";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { estimateVehicleUsageCost, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
-
-const VEHICLE_ICONS = [
-  { key: "sedan", label: "เก๋ง", icon: CarFront },
-  { key: "suv", label: "SUV", icon: CarFront },
-  { key: "van", label: "รถตู้", icon: Van },
-  { key: "minibus", label: "มินิบัส", icon: BusFront },
-  { key: "bus", label: "รถบัส", icon: BusFront },
-  { key: "pickup", label: "กระบะ", icon: Truck },
-  { key: "truck", label: "รถบรรทุก", icon: Truck },
-  { key: "motorcycle", label: "มอเตอร์ไซค์", icon: Bike }
-];
+import { ServiceTimeSummary } from "./service-time-summary";
+import { VehicleIconPicker } from "./vehicle-icon-picker";
+import { VEHICLE_TYPE_OPTIONS } from "./vehicle-type-options";
 
 export function CreateResourcePairForm({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -61,7 +53,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
         <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">บันทึกเป็นทรัพยากรของโครงการ</span>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <section className="form-section">
           <div className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-operation shadow-sm"><UserRoundCheck className="h-5 w-5" /></span>
@@ -104,22 +96,27 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
               <p className="text-xs text-ink-faint">กำหนดชนิดรถเพื่อให้ศูนย์ควบคุมแยกสัญลักษณ์บนแผนที่ได้ชัดเจน</p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7rem,0.62fr)]">
             <label className="field-label">
               ทะเบียนรถ <span className="field-required">*</span>
               <input className="field-input" name="plateNumber" placeholder="เช่น 1กข 1234" required />
             </label>
             <label className="field-label">
               ประเภทรถ <span className="field-required">*</span>
-              <input className="field-input" name="vehicleType" placeholder="เช่น รถตู้" required />
-              <span className="field-hint">ควรตรงกับสัญลักษณ์ประเภทรถด้านล่าง</span>
+              <select className="field-input" name="vehicleType" defaultValue="" required>
+                <option value="" disabled>เลือกประเภทรถ</option>
+                {VEHICLE_TYPE_OPTIONS.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              <span className="field-hint">เลือกให้ตรงกับลักษณะรถจริง เพื่อช่วยแยกสัญลักษณ์ในศูนย์ควบคุม</span>
             </label>
             <label className="field-label">
               จำนวนที่นั่ง <span className="field-required">*</span>
               <input className="field-input" name="capacity" min={0} max={80} type="number" placeholder="เช่น 10" required />
             </label>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid items-start gap-3 md:grid-cols-3">
             <label className="field-label">
               ยี่ห้อ
               <input className="field-input" name="brand" placeholder="เช่น Toyota" />
@@ -140,27 +137,34 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
                 <span className="grid h-5 w-5 place-items-center rounded-full border border-border bg-white text-[11px] text-ink-faint">?</span>
               </Tooltip>
             </legend>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {VEHICLE_ICONS.map(({ key, label, icon: Icon }) => (
-                <label key={key} className="group grid cursor-pointer place-items-center gap-1.5 rounded-xl border border-border bg-white px-2.5 py-2 text-center text-[11px] font-semibold text-ink-soft transition has-[:checked]:border-operation has-[:checked]:bg-operation-soft has-[:checked]:text-operation">
-                  <input className="sr-only" type="radio" name="vehicleIcon" value={key} defaultChecked={key === "van"} />
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-canvas text-ink-soft transition group-has-[:checked]:bg-white group-has-[:checked]:text-operation">
-                    <Icon className="h-6 w-6" />
-                  </span>
-                  <span className="max-w-full truncate">{label}</span>
-                </label>
-              ))}
-            </div>
+            <VehicleIconPicker />
           </fieldset>
         </section>
       </div>
 
       <section className="form-section-white">
         <div>
+          <p className="text-sm font-semibold text-ink">ชื่อหน่วยรถ</p>
+          <p className="text-xs leading-5 text-ink-faint">กำหนด Call Sign ตั้งแต่หน้าทรัพยากร เพื่อให้หน่วยรถพร้อมรับมอบภารกิจในหน้าจัดการโครงการ</p>
+        </div>
+        <div className="grid items-start gap-3 md:grid-cols-2">
+          <label className="field-label">
+            ชื่อหน่วยรถ (Call Sign)
+            <input className="field-input" name="callSign" placeholder="เว้นว่างให้ระบบตั้งให้" />
+            <span className="field-hint">ใช้เป็นชื่อประจำคันในศูนย์ควบคุม QR และหน้าคนขับ</span>
+          </label>
+          <p className="rounded-2xl border border-slate-200 bg-canvas/60 px-3 py-2 text-xs leading-5 text-ink-soft">
+            ภารกิจและงานย่อยของรถแต่ละคันจะกำหนดในหน้า “จัดการโครงการ” หลังจากหน่วยรถนี้พร้อมใช้งานแล้ว
+          </p>
+        </div>
+      </section>
+
+      <section className="form-section-white">
+        <div>
           <p className="text-sm font-semibold text-ink">เวลามาตรฐานและค่าใช้จ่ายในการบริการ</p>
           <p className="text-xs leading-5 text-ink-faint">ใช้เป็นข้อมูลอ้างอิงสำหรับศูนย์ควบคุมในการคำนวณชั่วโมงใช้งานและค่าล่วงเวลา</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="field-label">
             เวลาเริ่มต้นปกติ
             <input className="field-input" name="defaultDutyStart" type="time" value={defaultDutyStart} onChange={(event) => setDefaultDutyStart(event.target.value)} />
@@ -195,6 +199,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
             </p>
           </div>
         </div>
+        <ServiceTimeSummary start={defaultDutyStart} end={defaultDutyEnd} packageHours={packageHours} />
         <label className="field-label">
           หมายเหตุค่าใช้จ่ายในการบริการ
           <input className="field-input" name="costNote" placeholder="เช่น รวมค่าน้ำมันแล้ว / ค่าล่วงเวลาคิดแยก" />

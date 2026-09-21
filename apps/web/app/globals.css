@@ -272,12 +272,13 @@ button:disabled {
 
 /* ---- forms ---- */
 .field-label {
-  @apply grid min-w-0 gap-1.5 text-[13px] font-semibold leading-5 text-ink-soft;
+  @apply grid min-w-0 content-start gap-1.5 text-[13px] font-semibold leading-5 text-ink-soft;
 }
 
 .field-input {
   border-radius: var(--r-sm);
   min-height: 2.75rem;
+  min-width: 0;
   @apply w-full border border-border bg-white px-3 py-2 text-[14px] leading-5 text-ink shadow-sm outline-none transition placeholder:text-ink-faint;
   @apply focus-visible:border-operation focus-visible:ring-2 focus-visible:ring-operation/20;
 }
@@ -315,11 +316,11 @@ textarea.field-input {
 }
 
 .form-section {
-  @apply grid gap-3 rounded-2xl border border-border/80 bg-canvas/45 p-3;
+  @apply grid items-start gap-3 rounded-2xl border border-border/80 bg-canvas/45 p-3;
 }
 
 .form-section-white {
-  @apply grid gap-3 rounded-2xl border border-border/80 bg-white p-3 shadow-sm;
+  @apply grid items-start gap-3 rounded-2xl border border-border/80 bg-white p-3 shadow-sm;
 }
 
 .form-section-title {

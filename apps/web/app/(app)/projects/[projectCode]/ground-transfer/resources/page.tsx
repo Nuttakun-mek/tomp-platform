@@ -57,7 +57,7 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
 
       <CollapsibleSection
         title="เพิ่มคนขับและรถเข้าโครงการนี้"
-        description="สร้างข้อมูลเป็นคู่เดียวกัน แล้วระบบจะสร้างหน่วยรถให้พร้อมเปิดงานและออก QR ในหน้าจัดการโครงการ"
+        description="สร้างข้อมูลเป็นคู่เดียวกัน แล้วระบบจะสร้างหน่วยรถให้พร้อมรับมอบภารกิจในหน้าจัดการโครงการ"
         storageKey={`res.${projectId}.newpair`}
         defaultOpen={drivers.length === 0 || vehicles.length === 0}
       >

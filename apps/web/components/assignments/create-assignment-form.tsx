@@ -10,6 +10,7 @@ import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { describeAssignmentConflicts } from "@/lib/domain/assignment-rules";
 import { isCallSignCrewed } from "@/lib/domain/call-sign-rules";
 import { createAssignmentSchema } from "@/lib/validation";
+import { ServiceTimeSummary } from "@/components/resources/service-time-summary";
 
 export interface ExistingAssignmentWindow {
   id: string;
@@ -265,6 +266,11 @@ export function CreateAssignmentForm({
             onEnd={setEndClock}
             timeOnly
           />
+          {startClock && endClock ? (
+            <div className="mt-2">
+              <ServiceTimeSummary start={startClock} end={endClock} packageHours="" />
+            </div>
+          ) : null}
           {!operationDate ? (
             <p className="field-hint mt-1">เลือกภารกิจก่อน เพื่อให้ระบบรู้ว่างานนี้อยู่วันไหน</p>
           ) : null}

@@ -7,6 +7,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { estimateVehicleUsageCost, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { createVehicleSchema } from "@/lib/validation";
+import { ServiceTimeSummary } from "./service-time-summary";
+import { VehicleIconPicker } from "./vehicle-icon-picker";
+import { VEHICLE_TYPE_OPTIONS } from "./vehicle-type-options";
 
 // This describes the vehicle and nothing else. Who drives it is decided when the
 // Call Sign is crewed, and what it is doing is decided when work is planned onto
@@ -62,6 +65,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         luggageCapacity: text(formData, "luggageCapacity"),
         defaultDutyStart: text(formData, "defaultDutyStart"),
         defaultDutyEnd: text(formData, "defaultDutyEnd"),
+        icon: text(formData, "vehicleIcon") || "van",
         packageHours: packageHours === "" ? null : Number(packageHours),
         packageAmount: packageAmount === "" ? null : Number(packageAmount),
         hourlyRate: costPreview.hourlyRate,
@@ -96,7 +100,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         </p>
       </div>
 
-      <fieldset className="grid gap-3 sm:grid-cols-3">
+      <fieldset className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7rem,0.62fr)]">
         <legend className="px-1 text-xs font-bold text-slate-600">ข้อมูลที่ต้องมี</legend>
         <label className="field-label">
           ทะเบียนรถ <span className="field-required">*</span>
@@ -104,16 +108,13 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         </label>
         <label className="field-label">
           ประเภทรถ <span className="field-required">*</span>
-          <input className="field-input" name="vehicleType" list="vehicle-types" placeholder="เช่น รถตู้, SUV, รถเก๋ง" required />
+          <select className="field-input" name="vehicleType" defaultValue="" required>
+            <option value="" disabled>เลือกประเภทรถ</option>
+            {VEHICLE_TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
           <span className="field-hint">ใช้จัดกลุ่มสัญลักษณ์รถในศูนย์ควบคุม</span>
-          <datalist id="vehicle-types">
-            <option value="รถเก๋ง" />
-            <option value="SUV" />
-            <option value="รถตู้" />
-            <option value="มินิบัส" />
-            <option value="รถบัส" />
-            <option value="กระบะ" />
-          </datalist>
         </label>
         <label className="field-label">
           จำนวนที่นั่ง <span className="field-required">*</span>
@@ -121,7 +122,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         </label>
       </fieldset>
 
-      <fieldset className="form-section sm:grid-cols-2">
+      <fieldset className="form-section md:grid-cols-2">
         <legend className="px-1 text-xs font-bold text-slate-600">รายละเอียดรถ (ไม่บังคับ)</legend>
         <label className="field-label">
           ยี่ห้อ
@@ -160,7 +161,17 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         </label>
       </fieldset>
 
-      <fieldset className="form-section sm:grid-cols-4">
+      <fieldset className="form-section">
+        <legend className="flex items-center gap-2 px-1 text-xs font-bold text-slate-600">
+          สัญลักษณ์ประเภทรถ
+          <Tooltip content="สัญลักษณ์นี้ใช้แยกรถในศูนย์ควบคุมและแผนที่รวม เลือกรูปแบบที่ใกล้เคียงกับรถจริงที่สุด">
+            <span className="grid h-5 w-5 place-items-center rounded-full border border-border bg-white text-[11px] text-ink-faint">?</span>
+          </Tooltip>
+        </legend>
+        <VehicleIconPicker />
+      </fieldset>
+
+      <fieldset className="form-section md:grid-cols-2 xl:grid-cols-4">
         <legend className="px-1 text-xs font-bold text-slate-600">เวลามาตรฐานและค่าใช้จ่ายในการบริการ</legend>
         <label className="field-label">
           เวลาเริ่มต้นปกติ
@@ -184,6 +195,9 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
           <p className="mt-1 text-[11px] leading-4 text-ink-faint">
             หากคนขับบันทึกเวลาเข้าก่อนเวลาเริ่ม ระบบจะไม่คำนวณค่าใช้จ่ายก่อนเวลาแผน และจะคำนวณค่าล่วงเวลาเมื่อบันทึกเวลาออกเกินเวลาที่กำหนด
           </p>
+        </div>
+        <div className="sm:col-span-4">
+          <ServiceTimeSummary start={defaultDutyStart} end={defaultDutyEnd} packageHours={packageHours} />
         </div>
       </fieldset>
 

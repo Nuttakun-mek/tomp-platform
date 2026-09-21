@@ -290,7 +290,7 @@ function ExistingResourcePairingPanel({
           ไม่มีคนขับหรือรถที่ยังว่างให้จับคู่ หากต้องการเพิ่มหน่วยใหม่ ให้เพิ่มชุดคนขับและรถด้านล่าง หรือนำเข้าจากคลังกลางก่อน
         </p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_0.8fr_auto] md:items-end">
+        <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(12rem,0.8fr)_auto] xl:items-end">
           <label className="field-label">
             คนขับ
             <select className="field-input" value={driverId} onChange={(event) => setDriverId(event.target.value)}>
@@ -324,12 +324,69 @@ function ExistingResourcePairingPanel({
             type="button"
             onClick={submit}
             disabled={isPending || !driverId || !vehicleId}
-            className="min-h-11 rounded-command bg-operation px-4 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300"
+            className="min-h-11 rounded-command bg-operation px-4 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300 lg:w-fit xl:w-auto"
           >
             {isPending ? "กำลังสร้าง..." : "สร้างหน่วยรถ"}
           </button>
         </div>
       )}
+    </section>
+  );
+}
+
+function UnitSummaryPanel({
+  callSigns,
+  drivers,
+  vehicles
+}: {
+  callSigns: CallSign[];
+  drivers: Driver[];
+  vehicles: Vehicle[];
+}) {
+  const driverById = new Map(drivers.map((driver) => [driver.id, driver]));
+  const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+  const active = callSigns.filter((unit) => unit.status !== "archived");
+
+  if (!active.length) return null;
+
+  return (
+    <section className="enterprise-panel grid gap-3 p-4 xl:col-span-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-ink">หน่วยรถพร้อมใช้งาน</h2>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
+            หน่วยรถคือข้อมูลรวมของ Call Sign คนขับ และรถ ใช้ตรวจความพร้อมก่อนรับมอบภารกิจและเปิดงานย่อยในหน้าจัดการโครงการ
+          </p>
+        </div>
+        <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">{active.length} หน่วย</span>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {active.map((unit) => {
+          const driver = unit.driverId ? driverById.get(unit.driverId) : null;
+          const vehicle = unit.vehicleId ? vehicleById.get(unit.vehicleId) : null;
+          return (
+            <article key={unit.id} className="rounded-2xl border border-border bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-ink">{unit.callSign}</p>
+                  <p className="mt-0.5 truncate text-xs text-ink-soft">{vehicle ? `${vehicle.plateNumber} / ${vehicle.vehicleType}` : "ยังไม่ได้ผูกรถ"}</p>
+                </div>
+                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">พร้อมจับงาน</span>
+              </div>
+              <dl className="mt-3 grid gap-1.5 text-xs">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-faint">คนขับ</dt>
+                  <dd className="min-w-0 truncate font-semibold text-ink">{driver?.fullName ?? "ยังไม่ได้ผูกคนขับ"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-faint">ขั้นต่อไป</dt>
+                  <dd className="min-w-0 truncate font-semibold text-ink">รับมอบภารกิจในหน้าจัดการโครงการ</dd>
+                </div>
+              </dl>
+            </article>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -358,6 +415,7 @@ export function ProjectResourceManager({
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
+      {inProject ? <UnitSummaryPanel callSigns={callSigns} drivers={drivers} vehicles={vehicles} /> : null}
       {inProject ? <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} /> : null}
       <Section
         kind="driver"

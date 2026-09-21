@@ -180,6 +180,7 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
   if (!driverParsed.success) return actionFailure("กรอกชื่อคนขับและเบอร์โทรศัพท์ให้ครบ", driverParsed.error.flatten().fieldErrors);
 
   const icon = cleanText(data.vehicleIcon);
+  const requestedCallSign = cleanText(data.callSign);
   const packageHours = numberOrNull(data.packageHours);
   const packageAmount = numberOrNull(data.packageAmount);
   const derivedHourlyRate = packageHours && packageAmount ? Math.round((packageAmount / packageHours) * 100) / 100 : null;
@@ -251,12 +252,15 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
     return actionFailure(getDatabaseErrorMessage(vehicleError, "บันทึกข้อมูลรถไม่สำเร็จ"));
   }
 
-  const seed = callSignSeed(String(vehicleRow.plate_number || vehicleParsed.data.plateNumber));
-  const { count } = await client
-    .from("call_signs")
-    .select("id", { count: "exact", head: true })
-    .eq("project_id", projectId);
-  const generatedCallSign = `${seed}-${String((count || 0) + 1).padStart(2, "0")}`;
+  let generatedCallSign = requestedCallSign;
+  if (!generatedCallSign) {
+    const seed = callSignSeed(String(vehicleRow.plate_number || vehicleParsed.data.plateNumber));
+    const { count } = await client
+      .from("call_signs")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId);
+    generatedCallSign = `${seed}-${String((count || 0) + 1).padStart(2, "0")}`;
+  }
   const { data: callSignRow, error: callSignError } = await client
     .from("call_signs")
     .insert({
@@ -268,7 +272,7 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
       status: "active",
       metadata: {
         source: "project_resource_pair_form",
-        generated: true,
+        generated: !requestedCallSign,
         preparedAsPair: true
       }
     })
