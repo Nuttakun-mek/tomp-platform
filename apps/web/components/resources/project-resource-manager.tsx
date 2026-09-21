@@ -45,9 +45,6 @@ const asVehicleRow = (vehicle: Vehicle): Row => ({
     vehicleIconLabel(inferVehicleIcon({ icon: vehicle.metadata.icon, vehicleType: vehicle.vehicleType, capacity: vehicle.capacity })),
     vehicle.vehicleType,
     vehicle.capacity ? `${vehicle.capacity} ที่นั่ง` : "",
-    typeof vehicle.metadata.defaultDutyStart === "string" && typeof vehicle.metadata.defaultDutyEnd === "string"
-      ? `${vehicle.metadata.defaultDutyStart}-${vehicle.metadata.defaultDutyEnd}`
-      : "",
     typeof vehicle.metadata.packageHours === "number" && typeof vehicle.metadata.packageAmount === "number"
       ? `ค่าใช้จ่ายในการบริการ ${vehicle.metadata.packageHours.toLocaleString("th-TH")} ชม. ${vehicle.metadata.packageAmount.toLocaleString("th-TH")} บ.`
       : typeof vehicle.metadata.hourlyRate === "number" ? `${vehicle.metadata.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : ""

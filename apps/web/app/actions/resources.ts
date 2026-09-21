@@ -28,11 +28,6 @@ function numberOrNull(value: unknown) {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
-function timeOrNull(value: unknown) {
-  const text = cleanText(value);
-  return /^\d{2}:\d{2}$/.test(text) ? text : null;
-}
-
 function callSignSeed(value: string) {
   const cleaned = value
     .toUpperCase()
@@ -198,8 +193,6 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
       packageAmount,
       hourlyRate: derivedHourlyRate,
       minimumHours: packageHours,
-      defaultDutyStart: timeOrNull(data.defaultDutyStart),
-      defaultDutyEnd: timeOrNull(data.defaultDutyEnd),
       costNote: cleanText(data.costNote),
       preparedAsPair: true
     }

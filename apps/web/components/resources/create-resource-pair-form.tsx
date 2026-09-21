@@ -6,9 +6,7 @@ import { UserRoundCheck, Van } from "lucide-react";
 import { createProjectResourcePairAction } from "@/app/actions/resources";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
-import { DateRangeFields } from "@/components/ui/datetime-field";
 import { estimateVehicleUsageCost, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
-import { ServiceTimeSummary } from "./service-time-summary";
 import { VehicleIconPicker } from "./vehicle-icon-picker";
 import { VEHICLE_TYPE_OPTIONS } from "./vehicle-type-options";
 
@@ -16,18 +14,14 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
   const router = useRouter();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
-  const [defaultDutyStart, setDefaultDutyStart] = useState("08:00");
-  const [defaultDutyEnd, setDefaultDutyEnd] = useState("18:00");
   const [packageHours, setPackageHours] = useState("10");
   const [packageAmount, setPackageAmount] = useState("3000");
   const costPreview = useMemo(() => estimateVehicleUsageCost({
     vehicleMetadata: {
-      defaultDutyStart,
-      defaultDutyEnd,
       packageHours: packageHours === "" ? null : Number(packageHours),
       packageAmount: packageAmount === "" ? null : Number(packageAmount)
     }
-  }), [defaultDutyEnd, defaultDutyStart, packageAmount, packageHours]);
+  }), [packageAmount, packageHours]);
 
   function submit(formData: FormData) {
     const payload = Object.fromEntries(formData.entries());
@@ -162,31 +156,17 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
 
       <section className="form-section-white">
         <div>
-          <p className="text-sm font-semibold text-ink">เวลามาตรฐานและค่าใช้จ่ายในการบริการ</p>
-          <p className="text-xs leading-5 text-ink-faint">ใช้เป็นข้อมูลอ้างอิงสำหรับศูนย์ควบคุมในการคำนวณชั่วโมงใช้งานและค่าล่วงเวลา</p>
+          <p className="text-sm font-semibold text-ink">ค่าใช้จ่ายในการบริการ</p>
+          <p className="text-xs leading-5 text-ink-faint">กำหนดจำนวนชั่วโมงบริการและยอดค่าใช้จ่ายต่อหน่วยรถ ส่วนเวลาเริ่มและสิ้นสุดงานจะกำหนดในหน้าจัดการโครงการเท่านั้น</p>
         </div>
-        <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="md:col-span-2">
-            <DateRangeFields
-              legend="เวลามาตรฐาน"
-              startLabel="เวลาเริ่มต้น"
-              endLabel="เวลาสิ้นสุด"
-              startName="defaultDutyStart"
-              endName="defaultDutyEnd"
-              start={defaultDutyStart}
-              end={defaultDutyEnd}
-              onStart={setDefaultDutyStart}
-              onEnd={setDefaultDutyEnd}
-              timeOnly
-            />
-          </div>
+        <div className="grid items-start gap-3 md:grid-cols-2">
           <label className="field-label">
             ค่าใช้จ่ายในการบริการ (บาท)
             <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />
-            <span className="field-hint">ค่าใช้จ่ายที่ตกลงสำหรับช่วงเวลามาตรฐาน</span>
+            <span className="field-hint">ยอดค่าใช้จ่ายสำหรับจำนวนชั่วโมงบริการที่ตกลงไว้</span>
           </label>
           <label className="field-label">
-            จำนวนชั่วโมงที่ครอบคลุม
+            จำนวนชั่วโมงบริการ
             <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
             <span className="field-hint">ใช้คำนวณอัตราเฉลี่ยและค่าล่วงเวลาเมื่อเกินเวลาที่กำหนด</span>
           </label>
@@ -204,7 +184,6 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
             </p>
           </div>
         </div>
-        <ServiceTimeSummary start={defaultDutyStart} end={defaultDutyEnd} packageHours={packageHours} />
         <label className="field-label">
           หมายเหตุค่าใช้จ่ายในการบริการ
           <input className="field-input" name="costNote" placeholder="เช่น รวมค่าน้ำมันแล้ว / ค่าล่วงเวลาคิดแยก" />

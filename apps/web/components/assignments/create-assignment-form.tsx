@@ -45,6 +45,12 @@ function vehicleLabel(vehicle?: Vehicle) {
   return `${vehicle.plateNumber}${vehicle.vehicleType ? ` / ${vehicle.vehicleType}` : ""}`;
 }
 
+function bangkokLocalToUtcIso(date: string, clock: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = clock.split(":").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hour - 7, minute, 0, 0)).toISOString();
+}
+
 function missionWindow(mission: Mission): { from: string; to: string } {
   const meta = (mission.metadata ?? {}) as Record<string, unknown>;
   const metaFrom = typeof meta.operationStartDate === "string" ? meta.operationStartDate : typeof meta.operationDate === "string" ? meta.operationDate : "";
@@ -93,8 +99,8 @@ export function CreateAssignmentForm({
 
   const window = useMemo(() => (mission ? missionWindow(mission) : { from: "", to: "" }), [mission]);
   const operationDate = window.from && window.from === window.to ? window.from : jobDate;
-  const startTime = operationDate && startClock ? `${operationDate}T${startClock}` : "";
-  const endTime = operationDate && endClock ? `${operationDate}T${endClock}` : "";
+  const startTime = operationDate && startClock ? bangkokLocalToUtcIso(operationDate, startClock) : "";
+  const endTime = operationDate && endClock ? bangkokLocalToUtcIso(operationDate, endClock) : "";
   const selectedCrewReady = Boolean(selectedCallSign && isCallSignCrewed(selectedCallSign));
 
   const conflicts = useMemo(() => {

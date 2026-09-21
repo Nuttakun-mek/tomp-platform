@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { createVehicleAction } from "@/app/actions/resources";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
-import { DateRangeFields } from "@/components/ui/datetime-field";
 import { estimateVehicleUsageCost, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { createVehicleSchema } from "@/lib/validation";
-import { ServiceTimeSummary } from "./service-time-summary";
 import { VehicleIconPicker } from "./vehicle-icon-picker";
 import { VEHICLE_TYPE_OPTIONS } from "./vehicle-type-options";
 
@@ -37,19 +35,15 @@ function text(form: FormData, key: string) {
 export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
   const router = useRouter();
   const toast = useToast();
-  const [defaultDutyStart, setDefaultDutyStart] = useState("08:00");
-  const [defaultDutyEnd, setDefaultDutyEnd] = useState("18:00");
   const [packageHours, setPackageHours] = useState("10");
   const [packageAmount, setPackageAmount] = useState("3000");
   const [isPending, startTransition] = useTransition();
   const costPreview = useMemo(() => estimateVehicleUsageCost({
     vehicleMetadata: {
-      defaultDutyStart,
-      defaultDutyEnd,
       packageHours: packageHours === "" ? null : Number(packageHours),
       packageAmount: packageAmount === "" ? null : Number(packageAmount)
     }
-  }), [defaultDutyEnd, defaultDutyStart, packageAmount, packageHours]);
+  }), [packageAmount, packageHours]);
 
   function handleSubmit(formData: FormData) {
     const parsed = createVehicleSchema.safeParse({
@@ -64,8 +58,6 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         year: text(formData, "year"),
         photoUrl: text(formData, "photoUrl"),
         luggageCapacity: text(formData, "luggageCapacity"),
-        defaultDutyStart: text(formData, "defaultDutyStart"),
-        defaultDutyEnd: text(formData, "defaultDutyEnd"),
         icon: text(formData, "vehicleIcon") || "van",
         packageHours: packageHours === "" ? null : Number(packageHours),
         packageAmount: packageAmount === "" ? null : Number(packageAmount),
@@ -172,39 +164,24 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
         <VehicleIconPicker />
       </fieldset>
 
-      <fieldset className="form-section md:grid-cols-2 xl:grid-cols-4">
-        <legend className="px-1 text-xs font-bold text-slate-600">เวลามาตรฐานและค่าใช้จ่ายในการบริการ</legend>
-        <div className="xl:col-span-2">
-          <DateRangeFields
-            legend="เวลามาตรฐาน"
-            startLabel="เวลาเริ่มต้น"
-            endLabel="เวลาสิ้นสุด"
-            startName="defaultDutyStart"
-            endName="defaultDutyEnd"
-            start={defaultDutyStart}
-            end={defaultDutyEnd}
-            onStart={setDefaultDutyStart}
-            onEnd={setDefaultDutyEnd}
-            timeOnly
-          />
-        </div>
+      <fieldset className="form-section md:grid-cols-2">
+        <legend className="px-1 text-xs font-bold text-slate-600">ค่าใช้จ่ายในการบริการ</legend>
         <label className="field-label">
           ค่าใช้จ่ายในการบริการ (บาท)
           <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />
+          <span className="field-hint">ยอดค่าใช้จ่ายสำหรับจำนวนชั่วโมงบริการที่ตกลงไว้</span>
         </label>
         <label className="field-label">
-          จำนวนชั่วโมงที่ครอบคลุม
+          จำนวนชั่วโมงบริการ
           <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
+          <span className="field-hint">ใช้คำนวณอัตราเฉลี่ยและค่าใช้จ่ายเพิ่มเติมเมื่อเกินเวลาที่กำหนดในงาน</span>
         </label>
-        <div className="rounded-2xl border border-slate-200 bg-canvas/60 p-3 sm:col-span-4">
+        <div className="rounded-2xl border border-slate-200 bg-canvas/60 p-3 md:col-span-2">
           <p className="text-sm font-semibold text-ink">ตัวอย่างการคำนวณ</p>
           <p className="mt-1 text-xs leading-5 text-ink-soft">{vehicleUsageCostBreakdown(costPreview)}</p>
           <p className="mt-1 text-[11px] leading-4 text-ink-faint">
             หากคนขับบันทึกเวลาเข้าก่อนเวลาเริ่ม ระบบจะไม่คำนวณค่าใช้จ่ายก่อนเวลาแผน และจะคำนวณค่าล่วงเวลาเมื่อบันทึกเวลาออกเกินเวลาที่กำหนด
           </p>
-        </div>
-        <div className="sm:col-span-4">
-          <ServiceTimeSummary start={defaultDutyStart} end={defaultDutyEnd} packageHours={packageHours} />
         </div>
       </fieldset>
 
