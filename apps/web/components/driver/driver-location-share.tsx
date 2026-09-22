@@ -194,6 +194,9 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
               capacity: driverAccess.vehicle.capacity
             }),
             assignmentStatus: driverAccess.assignment.status,
+            platform: "driver_web",
+            mode: "web_foreground",
+            appBuild: "web",
             // Read by lib/domain/gps-freshness: judge "overdue" against the
             // cadence this device promised, not the browser-tuned constants.
             heartbeatMs: LOCATION_HEARTBEAT_MS,
@@ -497,7 +500,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       <div className="grid gap-3 border-t border-border/70 p-3.5">
       {lastLocation ? (
         <p className="text-[12px] text-ink-soft">
-          ล่าสุด {formatTime(lastLocation.sentAt)} / ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} ม. / {health.message}
+          ศูนย์ควบคุมได้รับตำแหน่งล่าสุดเมื่อ {formatTime(lastLocation.sentAt)} / ความแม่นยำ {lastLocation.accuracy ? Math.round(lastLocation.accuracy) : "-"} ม. / {health.message}
         </p>
       ) : null}
 
@@ -560,7 +563,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
           <button
             type="button"
             onClick={() => setMapOpen((value) => !value)}
-             className="flex items-center justify-between rounded-[1rem] border border-border/80 bg-canvas/80 px-3 py-2 text-[12px] font-semibold text-ink-soft"
+            className="flex items-center justify-between rounded-[1rem] border border-border/80 bg-canvas/80 px-3 py-2 text-[12px] font-semibold text-ink-soft"
           >
             <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> ตำแหน่งของฉันบนแผนที่</span>
             <ChevronDown className={`h-4 w-4 transition ${mapOpen ? "rotate-180" : ""}`} />

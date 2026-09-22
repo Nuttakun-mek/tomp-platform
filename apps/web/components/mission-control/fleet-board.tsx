@@ -349,13 +349,15 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                     : "border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 hover:border-teal-200 hover:shadow-md"
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => setExpanded(open ? null : group.key)}
-                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 text-left sm:grid-cols-[auto_minmax(0,1fr)_minmax(10rem,auto)_auto]"
-                >
-                  <span className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ring-4 ring-white ${FRESH_DOT[group.freshness]}`} />
-                  <span className="min-w-0">
+                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(open ? null : group.key)}
+                    className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 text-left sm:grid-cols-[auto_minmax(0,1fr)_minmax(10rem,auto)]"
+                    aria-expanded={open}
+                  >
+                    <span className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ring-4 ring-white ${FRESH_DOT[group.freshness]}`} />
+                    <span className="min-w-0">
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="truncate text-[15px] font-bold text-ink">{group.title}</span>
                       {primaryJob ? (
@@ -410,8 +412,8 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         </span>
                       ) : null}
                     </span>
-                  </span>
-                  <span className="hidden min-w-0 justify-items-end gap-1 text-right sm:grid">
+                    </span>
+                    <span className="hidden min-w-0 justify-items-end gap-1 text-right sm:grid">
                     {serviceFocus ? (
                       <span
                         className={`max-w-[12rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
@@ -426,9 +428,30 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                     <span className="max-w-[12rem] truncate text-[11px] font-medium text-slate-500">
                       GPS: {gpsSummary}
                     </span>
-                  </span>
-                  <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
-                </button>
+                    </span>
+                  </button>
+                  {mapPointId ? (
+                    <button
+                      type="button"
+                      onClick={() => focusOnMap(mapPointId)}
+                      className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 text-xs font-bold text-operation shadow-sm transition hover:border-teal-400 hover:bg-white focus-ring"
+                      aria-label={`ไปที่รถของ ${group.title} บนแผนที่`}
+                      title="ไปที่รถบนแผนที่"
+                    >
+                      <LocateFixed className="h-3.5 w-3.5" />
+                      <span className="hidden xl:inline">ไปที่รถ</span>
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(open ? null : group.key)}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-ink focus-ring"
+                    aria-label={open ? "ซ่อนรายละเอียดคนขับ" : "แสดงรายละเอียดคนขับ"}
+                    aria-expanded={open}
+                  >
+                    <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
 
                 {open ? (
                   <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm">

@@ -3,6 +3,28 @@
 Written by the mobile agent, 2026-09-16, answering `979`. Read with `978`
 (the boundary) and `977` (the backlog).
 
+## Current Status, 2026-09-22
+
+Items from this handback that are now closed in source:
+
+- The web GPS card sends `gps.status.request` when it mounts, so the native shell
+  can answer with the current `gps_sharing` / `gps_stopped` state.
+- Driver messages and issue reports now carry `metadata.clientEventId`.
+- The driver web send path keeps optimistic pending messages and reconciles them
+  when the queued send succeeds.
+- Native offline queue flushing has a re-entrancy guard.
+- Native background GPS task diagnostics are no longer silent in source.
+
+Items still requiring real-device confirmation:
+
+- Android/iOS camera picker inside WebView for driver message photos.
+- Photo stamp receives a fresh native GPS snapshot while the device is locked or
+  after tab switches.
+- GPS state presentation across the native shell top bar and web GPS card feels
+  like one source of truth to the driver.
+- Sign-out/rescan clears the old job, stops GPS, and does not reopen the
+  previous iOS keychain session.
+
 Everything here was done inside `apps/mobile-driver/**`, except one additive
 change to `packages/driver-core/src/bridge.ts`, which is called out because that
 file is shared.

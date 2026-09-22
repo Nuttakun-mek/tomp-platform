@@ -175,7 +175,8 @@ export function parseBridgeMessage(raw: string): BridgeMessage | null {
 export function buildNativeStatusMessage(
   status: NativeStatus,
   message: string,
-  detail?: Record<string, unknown>
+  detail?: Record<string, unknown>,
+  options?: { canBackgroundLocation?: boolean }
 ): NativeStatusMessage {
   return {
     namespace: BRIDGE_NAMESPACE,
@@ -184,7 +185,7 @@ export function buildNativeStatusMessage(
     payload: {
       status,
       message,
-      canBackgroundLocation: status !== "session_missing",
+      canBackgroundLocation: options?.canBackgroundLocation ?? status !== "session_missing",
       recordedAt: new Date().toISOString(),
       detail
     }

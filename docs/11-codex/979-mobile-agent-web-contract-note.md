@@ -2,6 +2,29 @@
 
 Date: 2026-09-16
 
+## Current Status, 2026-09-22
+
+This note is still valid, with the following updates:
+
+- Web driver GPS now sends `metadata.platform = "driver_web"`,
+  `metadata.mode = "web_foreground"`, and `metadata.appBuild = "web"` for
+  browser/WebView fallback pings.
+- The web GPS card sends `gps.status.request` on mount and on mobile shell ready.
+- Driver message/issue idempotency is wired in the web send path through
+  `metadata.clientEventId`.
+- The next-job continuation flow now lets the driver accept the next same-day
+  Call Sign job without repeating vehicle photos/readiness.
+- Latest verification:
+  - `npm run typecheck -w @tomp/web`: pass
+  - `npm run lint -w @tomp/web`: pass
+  - `npm run test -w @tomp/web`: pass, 58 files / 289 tests
+  - `npm run typecheck:mobile`: pass
+  - `npm run test:mobile`: pass, 6 files / 34 tests
+  - `npm run test -w @tomp/driver-core`: pass, 6 files / 38 tests
+
+The mobile agent should still run the real-device checklist before any Android
+or iOS build is released.
+
 This note is for the mobile app agent. The web agent has completed a web-only
 pass and intentionally did not change `apps/mobile-driver/*`.
 

@@ -1,8 +1,15 @@
 # 982 — Everything still outstanding, after the data wipe
 
 **Date:** 2026-09-17
+**Updated:** 2026-09-22 after the enterprise web/mobile flow audit.
 **Supersedes the open half of:** `977`, `980`, `981`
 **Status:** the list of record. Close items here, not in the older documents.
+
+Read next with:
+
+- `978-web-mobile-contract-boundary.md` for API/bridge ownership.
+- `981-enterprise-web-mobile-flow-audit.md` for the current enterprise flow
+  audit and release guidance.
 
 ---
 
@@ -138,14 +145,32 @@ now takes `{ dateOnly }` and counts calendar days inclusive, with tests).
 
 # 5. Still open from `980`
 
-- **Two "กำลังส่ง GPS" indicators, one truth.** The shell's top bar and the web
-  card each hold their own state and can disagree. One of them should be the only
-  voice. Needs a decision across both tracks.
-- **One-tap call to the control room** from the driver page — the packet already
-  carries the number.
+2026-09-22 update: the web GPS card now asks the shell for status on mount,
+driver messages/issues now carry `metadata.clientEventId`, and the web send path
+keeps optimistic pending messages until the retry/send is reconciled. Treat the
+old "two web-owned message bugs" bullet below as closed. The remaining work is
+GPS status UX consistency, real-device validation, and production observability.
+
+2026-09-22 later update: the QR -> PIN/session -> readiness -> GPS share ->
+complete job -> next job -> accept continuation smoke path now exists as
+`npm run smoke:driver-flow`; the read-only operational monitor now exists as
+`npm run monitor:driver-ops`; and the opt-in visual screenshot suite now exists
+as `npm run e2e:visual` with `E2E_VISUAL=1`. They still need to be run against a
+stable staging/production target before the next release sign-off.
+
+New open items from the 2026-09-22 audit:
+
+- **Two GPS indicators, one truth.** Decision made 2026-09-22: the server/control
+  center GPS row is the confirmed truth. The native shell can show only local
+  transmitter state, while the web GPS card confirms when the control room
+  received a location. Still needs real-device validation.
+- **One-tap call to the control room** from the driver page — decision made
+  2026-09-22: keep it in the message/communication screen, not as a persistent
+  action on every tab. Still needs Android/iOS dialer validation.
 - **"Last received by the control room at HH:MM"** on the driver page. The most
   reassuring thing an operator can show a driver, and it makes a silent link
-  visible without the driver guessing.
+  visible without the driver guessing. The GPS card now shows this copy; keep
+  this open only for real-device validation.
 - **Contract oddities.** `NativeStatus` declares `shell_ready` and the app has
   never sent it. `buildNativeStatusMessage` hard-codes
   `canBackgroundLocation: status !== "session_missing"`, which claims background
@@ -179,3 +204,9 @@ Every file touched today under `apps/web/**` belongs to the web agent by the
 split recorded in `978`. The owner directed this work to the mobile track
 explicitly. `978` should be updated to say so, or the split should be retired —
 it no longer describes how the work is actually being done.
+
+2026-09-22 update: keep the split, but read it as a code-ownership boundary, not
+as a product-design boundary. Web/server owns operational truth and driver
+WebView screens; native mobile owns device capabilities and shell behavior. If a
+change crosses API shape, bridge shape, route path, session storage, or GPS
+payload semantics, update `978` before implementation.

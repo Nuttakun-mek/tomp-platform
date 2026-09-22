@@ -61,6 +61,7 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 412, height: 915 }, locale: "th-TH" });
 await context.addInitScript(bridgeBootstrap);
 const page = await context.newPage();
+let firstAssignmentId = null;
 const apiCalls = [];
 page.on("response", (r) => {
   if (r.url().includes("/api/driver/")) apiCalls.push(`${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`);
@@ -153,7 +154,8 @@ try {
     // 7. the assignment read the native app uses
     const asn = await fetch(`${baseUrl}/api/driver/assignment`, { headers: { "x-driver-session": mobileSession } });
     const asnJson = await asn.json().catch(() => null);
-    check("native assignment read works with the session", asn.ok && Boolean(asnJson?.data?.packet), `HTTP ${asn.status}`);
+    firstAssignmentId = asnJson?.data?.assignment?.id ?? asnJson?.data?.packet?.assignmentId ?? null;
+    check("native assignment read works with the session", asn.ok && Boolean(asnJson?.data?.packet), `HTTP ${asn.status}${firstAssignmentId ? ` assignment ${firstAssignmentId}` : ""}`);
   }
 
   // 7b. Complete the driver pre-flight so the task view (which owns the
@@ -222,6 +224,46 @@ try {
   await page.waitForTimeout(800);
   const afterStatus = await page.textContent("body");
   check("web reacts to the native gps_sharing status", afterStatus.includes("กำลังส่งตำแหน่ง GPS จากแอป") || afterStatus.includes("ส่งตำแหน่งล่าสุด"));
+
+  // 8b. Complete the current job through the same mobile session. The server
+  // should then resolve the session to the next assignment for the Call Sign,
+  // without forcing a new QR/PIN/pre-flight cycle.
+  if (mobileSession && firstAssignmentId) {
+    const complete = await fetch(`${baseUrl}/api/driver/status`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-driver-session": mobileSession },
+      body: JSON.stringify({
+        status: "completed",
+        source: "driver_qr",
+        metadata: { source: "simulate-mobile-shell", smokeStep: "complete-first-job" }
+      })
+    });
+    const completeJson = await complete.json().catch(() => null);
+    check("current job can be completed from the mobile session", complete.ok && completeJson?.success !== false, `HTTP ${complete.status}`);
+
+    const next = await fetch(`${baseUrl}/api/driver/assignment`, { headers: { "x-driver-session": mobileSession } });
+    const nextJson = await next.json().catch(() => null);
+    const nextAssignmentId = nextJson?.data?.assignment?.id ?? nextJson?.data?.packet?.assignmentId ?? null;
+    check(
+      "same mobile session resolves to the next Call Sign job",
+      next.ok && Boolean(nextAssignmentId) && nextAssignmentId !== firstAssignmentId,
+      `HTTP ${next.status}${nextAssignmentId ? ` next ${nextAssignmentId}` : ""}`
+    );
+
+    if (next.ok && nextAssignmentId && nextAssignmentId !== firstAssignmentId) {
+      const ack = await fetch(`${baseUrl}/api/driver/status`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-driver-session": mobileSession },
+        body: JSON.stringify({
+          status: "acknowledged",
+          source: "driver_qr",
+          metadata: { source: "simulate-mobile-shell", smokeStep: "acknowledge-next-job" }
+        })
+      });
+      const ackJson = await ack.json().catch(() => null);
+      check("next job can be acknowledged without a new QR session", ack.ok && ackJson?.success !== false, `HTTP ${ack.status}`);
+    }
+  }
 
   // 9. Mission Control sees the ping
   const mc = await fetch(`${baseUrl}/api/mission-control/locations`);

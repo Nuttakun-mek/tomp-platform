@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Seed one complete driver job (project -> day -> mission -> call sign -> driver
-// -> vehicle -> assignment -> QR token + PIN) so the QR -> session -> GPS flow
-// can be exercised end to end, then remove it again.
+// Seed a complete driver day (project -> day -> mission -> call sign -> driver
+// -> vehicle -> two assignments -> QR token + PIN) so the QR -> session -> GPS
+// -> complete -> next-job flow can be exercised end to end, then removed again.
 //
 // Everything is tagged `metadata.smokeTest = true`, which is what
 // public.purge_smoke_test_data() keys on, so --purge cleans up every row this
@@ -119,7 +119,13 @@ async function seedIn(sql) {
   const [assignment] = await sql`
     insert into assignments (project_id, mission_id, call_sign_id, vehicle_id, driver_id, status, start_time, end_time, metadata)
     values (${project.id}, ${mission.id}, ${callSign.id}, ${vehicle.id}, ${driver.id}, 'published', now(), now() + interval '4 hours',
-      ${sql.json({ smokeTest: true, pickupLocation: "โรงแรมทดสอบ", dropoffLocation: "ศูนย์ประชุมทดสอบ", commitmentTime: "09:00" })})
+      ${sql.json({ smokeTest: true, sequence: 1, pickupLocation: "โรงแรมทดสอบ", dropoffLocation: "ศูนย์ประชุมทดสอบ", commitmentTime: "09:00" })})
+    returning id`;
+
+  const [nextAssignment] = await sql`
+    insert into assignments (project_id, mission_id, call_sign_id, vehicle_id, driver_id, status, start_time, end_time, metadata)
+    values (${project.id}, ${mission.id}, ${callSign.id}, ${vehicle.id}, ${driver.id}, 'published', now() + interval '5 hours', now() + interval '7 hours',
+      ${sql.json({ smokeTest: true, sequence: 2, pickupLocation: "ศูนย์ประชุมทดสอบ", dropoffLocation: "สนามบินทดสอบ", commitmentTime: "14:00" })})
     returning id`;
 
   const token = `tomp_${callSign.id}_${driver.id}_${crypto.randomBytes(32).toString("base64url")}`;
@@ -136,6 +142,7 @@ async function seedIn(sql) {
   console.log(`  driver       ${driver.full_name}`);
   console.log(`  vehicle      ${vehicle.plate_number}`);
   console.log(`  assignment   ${assignment.id}`);
+  console.log(`  next job     ${nextAssignment.id}`);
   console.log(`\n  QR URL   ${baseUrl}/driver/${token}`);
   console.log(`  PIN      ${pin}\n`);
   console.log("  Token hashed with DRIVER_ACCESS_TOKEN_SECRET from this machine — the");

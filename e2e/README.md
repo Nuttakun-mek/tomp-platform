@@ -16,6 +16,7 @@ npx playwright install chromium
 | `unauthenticated.spec.ts` | nothing (read-only vs prod) | ✅ `e2e-unauthenticated` job |
 | `operator-flow.spec.ts` | `E2E_OPERATOR_EMAIL` / `_PASSWORD`, staging | no — staging only |
 | `driver-flow.spec.ts` | `E2E_DRIVER_QR_URL` (+ `E2E_DRIVER_PIN`), staging | no — staging only |
+| `visual-mobile-regression.spec.ts` | `E2E_VISUAL=1` + driver/fleet/mission-control URLs, staging | no — opt-in only |
 | `rbac-negative.spec.ts` | `E2E_DISPATCHER_EMAIL` / `_PASSWORD` / `E2E_FOREIGN_PROJECT_ID` / `E2E_FOREIGN_PROJECT_CODE`, staging | no — staging only |
 
 `unauthenticated.spec.ts` also covers P0-2 directly: every `/api/driver/*`
@@ -40,6 +41,26 @@ E2E_PROJECT_PREFIX=E2E \
 E2E_BASE_URL=https://<staging> \
 E2E_DRIVER_QR_URL="https://<staging>/driver?token=tomp_..." E2E_DRIVER_PIN=123456 \
   npx playwright test --config e2e/playwright.config.ts driver-flow
+
+# driver mobile shell smoke — seeds data, simulates QR/PIN/mobile-session/GPS,
+# completes the first job, verifies the next Call Sign job is available, then purges.
+TOMP_BASE_URL=https://<staging> npm run smoke:driver-flow
+
+# production is deliberately blocked unless the run is explicit
+node scripts/driver-flow-smoke.mjs https://tomp-platform.vercel.app --allow-production
+
+# ops monitor — read-only pre-release check for GPS freshness, diagnostics,
+# mobile sessions, and missing push tokens.
+npm run monitor:driver-ops
+
+# visual regression — opt-in because it needs stable seeded URLs and baseline images.
+# On PowerShell:
+$env:E2E_VISUAL=1
+$env:E2E_DRIVER_QR_URL="https://<staging>/driver/<token>"
+$env:E2E_DRIVER_PIN="123456"
+$env:E2E_FLEET_URL="https://<staging>/fleet/<token>"
+$env:E2E_MISSION_CONTROL_URL="https://<staging>/projects/<project>/mission-control"
+npm run e2e:visual
 
 # rbac negative — two seeded users on two projects
 E2E_BASE_URL=https://<staging> \

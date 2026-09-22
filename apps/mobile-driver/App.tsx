@@ -152,7 +152,7 @@ function DriverShell() {
     networkConnected === false
       ? "ออฟไลน์"
       : locationSharingActive
-        ? "กำลังแชร์ตำแหน่ง"
+        ? "กำลังส่งจากอุปกรณ์"
         : "ยังไม่แชร์ตำแหน่ง";
   const networkIcon = networkTone === "live" ? "✓" : networkTone === "offline" ? "!" : "GPS";
   const currentScreenLabel = mode === "web"
@@ -179,7 +179,7 @@ function DriverShell() {
   }, [activeWebView, currentToken]);
 
   const postStatusToWeb = useCallback((nativeStatus: Parameters<typeof buildNativeStatusMessage>[0], text: string, detail?: Record<string, unknown>) => {
-    const payload = buildNativeStatusMessage(nativeStatus, text, detail);
+    const payload = buildNativeStatusMessage(nativeStatus, text, detail, { canBackgroundLocation: BACKGROUND_GPS_ENABLED });
     const serialized = JSON.stringify(payload)
       .replace(/</g, "\\u003c")
       .replace(/\u2028/g, "\\u2028")

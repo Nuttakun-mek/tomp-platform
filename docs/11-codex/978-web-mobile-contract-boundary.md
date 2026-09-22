@@ -3,6 +3,42 @@
 Opened 2026-09-16 to keep web-side work and mobile-app work from breaking each
 other while both agents move in parallel.
 
+## Current Status, 2026-09-22
+
+This file is still the source of truth for the web/mobile boundary.
+
+Updates verified in code:
+
+- `packages/driver-core/src/bridge.ts` remains the single shared bridge
+  contract.
+- `gps.status.request` is implemented in the shared bridge, handled by the
+  native shell, and sent by the web GPS card on mount.
+- Native background GPS diagnostics are no longer silent in the current source:
+  background task errors, missing locations, session read failures and missing
+  sessions are reported or queued as diagnostic location events.
+- `apps/mobile-driver/src/services/offline-queue.ts` has a re-entrancy guard for
+  `flushOfflineQueue()`.
+- Web fallback GPS now also sends `metadata.platform`, `metadata.mode`, and
+  `metadata.appBuild` so Mission Control/debugging can distinguish browser,
+  WebView and native pings.
+- Driver message and issue sends now use `metadata.clientEventId`; the web send
+  path reconciles optimistic pending messages instead of relying on polling to
+  make them disappear/reappear.
+- The current-assignment resolver is Call Sign/session aware, so a driver can
+  continue to the next same-day job without being forced through preflight
+  photos/readiness again.
+
+Still open at the contract level:
+
+- Do not change `/api/driver/*`, `x-driver-session`, bridge message types, or
+  GPS metadata shape without updating this file and coordinating the mobile
+  agent.
+- Real-device verification is still required before a native release: Android
+  background GPS with locked screen, iOS background behavior, camera/photo
+  attach with location stamp, push/unread badge, and sign-out/rescan.
+- Keep old driver route support until the replacement Android/iOS build is
+  installed on every active driver device.
+
 ## Rule
 
 This track changes the **web application only**. The mobile app is owned by the

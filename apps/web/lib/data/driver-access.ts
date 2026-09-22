@@ -355,7 +355,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
       .order("created_at", { ascending: false })
       .limit(5)
   ]);
-  const activated = Boolean((checkinRes.data as unknown[] | null)?.length);
+  const currentAssignmentActivated = Boolean((checkinRes.data as unknown[] | null)?.length);
   const latestStatusRow = latestStatusRes.data as Row | null;
   const workSessionRows = (workSessionRes.data || []) as Row[];
   const operationAnchor = nullableText(assignment, "start_time") || new Date().toISOString();
@@ -375,6 +375,18 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     : { data: [] as Row[] };
   const dayCallSignById = new Map(((dayCallSignRows || []) as Row[]).map((row) => [text(row, "id"), text(row, "call_sign")]));
   const dayAssignments = buildDayAssignments(visibleDayRows, text(assignment, "id"), (id) => dayCallSignById.get(id));
+  const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const { data: unitReadyRows } = !currentAssignmentActivated && visibleDayAssignmentIds.length
+    ? await client
+        .from("driver_checkins")
+        .select("id")
+        .eq("project_id", text(assignment, "project_id"))
+        .eq("driver_id", String(tokenRow.driver_id))
+        .eq("status", "ready")
+        .in("assignment_id", visibleDayAssignmentIds)
+        .limit(1)
+    : { data: [] as Row[] };
+  const activated = currentAssignmentActivated || Boolean((unitReadyRows as unknown[] | null)?.length);
 
   const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
 
@@ -547,6 +559,18 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
   const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
   const latestStatusRow = latestStatusRes.data as Row | null;
   const workSessionRows = (workSessionRes.data || []) as Row[];
+  const currentAssignmentActivated = Boolean((checkinRes.data as unknown[] | null)?.length);
+  const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const { data: unitReadyRows } = !currentAssignmentActivated && visibleDayAssignmentIds.length
+    ? await client
+        .from("driver_checkins")
+        .select("id")
+        .eq("project_id", context.projectId)
+        .eq("driver_id", context.driverId)
+        .eq("status", "ready")
+        .in("assignment_id", visibleDayAssignmentIds)
+        .limit(1)
+    : { data: [] as Row[] };
 
   return {
     token: "",
@@ -561,7 +585,7 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
     latestStatus: latestStatus(latestStatusRow),
     workSession: workSessionFromRows(workSessionRows),
     dayAssignments: buildDayAssignments(visibleDayRows, current.id, (id) => dayCallSignById.get(id)),
-    activated: Boolean((checkinRes.data as unknown[] | null)?.length),
+    activated: currentAssignmentActivated || Boolean((unitReadyRows as unknown[] | null)?.length),
     project: {
       ...base(project as Row),
       organizationId: text(project as Row, "organization_id"),
@@ -683,6 +707,18 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     : [];
   const dayCallSignById = new Map(dayCallSignRows.map((row) => [text(row, "id"), text(row, "call_sign")]));
   const dayAssignments = buildDayAssignments(visibleDayRows, text(assignment, "id"), (id) => dayCallSignById.get(id));
+  const currentAssignmentActivated = checkinRows.length > 0;
+  const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const unitReadyRows = !currentAssignmentActivated && visibleDayAssignmentIds.length
+    ? await sql<Row[]>`
+        select id from driver_checkins
+        where project_id = ${String(tokenRow.project_id)}
+          and driver_id = ${String(tokenRow.driver_id)}
+          and status = 'ready'
+          and assignment_id in ${sql(visibleDayAssignmentIds)}
+        limit 1
+      `
+    : [];
 
   await sql`
     update driver_access_tokens
@@ -701,7 +737,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     token,
     tokenValidated: true,
     packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,
-    activated: checkinRows.length > 0,
+    activated: currentAssignmentActivated || unitReadyRows.length > 0,
     latestStatus: latestStatus(latestStatusRows[0]),
     workSession: workSessionFromRows(workSessionRows),
     dayAssignments,
@@ -846,6 +882,18 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
   const dayCallSignById = new Map(dayCallSignRows.map((row) => [text(row, "id"), text(row, "call_sign")]));
   const packetPayload = packetRows[0]?.payload;
   const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
+  const currentAssignmentActivated = checkinRows.length > 0;
+  const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const unitReadyRows = !currentAssignmentActivated && visibleDayAssignmentIds.length
+    ? await sql<Row[]>`
+        select id from driver_checkins
+        where project_id = ${context.projectId}
+          and driver_id = ${context.driverId}
+          and status = 'ready'
+          and assignment_id in ${sql(visibleDayAssignmentIds)}
+        limit 1
+      `
+    : [];
 
   return {
     token: "",
@@ -854,7 +902,7 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
     deviceBoundTo: typeof tokenMeta.deviceHash === "string" && tokenMeta.deviceHash ? tokenMeta.deviceHash : null,
     tokenValidated: true,
     packet: packetPayload && typeof packetPayload === "object" ? (packetPayload as DriverAssignmentPacket) : null,
-    activated: checkinRows.length > 0,
+    activated: currentAssignmentActivated || unitReadyRows.length > 0,
     latestStatus: latestStatus(latestStatusRows[0]),
     workSession: workSessionFromRows(workSessionRows),
     dayAssignments: buildDayAssignments(visibleDayRows, current.id, (id) => dayCallSignById.get(id)),

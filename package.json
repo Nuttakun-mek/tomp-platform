@@ -38,7 +38,10 @@
     "db:local:stop": "npx --prefix apps/web supabase stop",
     "db:local:reset": "npm run db:local:sync && npx --prefix apps/web supabase db reset",
     "db:local:status": "npx --prefix apps/web supabase status",
-    "live-test:smoke": "node scripts/live-test-smoke.mjs"
+    "live-test:smoke": "node scripts/live-test-smoke.mjs",
+    "smoke:driver-flow": "node scripts/driver-flow-smoke.mjs",
+    "monitor:driver-ops": "node scripts/driver-ops-monitor.mjs",
+    "e2e:visual": "playwright test --config e2e/playwright.config.ts visual-mobile-regression"
   },
   "engines": {
     "node": ">=20"

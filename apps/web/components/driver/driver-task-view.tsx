@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, ChevronDown, Clock3, Home, ListChecks, LogIn, LogOut, MapPin, MessageCircle, Navigation, Phone, RotateCcw, TriangleAlert } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CarFront, CheckCircle2, ChevronDown, Clock3, Home, ListChecks, LogIn, LogOut, MapPin, MessageCircle, Navigation, Phone, RotateCcw, TriangleAlert, UserRound } from "lucide-react";
 import { assignmentStatusUpdateAction, driverIssueReportAction } from "@/app/actions/driver";
 import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
@@ -114,6 +115,7 @@ function assignmentStatusPresentation(status: string): { Icon: StatusIcon; class
 }
 
 export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
+  const router = useRouter();
   const meta = driverAccess.assignment.metadata;
   const pickup = metaText(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ");
   const dropoff = metaText(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง");
@@ -144,6 +146,9 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const [dayAssignments, setDayAssignments] = useState(driverAccess.dayAssignments);
   const [workSession, setWorkSession] = useState<DriverWorkSessionState>(driverAccess.workSession);
   const [gpsLight, setGpsLight] = useState<DriverGpsLight>("off");
+  const [currentJobAcknowledged, setCurrentJobAcknowledged] = useState(() => (
+    Boolean(driverAccess.latestStatus) || ["acknowledged", "active", "completed"].includes(driverAccess.assignment.status)
+  ));
   const [outboxCount, setOutboxCount] = useState(0);
   const [insideNativeShell, setInsideNativeShell] = useState(false);
   const seenIds = useRef(new Set(driverAccess.notifications.map((notification) => notification.id)));
@@ -206,6 +211,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
         };
         if (!json.success || !json.data) return;
         if (json.data.latestStatus?.status) {
+          setCurrentJobAcknowledged(true);
           setTripStep((current) => Math.max(current, stepFromStatus(json.data?.latestStatus?.status)));
         }
         if (json.data.workSession) setWorkSession(json.data.workSession);
@@ -270,8 +276,25 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
       if (result.success) {
         setTripStep(nextIndex);
         setBanner({ tone: "ok", text: "อัปเดตสถานะให้ศูนย์ควบคุมแล้ว" });
+        if (status === "completed") {
+          window.setTimeout(() => router.refresh(), 350);
+        }
       } else {
         enqueueFailed("status", payload, result.error || "ส่งสถานะไม่สำเร็จ ระบบจะส่งข้อมูลอีกครั้งเมื่อเชื่อมต่อได้");
+      }
+    });
+  }
+
+  function acknowledgeCurrentJob() {
+    const payload = { ...ids, status: "acknowledged", source: "driver_qr", metadata: { via: "driver_next_job" } };
+    setBanner(null);
+    startTransition(async () => {
+      const result = await assignmentStatusUpdateAction(payload);
+      if (result.success) {
+        setCurrentJobAcknowledged(true);
+        setBanner({ tone: "ok", text: "รับงานต่อเรียบร้อยแล้ว ศูนย์ควบคุมได้รับสถานะล่าสุด" });
+      } else {
+        enqueueFailed("status", payload, result.error || "รับงานต่อไม่สำเร็จ ระบบจะส่งข้อมูลอีกครั้งเมื่อเชื่อมต่อได้");
       }
     });
   }
@@ -384,6 +407,11 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   const assignmentStatus = assignmentStatusPresentation(driverAccess.assignment.status);
   const GpsStatusIcon = gpsStatus.Icon;
   const AssignmentStatusIcon = assignmentStatus.Icon;
+  const workSessionLabel =
+    workSession.status === "active" ? "กำลังปฏิบัติงาน" : workSession.status === "ended" ? "บันทึกเวลาออกแล้ว" : "ยังไม่บันทึกเวลาเข้า";
+  const workSessionClass =
+    workSession.status === "active" ? "bg-emerald-300/18 text-emerald-50 ring-emerald-300/30" : workSession.status === "ended" ? "bg-white/10 text-slate-100 ring-white/20" : "bg-amber-300/16 text-amber-50 ring-amber-300/30";
+  const needsCurrentJobAcceptance = !currentJobAcknowledged && ["draft", "planned", "published", "parked"].includes(driverAccess.assignment.status);
   const currentStep = TRIP_STEPS[tripStep];
   const doneSteps = TRIP_STEPS.slice(0, tripStep);
   const laterSteps = TRIP_STEPS.slice(tripStep + 1);
@@ -397,30 +425,61 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
       id="driver-home"
       className={`grid gap-3 ${insideNativeShell ? "pb-6" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"}`}
     >
-      <header className="relative grid gap-2 overflow-hidden rounded-[1rem] bg-[radial-gradient(circle_at_top_right,rgba(139,226,218,0.22),transparent_34%),linear-gradient(145deg,#0d344c_0%,#0b2538_58%,#071827_100%)] p-3 text-white shadow-[0_14px_34px_rgba(7,24,39,0.22)] ring-1 ring-white/10">
+      <header className="relative grid gap-3 overflow-hidden rounded-[1.25rem] bg-[radial-gradient(circle_at_84%_12%,rgba(139,226,218,0.28),transparent_32%),radial-gradient(circle_at_12%_86%,rgba(37,99,235,0.2),transparent_34%),linear-gradient(145deg,#0d344c_0%,#0b2538_56%,#071827_100%)] p-3.5 text-white shadow-[0_16px_38px_rgba(7,24,39,0.24)] ring-1 ring-white/10">
+        <span className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full border border-white/10 bg-white/5" aria-hidden />
         <span className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/30" aria-hidden />
-        <div className="flex items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[11px] font-semibold text-teal-100">{driverAccess.project.projectName}</p>
-          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[11px] font-bold ring-1 ${gpsStatus.className}`}>
-            <span className={`grid h-6 w-6 place-items-center rounded-full ${gpsStatus.iconClassName}`}>
-              <GpsStatusIcon className="h-3.5 w-3.5" />
-            </span>
-            {gpsStatus.label}
-          </span>
-        </div>
-        <div className="flex items-end justify-between gap-3">
+        <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-100/80">Call Sign</p>
-            <h1 className="min-w-0 truncate text-[1.65rem] font-black leading-9 tracking-normal text-white">{driverAccess.callSign.callSign}</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-100/80">โครงการ</p>
+            <p className="min-w-0 truncate text-[12px] font-bold leading-5 text-teal-50">{driverAccess.project.projectName}</p>
           </div>
-          <span className={`mb-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${assignmentStatus.className}`}>
+          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${assignmentStatus.className}`}>
             <AssignmentStatusIcon className="h-3.5 w-3.5" />
             {formatStatusTh(driverAccess.assignment.status)}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-1.5 text-[11px] font-semibold text-white/78">
-          <p className="min-w-0 truncate rounded-xl bg-white/10 px-2 py-1.5">{driverAccess.driver.fullName}</p>
-          <p className="min-w-0 truncate rounded-xl bg-white/10 px-2 py-1.5">{driverAccess.vehicle.plateNumber} / {driverAccess.vehicle.vehicleType}</p>
+        <div className="relative grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+          <div className="grid h-14 w-14 place-items-center rounded-[1.05rem] bg-white/12 text-center shadow-inner ring-1 ring-white/18">
+            <span className="text-[10px] font-bold text-teal-100/80">หน่วย</span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-100/80">Call Sign</p>
+            <h1 className="min-w-0 truncate text-[1.8rem] font-black leading-9 tracking-normal text-white">{driverAccess.callSign.callSign}</h1>
+          </div>
+        </div>
+        <div className="relative grid gap-2">
+          <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
+            <div className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-2 rounded-[0.95rem] bg-white/10 px-2.5 py-2 ring-1 ring-white/10">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-white/12 text-teal-100">
+                <UserRound className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-semibold text-white/55">คนขับ</span>
+                <span className="block truncate text-[12px] font-bold text-white">{driverAccess.driver.fullName}</span>
+              </span>
+            </div>
+            <div className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-2 rounded-[0.95rem] bg-white/10 px-2.5 py-2 ring-1 ring-white/10">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-white/12 text-teal-100">
+                <CarFront className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-semibold text-white/55">รถ</span>
+                <span className="block truncate text-[12px] font-bold text-white">{driverAccess.vehicle.plateNumber} / {driverAccess.vehicle.vehicleType}</span>
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex min-h-8 flex-1 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[11px] font-bold ring-1 ${gpsStatus.className}`}>
+              <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${gpsStatus.iconClassName}`}>
+                <GpsStatusIcon className="h-3.5 w-3.5" />
+              </span>
+              <span className="truncate">{gpsStatus.label}</span>
+            </span>
+            <span className={`inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${workSessionClass}`}>
+              <Clock3 className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{workSessionLabel}</span>
+            </span>
+          </div>
         </div>
       </header>
 
@@ -451,7 +510,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
             workSession.status === "active" ? "bg-emerald-50 text-emerald-800" : workSession.status === "ended" ? "bg-slate-100 text-slate-700" : "bg-amber-50 text-amber-800"
           }`}>
-            {workSession.status === "active" ? "กำลังปฏิบัติงาน" : workSession.status === "ended" ? "บันทึกเวลาออกแล้ว" : "ยังไม่บันทึกเวลาเข้า"}
+            {workSessionLabel}
           </span>
         </div>
         <div className="grid gap-2 rounded-[1rem] bg-canvas/70 p-2.5 text-[12px] text-ink-soft">
@@ -513,7 +572,23 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
           </div>
         ) : null}
 
-        {currentStep ? (
+        {needsCurrentJobAcceptance ? (
+          <div id="driver-next-action" className="grid gap-2 scroll-mt-3">
+            <p className="text-[12px] font-semibold text-ink-soft">งานถัดไปพร้อมให้ดำเนินการ</p>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={acknowledgeCurrentJob}
+              className="flex min-h-14 items-center justify-center gap-2 rounded-[1rem] bg-operation px-4 text-[16px] font-bold text-white shadow-[0_10px_20px_rgba(8,123,115,0.22)] transition active:scale-[0.99] disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-5 w-5" />
+              รับงานต่อ
+            </button>
+            <p className="rounded-card bg-operation-soft px-3 py-2 text-[12px] leading-5 text-operation">
+              งานนี้ใช้การยืนยันความพร้อมและหลักฐานรถจากการเริ่มปฏิบัติงานวันนี้แล้ว ไม่ต้องถ่ายรูปหรือยืนยันข้อมูลซ้ำ
+            </p>
+          </div>
+        ) : currentStep ? (
           <div id="driver-next-action" className="grid gap-2 scroll-mt-3">
             <p className="text-[12px] font-semibold text-ink-soft">ขั้นตอนถัดไปที่ต้องดำเนินการ</p>
             <button
