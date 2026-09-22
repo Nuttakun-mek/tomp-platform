@@ -4,7 +4,7 @@ import { ArrowRight, CarFront, Library } from "lucide-react";
 import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { CreateResourcePairForm } from "@/components/resources/create-resource-pair-form";
-import { ProjectResourceManager } from "@/components/resources/project-resource-manager";
+import { ExistingResourcePairingPanel, ProjectResourceManager } from "@/components/resources/project-resource-manager";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getProjectByCode } from "@/lib/data/projects";
 import { getLibraryDrivers, getLibraryVehicles, getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
@@ -63,6 +63,8 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
       >
         <CreateResourcePairForm projectId={projectId} />
       </CollapsibleSection>
+
+      <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} />
 
       <Link className="smart-card group flex items-center justify-between gap-3 p-4" href={`/resources/vehicles?projectId=${encodeURIComponent(projectId)}`}>
         <span className="flex items-center gap-3">

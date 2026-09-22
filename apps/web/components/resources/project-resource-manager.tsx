@@ -219,7 +219,7 @@ function Section({
   );
 }
 
-function ExistingResourcePairingPanel({
+export function ExistingResourcePairingPanel({
   projectId,
   drivers,
   vehicles,
@@ -452,7 +452,6 @@ export function ProjectResourceManager({
         projectId={projectId}
         usedBy={inProject ? undefined : vehicleUsage}
       />
-      {inProject ? <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} /> : null}
     </div>
   );
 }
