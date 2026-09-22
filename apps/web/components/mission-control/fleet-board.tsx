@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { CarFront, Check, ChevronDown, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
+import { CarFront, Check, ChevronDown, LocateFixed, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
 import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
@@ -103,6 +103,14 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
   const [expanded, setExpanded] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [, startResolve] = useTransition();
+
+  const focusOnMap = useCallback((pointId: string) => {
+    window.dispatchEvent(new CustomEvent("tomp:open-collapsible", { detail: { storageKey: "mc.map" } }));
+    document.getElementById("mission-live-map")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("tomp:focus-map-point", { detail: { id: pointId } }));
+    }, 220);
+  }, []);
 
   function resolveMessage(id: string) {
     setResolvedIds((current) => new Set(current).add(id));
@@ -331,19 +339,22 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
             const windowSummary = primaryJob ? formatAssignmentWindow(primaryJob.assignment.startTime, primaryJob.assignment.endTime) : "ยังไม่ระบุเวลา";
             const primaryStatus = primaryJob?.reported ? formatStatusTh(primaryJob.reported.status) : primaryJob ? formatStatusTh(primaryJob.assignment.status) : "ยังไม่มีงาน";
             const gpsSummary = group.location ? formatRelativeTh(group.location.recordedAt, effectiveNow) : FRESH_LABEL[group.freshness];
+            const mapPointId = group.location ? group.location.assignmentId || group.location.driverId || group.location.id : "";
             return (
               <article
                 key={group.key}
-                className={`overflow-hidden rounded-2xl border transition ${
-                  group.unread ? "border-rose-300 bg-rose-50/50 shadow-sm" : "border-slate-200 bg-white"
+                className={`overflow-hidden rounded-2xl border shadow-sm transition ${
+                  group.unread
+                    ? "border-rose-300 bg-gradient-to-br from-rose-50 via-white to-white shadow-rose-100"
+                    : "border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 hover:border-teal-200 hover:shadow-md"
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => setExpanded(open ? null : group.key)}
-                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 text-left sm:grid-cols-[auto_minmax(0,1fr)_minmax(9rem,auto)_auto]"
+                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 text-left sm:grid-cols-[auto_minmax(0,1fr)_minmax(10rem,auto)_auto]"
                 >
-                  <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${FRESH_DOT[group.freshness]}`} />
+                  <span className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ring-4 ring-white ${FRESH_DOT[group.freshness]}`} />
                   <span className="min-w-0">
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="truncate text-[15px] font-bold text-ink">{group.title}</span>
@@ -478,6 +489,15 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      {mapPointId ? (
+                        <button
+                          type="button"
+                          onClick={() => focusOnMap(mapPointId)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-bold text-operation shadow-sm transition hover:border-teal-400 hover:bg-white focus-ring"
+                        >
+                          <LocateFixed className="h-3.5 w-3.5" /> ไปยังรถบนแผนที่
+                        </button>
+                      ) : null}
                       {phone ? (
                         <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
                           <Phone className="h-3.5 w-3.5" /> โทรหาคนขับ

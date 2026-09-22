@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import type { DriverLocation } from "@tomp/types/domain";
@@ -53,6 +53,7 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
   const layerRef = useRef<LayerGroup | null>(null);
   const trailsRef = useRef<Map<string, Array<[number, number]>>>(new Map());
   const firstFitRef = useRef(true);
+  const [focusedPointId, setFocusedPointId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +76,16 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
   }, []);
 
   useEffect(() => {
+    function handleFocus(event: Event) {
+      const detail = (event as CustomEvent<{ id?: string }>).detail;
+      if (detail?.id) setFocusedPointId(detail.id);
+    }
+
+    window.addEventListener("tomp:focus-map-point", handleFocus);
+    return () => window.removeEventListener("tomp:focus-map-point", handleFocus);
+  }, []);
+
+  useEffect(() => {
     (async () => {
       const L = (await import("leaflet")).default;
       const map = mapRef.current;
@@ -83,6 +94,9 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
 
       layer.clearLayers();
       const valid = spreadOverlappingMapPoints(points.filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude)));
+
+      let focusedMarker: ReturnType<typeof L.marker> | null = null;
+      let focusedLatLng: [number, number] | null = null;
 
       for (const spread of valid) {
         const point = spread.point;
@@ -114,7 +128,7 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
           (point.accuracy ? `<br/>ความแม่นยำ ${Math.round(point.accuracy)} ม.` : "") +
           (spread.isOffset ? `<br/>พิกัดจริงซ้อนกับ ${spread.overlapCount} คัน จึงแยกหมุดบนแผนที่เพื่อให้อ่านง่าย` : "");
 
-        L.marker([spread.displayLatitude, spread.displayLongitude], {
+        const marker = L.marker([spread.displayLatitude, spread.displayLongitude], {
           icon: L.divIcon({
             className: "",
             html: `<span class="tomp-map-marker" style="--marker-color:${color}">${vehicleIconSvgMarkup(point.vehicleIcon ?? "sedan")}<span class="tomp-map-marker-status">${TRACKING_MARKER_STATUS_ICON[point.freshness]}</span></span>`,
@@ -125,15 +139,22 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
         })
           .bindPopup(popup)
           .addTo(layer);
+        if (focusedPointId && point.id === focusedPointId) {
+          focusedMarker = marker;
+          focusedLatLng = [spread.displayLatitude, spread.displayLongitude];
+        }
       }
 
-      if (valid.length && firstFitRef.current) {
+      if (focusedMarker && focusedLatLng) {
+        map.setView(focusedLatLng, Math.max(map.getZoom(), 16), { animate: true });
+        focusedMarker.openPopup();
+      } else if (valid.length && firstFitRef.current) {
         firstFitRef.current = false;
         const bounds = L.latLngBounds(valid.map((spread) => [spread.latitude, spread.longitude] as [number, number]));
         map.fitBounds(bounds.pad(0.3), { maxZoom: 15 });
       }
     })();
-  }, [points]);
+  }, [focusedPointId, points]);
 
   return <div ref={containerRef} className="w-full" style={{ height }} aria-label="แผนที่ติดตามคนขับ" />;
 }

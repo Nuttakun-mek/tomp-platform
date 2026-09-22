@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Library, Trash2, UserRoundCheck, CarFront } from "lucide-react";
+import { CarFront, ChevronDown, Library, Trash2, UserRoundCheck } from "lucide-react";
 import type { CallSign, Driver, Vehicle } from "@tomp/types/domain";
 import {
   createExistingProjectResourcePairAction,
@@ -234,6 +234,7 @@ function ExistingResourcePairingPanel({
   const [driverId, setDriverId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [callSign, setCallSign] = useState("");
+  const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
   const [isPending, startTransition] = useTransition();
@@ -270,7 +271,12 @@ function ExistingResourcePairingPanel({
 
   return (
     <section className="enterprise-panel grid gap-3 p-4 xl:col-span-2">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full flex-wrap items-start justify-between gap-3 text-left"
+        aria-expanded={open}
+      >
         <div>
           <h2 className="text-base font-semibold text-ink">สร้างหน่วยรถจากทรัพยากรที่มีอยู่</h2>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
@@ -280,7 +286,10 @@ function ExistingResourcePairingPanel({
         <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">
           เหลือ {freeDrivers.length} คน / {freeVehicles.length} รถ
         </span>
-      </div>
+        <ChevronDown className={`mt-1 h-4 w-4 text-ink-faint transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <>
       {message ? <ActionFeedback tone={tone} message={message} /> : null}
       {disabled ? (
         <p className="rounded-card border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-[13px] text-ink-soft">
@@ -327,6 +336,8 @@ function ExistingResourcePairingPanel({
           </button>
         </div>
       )}
+        </>
+      ) : null}
     </section>
   );
 }
@@ -413,7 +424,6 @@ export function ProjectResourceManager({
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {inProject ? <UnitSummaryPanel callSigns={callSigns} drivers={drivers} vehicles={vehicles} /> : null}
-      {inProject ? <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} /> : null}
       <Section
         kind="driver"
         title={inProject ? "คนขับในโครงการนี้" : "คนขับในคลังกลาง"}
@@ -442,6 +452,7 @@ export function ProjectResourceManager({
         projectId={projectId}
         usedBy={inProject ? undefined : vehicleUsage}
       />
+      {inProject ? <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} /> : null}
     </div>
   );
 }

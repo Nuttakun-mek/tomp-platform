@@ -28,6 +28,23 @@ export function CollapsibleSection({ title, children, defaultOpen = true, storag
     }
   }, [storageKey]);
 
+  useEffect(() => {
+    if (!storageKey) return;
+    function openFromEvent(event: Event) {
+      const detail = (event as CustomEvent<{ storageKey?: string }>).detail;
+      if (detail?.storageKey !== storageKey) return;
+      setOpen(true);
+      try {
+        window.localStorage.setItem(`collapsible:${storageKey}`, "open");
+      } catch {
+        /* ignore */
+      }
+    }
+
+    window.addEventListener("tomp:open-collapsible", openFromEvent);
+    return () => window.removeEventListener("tomp:open-collapsible", openFromEvent);
+  }, [storageKey]);
+
   function toggle() {
     setOpen((current) => {
       const next = !current;
@@ -43,7 +60,7 @@ export function CollapsibleSection({ title, children, defaultOpen = true, storag
   }
 
   return (
-    <section className="enterprise-panel overflow-hidden">
+    <section className="enterprise-panel overflow-visible">
       <button
         type="button"
         onClick={toggle}

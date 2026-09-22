@@ -154,6 +154,7 @@ function DriverShell() {
       : locationSharingActive
         ? "กำลังแชร์ตำแหน่ง"
         : "ยังไม่แชร์ตำแหน่ง";
+  const networkIcon = networkTone === "live" ? "✓" : networkTone === "offline" ? "!" : "GPS";
   const currentScreenLabel = mode === "web"
     ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
     : `เวอร์ชัน ${TOMP_DRIVER_APP_VERSION}`;
@@ -625,7 +626,11 @@ function DriverShell() {
                   networkTone === "live" ? styles.networkLive : networkTone === "offline" ? styles.networkOffline : styles.networkIdle
                 ]}
               >
-                <View style={[styles.networkDot, networkTone === "live" ? styles.networkDotLive : networkTone === "offline" ? styles.networkDotOffline : styles.networkDotIdle]} />
+                <View style={[styles.networkIcon, networkTone === "live" ? styles.networkIconLive : networkTone === "offline" ? styles.networkIconOffline : styles.networkIconIdle]}>
+                  <Text style={[styles.networkIconText, networkTone === "live" ? styles.networkIconTextLive : networkTone === "offline" ? styles.networkIconTextOffline : styles.networkIconTextIdle]}>
+                    {networkIcon}
+                  </Text>
+                </View>
                 <Text numberOfLines={1} style={[styles.networkText, networkTone === "live" ? styles.networkTextLive : networkTone === "offline" ? styles.networkTextOffline : styles.networkTextIdle]}>
                   {networkDisplayLabel || networkLabel}
                 </Text>
@@ -927,12 +932,12 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     borderRadius: radius.pill,
     flexDirection: "row",
-    gap: space.xs,
+    gap: 6,
     flexShrink: 1,
-    maxWidth: 148,
+    maxWidth: 172,
     overflow: "hidden",
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs
+    paddingHorizontal: 6,
+    paddingVertical: 4
   },
   networkLive: {
     backgroundColor: overlay.successFill
@@ -956,6 +961,36 @@ const styles = StyleSheet.create({
   },
   networkDotOffline: {
     backgroundColor: colors.dangerOnDark
+  },
+  networkIcon: {
+    alignItems: "center",
+    borderRadius: radius.pill,
+    height: 24,
+    justifyContent: "center",
+    width: 24
+  },
+  networkIconLive: {
+    backgroundColor: colors.success
+  },
+  networkIconIdle: {
+    backgroundColor: colors.warning
+  },
+  networkIconOffline: {
+    backgroundColor: colors.danger
+  },
+  networkIconText: {
+    fontFamily: font.bold,
+    textAlign: "center",
+    ...text.micro
+  },
+  networkIconTextLive: {
+    color: colors.surface
+  },
+  networkIconTextIdle: {
+    color: colors.command
+  },
+  networkIconTextOffline: {
+    color: colors.surface
   },
   networkText: {
     flexShrink: 1,
@@ -996,12 +1031,12 @@ const styles = StyleSheet.create({
     borderColor: colors.operationSoft,
     borderRadius: radius.xl,
     borderWidth: 1,
-    elevation: 3,
+    elevation: 4,
     padding: space.lg,
     shadowColor: colors.ink,
-    shadowOffset: { height: 8, width: 0 },
-    shadowOpacity: 0.07,
-    shadowRadius: 18
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20
   },
   heroMetaRow: {
     alignItems: "center",
@@ -1041,29 +1076,36 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radius.xl,
     borderWidth: 1,
-    elevation: 2,
+    elevation: 4,
     gap: space.sm,
     padding: space.lg,
     shadowColor: colors.ink,
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 14
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 22
   },
   readyCard: {
     alignItems: "center",
-    backgroundColor: colors.operationSoft,
+    backgroundColor: colors.surfaceRaised,
     borderColor: colors.operationSoft,
     borderRadius: radius.lg,
     borderWidth: 1,
+    elevation: 1,
     flexDirection: "row",
     gap: space.sm,
-    padding: space.md
+    padding: space.md,
+    shadowColor: colors.operation,
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10
   },
   readyDot: {
     backgroundColor: colors.operation,
+    borderColor: colors.operationSoft,
+    borderWidth: 4,
     borderRadius: radius.pill,
-    height: 10,
-    width: 10
+    height: 18,
+    width: 18
   },
   readyCopy: {
     flex: 1,
@@ -1192,13 +1234,13 @@ const styles = StyleSheet.create({
     borderColor: colors.operationSoft,
     borderRadius: radius.xl,
     borderWidth: 1,
-    elevation: 1,
+    elevation: 2,
     gap: space.md,
     padding: space.lg,
     shadowColor: colors.ink,
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16
   },
   noteTitle: {
     color: colors.operationDeep,

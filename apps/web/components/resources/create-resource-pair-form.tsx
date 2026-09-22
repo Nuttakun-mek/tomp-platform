@@ -50,7 +50,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
       </div>
 
       <section className="form-section-white border-operation/25 bg-operation-soft/40">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-ink">Call Sign</p>
             <p className="text-xs leading-5 text-ink-faint">กำหนดรหัสประจำหน่วยรถตั้งแต่ขั้นตอนแรก เพื่อให้ค้นหา มอบหมายงาน และออก QR ได้ถูกต้อง</p>
@@ -161,7 +161,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
           <p className="text-sm font-semibold text-ink">ค่าใช้จ่ายในการบริการ</p>
           <p className="text-xs leading-5 text-ink-faint">กำหนดจำนวนชั่วโมงบริการและยอดค่าใช้จ่ายต่อหน่วยรถ ส่วนเวลาเริ่มและสิ้นสุดงานจะกำหนดในหน้าจัดการโครงการเท่านั้น</p>
         </div>
-        <div className="grid items-start gap-3 md:grid-cols-2">
+        <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem]">
           <label className="field-label">
             ค่าใช้จ่ายในการบริการ (บาท)
             <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />
@@ -172,18 +172,18 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
             <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
             <span className="field-hint">ใช้คำนวณอัตราเฉลี่ยและค่าล่วงเวลาเมื่อเกินเวลาที่กำหนด</span>
           </label>
-        </div>
-        <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-canvas/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-canvas/60 px-3 py-2 lg:-mt-1 lg:min-h-[4.75rem]">
           <div className="min-w-0">
             <p className="text-xs font-semibold text-ink">ตัวอย่างการคำนวณ</p>
             <p className="mt-0.5 text-xs leading-5 text-ink-soft">{vehicleUsageCostBreakdown(costPreview)}</p>
             <p className="mt-0.5 truncate text-[11px] leading-4 text-ink-faint">คนขับเห็นเฉพาะการบันทึกเวลาเข้าออกและรายการปฏิบัติงาน ศูนย์ควบคุมเป็นผู้ตรวจสอบข้อมูลการคำนวณ</p>
           </div>
-          <div className="shrink-0 rounded-xl bg-operation-soft px-3 py-2 text-right">
+          <div className="shrink-0 rounded-xl bg-operation-soft px-3 py-2 text-right lg:mt-1">
             <p className="text-[11px] font-semibold text-operation">อัตราเฉลี่ย</p>
             <p className="text-lg font-bold text-operation">
               {costPreview.hourlyRate != null ? `${costPreview.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : "ยังคำนวณไม่ได้"}
             </p>
+          </div>
           </div>
         </div>
         <label className="field-label">

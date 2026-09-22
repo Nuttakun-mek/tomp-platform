@@ -75,25 +75,28 @@ function timeStampLabel(value?: string | null) {
   }).format(new Date(value));
 }
 
-function gpsStatusPresentation(light: DriverGpsLight): { label: string; Icon: StatusIcon; className: string } {
+function gpsStatusPresentation(light: DriverGpsLight): { label: string; Icon: StatusIcon; className: string; iconClassName: string } {
   if (light === "live") {
     return {
       label: "กำลังส่ง GPS",
       Icon: MapPin,
-      className: "bg-emerald-400/18 text-emerald-50 ring-emerald-300/30"
+      className: "bg-white/10 text-emerald-50 ring-emerald-300/35",
+      iconClassName: "bg-emerald-400 text-emerald-950"
     };
   }
   if (light === "stale") {
     return {
       label: "GPS ขาดช่วง",
       Icon: TriangleAlert,
-      className: "bg-amber-400/18 text-amber-50 ring-amber-300/30"
+      className: "bg-white/10 text-amber-50 ring-amber-300/35",
+      iconClassName: "bg-amber-300 text-amber-950"
     };
   }
   return {
     label: "ยังไม่ได้ส่ง GPS",
     Icon: TriangleAlert,
-    className: "bg-slate-200/12 text-slate-100 ring-white/15"
+    className: "bg-white/10 text-slate-100 ring-white/20",
+    iconClassName: "bg-slate-400 text-white"
   };
 }
 
@@ -394,11 +397,14 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
       id="driver-home"
       className={`grid gap-3 ${insideNativeShell ? "pb-6" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"}`}
     >
-      <header className="grid gap-2 rounded-[1rem] bg-[linear-gradient(145deg,#0d344c_0%,#0b2538_58%,#071827_100%)] p-3 text-white shadow-[0_10px_24px_rgba(7,24,39,0.16)]">
+      <header className="relative grid gap-2 overflow-hidden rounded-[1rem] bg-[radial-gradient(circle_at_top_right,rgba(139,226,218,0.22),transparent_34%),linear-gradient(145deg,#0d344c_0%,#0b2538_58%,#071827_100%)] p-3 text-white shadow-[0_14px_34px_rgba(7,24,39,0.22)] ring-1 ring-white/10">
+        <span className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/30" aria-hidden />
         <div className="flex items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[11px] font-semibold text-teal-100">{driverAccess.project.projectName}</p>
-          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${gpsStatus.className}`}>
-            <GpsStatusIcon className="h-3.5 w-3.5" />
+          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[11px] font-bold ring-1 ${gpsStatus.className}`}>
+            <span className={`grid h-6 w-6 place-items-center rounded-full ${gpsStatus.iconClassName}`}>
+              <GpsStatusIcon className="h-3.5 w-3.5" />
+            </span>
             {gpsStatus.label}
           </span>
         </div>

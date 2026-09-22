@@ -76,7 +76,7 @@ export function CreateAssignmentForm({
 }: CreateAssignmentFormProps) {
   const router = useRouter();
   const availableCallSigns = useMemo(() => callSigns.filter((callSign) => Boolean(callSignMissionId(callSign))), [callSigns]);
-  const [selectedCallSignId, setSelectedCallSignId] = useState(() => availableCallSigns[0]?.id || "");
+  const [selectedCallSignId, setSelectedCallSignId] = useState("");
   const [jobDate, setJobDate] = useState("");
   const [startClock, setStartClock] = useState("");
   const [endClock, setEndClock] = useState("");
@@ -116,8 +116,9 @@ export function CreateAssignmentForm({
   const canCreate = Boolean(availableCallSigns.length && selectedCrewReady && mission?.id);
 
   useEffect(() => {
-    if (selectedCallSignId && availableCallSigns.some((callSign) => callSign.id === selectedCallSignId)) return;
-    setSelectedCallSignId(availableCallSigns[0]?.id || "");
+    if (!selectedCallSignId) return;
+    if (availableCallSigns.some((callSign) => callSign.id === selectedCallSignId)) return;
+    setSelectedCallSignId("");
   }, [availableCallSigns, selectedCallSignId]);
 
   function handleSubmit(formData: FormData) {
@@ -233,7 +234,8 @@ export function CreateAssignmentForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         {window.from && window.from !== window.to ? (
-          <DateTimeField
+          <div className="md:col-span-2 xl:max-w-2xl">
+            <DateTimeField
             label="วันที่ของงานย่อย"
             name="jobDate"
             value={jobDate}
@@ -242,7 +244,8 @@ export function CreateAssignmentForm({
             max={window.to}
             required
             hint={`เลือกได้ระหว่าง ${describeThai(window.from, false)} ถึง ${describeThai(window.to, false)}`}
-          />
+            />
+          </div>
         ) : null}
 
         <div className="md:col-span-2">

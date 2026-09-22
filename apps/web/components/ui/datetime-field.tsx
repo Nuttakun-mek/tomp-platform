@@ -289,7 +289,13 @@ function TimePartControl({
   return (
     <div className="grid gap-1.5">
       <span className="text-[11px] font-semibold text-ink-faint">{label}</span>
-      <div className="grid grid-cols-[1.9rem_1fr_1.9rem] items-center overflow-hidden rounded-xl border border-border bg-white shadow-sm focus-within:border-operation focus-within:ring-4 focus-within:ring-operation/10">
+      <div
+        className="grid grid-cols-[1.9rem_1fr_1.9rem] items-center overflow-hidden rounded-xl border border-border bg-white shadow-sm focus-within:border-operation focus-within:ring-4 focus-within:ring-operation/10"
+        onWheel={(event) => {
+          event.preventDefault();
+          onStep(event.deltaY > 0 ? 1 : -1);
+        }}
+      >
         <button type="button" onClick={() => onStep(-1)} className="grid h-10 place-items-center text-lg font-bold text-ink-faint transition hover:bg-operation-soft hover:text-operation focus-ring" aria-label={`ลด${label}`}>-</button>
         <input
           className="h-10 min-w-0 border-x border-border/70 bg-white text-center text-base font-bold tabular-nums text-ink outline-none"

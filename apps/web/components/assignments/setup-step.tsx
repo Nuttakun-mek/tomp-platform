@@ -30,7 +30,7 @@ export function SetupStep({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="enterprise-panel overflow-hidden">
+    <section className="enterprise-panel overflow-visible">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}

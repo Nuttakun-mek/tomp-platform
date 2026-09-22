@@ -129,7 +129,7 @@ export function LiveLocationMap({ projectId, initialLocations = [], height = 620
   const issueCount = hydrated ? locations.filter((location) => ["slow", "offline", "stopped"].includes(getFreshness(location, effectiveNow))).length : 0;
 
   return (
-    <section className="enterprise-panel overflow-hidden">
+    <section id="mission-live-map" className="enterprise-panel scroll-mt-4 overflow-hidden">
       {showHeader ? (
         <div className="border-b border-slate-200 bg-slate-950 px-4 py-2.5 text-white">
           <div className="flex flex-wrap items-center justify-between gap-2">

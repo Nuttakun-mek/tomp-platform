@@ -65,9 +65,7 @@ export function MissionAssignmentStep({
     () => callSigns.filter((item) => item.status === "active" && item.driverId && item.vehicleId),
     [callSigns]
   );
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(readyUnits.filter((item) => !missionIdOf(item)).map((item) => item.id))
-  );
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [missionName, setMissionName] = useState("");
   const [missionType, setMissionType] = useState(MISSION_TYPES[0]);
   const [priority, setPriority] = useState("normal");
@@ -191,7 +189,7 @@ export function MissionAssignmentStep({
             ยังไม่มี Call Sign ที่พร้อมใช้งาน กรุณาไปที่หน้าทรัพยากรโครงการเพื่อสร้างหรือจับคู่คนขับกับรถก่อน
           </p>
         ) : (
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto pr-1">
             {readyUnits.map((unit) => {
               const mission = missionById.get(missionIdOf(unit));
               const isSelected = selected.has(unit.id);
@@ -203,18 +201,18 @@ export function MissionAssignmentStep({
                   type="button"
                   onClick={() => toggle(unit.id)}
                   aria-pressed={isSelected}
-                  className={`grid min-w-0 gap-2 rounded-2xl border p-3 text-left transition focus-ring ${
+                  className={`grid w-full min-w-0 gap-1.5 rounded-xl border px-3 py-2 text-left transition focus-ring sm:w-[min(22rem,100%)] ${
                     isSelected ? "border-operation bg-operation-soft/70 shadow-sm" : "border-border bg-white hover:border-operation/40"
                   }`}
                 >
                   <span className="flex min-w-0 items-center justify-between gap-2">
                     <span className="min-w-0">
                       <span className="block text-[11px] font-bold uppercase tracking-wide text-ink-faint">Call Sign</span>
-                      <span className="block truncate text-lg font-bold text-ink">{unit.callSign}</span>
+                      <span className="block truncate text-base font-bold text-ink">{unit.callSign}</span>
                     </span>
                     {isSelected ? <CheckCircle2 className="h-5 w-5 shrink-0 text-operation" /> : <Circle className="h-5 w-5 shrink-0 text-slate-300" />}
                   </span>
-                  <span className="grid gap-1 text-xs leading-5 text-ink-soft">
+                  <span className="grid gap-0.5 text-[11px] leading-4 text-ink-soft">
                     <span className="truncate">{driverLabel(driver)}</span>
                     <span className="truncate">{vehicleLabel(vehicle)}</span>
                     <span className={mission ? "font-semibold text-operation" : "font-semibold text-amber-700"}>
