@@ -101,19 +101,6 @@ function gpsStatusPresentation(light: DriverGpsLight): { label: string; Icon: St
   };
 }
 
-function assignmentStatusPresentation(status: string): { Icon: StatusIcon; className: string } {
-  if (status === "completed") {
-    return { Icon: CheckCircle2, className: "bg-emerald-400/18 text-emerald-50 ring-emerald-300/30" };
-  }
-  if (["cancelled", "archived"].includes(status)) {
-    return { Icon: TriangleAlert, className: "bg-rose-400/18 text-rose-50 ring-rose-300/30" };
-  }
-  if (["active", "operating"].includes(status)) {
-    return { Icon: Navigation, className: "bg-teal-300/18 text-teal-50 ring-teal-200/30" };
-  }
-  return { Icon: Clock3, className: "bg-sky-300/16 text-sky-50 ring-sky-200/25" };
-}
-
 export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
   const router = useRouter();
   const meta = driverAccess.assignment.metadata;
@@ -404,9 +391,7 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   }
 
   const gpsStatus = gpsStatusPresentation(gpsLight);
-  const assignmentStatus = assignmentStatusPresentation(driverAccess.assignment.status);
   const GpsStatusIcon = gpsStatus.Icon;
-  const AssignmentStatusIcon = assignmentStatus.Icon;
   const workSessionLabel =
     workSession.status === "active" ? "กำลังปฏิบัติงาน" : workSession.status === "ended" ? "บันทึกเวลาออกแล้ว" : "ยังไม่บันทึกเวลาเข้า";
   const workSessionClass =
@@ -425,59 +410,47 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
       id="driver-home"
       className={`grid gap-3 ${insideNativeShell ? "pb-6" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]"}`}
     >
-      <header className="relative grid gap-3 overflow-hidden rounded-[1.25rem] bg-[radial-gradient(circle_at_84%_12%,rgba(139,226,218,0.28),transparent_32%),radial-gradient(circle_at_12%_86%,rgba(37,99,235,0.2),transparent_34%),linear-gradient(145deg,#0d344c_0%,#0b2538_56%,#071827_100%)] p-3.5 text-white shadow-[0_16px_38px_rgba(7,24,39,0.24)] ring-1 ring-white/10">
+      <header className="relative grid gap-2.5 overflow-hidden rounded-[1.25rem] bg-[radial-gradient(circle_at_84%_12%,rgba(139,226,218,0.28),transparent_32%),radial-gradient(circle_at_12%_86%,rgba(37,99,235,0.2),transparent_34%),linear-gradient(145deg,#0d344c_0%,#0b2538_56%,#071827_100%)] p-3 text-white shadow-[0_16px_38px_rgba(7,24,39,0.24)] ring-1 ring-white/10">
         <span className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full border border-white/10 bg-white/5" aria-hidden />
         <span className="pointer-events-none absolute inset-x-3 top-0 h-px bg-white/30" aria-hidden />
-        <div className="relative flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-100/80">โครงการ</p>
-            <p className="min-w-0 truncate text-[12px] font-bold leading-5 text-teal-50">{driverAccess.project.projectName}</p>
-          </div>
-          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${assignmentStatus.className}`}>
-            <AssignmentStatusIcon className="h-3.5 w-3.5" />
-            {formatStatusTh(driverAccess.assignment.status)}
-          </span>
-        </div>
-        <div className="relative grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-          <div className="grid h-14 w-14 place-items-center rounded-[1.05rem] bg-white/12 text-center shadow-inner ring-1 ring-white/18">
-            <span className="text-[10px] font-bold text-teal-100/80">หน่วย</span>
-          </div>
-          <div className="min-w-0">
+        <div className="relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2.5">
+          <div className="min-w-0 pr-1">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-teal-100/80">Call Sign</p>
-            <h1 className="min-w-0 truncate text-[1.8rem] font-black leading-9 tracking-normal text-white">{driverAccess.callSign.callSign}</h1>
-          </div>
-        </div>
-        <div className="relative grid gap-2">
-          <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
-            <div className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-2 rounded-[0.95rem] bg-white/10 px-2.5 py-2 ring-1 ring-white/10">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-white/12 text-teal-100">
-                <UserRound className="h-3.5 w-3.5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[10px] font-semibold text-white/55">คนขับ</span>
-                <span className="block truncate text-[12px] font-bold text-white">{driverAccess.driver.fullName}</span>
-              </span>
+            <div className="mt-0.5 flex min-w-0 items-baseline gap-2">
+              <h1 className="min-w-0 truncate text-[2rem] font-black leading-9 tracking-normal text-white">{driverAccess.callSign.callSign}</h1>
             </div>
-            <div className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-2 rounded-[0.95rem] bg-white/10 px-2.5 py-2 ring-1 ring-white/10">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-white/12 text-teal-100">
-                <CarFront className="h-3.5 w-3.5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[10px] font-semibold text-white/55">รถ</span>
-                <span className="block truncate text-[12px] font-bold text-white">{driverAccess.vehicle.plateNumber} / {driverAccess.vehicle.vehicleType}</span>
-              </span>
-            </div>
+            <p className="min-w-0 truncate text-[11px] font-semibold leading-5 text-teal-50/88">{driverAccess.project.projectName}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`inline-flex min-h-8 flex-1 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[11px] font-bold ring-1 ${gpsStatus.className}`}>
-              <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${gpsStatus.iconClassName}`}>
-                <GpsStatusIcon className="h-3.5 w-3.5" />
+          <div className="flex max-w-[46%] shrink-0 flex-col items-end gap-1.5">
+            <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full py-1 pl-1 pr-2 text-[10.5px] font-bold ring-1 ${gpsStatus.className}`}>
+              <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${gpsStatus.iconClassName}`}>
+                <GpsStatusIcon className="h-3 w-3" />
               </span>
               <span className="truncate">{gpsStatus.label}</span>
             </span>
-            <span className={`inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${workSessionClass}`}>
-              <Clock3 className="h-3.5 w-3.5 shrink-0" />
+            <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[10.5px] font-bold ring-1 ${workSessionClass}`}>
+              <Clock3 className="h-3 w-3 shrink-0" />
               <span className="truncate">{workSessionLabel}</span>
+            </span>
+          </div>
+        </div>
+        <div className="relative grid grid-cols-2 gap-1.5">
+          <div className="grid min-w-0 grid-cols-[1.4rem_minmax(0,1fr)] items-center gap-1.5 rounded-[0.85rem] bg-white/10 px-2 py-1.5 ring-1 ring-white/10">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-white/12 text-teal-100">
+              <UserRound className="h-3 w-3" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[9.5px] font-semibold leading-3 text-white/55">คนขับ</span>
+              <span className="block truncate text-[11.5px] font-bold leading-4 text-white">{driverAccess.driver.fullName}</span>
+            </span>
+          </div>
+          <div className="grid min-w-0 grid-cols-[1.4rem_minmax(0,1fr)] items-center gap-1.5 rounded-[0.85rem] bg-white/10 px-2 py-1.5 ring-1 ring-white/10">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-white/12 text-teal-100">
+              <CarFront className="h-3 w-3" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[9.5px] font-semibold leading-3 text-white/55">รถ</span>
+              <span className="block truncate text-[11.5px] font-bold leading-4 text-white">{driverAccess.vehicle.plateNumber} / {driverAccess.vehicle.vehicleType}</span>
             </span>
           </div>
         </div>
