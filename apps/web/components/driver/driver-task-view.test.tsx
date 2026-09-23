@@ -137,6 +137,40 @@ describe("DriverTaskView view switching", () => {
     expect(screen.getByText("ลำดับงานที่ต้องดำเนินการถัดไป")).toBeTruthy();
   });
 
+  it("shows a pickup the control room changed mid-job, taken from the periodic poll", async () => {
+    // The page loads once per job now, so the current job's pickup, dropoff and
+    // time can no longer ride in on a tab tap's page load. The 15s poll has to
+    // carry them, or the driver keeps looking at the old pickup point.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({
+          success: true,
+          data: {
+            assignmentMetadata: {
+              pickupLocation: "ประตู 4 ผู้โดยสารขาเข้า",
+              dropoffLocation: "โรงแรมใหม่",
+              commitmentTime: "09:30"
+            }
+          }
+        })
+      }))
+    );
+    try {
+      render(<DriverTaskView driverAccess={buildDriverAccess()} view="home" />);
+      expect(screen.getByText(/สนามบินสุวรรณภูมิ/)).toBeTruthy();
+
+      expect(await screen.findByText(/ประตู 4 ผู้โดยสารขาเข้า/)).toBeTruthy();
+      expect(screen.getByText(/โรงแรมใหม่/)).toBeTruthy();
+      expect(screen.getByText(/09:30/)).toBeTruthy();
+      expect(screen.queryByText(/สนามบินสุวรรณภูมิ/)).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps a bridge-driven tab when the parent re-renders with the same `view` prop", () => {
     // Inside the shell the URL never changes after load, so the prop stays put
     // while the shell switches tabs over the bridge. An unrelated re-render must

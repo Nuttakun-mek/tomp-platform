@@ -106,7 +106,15 @@ function gpsStatusPresentation(light: DriverGpsLight): { label: string; Icon: St
 
 export function DriverTaskView({ driverAccess, view: initialView = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
   const router = useRouter();
-  const meta = driverAccess.assignment.metadata;
+  // The job's own details (pickup, dropoff, time, coordinator phone). State, not
+  // a plain read of the prop: the page loads once per job, so an edit made in
+  // the control room mid-job reaches it through the periodic poll below. A fresh
+  // prop (router.refresh, or the desktop fallback nav's soft navigation) still
+  // wins, as it always did.
+  const [meta, setMeta] = useState(driverAccess.assignment.metadata);
+  useEffect(() => {
+    setMeta(driverAccess.assignment.metadata);
+  }, [driverAccess.assignment.metadata]);
   const pickup = metaText(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ");
   const dropoff = metaText(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง");
   const commitmentTime = metaText(meta.commitmentTime || meta.commitment_time, "ยังไม่ระบุเวลา");
@@ -203,6 +211,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
         const json = (await res.json()) as {
           success?: boolean;
           data?: {
+            assignmentMetadata?: Record<string, unknown>;
             latestStatus?: { status: string; at: string } | null;
             workSession?: DriverWorkSessionState;
             dayAssignments?: DriverAccessAssignment["dayAssignments"];
@@ -215,6 +224,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
           setCurrentJobAcknowledged(true);
           setTripStep((current) => Math.max(current, stepFromStatus(json.data?.latestStatus?.status)));
         }
+        if (json.data.assignmentMetadata && typeof json.data.assignmentMetadata === "object") setMeta(json.data.assignmentMetadata);
         if (json.data.workSession) setWorkSession(json.data.workSession);
         if (Array.isArray(json.data.dayAssignments)) setDayAssignments(json.data.dayAssignments);
         if (Array.isArray(json.data.messages)) setMessages(mergePendingMessages(json.data.messages, pendingMessagesRef.current));
