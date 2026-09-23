@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { LogIn, LogOut } from "lucide-react";
+import { KeyRound, LogIn, LogOut } from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
 import { roleLabelTh } from "@/lib/i18n/role-th";
 
@@ -66,6 +66,15 @@ export function UserMenu({ name, email, roleKey, signedIn, variant = "dark" }: U
             {email ? ` · ${email}` : ""}
           </span>
         </span>
+        <Link
+          href="/account/password"
+          title="เปลี่ยนรหัสผ่าน"
+          className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition ${
+            dark ? "border-white/10 text-slate-300 hover:bg-white/10 hover:text-white" : "border-border text-ink-soft hover:border-operation/40 hover:text-operation"
+          }`}
+        >
+          <KeyRound className="h-4 w-4" />
+        </Link>
         <button
           type="button"
           onClick={handleLogout}
