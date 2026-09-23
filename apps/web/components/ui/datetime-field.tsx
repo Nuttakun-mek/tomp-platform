@@ -358,14 +358,18 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
         </button>
 
         {open ? (
-          <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[min(20rem,calc(100vw-2rem))] rounded-[18px] border border-border/90 bg-white/95 p-3.5 shadow-[0_24px_70px_rgba(16,32,51,0.16)] backdrop-blur">
+          // Date and time sit side by side when there is room: stacked, the pair
+          // was ~670px tall and ran off the bottom of a laptop screen.
+          <div className={`absolute left-0 top-[calc(100%+8px)] z-50 rounded-[18px] border border-border/90 bg-white/95 p-3.5 shadow-[0_24px_70px_rgba(16,32,51,0.16)] backdrop-blur ${
+            withTime && !timeOnly ? "w-[min(38rem,calc(100vw-2rem))]" : "w-[min(20rem,calc(100vw-2rem))]"
+          }`}>
             {timeOnly ? (
               <TimeGrid value={value} onPick={pickTime} />
             ) : (
-              <div className="grid gap-3">
+              <div className={`grid gap-3 ${withTime ? "sm:grid-cols-2 sm:gap-4" : ""}`}>
                 <CalendarGrid selected={datePart(value)} min={min} max={max} onPick={pickDate} />
                 {withTime ? (
-                  <div className="border-t border-slate-100 pt-2">
+                  <div className="border-t border-slate-100 pt-2 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
                     <TimeGrid value={timePart(value)} onPick={pickTime} />
                   </div>
                 ) : null}

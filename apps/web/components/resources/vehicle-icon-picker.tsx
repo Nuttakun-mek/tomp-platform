@@ -43,7 +43,7 @@ const VEHICLE_ICON_OPTIONS: VehicleIconOption[] = [
 
 export function VehicleIconPicker({ defaultValue = "van" }: { defaultValue?: VehicleIconKey }) {
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 2xl:grid-cols-4">
       {VEHICLE_ICON_OPTIONS.map(({ key, label, description, icon: Icon, emoji, tone }) => (
         <label key={key} className="group min-w-0 cursor-pointer">
           <input className="peer sr-only" type="radio" name="vehicleIcon" value={key} defaultChecked={key === defaultValue} />

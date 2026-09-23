@@ -52,8 +52,10 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
         <input className="field-input" name="callSign" placeholder="เช่น VAN-01 หรือเว้นว่างให้ระบบตั้งให้" />
       </label>
 
+      {/* content-start: the two columns share a row height, and without it the
+          shorter driver column spread its fields out to match the vehicle one. */}
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="form-section">
+        <section className="form-section content-start">
           <div className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-operation shadow-sm"><UserRoundCheck className="h-5 w-5" /></span>
             <div>
@@ -87,7 +89,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
           </label>
         </section>
 
-        <section className="form-section">
+        <section className="form-section content-start">
           <div className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-operation shadow-sm"><Van className="h-5 w-5" /></span>
             <div>
