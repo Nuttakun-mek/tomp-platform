@@ -7,6 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { estimateVehicleUsageCost } from "@/lib/domain/vehicle-cost";
 import { createVehicleSchema } from "@/lib/validation";
+import { HourlyRatePreview } from "./hourly-rate-preview";
 import { VehicleIconPicker } from "./vehicle-icon-picker";
 import { VEHICLE_TYPE_OPTIONS } from "./vehicle-type-options";
 
@@ -166,26 +167,25 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
 
       {/* Same one-row layout as the project form's cost section: amount, hours
           and the rate they produce side by side, the rules in the help icon. */}
-      <fieldset className="form-section items-end sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+      <fieldset className="form-section">
         <legend className="flex items-center gap-2 px-1 text-xs font-bold text-slate-600">
           ค่าใช้จ่ายในการบริการ
           <Tooltip content="ยอดค่าใช้จ่ายต่อจำนวนชั่วโมงบริการที่ตกลงไว้ ใช้คำนวณอัตราเฉลี่ยและค่าล่วงเวลา หากคนขับบันทึกเวลาเข้าก่อนเวลาเริ่ม ระบบจะไม่คำนวณค่าใช้จ่ายก่อนเวลาแผน และจะคำนวณค่าล่วงเวลาเมื่อบันทึกเวลาออกเกินเวลาที่กำหนด">
             <span className="grid h-5 w-5 place-items-center rounded-full border border-border bg-white text-[11px] text-ink-faint">?</span>
           </Tooltip>
         </legend>
-        <label className="field-label">
-          ค่าใช้จ่าย (บาท)
-          <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />
-        </label>
-        <label className="field-label">
-          จำนวนชั่วโมงบริการ
-          <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
-        </label>
-        <div className="field-label">
-          อัตราเฉลี่ย
-          <output className="field-input flex items-center whitespace-nowrap border-transparent bg-operation-soft font-bold text-operation">
-            {costPreview.hourlyRate != null ? `${costPreview.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : "—"}
-          </output>
+        {/* Alignment lives on this inner row: .form-section is unlayered CSS after
+            @tailwind utilities, so its items-start beats an items-end utility on the fieldset. */}
+        <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <label className="field-label">
+            ค่าใช้จ่าย (บาท)
+            <input className="field-input" name="packageAmount" inputMode="decimal" min={0} step="0.01" type="number" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder="เช่น 3000" />
+          </label>
+          <label className="field-label">
+            จำนวนชั่วโมงบริการ
+            <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
+          </label>
+          <HourlyRatePreview rate={costPreview.hourlyRate} />
         </div>
       </fieldset>
 

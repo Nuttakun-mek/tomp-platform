@@ -26,6 +26,21 @@ describe("estimateVehicleUsageCost", () => {
     expect(cost.baseAmount).toBe(3150);
     expect(cost.extraAmount).toBe(0);
     expect(cost.estimatedCost).toBe(3150);
+    // No clock-out yet, so this is the plan, not a finding that there was no OT.
+    expect(vehicleUsageCostBreakdown(cost)).toContain("ประมาณการตามเวลาในแผน");
+    expect(vehicleUsageCostBreakdown(cost)).not.toContain("ไม่เกินเวลาที่กำหนด");
+  });
+
+  it("says no overtime only once the real clock-in and clock-out are known", () => {
+    const cost = estimateVehicleUsageCost({
+      assignmentStart: "2026-09-20T08:00:00.000Z",
+      assignmentEnd: "2026-09-20T18:00:00.000Z",
+      actualStart: "2026-09-20T08:00:00.000Z",
+      actualEnd: "2026-09-20T17:30:00.000Z",
+      vehicleMetadata: { packageHours: 10, packageAmount: 3000 }
+    });
+
+    expect(cost.source).toBe("actual_session");
     expect(vehicleUsageCostBreakdown(cost)).toContain("ไม่เกินเวลาที่กำหนด");
   });
 
@@ -102,6 +117,32 @@ describe("evaluateVehicleServiceTimeAlert", () => {
     });
 
     expect(alert.tone).toBe("danger");
+    expect(alert.label).toBe("เกินเวลาบริการ");
+  });
+
+  it("says the clock-out is missing, not overtime, when the job is done but the session is still open", () => {
+    // The fleet card used to put "เกินเวลาบริการ" beside a cost line reading
+    // "ไม่เกินเวลาที่กำหนด" for the same finished job: the session was simply
+    // never clocked out. Name that, rather than an overtime that isn't known.
+    const alert = evaluateVehicleServiceTimeAlert({
+      assignmentEnd: "2026-09-20T18:00:00.000Z",
+      workSessionStatus: "active",
+      jobCompleted: true,
+      now: new Date("2026-09-22T09:00:00.000Z").getTime()
+    });
+
+    expect(alert.tone).toBe("warning");
+    expect(alert.label).toBe("ยังไม่บันทึกเวลาออก");
+  });
+
+  it("still flags overtime on a job that is running past its end", () => {
+    const alert = evaluateVehicleServiceTimeAlert({
+      assignmentEnd: "2026-09-20T18:00:00.000Z",
+      workSessionStatus: "active",
+      jobCompleted: false,
+      now: new Date("2026-09-20T18:10:00.000Z").getTime()
+    });
+
     expect(alert.label).toBe("เกินเวลาบริการ");
   });
 

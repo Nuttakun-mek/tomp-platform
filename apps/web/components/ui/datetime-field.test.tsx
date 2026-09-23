@@ -39,6 +39,24 @@ describe("DateTimeField time picker", () => {
     expect(onChange).toHaveBeenLastCalledWith("07:07");
   });
 
+  it("keeps a typed time when the picker is closed with Escape", () => {
+    // Escape and outside clicks unmount the input before it blurs, so a time
+    // saved only on blur/Enter was silently dropped.
+    const onChange = openPicker("09:30");
+    fireEvent.change(screen.getByLabelText("พิมพ์เวลา"), { target: { value: "7:07" } });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByLabelText("พิมพ์เวลา")).toBeNull();
+    expect(onChange).toHaveBeenLastCalledWith("07:07");
+  });
+
+  it("keeps a typed time when the picker is closed by clicking outside", () => {
+    const onChange = openPicker("09:30");
+    fireEvent.change(screen.getByLabelText("พิมพ์เวลา"), { target: { value: "0707" } });
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByLabelText("พิมพ์เวลา")).toBeNull();
+    expect(onChange).toHaveBeenLastCalledWith("07:07");
+  });
+
   it("ignores a typed value that is not a time", () => {
     const onChange = openPicker("09:30");
     const input = screen.getByLabelText("พิมพ์เวลา");

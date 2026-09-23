@@ -66,8 +66,10 @@ function identityFromRow(row: Record<string, unknown>): DriverTokenIdentity | nu
 
 export interface DriverUpdates {
   assignmentStatus: string;
-  /** The current job's own metadata (pickup, dropoff, time, ...), so an edit made mid-job reaches a page that loads once. */
-  assignmentMetadata: Record<string, unknown>;
+  /** Which job these updates describe — re-resolved per poll, so it can move on from the page's job. */
+  assignmentId: string;
+  /** The job's own metadata (pickup, dropoff, time, ...), so a mid-job edit reaches a page that loads once. Null when the row could not be read. */
+  assignmentMetadata: Record<string, unknown> | null;
   latestStatus: { status: string; at: string } | null;
   workSession: DriverWorkSessionState;
   dayAssignments: DriverDayAssignment[];
@@ -1056,7 +1058,8 @@ export async function getDriverUpdatesFor({
 
   return {
     assignmentStatus: text(assignmentRow as Row | null, "status", "planned"),
-    assignmentMetadata: metadata((assignmentRow ?? {}) as Row),
+    assignmentId,
+    assignmentMetadata: assignmentRow ? metadata(assignmentRow as Row) : null,
     latestStatus: latestStatus(latestStatusRow),
     workSession: workSessionFromRows((workSessionRes.data || []) as Row[]),
     notifications,
@@ -1125,7 +1128,8 @@ async function getDriverUpdatesForViaPostgres(projectId: string, assignmentId: s
 
   return {
     assignmentStatus: text(assignmentRows[0], "status", "planned"),
-    assignmentMetadata: metadata((assignmentRows[0] ?? {}) as Row),
+    assignmentId,
+    assignmentMetadata: assignmentRows[0] ? metadata(assignmentRows[0]) : null,
     latestStatus: latestStatus(latestStatusRows[0]),
     workSession: workSessionFromRows(workSessionRows),
     notifications,

@@ -137,27 +137,27 @@ describe("DriverTaskView view switching", () => {
     expect(screen.getByText("ลำดับงานที่ต้องดำเนินการถัดไป")).toBeTruthy();
   });
 
+  function stubPoll(data: Record<string, unknown>) {
+    const fetchMock = vi.fn(async () => ({
+      status: 200,
+      headers: { get: () => null },
+      json: async () => ({ success: true, data })
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  const changedPickup = {
+    pickupLocation: "ประตู 4 ผู้โดยสารขาเข้า",
+    dropoffLocation: "โรงแรมใหม่",
+    commitmentTime: "09:30"
+  };
+
   it("shows a pickup the control room changed mid-job, taken from the periodic poll", async () => {
     // The page loads once per job now, so the current job's pickup, dropoff and
     // time can no longer ride in on a tab tap's page load. The 15s poll has to
     // carry them, or the driver keeps looking at the old pickup point.
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        status: 200,
-        headers: { get: () => null },
-        json: async () => ({
-          success: true,
-          data: {
-            assignmentMetadata: {
-              pickupLocation: "ประตู 4 ผู้โดยสารขาเข้า",
-              dropoffLocation: "โรงแรมใหม่",
-              commitmentTime: "09:30"
-            }
-          }
-        })
-      }))
-    );
+    stubPoll({ assignmentId: "assignment-1", assignmentMetadata: changedPickup });
     try {
       render(<DriverTaskView driverAccess={buildDriverAccess()} view="home" />);
       expect(screen.getByText(/สนามบินสุวรรณภูมิ/)).toBeTruthy();
@@ -166,6 +166,37 @@ describe("DriverTaskView view switching", () => {
       expect(screen.getByText(/โรงแรมใหม่/)).toBeTruthy();
       expect(screen.getByText(/09:30/)).toBeTruthy();
       expect(screen.queryByText(/สนามบินสุวรรณภูมิ/)).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("ignores poll details that belong to a different job", async () => {
+    // The poll re-resolves the driver's current job each time. Once the next job
+    // takes over, its details must not land on a page whose buttons still post
+    // for the job it was loaded with.
+    const fetchMock = stubPoll({ assignmentId: "assignment-2", assignmentMetadata: changedPickup });
+    try {
+      render(<DriverTaskView driverAccess={buildDriverAccess()} view="home" />);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(screen.getByText(/สนามบินสุวรรณภูมิ/)).toBeTruthy();
+      expect(screen.queryByText(/ประตู 4 ผู้โดยสารขาเข้า/)).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps the job's details when the poll could not read the job", async () => {
+    // A missing row or a failed read comes back as null, not {}: an empty object
+    // would blank the pickup, dropoff and coordinator phone mid-job.
+    const fetchMock = stubPoll({ assignmentId: "assignment-1", assignmentMetadata: null });
+    try {
+      render(<DriverTaskView driverAccess={buildDriverAccess()} view="home" />);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(screen.getByText(/สนามบินสุวรรณภูมิ/)).toBeTruthy();
+      expect(screen.queryByText(/ยังไม่ระบุจุดรับ/)).toBeNull();
     } finally {
       vi.unstubAllGlobals();
     }

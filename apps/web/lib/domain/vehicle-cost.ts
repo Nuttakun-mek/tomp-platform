@@ -121,9 +121,14 @@ export function vehicleUsageCostBreakdown(cost: VehicleUsageCost): string {
   if (cost.billableHours == null || cost.hourlyRate == null || cost.estimatedCost == null) {
     return formatVehicleUsageCost(cost);
   }
+  // "No overtime" is only a finding once the real clock-in and clock-out are
+  // known. Before that the hours are the plan's, so say so instead of implying
+  // the job finished on time.
   const extra = cost.extraHours && cost.extraHours > 0
     ? `มีค่าล่วงเวลา (OT) ${cost.extraHours.toLocaleString("th-TH")} ชม.`
-    : "ไม่เกินเวลาที่กำหนด";
+    : cost.source === "actual_session"
+      ? "ไม่เกินเวลาที่กำหนด"
+      : "ประมาณการตามเวลาในแผน (ยังไม่มีเวลาออกจริง)";
   const base = cost.packageHours != null && cost.packageAmount != null
     ? `ค่าใช้จ่ายในการบริการ ${cost.packageHours.toLocaleString("th-TH")} ชม. ${cost.packageAmount.toLocaleString("th-TH")} บ.`
     : `${cost.billableHours.toLocaleString("th-TH")} ชม. × ${cost.hourlyRate.toLocaleString("th-TH")} บ./ชม.`;
@@ -135,6 +140,8 @@ export function evaluateVehicleServiceTimeAlert(input: {
   workSessionStatus?: "pending" | "active" | "ended" | string | null;
   actualEnd?: string | null;
   extraHours?: number | null;
+  /** The job itself is finished (driver or control room marked it done). */
+  jobCompleted?: boolean;
   now?: number;
   warnBeforeMinutes?: number;
 }): VehicleServiceTimeAlert {
@@ -154,6 +161,17 @@ export function evaluateVehicleServiceTimeAlert(input: {
 
   if (input.workSessionStatus !== "active") {
     return { tone: "neutral", label: "ยังไม่เริ่มเวลาบริการ", detail: "รอคนขับบันทึกเวลาเข้า", minutesRemaining: null };
+  }
+
+  // Done, but still on the clock: the real end time is unknown, so overtime
+  // cannot be judged yet. The action for the control room is the clock-out.
+  if (input.jobCompleted) {
+    return {
+      tone: "warning",
+      label: "ยังไม่บันทึกเวลาออก",
+      detail: "งานเสร็จแล้วแต่คนขับยังไม่บันทึกเวลาออก ค่าใช้จ่ายคิดตามเวลาในแผนไปก่อน",
+      minutesRemaining: null
+    };
   }
 
   if (!input.assignmentEnd) {

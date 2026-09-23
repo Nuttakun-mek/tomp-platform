@@ -8,6 +8,7 @@ import { FieldHelp } from "@/components/ui/field-help";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { estimateVehicleUsageCost } from "@/lib/domain/vehicle-cost";
+import { HourlyRatePreview } from "./hourly-rate-preview";
 import { VehicleIconPicker } from "./vehicle-icon-picker";
 import { VEHICLE_TYPE_OPTIONS } from "./vehicle-type-options";
 
@@ -159,12 +160,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
             จำนวนชั่วโมงบริการ
             <input className="field-input" name="packageHours" inputMode="decimal" min={0} step="0.5" type="number" value={packageHours} onChange={(event) => setPackageHours(event.target.value)} placeholder="เช่น 10" />
           </label>
-          <div className="field-label">
-            อัตราเฉลี่ย
-            <output className="field-input flex items-center whitespace-nowrap border-transparent bg-operation-soft font-bold text-operation">
-              {costPreview.hourlyRate != null ? `${costPreview.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : "—"}
-            </output>
-          </div>
+          <HourlyRatePreview rate={costPreview.hourlyRate} />
           <label className="field-label">
             หมายเหตุ
             <input className="field-input" name="costNote" placeholder="เช่น รวมค่าน้ำมันแล้ว / ค่าล่วงเวลาคิดแยก" />

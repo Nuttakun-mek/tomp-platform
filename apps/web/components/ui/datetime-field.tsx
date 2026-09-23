@@ -238,6 +238,19 @@ function TimeGrid({ value, onPick }: { value: string; onPick: (time: string) => 
     }
   };
 
+  // Escape and outside clicks close the popover by unmounting this grid, and the
+  // input never blurs on the way out — so a typed time is saved here instead.
+  const pending = useRef({ draft, value, onPick });
+  pending.current = { draft, value, onPick };
+  useEffect(
+    () => () => {
+      const { draft: typed, value: saved, onPick: save } = pending.current;
+      const time = parseTypedTime(typed);
+      if (time && time !== saved) save(time);
+    },
+    []
+  );
+
   const cell = (selected: boolean) =>
     `grid h-8 place-items-center rounded-lg text-[13px] font-semibold tabular-nums transition focus-ring ${
       selected ? "bg-operation text-white shadow-sm" : "text-ink-soft hover:bg-operation-soft hover:text-operation"
@@ -304,7 +317,23 @@ interface FieldProps {
 export function DateTimeField({ label, name, value, onChange, withTime = false, required, min, max, hint, timeOnly }: FieldProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const ref = useDismiss(open, () => setOpen(false));
+  const wide = withTime && !timeOnly;
+  // One source for the popover width: the class below and the fit check in toggle().
+  const popoverRem = wide ? 38 : 20;
+
+  function toggle() {
+    if (!open && ref.current) {
+      // Opened from a right-hand column, a left-anchored popover runs off the
+      // screen. Anchor it to the field's right edge instead, when that fits.
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const width = Math.min(popoverRem * rem, window.innerWidth - 2 * rem);
+      const field = ref.current.getBoundingClientRect();
+      setAlignRight(field.left + width > window.innerWidth - rem && field.right - width >= rem);
+    }
+    setOpen((current) => !current);
+  }
 
   const echo = timeOnly ? (value ? `${value} น.` : "") : describeThai(value, withTime);
   const Icon = withTime || timeOnly ? Clock : CalendarDays;
@@ -341,7 +370,7 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
         <button
           id={id}
           type="button"
-          onClick={() => setOpen((current) => !current)}
+          onClick={toggle}
           aria-expanded={open}
           className={`flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-left text-[14px] shadow-sm transition focus-ring ${
             open
@@ -360,9 +389,10 @@ export function DateTimeField({ label, name, value, onChange, withTime = false, 
         {open ? (
           // Date and time sit side by side when there is room: stacked, the pair
           // was ~670px tall and ran off the bottom of a laptop screen.
-          <div className={`absolute left-0 top-[calc(100%+8px)] z-50 rounded-[18px] border border-border/90 bg-white/95 p-3.5 shadow-[0_24px_70px_rgba(16,32,51,0.16)] backdrop-blur ${
-            withTime && !timeOnly ? "w-[min(38rem,calc(100vw-2rem))]" : "w-[min(20rem,calc(100vw-2rem))]"
-          }`}>
+          <div className={`absolute top-[calc(100%+8px)] z-50 rounded-[18px] border border-border/90 bg-white/95 p-3.5 shadow-[0_24px_70px_rgba(16,32,51,0.16)] backdrop-blur ${
+            alignRight ? "right-0" : "left-0"
+          }`}
+          style={{ width: `min(${popoverRem}rem, calc(100vw - 2rem))` }}>
             {timeOnly ? (
               <TimeGrid value={value} onPick={pickTime} />
             ) : (

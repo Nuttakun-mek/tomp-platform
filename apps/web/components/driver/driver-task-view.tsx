@@ -104,17 +104,26 @@ function gpsStatusPresentation(light: DriverGpsLight): { label: string; Icon: St
   };
 }
 
+// Local state that also resets whenever the prop it came from changes. Synced
+// during render rather than in an effect, so a new prop shows on the same render
+// instead of one render late.
+function useStateSyncedToProp<T>(prop: T) {
+  const [value, setValue] = useState(prop);
+  const [seen, setSeen] = useState(prop);
+  if (seen !== prop) {
+    setSeen(prop);
+    setValue(prop);
+  }
+  return [value, setValue] as const;
+}
+
 export function DriverTaskView({ driverAccess, view: initialView = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
   const router = useRouter();
   // The job's own details (pickup, dropoff, time, coordinator phone). State, not
   // a plain read of the prop: the page loads once per job, so an edit made in
   // the control room mid-job reaches it through the periodic poll below. A fresh
-  // prop (router.refresh, or the desktop fallback nav's soft navigation) still
-  // wins, as it always did.
-  const [meta, setMeta] = useState(driverAccess.assignment.metadata);
-  useEffect(() => {
-    setMeta(driverAccess.assignment.metadata);
-  }, [driverAccess.assignment.metadata]);
+  // prop (router.refresh, or the desktop fallback nav's soft navigation) still wins.
+  const [meta, setMeta] = useStateSyncedToProp(driverAccess.assignment.metadata);
   const pickup = metaText(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ");
   const dropoff = metaText(meta.dropoffLocation || meta.dropoff_location, "ยังไม่ระบุจุดส่ง");
   const commitmentTime = metaText(meta.commitmentTime || meta.commitment_time, "ยังไม่ระบุเวลา");
@@ -156,10 +165,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
   // component with a new prop instead of remounting it. Keyed on the prop, so a
   // re-render that leaves it alone (the shell's case: its URL never changes)
   // does not undo a tab the shell chose over the bridge.
-  const [view, setView] = useState<DriverTaskViewMode>(initialView);
-  useEffect(() => {
-    setView(initialView);
-  }, [initialView]);
+  const [view, setView] = useStateSyncedToProp<DriverTaskViewMode>(initialView);
   const seenIds = useRef(new Set(driverAccess.notifications.map((notification) => notification.id)));
   const pendingMessagesRef = useRef<Map<string, DriverIssueMessage>>(new Map());
 
@@ -211,7 +217,8 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
         const json = (await res.json()) as {
           success?: boolean;
           data?: {
-            assignmentMetadata?: Record<string, unknown>;
+            assignmentId?: string;
+            assignmentMetadata?: Record<string, unknown> | null;
             latestStatus?: { status: string; at: string } | null;
             workSession?: DriverWorkSessionState;
             dayAssignments?: DriverAccessAssignment["dayAssignments"];
@@ -224,7 +231,11 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
           setCurrentJobAcknowledged(true);
           setTripStep((current) => Math.max(current, stepFromStatus(json.data?.latestStatus?.status)));
         }
-        if (json.data.assignmentMetadata && typeof json.data.assignmentMetadata === "object") setMeta(json.data.assignmentMetadata);
+        // Only this page's own job: the poll re-resolves the current job, and the
+        // buttons below still post for ids.assignmentId.
+        if (json.data.assignmentId === ids.assignmentId && json.data.assignmentMetadata && typeof json.data.assignmentMetadata === "object") {
+          setMeta(json.data.assignmentMetadata);
+        }
         if (json.data.workSession) setWorkSession(json.data.workSession);
         if (Array.isArray(json.data.dayAssignments)) setDayAssignments(json.data.dayAssignments);
         if (Array.isArray(json.data.messages)) setMessages(mergePendingMessages(json.data.messages, pendingMessagesRef.current));
@@ -253,7 +264,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [driverAccess.token]);
+  }, [driverAccess.token, ids.assignmentId, setMeta]);
 
   useEffect(() => {
     const updateShellState = () => setInsideNativeShell(Boolean(getMobileShell(window)));
@@ -280,7 +291,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     };
     window.addEventListener(VIEW_SWITCH_EVENT, handleViewSwitch);
     return () => window.removeEventListener(VIEW_SWITCH_EVENT, handleViewSwitch);
-  }, []);
+  }, [setView]);
 
   function enqueueFailed(kind: "status" | "message" | "issue", payload: Record<string, unknown>, text: string, id?: string) {
     enqueueDriverOutbox(driverAccess.token, { id, kind, payload });

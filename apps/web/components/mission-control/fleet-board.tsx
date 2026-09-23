@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { CarFront, Check, ChevronDown, LocateFixed, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
@@ -101,6 +101,12 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
   const { locations, comms, now } = useMissionControlFeed();
   const { statuses, workSessions, evidence, inbound } = comms;
   const [expanded, setExpanded] = useState<string | null>(null);
+  // An opened card moves to a full-width row of its own; keep it in view so the
+  // controller does not lose the card they just clicked.
+  useEffect(() => {
+    if (!expanded) return;
+    document.querySelector(`[data-fleet-card="${CSS.escape(expanded)}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [expanded]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [, startResolve] = useTransition();
 
@@ -197,6 +203,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
           workSessionStatus: workSession?.status,
           actualEnd: workSession?.endedAt,
           extraHours: cost.extraHours,
+          jobCompleted: assignment.status === "completed" || statuses[assignment.id]?.status === "completed",
           now: effectiveNow
         });
         return {
@@ -325,11 +332,11 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
       </div>
 
       {groups.length ? (
-        // Cards stretch to fill the row (1fr) instead of capping at 24rem, which
-        // left most of a wide control-room screen empty and truncated the text
-        // inside each card. An open card takes the whole row (col-span-full on
-        // the article) so its detail lays out sideways instead of as a tall strip.
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start gap-2 p-3 sm:p-4">
+        // Cards stretch to fill the row (1fr) rather than capping at 24rem, which
+        // left wide screens mostly empty and truncated card text. An open card
+        // spans the whole row so its detail lays out sideways; dense packing fills
+        // the gap it leaves behind.
+        <div className="grid grid-flow-row-dense grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start gap-2 p-3 sm:p-4">
           {visibleGroups.map((group) => {
             const open = expanded === group.key;
             const phone = group.driver?.phone ?? "";
@@ -346,6 +353,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
             return (
               <article
                 key={group.key}
+                data-fleet-card={group.key}
                 className={`overflow-hidden rounded-2xl border shadow-sm transition ${open ? "col-span-full" : ""} ${
                   group.unread
                     ? "border-rose-300 bg-gradient-to-br from-rose-50 via-white to-white shadow-rose-100"
@@ -386,32 +394,31 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                             old split gave the badges their full width and crushed
                             the route chip to ~16px, whose padding then spilled over
                             the badge beside it. Now the route keeps at least 8rem
-                            and the badges drop to the next line when there's no room. */}
+                            and each badge is its own flex item, so they drop to the
+                            next line one at a time instead of overflowing as a block. */}
                         <span className="flex min-w-0 flex-wrap items-center gap-1">
                           <span className="min-w-[8rem] flex-1 truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700" title={routeSummary}>
                             {routeSummary}
                           </span>
-                          <span className="flex shrink-0 flex-wrap items-center gap-1">
-                            {hasNext ? (
-                              <span className="shrink-0 rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
-                            ) : null}
-                            {serviceFocus ? (
-                              <span
-                                className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
-                                title={serviceFocus.serviceAlert.detail}
-                              >
-                                {serviceFocus.serviceAlert.label}
-                              </span>
-                            ) : null}
-                            {primaryJob ? (
-                              <span
-                                className="shrink-0 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-operation"
-                                title={vehicleUsageCostBreakdown(primaryJob.cost)}
-                              >
-                                {formatShortCost(primaryJob.cost)}
-                              </span>
-                            ) : null}
-                          </span>
+                          {hasNext ? (
+                            <span className="shrink-0 rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
+                          ) : null}
+                          {serviceFocus ? (
+                            <span
+                              className={`min-w-0 max-w-full truncate rounded-full border px-2 py-0.5 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
+                              title={serviceFocus.serviceAlert.detail}
+                            >
+                              {serviceFocus.serviceAlert.label}
+                            </span>
+                          ) : null}
+                          {primaryJob ? (
+                            <span
+                              className="shrink-0 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-operation"
+                              title={vehicleUsageCostBreakdown(primaryJob.cost)}
+                            >
+                              {formatShortCost(primaryJob.cost)}
+                            </span>
+                          ) : null}
                         </span>
                       </span>
                     </span>
