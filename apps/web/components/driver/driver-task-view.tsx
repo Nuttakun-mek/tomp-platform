@@ -142,9 +142,16 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
   const [outboxCount, setOutboxCount] = useState(0);
   const [insideNativeShell, setInsideNativeShell] = useState(false);
   // Which section is on screen is now state, not a fixed prop: the native shell
-  // switches tabs by posting over the bridge rather than reloading this page,
-  // so the URL's `view` only seeds the first render.
+  // switches tabs by posting over the bridge rather than reloading this page.
+  // The URL's `view` seeds it, and still wins whenever it *changes* — the
+  // browser-only fallback nav is a <Link>, so Next re-renders this same mounted
+  // component with a new prop instead of remounting it. Keyed on the prop, so a
+  // re-render that leaves it alone (the shell's case: its URL never changes)
+  // does not undo a tab the shell chose over the bridge.
   const [view, setView] = useState<DriverTaskViewMode>(initialView);
+  useEffect(() => {
+    setView(initialView);
+  }, [initialView]);
   const seenIds = useRef(new Set(driverAccess.notifications.map((notification) => notification.id)));
   const pendingMessagesRef = useRef<Map<string, DriverIssueMessage>>(new Map());
 

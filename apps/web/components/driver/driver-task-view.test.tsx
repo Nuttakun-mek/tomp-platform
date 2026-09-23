@@ -121,4 +121,35 @@ describe("DriverTaskView view switching", () => {
     expect(screen.queryByText("รายการปฏิบัติงาน")).toBeNull();
     expect(screen.getByText("ลำดับงานที่ต้องดำเนินการถัดไป")).toBeTruthy();
   });
+
+  it("follows a new `view` prop, which is how the browser-only fallback nav changes tabs", () => {
+    // Outside the native shell the bottom nav is a <Link href="…&view=next">.
+    // Next re-renders the server page with the new searchParam and hands this
+    // same, still-mounted component a new `view` prop — it is never remounted.
+    // State seeded once from the prop would ignore that and leave every button dead.
+    const access = buildDriverAccess();
+    const { rerender } = render(<DriverTaskView driverAccess={access} view="home" />);
+    expect(screen.getByText("รายการปฏิบัติงาน")).toBeTruthy();
+
+    rerender(<DriverTaskView driverAccess={access} view="next" />);
+
+    expect(screen.queryByText("รายการปฏิบัติงาน")).toBeNull();
+    expect(screen.getByText("ลำดับงานที่ต้องดำเนินการถัดไป")).toBeTruthy();
+  });
+
+  it("keeps a bridge-driven tab when the parent re-renders with the same `view` prop", () => {
+    // Inside the shell the URL never changes after load, so the prop stays put
+    // while the shell switches tabs over the bridge. An unrelated re-render must
+    // not snap the page back to the URL's view.
+    const access = buildDriverAccess();
+    const { rerender } = render(<DriverTaskView driverAccess={access} view="home" />);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(VIEW_SWITCH_EVENT, { detail: buildViewSwitchMessage("next") }));
+    });
+    rerender(<DriverTaskView driverAccess={access} view="home" />);
+
+    expect(screen.getByText("ลำดับงานที่ต้องดำเนินการถัดไป")).toBeTruthy();
+    expect(screen.queryByText("รายการปฏิบัติงาน")).toBeNull();
+  });
 });
