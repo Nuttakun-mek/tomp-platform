@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { ResetPasswordButton } from "@/components/superadmin/reset-password-button";
 import { roleLabelTh } from "@/lib/i18n/role-th";
 import type { ProfileRow } from "@/lib/superadmin/users";
@@ -7,6 +8,15 @@ const STATUS_TH: Record<string, string> = {
   active: "ใช้งาน",
   invited: "รอเข้าสู่ระบบ",
   inactive: "ปิดใช้งาน"
+};
+
+// tone mapping follows the same neutral/ready/warning semantics ProjectsPage
+// already applies via StatusBadge (apps/web/app/(app)/projects/page.tsx):
+// "good to go" -> ready, "pending" -> warning, everything else -> neutral.
+const STATUS_TONE: Record<string, "neutral" | "ready" | "warning" | "critical"> = {
+  active: "ready",
+  invited: "warning",
+  inactive: "neutral"
 };
 
 export function UserList({ rows }: { rows: ProfileRow[] }) {
@@ -24,9 +34,10 @@ export function UserList({ rows }: { rows: ProfileRow[] }) {
             </div>
             <div className="grid gap-1.5 sm:justify-items-end">
               <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-                <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">
-                  {STATUS_TH[row.status] ?? row.status}
-                </span>
+                {/* StatusBadge matches the account-status indicator already used for
+                    project status in projects/page.tsx and mission status in
+                    portal-mission-status.tsx, instead of a one-off colored pill. */}
+                <StatusBadge label={STATUS_TH[row.status] ?? row.status} tone={STATUS_TONE[row.status] ?? "neutral"} />
                 {row.roleKeys.length ? (
                   row.roleKeys.map((key) => (
                     <span key={key} className="rounded-full bg-operation-soft px-2.5 py-1 text-[11px] font-semibold text-operation">
