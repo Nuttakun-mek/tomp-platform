@@ -204,109 +204,84 @@ function CalendarGrid({
   );
 }
 
-function TimeGrid({ value, onPick }: { value: string; onPick: (time: string) => void }) {
-  const [hour, minute] = value ? value.split(":") : ["", ""];
-  const [hourDraft, setHourDraft] = useState(hour);
-  const [minuteDraft, setMinuteDraft] = useState(minute);
+const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+const MINUTES = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 
-  useEffect(() => {
-    setHourDraft(hour);
-    setMinuteDraft(minute);
-  }, [hour, minute]);
-
-  const digits = (input: string) => input.replace(/\D/g, "").slice(0, 2);
-  const clamp = (input: string, max: number) => {
-    if (!input) return "";
-    return String(Math.min(max, Number(input))).padStart(2, "0");
-  };
-  const commit = (nextHour = hourDraft, nextMinute = minuteDraft) => {
-    onPick(`${clamp(nextHour || "0", 23)}:${clamp(nextMinute || "0", 59)}`);
-  };
-  const step = (part: "hour" | "minute", by: number) => {
-    const currentHour = Number(hourDraft || hour || "0");
-    const currentMinute = Number(minuteDraft || minute || "0");
-    const nextHour = part === "hour" ? (currentHour + by + 24) % 24 : currentHour;
-    const nextMinute = part === "minute" ? (currentMinute + by + 60) % 60 : currentMinute;
-    const nextHourText = String(nextHour).padStart(2, "0");
-    const nextMinuteText = String(nextMinute).padStart(2, "0");
-    setHourDraft(nextHourText);
-    setMinuteDraft(nextMinuteText);
-    onPick(`${nextHourText}:${nextMinuteText}`);
-  };
-
-  return (
-    <div className="rounded-2xl border border-border/80 bg-canvas/70 p-3 shadow-inner">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-        <TimePartControl
-          label="ชั่วโมง"
-          value={hourDraft}
-          onChange={(next) => {
-            const clean = digits(next);
-            setHourDraft(clean);
-            if (clean.length === 2) commit(clean, minuteDraft);
-          }}
-          onBlur={() => {
-            const clean = clamp(hourDraft, 23);
-            setHourDraft(clean);
-            if (clean || minuteDraft) commit(clean, minuteDraft);
-          }}
-          onStep={(by) => step("hour", by)}
-        />
-        <span className="pb-4 text-center text-xl font-bold text-ink-faint">:</span>
-        <TimePartControl
-          label="นาที"
-          value={minuteDraft}
-          onChange={(next) => {
-            const clean = digits(next);
-            setMinuteDraft(clean);
-            if (clean.length === 2) commit(hourDraft, clean);
-          }}
-          onBlur={() => {
-            const clean = clamp(minuteDraft, 59);
-            setMinuteDraft(clean);
-            if (hourDraft || clean) commit(hourDraft, clean);
-          }}
-          onStep={(by) => step("minute", by)}
-        />
-      </div>
-    </div>
-  );
+/** "7:05", "0705", "07.05" → "07:05"; anything that is not a real clock time → null. */
+function parseTypedTime(input: string): string | null {
+  const match = /^(\d{1,2})[:.]?(\d{2})$/.exec(input.trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-function TimePartControl({
-  label,
-  value,
-  onChange,
-  onBlur,
-  onStep
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  onBlur: () => void;
-  onStep: (by: number) => void;
-}) {
+// Sets a clock time — "starts at / ends at" — so it reads like a clock face: every
+// hour and every 5 minutes visible at once, one tap each. It used to be −/+
+// steppers with a mouse-wheel counter, which looked and behaved like a countdown
+// timer. Minutes off the 5-minute grid are typed in the box at the top.
+function TimeGrid({ value, onPick }: { value: string; onPick: (time: string) => void }) {
+  const [hour, minute] = value ? value.split(":") : ["", ""];
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commitDraft = () => {
+    const time = parseTypedTime(draft);
+    if (time) {
+      if (time !== value) onPick(time);
+    } else {
+      setDraft(value);
+    }
+  };
+
+  const cell = (selected: boolean) =>
+    `grid h-8 place-items-center rounded-lg text-[13px] font-semibold tabular-nums transition focus-ring ${
+      selected ? "bg-operation text-white shadow-sm" : "text-ink-soft hover:bg-operation-soft hover:text-operation"
+    }`;
+
   return (
-    <div className="grid gap-1.5">
-      <span className="text-[11px] font-semibold text-ink-faint">{label}</span>
-      <div
-        className="grid grid-cols-[1.9rem_1fr_1.9rem] items-center overflow-hidden rounded-xl border border-border bg-white shadow-sm focus-within:border-operation focus-within:ring-4 focus-within:ring-operation/10"
-        onWheel={(event) => {
-          event.preventDefault();
-          onStep(event.deltaY > 0 ? 1 : -1);
-        }}
-      >
-        <button type="button" onClick={() => onStep(-1)} className="grid h-10 place-items-center text-lg font-bold text-ink-faint transition hover:bg-operation-soft hover:text-operation focus-ring" aria-label={`ลด${label}`}>-</button>
+    <div className="grid gap-2.5">
+      <label className="grid gap-1">
+        <span className="text-[11px] font-semibold text-ink-faint">พิมพ์เวลา</span>
         <input
-          className="h-10 min-w-0 border-x border-border/70 bg-white text-center text-base font-bold tabular-nums text-ink outline-none"
+          aria-label="พิมพ์เวลา"
+          className="h-9 rounded-xl border border-border bg-white px-3 text-[14px] font-semibold tabular-nums text-ink outline-none focus:border-operation focus:ring-4 focus:ring-operation/10"
           inputMode="numeric"
-          maxLength={2}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onBlur={onBlur}
-          placeholder="00"
+          placeholder="เช่น 09:30"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commitDraft}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitDraft();
+            }
+          }}
         />
-        <button type="button" onClick={() => onStep(1)} className="grid h-10 place-items-center text-lg font-bold text-ink-faint transition hover:bg-operation-soft hover:text-operation focus-ring" aria-label={`เพิ่ม${label}`}>+</button>
+      </label>
+      <div className="grid gap-1">
+        <span className="text-[11px] font-semibold text-ink-faint">ชั่วโมง</span>
+        <div className="grid grid-cols-6 gap-1">
+          {HOURS.map((option) => (
+            <button key={option} type="button" aria-label={`${option} นาฬิกา`} className={cell(option === hour)} onClick={() => onPick(`${option}:${minute || "00"}`)}>
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-1">
+        <span className="text-[11px] font-semibold text-ink-faint">นาที</span>
+        <div className="grid grid-cols-6 gap-1">
+          {MINUTES.map((option) => (
+            <button key={option} type="button" aria-label={`${option} นาที`} className={cell(option === minute)} onClick={() => onPick(`${hour || "00"}:${option}`)}>
+              :{option}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
