@@ -37,7 +37,7 @@ import {
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
-import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
+import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, buildViewSwitchMessage, parseBridgeMessage, VIEW_SWITCH_EVENT } from "./src/bridge/protocol";
 import { BACKGROUND_GPS_ENABLED, buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, type DriverWebViewKey } from "./src/config";
 import { font, radius, space, text, TOUCH_MIN, useAppTheme, type ThemeColors, type ThemeOverlay } from "./src/theme";
 import {
@@ -162,10 +162,6 @@ function DriverShell() {
   const activeDriverMenuRef = useRef<DriverMenuKey>("home");
   const currentTokenRef = useRef("");
 
-  const activeWebView = useMemo(
-    () => DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.view ?? "home",
-    [activeDriverMenu]
-  );
   const networkTone = locationSharingActive ? "live" : networkConnected === false ? "offline" : "idle";
   const networkDisplayLabel =
     // "ยังไม่ได้ส่ง GPS" read as a fault to drivers, when it is simply the
@@ -179,9 +175,12 @@ function DriverShell() {
   const currentScreenLabel = mode === "web"
     ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
     : `เวอร์ชัน ${TOMP_DRIVER_APP_VERSION}`;
+  // Deliberately independent of the active tab: the URL is the page's one and
+  // only load, and which section it shows after that is the shell's to say over
+  // the bridge. Baking the tab in here is what made every tab tap a reload.
   const effectiveWebUrl = useMemo(
-    () => webUrl || (currentToken ? buildDriverWebUrl(currentToken, locale, activeWebView) : ""),
-    [activeWebView, currentToken, locale, webUrl]
+    () => webUrl || (currentToken ? buildDriverWebUrl(currentToken, locale) : ""),
+    [currentToken, locale, webUrl]
   );
 
   useEffect(() => {
@@ -200,6 +199,21 @@ function DriverShell() {
       .replace(/\u2029/g, "\\u2029");
     webViewRef.current?.injectJavaScript(`
       window.dispatchEvent(new CustomEvent("tomp:native-status", { detail: ${serialized} }));
+      true;
+    `);
+  }, []);
+
+  // A tab tap used to change the WebView's source.uri, which is a full HTTP
+  // navigation and re-runs the page's server-side assignment fetch for data it
+  // already had. The page is loaded once and told which section to show.
+  const postViewSwitchToWeb = useCallback((view: DriverWebViewKey) => {
+    const message = buildViewSwitchMessage(view);
+    const serialized = JSON.stringify(message)
+      .replace(/</g, "\\u003c")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
+    webViewRef.current?.injectJavaScript(`
+      window.dispatchEvent(new CustomEvent("${VIEW_SWITCH_EVENT}", { detail: ${serialized} }));
       true;
     `);
   }, []);
@@ -449,15 +463,15 @@ function DriverShell() {
   }, [postStatusToWeb]);
 
   const openDriverMenu = useCallback((item: { key: DriverMenuKey; view?: DriverWebViewKey }) => {
-    activeDriverMenuRef.current = item.key;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    activeDriverMenuRef.current = item.key;
     setActiveDriverMenu(item.key);
     if (item.key === "messages") {
       setHasUnreadMessages(false);
       void clearDeliveredNotifications();
     }
-    if (currentToken && item.view) setWebUrl(buildDriverWebUrl(currentToken, localeRef.current, item.view));
-  }, [currentToken]);
+    if (item.view) postViewSwitchToWeb(item.view);
+  }, [postViewSwitchToWeb]);
 
   const resetAssignment = useCallback(async () => {
     await stopLocationSharing().catch(() => undefined);

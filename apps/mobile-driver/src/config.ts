@@ -1,3 +1,10 @@
+// One source of truth for this union: the web side now reads it too, off the
+// same shared bridge package the view-switch message is declared in. Imported
+// as well as re-exported because buildDriverWebUrl below still names it.
+import type { DriverWebViewKey } from "@tomp/driver-core";
+
+export type { DriverWebViewKey };
+
 export const TOMP_API_BASE_URL =
   process.env.EXPO_PUBLIC_TOMP_API_BASE_URL ||
   "https://tomp-platform.vercel.app";
@@ -35,8 +42,6 @@ export const LOCATION_TASK_NAME = "tomp-driver-background-location";
 // getExpoPushTokenAsync needs the EAS project id in a bare/dev-client build.
 // Mirrors expo.extra.eas.projectId in app.json.
 export const EAS_PROJECT_ID = "ea9c91b8-049d-4287-bfcd-dad4ecc7981b";
-
-export type DriverWebViewKey = "home" | "next" | "messages" | "gps";
 
 export function isDriverWebPath(pathname: string) {
   return pathname === DRIVER_WEB_PATH_PREFIX || pathname.startsWith(`${DRIVER_WEB_PATH_PREFIX}/`);

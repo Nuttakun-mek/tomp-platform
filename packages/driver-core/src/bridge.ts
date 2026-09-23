@@ -199,3 +199,29 @@ export function parseNativeStatusDetail(detail: unknown): NativeStatusPayload | 
   if (!isRecord(payload) || typeof payload.status !== "string") return null;
   return payload as unknown as NativeStatusPayload;
 }
+
+/** CustomEvent the shell dispatches to tell the page which tab is now active. */
+export const VIEW_SWITCH_EVENT = "tomp:view-switch";
+
+export type DriverWebViewKey = "home" | "next" | "messages" | "gps";
+
+export interface ViewSwitchMessage {
+  namespace: typeof BRIDGE_NAMESPACE;
+  version: typeof BRIDGE_VERSION;
+  type: "view.switch";
+  payload: { view: DriverWebViewKey };
+}
+
+export function buildViewSwitchMessage(view: DriverWebViewKey): ViewSwitchMessage {
+  return { namespace: BRIDGE_NAMESPACE, version: BRIDGE_VERSION, type: "view.switch", payload: { view } };
+}
+
+const VIEW_KEYS: readonly DriverWebViewKey[] = ["home", "next", "messages", "gps"];
+
+/** Read a `tomp:view-switch` CustomEvent detail without trusting its shape. */
+export function parseViewSwitchDetail(detail: unknown): DriverWebViewKey | null {
+  if (!isRecord(detail)) return null;
+  const payload = detail.payload;
+  if (!isRecord(payload) || typeof payload.view !== "string") return null;
+  return (VIEW_KEYS as readonly string[]).includes(payload.view) ? (payload.view as DriverWebViewKey) : null;
+}

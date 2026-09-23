@@ -14,7 +14,7 @@ import { enqueueDriverOutbox, flushDriverOutbox, readDriverOutbox, type DriverOu
 import { createDriverMessageClientEventId, extractDriverMessageClientEventId } from "@/lib/driver/message-idempotency";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import type { DriverNotification } from "@tomp/types/domain";
-import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail } from "@tomp/driver-core";
+import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail, parseViewSwitchDetail, VIEW_SWITCH_EVENT } from "@tomp/driver-core";
 import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
 
 type DriverGpsLight = "off" | "live" | "stale";
@@ -101,7 +101,7 @@ function gpsStatusPresentation(light: DriverGpsLight): { label: string; Icon: St
   };
 }
 
-export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
+export function DriverTaskView({ driverAccess, view: initialView = "home" }: { driverAccess: DriverAccessAssignment; view?: DriverTaskViewMode }) {
   const router = useRouter();
   const meta = driverAccess.assignment.metadata;
   const pickup = metaText(meta.pickupLocation || meta.pickup_location, "ยังไม่ระบุจุดรับ");
@@ -138,6 +138,10 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
   ));
   const [outboxCount, setOutboxCount] = useState(0);
   const [insideNativeShell, setInsideNativeShell] = useState(false);
+  // Which section is on screen is now state, not a fixed prop: the native shell
+  // switches tabs by posting over the bridge rather than reloading this page,
+  // so the URL's `view` only seeds the first render.
+  const [view, setView] = useState<DriverTaskViewMode>(initialView);
   const seenIds = useRef(new Set(driverAccess.notifications.map((notification) => notification.id)));
   const pendingMessagesRef = useRef<Map<string, DriverIssueMessage>>(new Map());
 
@@ -247,6 +251,15 @@ export function DriverTaskView({ driverAccess, view = "home" }: { driverAccess: 
     };
     window.addEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
     return () => window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
+  }, []);
+
+  useEffect(() => {
+    const handleViewSwitch = (event: Event) => {
+      const nextView = parseViewSwitchDetail((event as CustomEvent).detail);
+      if (nextView) setView(nextView);
+    };
+    window.addEventListener(VIEW_SWITCH_EVENT, handleViewSwitch);
+    return () => window.removeEventListener(VIEW_SWITCH_EVENT, handleViewSwitch);
   }, []);
 
   function enqueueFailed(kind: "status" | "message" | "issue", payload: Record<string, unknown>, text: string, id?: string) {

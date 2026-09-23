@@ -4,10 +4,12 @@ import {
   BRIDGE_VERSION,
   buildBridgeMessage,
   buildNativeStatusMessage,
+  buildViewSwitchMessage,
   getMobileShell,
   isMobileShell,
   parseBridgeMessage,
-  parseNativeStatusDetail
+  parseNativeStatusDetail,
+  parseViewSwitchDetail
 } from "../bridge";
 
 const shell = {
@@ -99,5 +101,24 @@ describe("native status", () => {
     expect(parseNativeStatusDetail(message)?.status).toBe("gps_stopped");
     expect(parseNativeStatusDetail({ payload: {} })).toBeNull();
     expect(parseNativeStatusDetail(null)).toBeNull();
+  });
+});
+
+describe("view switch", () => {
+  it("builds a message for a valid view", () => {
+    expect(buildViewSwitchMessage("next")).toEqual({
+      namespace: BRIDGE_NAMESPACE,
+      version: BRIDGE_VERSION,
+      type: "view.switch",
+      payload: { view: "next" }
+    });
+  });
+
+  it("parses a valid detail and rejects everything else", () => {
+    const message = buildViewSwitchMessage("messages");
+    expect(parseViewSwitchDetail(message)).toBe("messages");
+    expect(parseViewSwitchDetail({ payload: { view: "not-a-real-view" } })).toBeNull();
+    expect(parseViewSwitchDetail({ payload: {} })).toBeNull();
+    expect(parseViewSwitchDetail(null)).toBeNull();
   });
 });

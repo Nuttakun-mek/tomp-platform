@@ -11,7 +11,12 @@ export default defineConfig({
     // under the old lib-only pattern — `npm run test` reported them passing
     // only because vitest's file filter matched nothing there, not because
     // the tests ran.
-    include: ["lib/**/*.test.ts", "app/**/*.test.ts"]
+    // components/** added for the same reason, and .tsx alongside it: a
+    // component test needs JSX, and the two older globs are .test.ts only
+    // because nothing under lib/ or app/ has needed it yet. The file-level
+    // default stays `node`; the one test that needs a DOM opts itself in with
+    // a `// @vitest-environment jsdom` pragma.
+    include: ["lib/**/*.test.ts", "app/**/*.test.ts", "components/**/*.test.{ts,tsx}"]
   },
   // Next.js compiles .tsx with the automatic JSX runtime (no `import React`
   // needed — none of this codebase's components do), but tsconfig.json's
