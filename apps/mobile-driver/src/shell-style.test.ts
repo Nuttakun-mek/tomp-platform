@@ -1,6 +1,13 @@
 import fs from "node:fs";
-import { describe, expect, it } from "vitest";
-import { colors, font, space, text, TOUCH_MIN } from "./theme";
+import { describe, expect, it, vi } from "vitest";
+
+// theme.ts's useAppTheme hook imports react-native for useColorScheme. The
+// real package ships unbundled Flow source, which this test's plain-node
+// transform cannot parse — and this suite never renders a hook, it only
+// reads theme.ts's plain data exports and re-parses App.tsx as text.
+vi.mock("react-native", () => ({ useColorScheme: () => null }));
+
+import { font, lightColors, space, text, TOUCH_MIN } from "./theme";
 
 // The shell's look is defined in theme.ts, and App.tsx is meant to spend it,
 // not reinvent it. Before this guard the shell carried nine font sizes,
@@ -91,7 +98,7 @@ describe("the theme itself", () => {
 
   it("exposes a spacing scale and the colours the shell needs", () => {
     expect(Object.keys(space)).toEqual(["xs", "sm", "md", "lg", "xl", "xxl"]);
-    expect(colors.accent).toBeTruthy();
-    expect(colors.onCommand).toBeTruthy();
+    expect(lightColors.accent).toBeTruthy();
+    expect(lightColors.onCommand).toBeTruthy();
   });
 });

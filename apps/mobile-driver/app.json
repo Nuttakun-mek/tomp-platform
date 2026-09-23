@@ -6,7 +6,7 @@
     "scheme": "tompdriver",
     "version": "0.2.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"

@@ -2,7 +2,9 @@
 // a screen cannot quietly invent its own — before this file carried a scale,
 // App.tsx held nine different font sizes and forty-four raw hex values.
 
-export const colors = {
+import { useColorScheme } from "react-native";
+
+export const lightColors = {
   ink: "#102034",
   muted: "#5c6f84",
   canvas: "#edf4f7",
@@ -40,7 +42,7 @@ export const colors = {
 };
 
 /** Translucent fills over the command bar and the camera. */
-export const overlay = {
+export const lightOverlay = {
   faint: "rgba(255,255,255,0.08)",
   soft: "rgba(255,255,255,0.12)",
   frame: "rgba(255,255,255,0.85)",
@@ -48,6 +50,50 @@ export const overlay = {
   successFill: "rgba(34,197,94,0.16)",
   warningFill: "rgba(245,158,11,0.13)",
   dangerFill: "rgba(239,68,68,0.14)"
+};
+
+/** Same shape as `lightColors`, tuned for a dark background. */
+export const darkColors: typeof lightColors = {
+  ink: "#e8eef5",
+  muted: "#9fb0c2",
+  canvas: "#0f1c28",
+  surface: "#16222f",
+  surfaceSoft: "#1b2a38",
+  surfaceRaised: "#1e2f3f",
+  line: "#2a3b4b",
+  lineSoft: "#233444",
+  placeholder: "#6d8194",
+  operation: "#3ecfc0",
+  operationDeep: "#8be2da",
+  operationSoft: "#123a37",
+  route: "#5b8def",
+  success: "#4ade80",
+  warning: "#f0b45e",
+  warningSoft: "#3a2a12",
+  warningLine: "#5a4420",
+  danger: "#f87171",
+  dangerSoft: "#3a1418",
+  dangerLine: "#5a2026",
+  command: "#081521",
+  commandMid: "#0d2334",
+  commandDeep: "#04101a",
+  accent: "#8be2da",
+  onCommand: "#d6e5ee",
+  onCommandMuted: "#8fa4b6",
+  successOnDark: "#86efac",
+  warningOnDark: "#f8d181",
+  dangerOnDark: "#fecaca"
+};
+
+/** Same shape as `lightOverlay`, tuned for a dark background. */
+export const darkOverlay: typeof lightOverlay = {
+  faint: "rgba(255,255,255,0.06)",
+  soft: "rgba(255,255,255,0.10)",
+  frame: "rgba(255,255,255,0.7)",
+  scannerLabel: "rgba(4,16,26,0.82)",
+  successFill: "rgba(74,222,128,0.16)",
+  warningFill: "rgba(240,180,94,0.14)",
+  dangerFill: "rgba(248,113,113,0.16)"
 };
 
 export const radius = {
@@ -93,3 +139,14 @@ export const font = {
 
 /** Anything a finger has to hit. Below this, a driver misses it in a moving vehicle. */
 export const TOUCH_MIN = 44;
+
+export type ThemeColors = typeof lightColors;
+export type ThemeOverlay = typeof lightOverlay;
+
+/** Picks the active palette from the OS appearance setting. */
+export function useAppTheme(): { scheme: "light" | "dark"; colors: ThemeColors; overlay: ThemeOverlay } {
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
+  return scheme === "dark"
+    ? { scheme, colors: darkColors, overlay: darkOverlay }
+    : { scheme, colors: lightColors, overlay: lightOverlay };
+}

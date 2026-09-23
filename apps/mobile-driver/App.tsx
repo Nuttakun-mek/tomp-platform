@@ -38,7 +38,7 @@ import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, parseBridgeMessage } from "./src/bridge/protocol";
 import { BACKGROUND_GPS_ENABLED, buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, type DriverWebViewKey } from "./src/config";
-import { colors, font, overlay, radius, space, text, TOUCH_MIN } from "./src/theme";
+import { font, radius, space, text, TOUCH_MIN, useAppTheme, type ThemeColors, type ThemeOverlay } from "./src/theme";
 import {
   getLastSharedLocation,
   hasBackgroundLocationPermission,
@@ -112,6 +112,8 @@ const bridgeBootstrap = `
 
 function DriverShell() {
   const insets = useSafeAreaInsets();
+  const { colors, overlay } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, overlay), [colors, overlay]);
   const bottomSafeInset = Math.max(insets.bottom, Platform.OS === "android" ? 24 : 0);
   const [fontsLoaded] = useFonts({
     NotoSansThai_400Regular,
@@ -855,7 +857,8 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
+  return StyleSheet.create({
   safe: {
     backgroundColor: colors.command,
     flex: 1
@@ -1560,4 +1563,5 @@ const styles = StyleSheet.create({
     fontFamily: font.semibold,
     ...text.body
   }
-});
+  });
+}
