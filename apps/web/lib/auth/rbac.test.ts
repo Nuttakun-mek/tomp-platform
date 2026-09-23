@@ -78,6 +78,44 @@ describe("global permission checks do not leak from project-scoped roles", () =>
   });
 });
 
+describe("platform-role bypass on a project-scoped permission (project-membership check)", () => {
+  beforeEach(() => {
+    globalRoleKeys = [];
+    projectMemberships = [];
+  });
+
+  // A globally-assigned project_manager (e.g. one granted through
+  // /superadmin/users so they can create their own first project) must NOT
+  // get free access to every project on the platform — the bypass at the
+  // bottom of requirePermission is reserved for genuinely platform-wide
+  // roles (matrix is ["*"]), not "any global role that happens to include
+  // this specific permission key". project_manager's matrix has no "*", so
+  // it must fall through to the membership check and be denied here since
+  // there is no project_members row for this project.
+  it("denies project.update for a profile with only a global project_manager role and no membership in this project", async () => {
+    globalRoleKeys = ["project_manager"];
+
+    const result = await requirePermission("some-project-id", "project.update");
+    expect(result.allowed).toBe(false);
+  });
+
+  it("denies project.delete for a profile with only a global project_manager role and no membership in this project", async () => {
+    globalRoleKeys = ["project_manager"];
+
+    const result = await requirePermission("some-project-id", "project.delete");
+    expect(result.allowed).toBe(false);
+  });
+
+  // The bypass must still work for the one role it's meant for: super_admin's
+  // matrix is ["*"], so it acts on every project without a project_members row.
+  it("allows project.update for super_admin with no membership in this project", async () => {
+    globalRoleKeys = ["super_admin"];
+
+    const result = await requirePermission("some-project-id", "project.update");
+    expect(result.allowed).toBe(true);
+  });
+});
+
 describe("project-scoped permission checked with no project (central resource library)", () => {
   beforeEach(() => {
     globalRoleKeys = [];

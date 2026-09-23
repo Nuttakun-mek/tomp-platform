@@ -42,9 +42,16 @@ export async function requirePermission(first: string, second?: string): Promise
 
   // A platform-level role (super_admin) acts on every project without a
   // project_members row. This is the ONLY sanctioned way past the membership
-  // check — the service-role transport is not authorization.
+  // check — the service-role transport is not authorization. Deliberately
+  // checked against the wildcard ("*"), not the requested permissionKey:
+  // a global role can be genuinely platform-wide (super_admin, matrix is
+  // ["*"]) or merely a project-scoped role assigned without a project id
+  // (e.g. a freshly provisioned project_manager, whose matrix has no "*").
+  // The latter must NOT get free access to every project on the platform —
+  // only to ones they hold an actual project_members row for, same as if
+  // that role had been assigned per-project in the first place.
   const globalRoles = await getGlobalRoleKeys(profile.id);
-  if (globalRoles.some((roleKey) => roleHasPermission(roleKey, permissionKey))) {
+  if (globalRoles.some((roleKey) => roleHasPermission(roleKey, "*"))) {
     return { allowed: true };
   }
 
