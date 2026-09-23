@@ -9,15 +9,25 @@ export async function requirePermission(first: string, second?: string): Promise
   const permissionKey = firstLooksLikePermission ? first : String(second);
   const projectId = firstLooksLikePermission ? second : first;
 
-  // Global/org-scoped permissions (e.g. project.create) are never granted through
-  // project_members — check ONLY global roles (user_role_assignments with no
-  // project_id), never the flattened getUserRoles(), which unions in every
-  // project-scoped role a profile holds anywhere. A project_manager grant on
-  // one project must never imply platform-wide project-creation rights.
-  if (!projectId || isGlobalPermission(permissionKey)) {
+  // Global/org-scoped permissions (e.g. project.create) are never granted
+  // through project_members — check ONLY global roles, regardless of
+  // whether a project id was passed in.
+  if (isGlobalPermission(permissionKey)) {
     const profile = await getCurrentUserProfile();
     if (profile.isDevelopmentFallback) return { allowed: true };
     const roles = await getGlobalRoleKeys(profile.id);
+    const allowed = roles.some((roleKey) => roleHasPermission(roleKey, permissionKey));
+    return allowed ? { allowed: true } : { allowed: false, reason: `No role includes ${permissionKey}.` };
+  }
+
+  // A project-scoped permission (e.g. driver.create) asked with no project —
+  // the central resource library, which belongs to no project on purpose.
+  // Unchanged from before this task: any role the profile holds anywhere.
+  // No GLOBAL_PERMISSIONS key can reach this branch (caught above first).
+  if (!projectId) {
+    const profile = await getCurrentUserProfile();
+    if (profile.isDevelopmentFallback) return { allowed: true };
+    const roles = await getUserRoles(profile.id);
     const allowed = roles.some((roleKey) => roleHasPermission(roleKey, permissionKey));
     return allowed ? { allowed: true } : { allowed: false, reason: `No role includes ${permissionKey}.` };
   }

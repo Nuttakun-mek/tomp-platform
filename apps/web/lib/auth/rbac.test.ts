@@ -77,3 +77,22 @@ describe("global permission checks do not leak from project-scoped roles", () =>
     expect(result.allowed).toBe(true);
   });
 });
+
+describe("project-scoped permission checked with no project (central resource library)", () => {
+  beforeEach(() => {
+    globalRoleKeys = [];
+    projectMemberships = [];
+  });
+
+  // driver.create/vehicle.create are NOT in GLOBAL_PERMISSIONS, so a bare
+  // requirePermission("driver.create") call (no projectId — the central
+  // library, which belongs to no project on purpose) must keep its
+  // pre-existing flattened-role behavior, not the tightened
+  // getGlobalRoleKeys-only check that GLOBAL_PERMISSIONS keys now get.
+  it("allows driver.create with no project for a profile whose only dispatcher grant is project-scoped", async () => {
+    projectMemberships = [{ projectId: "project-a", roleKey: "dispatcher" }];
+
+    const result = await requirePermission("driver.create");
+    expect(result.allowed).toBe(true);
+  });
+});
