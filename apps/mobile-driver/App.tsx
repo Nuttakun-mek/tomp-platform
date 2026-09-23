@@ -171,13 +171,6 @@ function DriverShell() {
     currentTokenRef.current = currentToken;
   }, [currentToken]);
 
-  const changeLocale = useCallback((nextLocale: MobileLocale) => {
-    localeRef.current = nextLocale;
-    setLocale(nextLocale);
-    void saveMobileLocale(nextLocale);
-    if (currentToken) setWebUrl(buildDriverWebUrl(currentToken, nextLocale, activeWebView));
-  }, [activeWebView, currentToken]);
-
   const postStatusToWeb = useCallback((nativeStatus: Parameters<typeof buildNativeStatusMessage>[0], text: string, detail?: Record<string, unknown>) => {
     const payload = buildNativeStatusMessage(nativeStatus, text, detail, { canBackgroundLocation: BACKGROUND_GPS_ENABLED });
     const serialized = JSON.stringify(payload)
@@ -600,21 +593,6 @@ function DriverShell() {
             <Text numberOfLines={1} style={styles.product}>TOMP Driver</Text>
             <Text numberOfLines={1} style={styles.title}>{currentScreenLabel}</Text>
           </View>
-          <View style={styles.statusGroup}>
-            <View style={styles.localeSwitch}>
-              {(["th", "en"] as const).map((item) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: locale === item }}
-                  key={item}
-                  onPress={() => changeLocale(item)}
-                  style={({ pressed }) => [styles.localeButton, locale === item && styles.localeButtonActive, pressed && styles.pressablePressed]}
-                >
-                  <Text style={[styles.localeButtonText, locale === item && styles.localeButtonTextActive]}>{item.toUpperCase()}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
         </View>
 
         {mode === "web" && effectiveWebUrl ? (
@@ -884,39 +862,6 @@ const styles = StyleSheet.create({
     color: colors.onCommand,
     fontFamily: font.semibold,
     ...text.caption
-  },
-  statusGroup: {
-    alignItems: "flex-end",
-    flexShrink: 0,
-    maxWidth: 96
-  },
-  localeSwitch: {
-    backgroundColor: overlay.faint,
-    borderRadius: radius.pill,
-    flexDirection: "row",
-    gap: 2,
-    padding: 2
-  },
-  // The one control deliberately under TOUCH_MIN: a language toggle is a
-  // settings affordance, not something reached for while moving, and two 44pt
-  // chips would own the header.
-  localeButton: {
-    alignItems: "center",
-    borderRadius: radius.pill,
-    justifyContent: "center",
-    minHeight: 30,
-    paddingHorizontal: space.sm
-  },
-  localeButtonActive: {
-    backgroundColor: colors.accent
-  },
-  localeButtonText: {
-    color: colors.onCommandMuted,
-    fontFamily: font.bold,
-    ...text.micro
-  },
-  localeButtonTextActive: {
-    color: colors.command
   },
   statusPill: {
     backgroundColor: overlay.soft,
