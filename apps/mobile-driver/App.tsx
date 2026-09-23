@@ -21,6 +21,7 @@ import {
 // bar at a flat 54px. These insets are measured by the OS on both platforms.
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
 import * as ExpoLinking from "expo-linking";
 import * as Network from "expo-network";
 import { useFonts } from "expo-font";
@@ -255,12 +256,14 @@ function DriverShell() {
       }
     }
     setQrLocked(false);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setScannerOpen((value) => !value);
   }, [cameraPermission?.granted, requestCameraPermission]);
 
   const handleQrScanned = useCallback(
     (result: BarcodeScanningResult) => {
       if (qrLocked) return;
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setQrLocked(true);
       void openDriverLink(result.data);
     },
@@ -275,6 +278,7 @@ function DriverShell() {
       if (parsed.type === "mobile-session.set") {
         await saveMobileDriverSession(parsed.payload);
         setSessionReady(true);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         void flushOutbox();
         void registerPush(parsed.payload);
         postStatusToWeb("session_ready", "แอปพร้อมส่งตำแหน่ง GPS เบื้องหลัง");
@@ -294,6 +298,7 @@ function DriverShell() {
         }
         await saveMobileDriverSession(result.data);
         setSessionReady(true);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         void flushOutbox();
         void registerPush(result.data);
         postStatusToWeb("session_ready", "แอปพร้อมส่งตำแหน่ง GPS เบื้องหลัง");
@@ -426,6 +431,7 @@ function DriverShell() {
 
   const openDriverMenu = useCallback((item: { key: DriverMenuKey; view?: DriverWebViewKey }) => {
     activeDriverMenuRef.current = item.key;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveDriverMenu(item.key);
     if (item.key === "messages") {
       setHasUnreadMessages(false);
@@ -463,7 +469,14 @@ function DriverShell() {
       "ต้องการออกจากงานนี้หรือไม่ ระบบจะหยุดส่งตำแหน่ง GPS และกลับไปหน้ารับงานจากศูนย์ควบคุม",
       [
         { text: "ยกเลิก", style: "cancel" },
-        { text: "ออกจากงาน", style: "destructive", onPress: () => void resetAssignment() }
+        {
+          text: "ออกจากงาน",
+          style: "destructive",
+          onPress: () => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            void resetAssignment();
+          }
+        }
       ]
     );
   }, [resetAssignment]);
