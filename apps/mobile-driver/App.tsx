@@ -438,6 +438,20 @@ function DriverShell() {
       }
       setMessage("เปิดหน้าคนขับผ่าน TOMP Web แล้ว");
 
+      // The URL carries whichever view it was last built with, and it is no
+      // longer rebuilt per tab — so any load the bottom bar did not start (the
+      // "ลองใหม่" retry button, a push-notification tap, an OS-initiated
+      // reload) would show one section while the bar confidently highlighted
+      // another. Whatever the reason for this load, the selected tab is the
+      // truth; say so. Read off the ref inside the closure so the delayed call
+      // posts the tab the driver is on now, not the one they were on 600ms ago.
+      const announceView = () => {
+        const view = DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenuRef.current)?.view;
+        if (view) postViewSwitchToWeb(view);
+      };
+      announceView();
+      setTimeout(announceView, 600);
+
       // The page loads with no idea what the shell is doing, so it offered
       // "share again" while sharing was already running. Tell it the truth.
       //
@@ -451,7 +465,7 @@ function DriverShell() {
       void postLocationSharingStatus();
       setTimeout(() => void postLocationSharingStatus(), 600);
     },
-    [postLocationSharingStatus]
+    [postLocationSharingStatus, postViewSwitchToWeb]
   );
 
   const handleShouldStartLoad = useCallback((request: { url: string }) => {
