@@ -78,7 +78,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
