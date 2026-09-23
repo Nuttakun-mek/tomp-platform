@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   AppState,
   type AppStateStatus,
   BackHandler,
@@ -110,6 +111,21 @@ const bridgeBootstrap = `
   true;
 `;
 
+function usePulse() {
+  const value = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(value, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(value, { toValue: 0.4, duration: 700, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [value]);
+  return value;
+}
+
 function DriverShell() {
   const insets = useSafeAreaInsets();
   const { colors, overlay } = useAppTheme();
@@ -120,6 +136,7 @@ function DriverShell() {
     NotoSansThai_600SemiBold,
     NotoSansThai_700Bold
   });
+  const pulse = usePulse();
   const webViewRef = useRef<WebView>(null);
   const [mode, setMode] = useState<ShellMode>("activation");
   const [tokenInput, setTokenInput] = useState("");
@@ -591,8 +608,10 @@ function DriverShell() {
     return (
       <View style={[styles.safe, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" backgroundColor={colors.command} />
-        <View style={styles.fontLoading}>
-          <ActivityIndicator color={colors.accent} />
+        <View style={styles.skeletonTopbar} />
+        <View style={styles.skeletonBody}>
+          <Animated.View style={[styles.skeletonCard, { opacity: pulse }]} />
+          <Animated.View style={[styles.skeletonCard, styles.skeletonCardShort, { opacity: pulse }]} />
         </View>
       </View>
     );
@@ -705,8 +724,8 @@ function DriverShell() {
                 startInLoadingState
                 renderLoading={() => (
                   <View style={styles.loading}>
-                    <ActivityIndicator color={colors.operation} />
-                    <Text style={styles.loadingText}>กำลังเปิดหน้าคนขับ</Text>
+                    <Animated.View style={[styles.skeletonStrip, { opacity: pulse }]} />
+                    <Animated.View style={[styles.skeletonCard, { opacity: pulse }]} />
                   </View>
                 )}
                 onError={(syntheticEvent) => {
@@ -872,6 +891,30 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     backgroundColor: colors.command,
     flex: 1,
     justifyContent: "center"
+  },
+  skeletonTopbar: {
+    backgroundColor: colors.commandMid,
+    height: 68
+  },
+  skeletonBody: {
+    gap: space.md,
+    padding: space.lg
+  },
+  skeletonStrip: {
+    backgroundColor: colors.line,
+    borderRadius: radius.md,
+    height: 40,
+    marginBottom: space.md,
+    marginHorizontal: space.md,
+    marginTop: space.md
+  },
+  skeletonCard: {
+    backgroundColor: colors.line,
+    borderRadius: radius.xl,
+    height: 140
+  },
+  skeletonCardShort: {
+    height: 88
   },
   pressablePressed: {
     opacity: 0.72,
