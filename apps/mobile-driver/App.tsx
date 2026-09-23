@@ -135,6 +135,7 @@ function DriverShell() {
   const [locationSharingActive, setLocationSharingActive] = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [webViewError, setWebViewError] = useState<string | null>(null);
   const [outboxCount, setOutboxCount] = useState(0);
   const [syncLabel, setSyncLabel] = useState("");
   const [activeDriverMenu, setActiveDriverMenu] = useState<DriverMenuKey>("home");
@@ -394,6 +395,7 @@ function DriverShell() {
     (event: WebViewNavigation) => {
       setCanGoBack(event.canGoBack);
       if (event.loading) {
+        setWebViewError(null);
         return;
       }
       setMessage("เปิดหน้าคนขับผ่าน TOMP Web แล้ว");
@@ -686,6 +688,24 @@ function DriverShell() {
                   <View style={styles.loading}>
                     <ActivityIndicator color={colors.operation} />
                     <Text style={styles.loadingText}>กำลังเปิดหน้าคนขับ</Text>
+                  </View>
+                )}
+                onError={(syntheticEvent) => {
+                  const { description } = syntheticEvent.nativeEvent;
+                  setWebViewError(description || "เชื่อมต่อไม่สำเร็จ");
+                }}
+                renderError={() => (
+                  <View style={styles.webErrorBox}>
+                    <Text style={styles.webErrorGlyph}>⚠️</Text>
+                    <Text style={styles.webErrorTitle}>เปิดหน้าคนขับไม่สำเร็จ</Text>
+                    <Text style={styles.webErrorText}>ตรวจสอบสัญญาณอินเทอร์เน็ตแล้วลองอีกครั้ง</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      style={({ pressed }) => [styles.webErrorRetryButton, pressed && styles.pressablePressed]}
+                      onPress={() => webViewRef.current?.reload()}
+                    >
+                      <Text style={styles.webErrorRetryText}>ลองใหม่</Text>
+                    </Pressable>
                   </View>
                 )}
               />
@@ -1383,6 +1403,46 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontFamily: font.semibold,
     ...text.body
+  },
+  webErrorBox: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    bottom: 0,
+    gap: space.sm,
+    justifyContent: "center",
+    left: 0,
+    paddingHorizontal: space.xl,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  webErrorGlyph: {
+    fontSize: 32
+  },
+  webErrorTitle: {
+    color: colors.ink,
+    fontFamily: font.bold,
+    ...text.title
+  },
+  webErrorText: {
+    color: colors.muted,
+    fontFamily: font.regular,
+    textAlign: "center",
+    ...text.body
+  },
+  webErrorRetryButton: {
+    alignItems: "center",
+    backgroundColor: colors.operation,
+    borderRadius: radius.lg,
+    justifyContent: "center",
+    minHeight: TOUCH_MIN,
+    marginTop: space.sm,
+    paddingHorizontal: space.xl
+  },
+  webErrorRetryText: {
+    color: colors.surface,
+    fontFamily: font.bold,
+    ...text.strong
   },
   bottomBar: {
     backgroundColor: colors.surfaceRaised,
