@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CarFront, PlaneTakeoff } from "lucide-react";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getViewerAccess } from "@/lib/auth/access";
@@ -32,6 +33,11 @@ export default async function RootPage() {
   const [systems, profile, { roleKeys }] = await Promise.all([getActiveSystems(), getCurrentUserProfile(), getViewerAccess()]);
   const isSuperAdmin = roleKeys.includes("super_admin");
   const viewerSystems = isSuperAdmin ? systems.map((s) => s.key) : await getViewerSystemKeys(profile.id);
+
+  const unlockedSystems = systems.filter((system) => viewerSystems.includes(system.key));
+  if (unlockedSystems.length === 1) {
+    redirect(`/${unlockedSystems[0]!.route}`);
+  }
 
   return (
     <div className="grid min-h-[70vh] content-center gap-6 px-4">
