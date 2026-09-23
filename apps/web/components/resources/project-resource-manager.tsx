@@ -270,23 +270,28 @@ export function ExistingResourcePairingPanel({
   }
 
   return (
-    <section className="enterprise-panel grid gap-3 p-4 xl:col-span-2">
+    <section className="enterprise-panel grid gap-3 p-4">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
         className="flex w-full flex-wrap items-start justify-between gap-3 text-left"
         aria-expanded={open}
       >
-        <div>
+        <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">สร้างหน่วยรถจากทรัพยากรที่มีอยู่</h2>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
             ใช้สำหรับคนขับและรถที่นำเข้าจากคลังกลาง หรือรายการที่สร้างแยกไว้แล้ว จับคู่ให้เสร็จในหน้าทรัพยากรโครงการนี้
           </p>
         </div>
-        <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">
-          เหลือ {freeDrivers.length} คน / {freeVehicles.length} รถ
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">
+            เหลือ {freeDrivers.length} คน / {freeVehicles.length} รถ
+          </span>
+          <span className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+            {open ? "ซ่อน" : "แสดง"}
+            <ChevronDown className={`h-4 w-4 text-ink-faint transition ${open ? "rotate-180" : ""}`} />
+          </span>
         </span>
-        <ChevronDown className={`mt-1 h-4 w-4 text-ink-faint transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
         <>
@@ -296,7 +301,7 @@ export function ExistingResourcePairingPanel({
           ไม่มีคนขับหรือรถที่ยังว่างให้จับคู่ หากต้องการเพิ่มหน่วยใหม่ ให้เพิ่มชุดคนขับและรถด้านล่าง หรือนำเข้าจากคลังกลางก่อน
         </p>
       ) : (
-        <div className="grid items-start gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(12rem,0.8fr)_auto] xl:items-end">
+        <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(12rem,0.8fr)_auto] xl:items-end">
           <label className="field-label">
             คนขับ
             <select className="field-input" value={driverId} onChange={(event) => setDriverId(event.target.value)}>
@@ -358,7 +363,7 @@ function UnitSummaryPanel({
   if (!active.length) return null;
 
   return (
-    <section className="enterprise-panel grid gap-3 p-4 xl:col-span-2">
+    <section className="enterprise-panel grid gap-3 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-ink">หน่วยรถพร้อมใช้งาน</h2>
@@ -368,7 +373,7 @@ function UnitSummaryPanel({
         </div>
         <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">{active.length} หน่วย</span>
       </div>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),18rem))] gap-2">
         {active.map((unit) => {
           const driver = unit.driverId ? driverById.get(unit.driverId) : null;
           const vehicle = unit.vehicleId ? vehicleById.get(unit.vehicleId) : null;
@@ -422,36 +427,38 @@ export function ProjectResourceManager({
   const inProject = Boolean(projectId);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid gap-4">
       {inProject ? <UnitSummaryPanel callSigns={callSigns} drivers={drivers} vehicles={vehicles} /> : null}
-      <Section
-        kind="driver"
-        title={inProject ? "คนขับในโครงการนี้" : "คนขับในคลังกลาง"}
-        subtitle={
-          inProject
-            ? "เฉพาะของโครงการนี้ — แก้ไขหรือลบที่นี่ไม่กระทบโครงการอื่น"
-            : "รายชื่อที่เก็บไว้ใช้ข้ามโครงการ โครงการจะนำเข้าไปเป็นสำเนาของตัวเอง"
-        }
-        icon={<UserRoundCheck className="h-5 w-5" />}
-        mine={drivers.map(asDriverRow)}
-        library={libraryDrivers.map(asDriverRow)}
-        projectId={projectId}
-        usedBy={inProject ? undefined : driverUsage}
-      />
-      <Section
-        kind="vehicle"
-        title={inProject ? "รถในโครงการนี้" : "รถในคลังกลาง"}
-        subtitle={
-          inProject
-            ? "เฉพาะของโครงการนี้ — แก้ไขหรือลบที่นี่ไม่กระทบโครงการอื่น"
-            : "โปรไฟล์รถที่เก็บไว้ใช้ข้ามโครงการ"
-        }
-        icon={<CarFront className="h-5 w-5" />}
-        mine={vehicles.map(asVehicleRow)}
-        library={libraryVehicles.map(asVehicleRow)}
-        projectId={projectId}
-        usedBy={inProject ? undefined : vehicleUsage}
-      />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Section
+          kind="driver"
+          title={inProject ? "คนขับในโครงการนี้" : "คนขับในคลังกลาง"}
+          subtitle={
+            inProject
+              ? "เฉพาะของโครงการนี้ — แก้ไขหรือลบที่นี่ไม่กระทบโครงการอื่น"
+              : "รายชื่อที่เก็บไว้ใช้ข้ามโครงการ โครงการจะนำเข้าไปเป็นสำเนาของตัวเอง"
+          }
+          icon={<UserRoundCheck className="h-5 w-5" />}
+          mine={drivers.map(asDriverRow)}
+          library={libraryDrivers.map(asDriverRow)}
+          projectId={projectId}
+          usedBy={inProject ? undefined : driverUsage}
+        />
+        <Section
+          kind="vehicle"
+          title={inProject ? "รถในโครงการนี้" : "รถในคลังกลาง"}
+          subtitle={
+            inProject
+              ? "เฉพาะของโครงการนี้ — แก้ไขหรือลบที่นี่ไม่กระทบโครงการอื่น"
+              : "โปรไฟล์รถที่เก็บไว้ใช้ข้ามโครงการ"
+          }
+          icon={<CarFront className="h-5 w-5" />}
+          mine={vehicles.map(asVehicleRow)}
+          library={libraryVehicles.map(asVehicleRow)}
+          projectId={projectId}
+          usedBy={inProject ? undefined : vehicleUsage}
+        />
+      </div>
     </div>
   );
 }

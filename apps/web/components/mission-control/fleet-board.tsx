@@ -325,7 +325,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
       </div>
 
       {groups.length ? (
-        <div className="grid gap-2 p-3 sm:p-4 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),24rem))] gap-2 p-3 sm:p-4">
           {visibleGroups.map((group) => {
             const open = expanded === group.key;
             const phone = group.driver?.phone ?? "";
@@ -337,7 +337,6 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
               primaryJob;
             const routeSummary = primaryJob ? `${primaryJob.pickup} → ${primaryJob.dropoff}` : "ยังไม่มีงานที่เปิดใช้งาน";
             const windowSummary = primaryJob ? formatAssignmentWindow(primaryJob.assignment.startTime, primaryJob.assignment.endTime) : "ยังไม่ระบุเวลา";
-            const primaryStatus = primaryJob?.reported ? formatStatusTh(primaryJob.reported.status) : primaryJob ? formatStatusTh(primaryJob.assignment.status) : "ยังไม่มีงาน";
             const gpsSummary = group.location ? formatRelativeTh(group.location.recordedAt, effectiveNow) : FRESH_LABEL[group.freshness];
             const mapPointId = group.location ? group.location.assignmentId || group.location.driverId || group.location.id : "";
             return (
@@ -349,108 +348,88 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                     : "border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 hover:border-teal-200 hover:shadow-md"
                 }`}
               >
-                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-2 px-4 py-3">
+                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-2 px-3 py-2.5 sm:px-3.5">
                   <button
                     type="button"
                     onClick={() => setExpanded(open ? null : group.key)}
-                    className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 text-left sm:grid-cols-[auto_minmax(0,1fr)_minmax(10rem,auto)]"
+                    className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2 text-left"
                     aria-expanded={open}
                   >
-                    <span className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ring-4 ring-white ${FRESH_DOT[group.freshness]}`} />
+                    <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-4 ring-white ${FRESH_DOT[group.freshness]}`} />
                     <span className="min-w-0">
-                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="truncate text-[15px] font-bold text-ink">{group.title}</span>
-                      {primaryJob ? (
-                        <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">{primaryJob.label}</span>
-                      ) : null}
-                      {group.jobs.length > 1 ? (
-                        <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                          {group.jobs.length} งาน
+                      <span className="grid min-w-0 gap-1">
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-[15px] font-bold text-ink">{group.title}</span>
+                          {primaryJob ? (
+                            <span className="shrink-0 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">{primaryJob.label}</span>
+                          ) : null}
+                          {group.jobs.length > 1 ? (
+                            <span className="shrink-0 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                              {group.jobs.length} งาน
+                            </span>
+                          ) : null}
+                          {group.unread ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                              {group.hasIssue ? <TriangleAlert className="h-2.5 w-2.5" /> : <MessageSquare className="h-2.5 w-2.5" />}
+                              {group.unread}
+                            </span>
+                          ) : null}
                         </span>
-                      ) : null}
-                      {hasNext ? (
-                        <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">มีงานถัดไป</span>
-                      ) : null}
-                      {group.unread ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                          {group.hasIssue ? <TriangleAlert className="h-2.5 w-2.5" /> : <MessageSquare className="h-2.5 w-2.5" />}
-                          {group.unread}
+                        <span className="block truncate text-xs font-medium text-slate-600">
+                          {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · {gpsSummary} · {windowSummary}
                         </span>
-                      ) : null}
-                    </span>
-                    {/* One line, not three. The old middle line comma-joined
-                        every job label onto a card that lists those same jobs in
-                        full the moment it opens, and the line below it repeated
-                        the freshness the coloured dot already carries. */}
-                    <span className="hidden">
-                      {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · {FRESH_LABEL[group.freshness]}
-                      {group.location ? ` · ${formatRelativeTh(group.location.recordedAt, effectiveNow)}` : ""}
-                    </span>
-                    <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
-                      <span className="font-semibold text-slate-700">{group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"}</span>
-                      <span>{FRESH_LABEL[group.freshness]}{group.location ? ` · ${formatRelativeTh(group.location.recordedAt, effectiveNow)}` : ""}</span>
-                      <span className="font-semibold text-slate-700">{windowSummary}</span>
-                    </span>
-                    <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                      <span className="max-w-full truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                        {routeSummary}
+                        <span className="grid min-w-0 gap-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                          <span className="truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700" title={routeSummary}>
+                            {routeSummary}
+                          </span>
+                          <span className="flex min-w-0 items-center gap-1 overflow-hidden">
+                            {hasNext ? (
+                              <span className="shrink-0 rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
+                            ) : null}
+                            {serviceFocus ? (
+                              <span
+                                className={`truncate rounded-full border px-2 py-0.5 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
+                                title={serviceFocus.serviceAlert.detail}
+                              >
+                                {serviceFocus.serviceAlert.label}
+                              </span>
+                            ) : null}
+                            {primaryJob ? (
+                              <span
+                                className="shrink-0 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-operation"
+                                title={vehicleUsageCostBreakdown(primaryJob.cost)}
+                              >
+                                {formatShortCost(primaryJob.cost)}
+                              </span>
+                            ) : null}
+                          </span>
+                        </span>
                       </span>
-                      {serviceFocus ? (
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[11px] font-bold sm:hidden ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
-                          title={serviceFocus.serviceAlert.detail}
-                        >
-                          {serviceFocus.serviceAlert.label}
-                        </span>
-                      ) : null}
-                      {primaryJob ? (
-                        <span
-                          className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-operation"
-                          title={vehicleUsageCostBreakdown(primaryJob.cost)}
-                        >
-                          {formatShortCost(primaryJob.cost)}
-                        </span>
-                      ) : null}
-                    </span>
-                    </span>
-                    <span className="hidden min-w-0 justify-items-end gap-1 text-right sm:grid">
-                    {serviceFocus ? (
-                      <span
-                        className={`max-w-[12rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
-                        title={serviceFocus.serviceAlert.detail}
-                      >
-                        {serviceFocus.serviceAlert.label}
-                      </span>
-                    ) : null}
-                    <span className="max-w-[12rem] truncate rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                      {primaryStatus}
-                    </span>
-                    <span className="max-w-[12rem] truncate text-[11px] font-medium text-slate-500">
-                      GPS: {gpsSummary}
-                    </span>
                     </span>
                   </button>
-                  {mapPointId ? (
+                  <div className="flex shrink-0 items-start gap-1">
+                    {mapPointId ? (
+                      <button
+                        type="button"
+                        onClick={() => focusOnMap(mapPointId)}
+                        className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 text-xs font-bold text-operation shadow-sm transition hover:border-teal-400 hover:bg-white focus-ring"
+                        aria-label={`ไปที่รถของ ${group.title} บนแผนที่`}
+                        title="ไปที่รถบนแผนที่"
+                      >
+                        <LocateFixed className="h-3.5 w-3.5" />
+                        <span className="hidden 2xl:inline">ไปที่รถ</span>
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={() => focusOnMap(mapPointId)}
-                      className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 text-xs font-bold text-operation shadow-sm transition hover:border-teal-400 hover:bg-white focus-ring"
-                      aria-label={`ไปที่รถของ ${group.title} บนแผนที่`}
-                      title="ไปที่รถบนแผนที่"
+                      onClick={() => setExpanded(open ? null : group.key)}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-ink focus-ring"
+                      aria-label={open ? "ซ่อนรายละเอียดคนขับ" : "แสดงรายละเอียดคนขับ"}
+                      aria-expanded={open}
                     >
-                      <LocateFixed className="h-3.5 w-3.5" />
-                      <span className="hidden xl:inline">ไปที่รถ</span>
+                      <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => setExpanded(open ? null : group.key)}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-ink focus-ring"
-                    aria-label={open ? "ซ่อนรายละเอียดคนขับ" : "แสดงรายละเอียดคนขับ"}
-                    aria-expanded={open}
-                  >
-                    <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
-                  </button>
+                  </div>
                 </div>
 
                 {open ? (
