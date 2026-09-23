@@ -10,11 +10,14 @@ export async function requirePermission(first: string, second?: string): Promise
   const projectId = firstLooksLikePermission ? second : first;
 
   // Global/org-scoped permissions (e.g. project.create) are never granted through
-  // project_members — check global + org roles even when an id was passed in.
+  // project_members — check ONLY global roles (user_role_assignments with no
+  // project_id), never the flattened getUserRoles(), which unions in every
+  // project-scoped role a profile holds anywhere. A project_manager grant on
+  // one project must never imply platform-wide project-creation rights.
   if (!projectId || isGlobalPermission(permissionKey)) {
     const profile = await getCurrentUserProfile();
     if (profile.isDevelopmentFallback) return { allowed: true };
-    const roles = await getUserRoles(profile.id);
+    const roles = await getGlobalRoleKeys(profile.id);
     const allowed = roles.some((roleKey) => roleHasPermission(roleKey, permissionKey));
     return allowed ? { allowed: true } : { allowed: false, reason: `No role includes ${permissionKey}.` };
   }
@@ -112,7 +115,7 @@ export async function canReadProject(projectId: string): Promise<boolean> {
 export async function canCreateProject(): Promise<boolean> {
   const profile = await getCurrentUserProfile();
   if (profile.isDevelopmentFallback) return true;
-  const roles = await getUserRoles(profile.id);
+  const roles = await getGlobalRoleKeys(profile.id);
   return roles.some((roleKey) => roleHasPermission(roleKey, "project.create"));
 }
 

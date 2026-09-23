@@ -4,6 +4,7 @@ import { ProjectArchiveButton } from "@/components/projects/project-archive-butt
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getVisibleProjects } from "@/lib/data/projects";
 import { getViewerAccess } from "@/lib/auth/access";
+import { canCreateProject } from "@/lib/auth/rbac";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
 interface ProjectsPageProps {
@@ -21,7 +22,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const showArchived = params.archived === "1";
   const { permissions, roleKeys } = await getViewerAccess();
   const canManage = permissions.includes("*") || roleKeys.includes("super_admin") || permissions.includes("project.update");
-  const canCreate = permissions.includes("*") || permissions.includes("project.create");
+  const canCreate = await canCreateProject();
 
   const all = await getVisibleProjects();
   const live = all.filter((p) => !["closed", "archived"].includes(p.status));
