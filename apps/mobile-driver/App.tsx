@@ -696,6 +696,10 @@ function DriverShell() {
                 // then printed "GPS ไม่มีพิกัด" — the one thing the stamp exists to carry.
                 // iOS ignores this prop; the manifest already carries ACCESS_FINE_LOCATION.
                 geolocationEnabled
+                // iOS only — WKWebView's own back/forward swipe gesture. Android's hardware
+                // back button is already handled above via BackHandler; this is the iOS
+                // equivalent affordance, which WebView does not enable by default.
+                allowsBackForwardNavigationGestures
                 startInLoadingState
                 renderLoading={() => (
                   <View style={styles.loading}>
