@@ -14,11 +14,14 @@ import { enqueueDriverOutbox, flushDriverOutbox, readDriverOutbox, type DriverOu
 import { createDriverMessageClientEventId, extractDriverMessageClientEventId } from "@/lib/driver/message-idempotency";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import type { DriverNotification } from "@tomp/types/domain";
-import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail, parseViewSwitchDetail, VIEW_SWITCH_EVENT } from "@tomp/driver-core";
+import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail, parseViewSwitchDetail, VIEW_SWITCH_EVENT, type DriverWebViewKey } from "@tomp/driver-core";
 import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
 
 type DriverGpsLight = "off" | "live" | "stale";
-export type DriverTaskViewMode = "home" | "next" | "messages" | "gps";
+// Aliased, not re-declared: the shell's view-switch message carries this exact
+// union, and two structurally-identical-but-separate unions would drift apart
+// silently the first time a fifth section is added on one side only.
+export type DriverTaskViewMode = DriverWebViewKey;
 type TripStatus = "arrived_pickup" | "passenger_onboard" | "completed";
 type WorkSessionStatus = "work_started" | "work_ended";
 type StatusIcon = typeof Home;

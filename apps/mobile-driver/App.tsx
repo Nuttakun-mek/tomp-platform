@@ -1,7 +1,6 @@
 import type { ComponentType, RefAttributes } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   AppState,
@@ -914,12 +913,6 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     backgroundColor: colors.canvas,
     flex: 1
   },
-  fontLoading: {
-    alignItems: "center",
-    backgroundColor: colors.command,
-    flex: 1,
-    justifyContent: "center"
-  },
   skeletonTopbar: {
     backgroundColor: colors.commandMid,
     height: 68
@@ -1489,11 +1482,6 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     position: "absolute",
     right: 0,
     top: 0
-  },
-  loadingText: {
-    color: colors.muted,
-    fontFamily: font.semibold,
-    ...text.body
   },
   webErrorBox: {
     alignItems: "center",

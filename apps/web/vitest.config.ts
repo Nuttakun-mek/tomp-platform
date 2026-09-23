@@ -44,7 +44,12 @@ export default defineConfig({
       // actually exercises the code that worktree just changed.
       "@tomp/types/schemas": fileURLToPath(new URL("../../packages/types/schemas.ts", import.meta.url)),
       "@tomp/types/domain": fileURLToPath(new URL("../../packages/types/domain.ts", import.meta.url)),
-      "@tomp/types": fileURLToPath(new URL("../../packages/types/src", import.meta.url))
+      "@tomp/types": fileURLToPath(new URL("../../packages/types/src", import.meta.url)),
+      // Same trap, same fix: driver-task-view.test.tsx is the first test to
+      // import @tomp/driver-core, so without this a worktree that has no
+      // node_modules of its own would test the MAIN CHECKOUT's bridge.ts and
+      // pass (or fail) on code this worktree never touched.
+      "@tomp/driver-core": fileURLToPath(new URL("../../packages/driver-core/src", import.meta.url))
     }
   }
 });
