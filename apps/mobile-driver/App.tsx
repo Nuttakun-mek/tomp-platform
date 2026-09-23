@@ -1417,7 +1417,7 @@ const styles = StyleSheet.create({
     top: 0
   },
   webErrorGlyph: {
-    fontSize: 32
+    fontSize: text.display.fontSize
   },
   webErrorTitle: {
     color: colors.ink,
