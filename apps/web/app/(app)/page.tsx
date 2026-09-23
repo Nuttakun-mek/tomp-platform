@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CarFront, PlaneTakeoff } from "lucide-react";
+import { CarFront, PlaneTakeoff, Plus } from "lucide-react";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getViewerAccess } from "@/lib/auth/access";
+import { canCreateProject } from "@/lib/auth/rbac";
 import { getViewerSystemKeys } from "@/lib/data/project-systems";
 
 const ICONS: Record<string, typeof CarFront> = { CarFront, PlaneTakeoff };
@@ -39,6 +40,14 @@ export default async function RootPage() {
     redirect(`/${unlockedSystems[0]!.route}`);
   }
 
+  // A freshly provisioned global project_manager has zero project_members
+  // rows at first login (nothing to unlock yet) — but their entire purpose
+  // is to create their own first project. Don't leave that account staring
+  // at an all-locked tile view; point it at /projects instead. Additive
+  // only: accounts with no create permission keep the unchanged locked-tile
+  // view below.
+  const canCreate = unlockedSystems.length === 0 ? await canCreateProject() : false;
+
   return (
     <div className="grid min-h-[70vh] content-center gap-6 px-4">
       <div className="text-center">
@@ -71,6 +80,16 @@ export default async function RootPage() {
           );
         })}
       </div>
+      {unlockedSystems.length === 0 && canCreate ? (
+        <div className="text-center">
+          <Link
+            href="/projects"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-operation px-4 py-2.5 text-sm font-semibold text-white hover:bg-operation-deep"
+          >
+            <Plus className="h-4 w-4" /> สร้างโครงการแรกของคุณ
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }

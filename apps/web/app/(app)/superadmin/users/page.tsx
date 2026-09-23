@@ -17,7 +17,7 @@ export default async function SuperadminUsersPage() {
       <PageHeader
         eyebrow="ทีมแพลตฟอร์ม"
         title="ผู้ใช้และสิทธิ์"
-        description="เพิ่มผู้ใช้ และกำหนดบทบาทในแต่ละโครงการ ผู้ใช้จะเข้าสู่ระบบด้วยอีเมลเดียวกันเพื่อเปิดใช้บัญชี"
+        description="สร้างบัญชีใหม่และให้สิทธิ์ระดับแพลตฟอร์ม — ผู้จัดการโครงการที่สร้างโครงการเองได้ หรือผู้ดูแลแพลตฟอร์ม ต้องการเพิ่มคนเข้าทำงานในโครงการที่มีอยู่แล้วแทน ให้ไปที่หน้าตั้งค่าของโครงการนั้น"
       />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] xl:items-start">
         <InviteUserForm organizations={organizations} />
