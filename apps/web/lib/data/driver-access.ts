@@ -66,6 +66,8 @@ function identityFromRow(row: Record<string, unknown>): DriverTokenIdentity | nu
 
 export interface DriverUpdates {
   assignmentStatus: string;
+  /** The current job's own metadata (pickup, dropoff, time, ...), so an edit made mid-job reaches a page that loads once. */
+  assignmentMetadata: Record<string, unknown>;
   latestStatus: { status: string; at: string } | null;
   workSession: DriverWorkSessionState;
   dayAssignments: DriverDayAssignment[];
@@ -1027,7 +1029,7 @@ export async function getDriverUpdatesFor({
   }
 
   const [{ data: assignmentRow }, notifications, messages, latestStatusRes, workSessionRes] = await Promise.all([
-    client.from("assignments").select("status, start_time, call_sign_id").eq("id", assignmentId).maybeSingle(),
+    client.from("assignments").select("status, start_time, call_sign_id, metadata").eq("id", assignmentId).maybeSingle(),
     getDriverNotificationsByAssignmentId(assignmentId),
     getDriverIssueMessagesByAssignmentId(assignmentId),
     client.from("assignment_status_updates").select("status, created_at").eq("assignment_id", assignmentId).in("status", TASK_STATUS_FILTER).order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -1054,6 +1056,7 @@ export async function getDriverUpdatesFor({
 
   return {
     assignmentStatus: text(assignmentRow as Row | null, "status", "planned"),
+    assignmentMetadata: metadata((assignmentRow ?? {}) as Row),
     latestStatus: latestStatus(latestStatusRow),
     workSession: workSessionFromRows((workSessionRes.data || []) as Row[]),
     notifications,
@@ -1092,7 +1095,7 @@ async function getDriverUpdatesForViaPostgres(projectId: string, assignmentId: s
   if (!sql) return null;
 
   const [assignmentRows, notifications, messages, latestStatusRows, workSessionRows] = await Promise.all([
-    sql<Row[]>`select status, start_time, call_sign_id from assignments where id = ${assignmentId} limit 1`,
+    sql<Row[]>`select status, start_time, call_sign_id, metadata from assignments where id = ${assignmentId} limit 1`,
     getDriverNotificationsByAssignmentId(assignmentId),
     getDriverIssueMessagesByAssignmentId(assignmentId),
     sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${assignmentId} and status not in ('work_started', 'work_ended') order by created_at desc limit 1`,
@@ -1122,6 +1125,7 @@ async function getDriverUpdatesForViaPostgres(projectId: string, assignmentId: s
 
   return {
     assignmentStatus: text(assignmentRows[0], "status", "planned"),
+    assignmentMetadata: metadata((assignmentRows[0] ?? {}) as Row),
     latestStatus: latestStatus(latestStatusRows[0]),
     workSession: workSessionFromRows(workSessionRows),
     notifications,
