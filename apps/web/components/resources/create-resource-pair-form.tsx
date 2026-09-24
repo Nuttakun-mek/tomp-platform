@@ -53,16 +53,6 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
               <p className="text-xs text-ink-faint">ชื่อและเบอร์โทรเป็นข้อมูลที่ต้องมีสำหรับติดต่อระหว่างปฏิบัติงาน</p>
             </div>
           </div>
-          {/* The Call Sign names the unit (this driver in that vehicle) and heads
-              the form. It sits on the driver side, the shorter column, so the
-              two columns come out about even instead of leaving a gap here. */}
-          <label className="field-label">
-            <span className="field-title">
-              Call Sign
-              <FieldHelp content="รหัสประจำหน่วยรถ ใช้ค้นหา มอบหมายงาน และออก QR ในศูนย์ควบคุมและหน้าคนขับ เว้นว่างได้ ระบบจะตั้งให้" />
-            </span>
-            <input className="field-input" name="callSign" placeholder="เช่น VAN-01 หรือเว้นว่างให้ระบบตั้งให้" />
-          </label>
           <label className="field-label">
             <span className="field-title">ชื่อ-นามสกุล <span className="field-required-badge">*</span></span>
             <input className="field-input" name="fullName" placeholder="เช่น สมชาย ใจดี" required />
@@ -97,6 +87,16 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
               <p className="text-xs text-ink-faint">กำหนดชนิดรถเพื่อให้ศูนย์ควบคุมแยกสัญลักษณ์บนแผนที่ได้ชัดเจน</p>
             </div>
           </div>
+          {/* The Call Sign names the vehicle unit, so it heads the vehicle side on
+              its own row. With the symbol picker down to icons this is the
+              shorter column, and the extra row levels it with the driver side. */}
+          <label className="field-label">
+            <span className="field-title">
+              Call Sign
+              <FieldHelp content="รหัสประจำหน่วยรถ ใช้ค้นหา มอบหมายงาน และออก QR ในศูนย์ควบคุมและหน้าคนขับ เว้นว่างได้ ระบบจะตั้งให้" />
+            </span>
+            <input className="field-input" name="callSign" placeholder="เช่น VAN-01 หรือเว้นว่างให้ระบบตั้งให้" />
+          </label>
           <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7rem,0.62fr)]">
             <label className="field-label">
               <span className="field-title">ทะเบียนรถ <span className="field-required-badge">*</span></span>
