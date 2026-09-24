@@ -44,7 +44,7 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
   const callSigns = callSignsResult.data;
 
   return (
-    <div data-wide className="grid gap-4">
+    <div className="grid gap-4">
       <PageHeader
         eyebrow="จัดการโครงการ"
         title={project.projectName}

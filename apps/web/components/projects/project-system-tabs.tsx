@@ -89,7 +89,7 @@ export function ProjectSystemTabs({
           with a lighter style, so they read as part of Ground Transfer and not
           as siblings of Airport Transfer. */}
       {sections.length ? (
-        <div aria-label={`เมนูย่อย ${SYSTEM_LABEL.ground_transfer}`} className="flex items-center gap-1 overflow-x-auto border-t border-border bg-slate-50/70 px-2">
+        <div aria-label={`เมนูย่อย ${SYSTEM_LABEL.ground_transfer}`} className="flex items-center gap-1 overflow-x-auto overflow-y-hidden border-t border-border bg-slate-50/70 px-2">
           {sections.map((tab) => {
             const current = tab.key === activeSection;
             return (
@@ -97,7 +97,7 @@ export function ProjectSystemTabs({
                 key={tab.key}
                 href={tab.href}
                 aria-current={current ? "page" : undefined}
-                className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-semibold transition ${
+                className={`inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-semibold transition ${
                   current ? "border-operation text-operation" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-ink"
                 }`}
               >

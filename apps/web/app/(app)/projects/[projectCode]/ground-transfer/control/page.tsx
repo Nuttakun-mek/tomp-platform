@@ -61,7 +61,7 @@ export default async function ControlPage({ params }: ControlPageProps) {
   const readiness = assignments.length ? Math.min(100, Math.round((locations.length / assignments.length) * 100)) : locations.length ? 100 : 0;
 
   return (
-    <div data-wide className="grid gap-4">
+    <div className="grid gap-4">
       {!load.ok ? <DataUnavailable description="โหลดข้อมูลศูนย์ควบคุมบางส่วนไม่สำเร็จ" detail={load.error} /> : null}
       <CommandCenterHeader project={project} liveCount={locations.length} issueCount={followUps} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />

@@ -35,8 +35,11 @@ export default async function ProjectShellLayout({
     isSuperAdmin ? Promise.resolve(ALL_SYSTEM_KEYS) : getViewerSystemKeys(profile.id)
   ]);
 
+  // data-wide on the layout, not on individual pages: every tab of a project
+  // (and its loading screen) gets the same width, so switching tabs never
+  // makes the project bar jump between the 1400px cap and full width.
   return (
-    <div className="grid gap-4">
+    <div data-wide className="grid gap-4">
       <ProjectSystemTabs projectCode={project.projectCode} enabledSystems={enabledSystems} viewerSystems={viewerSystems} active="ground_transfer" />
       {children}
     </div>
