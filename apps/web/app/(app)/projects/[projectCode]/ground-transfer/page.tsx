@@ -2,8 +2,8 @@ import { AccessDenied } from "@/components/auth/access-denied";
 import { ProjectChangePanel } from "@/components/projects/project-change-panel";
 import { ProjectMissionBoard } from "@/components/projects/project-mission-board";
 import { ProjectOperationSummaryPanel } from "@/components/projects/project-operation-summary";
-import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { PageHeader } from "@/components/page-header";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { combineResults } from "@/lib/data/data-result";
@@ -33,18 +33,12 @@ export default async function GroundTransferOverviewPage({ params }: GroundTrans
 
   return (
     <div className="grid gap-4">
-      <ProjectWorkspaceTabs projectCode={project.projectCode} active="overview" />
-
-      <section className="enterprise-panel p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-operation">{project.projectCode}</p>
-            <h1 className="mt-1 text-xl font-bold text-ink">{project.projectName}</h1>
-            <p className="mt-1 text-sm text-slate-600">{project.startDate} – {project.endDate} · {project.timezone}</p>
-          </div>
-          <StatusBadge label={formatStatusTh(project.status)} tone={project.status === "published" || project.status === "operating" ? "ready" : "neutral"} />
-        </div>
-      </section>
+      <PageHeader
+        eyebrow={project.projectCode}
+        title={project.projectName}
+        description={`${project.startDate} – ${project.endDate} · ${project.timezone}`}
+        actions={<StatusBadge label={formatStatusTh(project.status)} tone={project.status === "published" || project.status === "operating" ? "ready" : "neutral"} />}
+      />
 
       <OverviewView projectId={project.id} />
     </div>

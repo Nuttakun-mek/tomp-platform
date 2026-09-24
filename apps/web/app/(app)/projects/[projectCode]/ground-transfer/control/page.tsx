@@ -7,7 +7,6 @@ import { MissionControlFeedProvider } from "@/components/mission-control/mission
 import { OperationKpiStrip } from "@/components/mission-control/operation-kpi-strip";
 import { OperationTimelinePanel } from "@/components/mission-control/operation-timeline-panel";
 import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
-import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { combineResults } from "@/lib/data/data-result";
@@ -62,8 +61,7 @@ export default async function ControlPage({ params }: ControlPageProps) {
   const readiness = assignments.length ? Math.min(100, Math.round((locations.length / assignments.length) * 100)) : locations.length ? 100 : 0;
 
   return (
-    <div className="grid gap-4">
-      <ProjectWorkspaceTabs projectCode={project.projectCode} active="control" />
+    <div data-wide className="grid gap-4">
       {!load.ok ? <DataUnavailable description="โหลดข้อมูลศูนย์ควบคุมบางส่วนไม่สำเร็จ" detail={load.error} /> : null}
       <CommandCenterHeader project={project} liveCount={locations.length} issueCount={followUps} />
       <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />

@@ -4,20 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, ClipboardList, LayoutDashboard, MapPinned, Users } from "lucide-react";
 
-type TabKey = "overview" | "dispatch" | "control" | "resources";
+export type GroundTransferTabKey = "overview" | "dispatch" | "control" | "resources";
 
-export function ProjectWorkspaceTabs({ projectCode, active }: { projectCode: string; active: TabKey }) {
-  const pathname = usePathname();
+/** The Ground Transfer sections of a project, shared by the project bar and this standalone bar. */
+export function groundTransferTabs(projectCode: string): Array<{ key: GroundTransferTabKey; label: string; href: string; icon: typeof LayoutDashboard }> {
   const base = `/projects/${projectCode}/ground-transfer`;
-
-  const tabs: Array<{ key: TabKey; label: string; href: string; icon: typeof LayoutDashboard }> = [
+  return [
     { key: "overview", label: "ภาพรวม", href: base, icon: LayoutDashboard },
     { key: "dispatch", label: "จัดการโครงการ", href: `${base}/dispatch`, icon: ClipboardList },
     { key: "control", label: "ศูนย์ควบคุม", href: `${base}/control`, icon: MapPinned },
     { key: "resources", label: "ทรัพยากร", href: `${base}/resources`, icon: Users }
   ];
+}
 
-  const resolvedActive: TabKey = tabs.find((tab) => tab.href === pathname)?.key ?? active;
+// Only for pages outside the project layout (e.g. /resources/vehicles?projectId=),
+// which do not get the project bar that already carries these tabs.
+export function ProjectWorkspaceTabs({ projectCode, active }: { projectCode: string; active: GroundTransferTabKey }) {
+  const pathname = usePathname();
+  const tabs = groundTransferTabs(projectCode);
+  const resolvedActive: GroundTransferTabKey = tabs.find((tab) => tab.href === pathname)?.key ?? active;
 
   return (
     <div className="grid gap-2">

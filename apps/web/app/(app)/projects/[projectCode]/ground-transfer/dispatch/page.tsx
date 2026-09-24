@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
 import { DriverJobOrderPanel } from "@/components/assignments/driver-job-order-panel";
-import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
+import { PageHeader } from "@/components/page-header";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { combineResults } from "@/lib/data/data-result";
 import { getAssignmentsByProjectId } from "@/lib/data/assignments";
@@ -44,17 +44,12 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
   const callSigns = callSignsResult.data;
 
   return (
-    <div className="grid gap-4">
-      <ProjectWorkspaceTabs projectCode={project.projectCode} active="dispatch" />
-      <section className="enterprise-panel overflow-hidden">
-        <div className="enterprise-surface p-4 lg:p-5">
-          <div className="min-w-0">
-            <p className="section-label">จัดการโครงการ</p>
-            <h1 className="page-title mt-2">{project.projectName}</h1>
-            <p className="page-description mt-2.5">จัดการหน่วยรถ เปิดงานให้คนขับ และออก QR สำหรับการปฏิบัติงาน ส่วนการติดตามเวลาและความเสี่ยง OT อยู่ที่ศูนย์ควบคุม</p>
-          </div>
-        </div>
-      </section>
+    <div data-wide className="grid gap-4">
+      <PageHeader
+        eyebrow="จัดการโครงการ"
+        title={project.projectName}
+        description="จัดการหน่วยรถ เปิดงานให้คนขับ และออก QR สำหรับการปฏิบัติงาน ส่วนการติดตามเวลาและความเสี่ยง OT อยู่ที่ศูนย์ควบคุม"
+      />
       {!load.ok ? <DataUnavailable description="โหลดข้อมูลงานของโครงการนี้ไม่สำเร็จ" detail={load.error} /> : null}
       {/* The page reads down the way the work happens: set a unit up, open work
           onto it, then watch the board. Each block is full width — the old

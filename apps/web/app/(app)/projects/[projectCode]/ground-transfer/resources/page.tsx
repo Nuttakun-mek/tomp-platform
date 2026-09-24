@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, CarFront, Library } from "lucide-react";
-import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
+import { PageHeader } from "@/components/page-header";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { CreateResourcePairForm } from "@/components/resources/create-resource-pair-form";
 import { ExistingResourcePairingPanel, ProjectResourceManager } from "@/components/resources/project-resource-manager";
@@ -26,15 +26,11 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
 
   return (
     <div className="grid gap-4">
-      <ProjectWorkspaceTabs projectCode={project.projectCode} active="resources" />
-
-      <section className="enterprise-panel-soft p-4">
-        <h1 className="text-lg font-semibold text-ink">ทรัพยากรของโครงการนี้</h1>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          คนขับ {drivers.length} คน · รถ {vehicles.length} คัน — นำเข้าจากคลังกลางหรือเพิ่มใหม่ก็ได้
-          หากเพิ่มเป็นคู่ ระบบจะสร้างหน่วยรถให้พร้อมใช้ในเมนู “จัดการโครงการ”
-        </p>
-      </section>
+      <PageHeader
+        eyebrow="ทรัพยากร"
+        title="ทรัพยากรของโครงการนี้"
+        description={`คนขับ ${drivers.length} คน · รถ ${vehicles.length} คัน — นำเข้าจากคลังกลางหรือเพิ่มใหม่ก็ได้ หากเพิ่มเป็นคู่ ระบบจะสร้างหน่วยรถให้พร้อมใช้ในเมนู “จัดการโครงการ”`}
+      />
 
       {drivers.length === 0 && vehicles.length === 0 ? (
         <section className="enterprise-panel-soft border-teal-200 bg-teal-50/60 p-4">

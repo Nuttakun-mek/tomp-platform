@@ -53,7 +53,7 @@ export function AppNav({ sections, locale }: { sections: NavSection[]; locale: L
       <nav className={`${open ? "grid" : "hidden"} gap-4 lg:grid`} aria-label={t(locale, "app.mainNav")}>
         {sections.map((section) => (
           <section key={section.titleKey} className="grid gap-1">
-            <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:text-slate-500">{t(locale, section.titleKey)}</p>
+            <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:group-data-[sidebar=collapsed]/shell:hidden">{t(locale, section.titleKey)}</p>
             <div className="grid gap-0.5">
               {section.items.map((item) => {
                 const Icon = ICONS[item.icon] ?? Gauge;
@@ -68,7 +68,8 @@ export function AppNav({ sections, locale }: { sections: NavSection[]; locale: L
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
                     title={t(locale, item.helpKey)}
-                    className={`group flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-colors ${
+                    aria-label={label}
+                    className={`group flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-colors lg:group-data-[sidebar=collapsed]/shell:justify-center lg:group-data-[sidebar=collapsed]/shell:px-0 ${
                       active
                         ? "border-teal-300/50 bg-white text-ink lg:bg-white/[0.12] lg:text-white"
                         : "border-transparent text-slate-700 hover:bg-slate-50 lg:text-slate-300 lg:hover:bg-white/[0.06] lg:hover:text-white"
@@ -83,7 +84,7 @@ export function AppNav({ sections, locale }: { sections: NavSection[]; locale: L
                     >
                       <Icon className="h-4 w-4" />
                     </span>
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 lg:group-data-[sidebar=collapsed]/shell:hidden">
                       <span className="block truncate text-[13px] font-semibold leading-5">{label}</span>
                       {active ? (
                         <span className="block truncate text-[11px] leading-4 text-slate-500 lg:text-slate-300">{description}</span>
