@@ -17,7 +17,7 @@ export default async function AccountPasswordPage() {
   return (
     <>
       <PageHeader eyebrow="บัญชีของฉัน" title="เปลี่ยนรหัสผ่าน" description="ตั้งรหัสผ่านใหม่สำหรับบัญชีนี้" />
-      <ChangePasswordForm />
+      <ChangePasswordForm email={profile.email} />
     </>
   );
 }

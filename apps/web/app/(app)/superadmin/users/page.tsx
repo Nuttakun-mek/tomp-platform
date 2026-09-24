@@ -1,11 +1,12 @@
 import { PageHeader } from "@/components/page-header";
 import { InviteUserForm } from "@/components/superadmin/invite-user-form";
 import { UserList } from "@/components/superadmin/user-list";
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { listProfilesWithRoles } from "@/lib/superadmin/users";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 export default async function SuperadminUsersPage() {
-  const rows = await listProfilesWithRoles();
+  const [rows, viewer] = await Promise.all([listProfilesWithRoles(), getCurrentUserProfile()]);
   const client = getSupabaseServerDataClient();
   const orgResult = client ? await client.from("organizations").select("id, name").order("name") : { data: [] };
   const orgRows = (orgResult.data || []) as Array<Record<string, unknown>>;
@@ -21,7 +22,7 @@ export default async function SuperadminUsersPage() {
       />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] xl:items-start">
         <InviteUserForm organizations={organizations} />
-        <UserList rows={rows} />
+        <UserList rows={rows} currentProfileId={viewer.id} />
       </div>
     </>
   );

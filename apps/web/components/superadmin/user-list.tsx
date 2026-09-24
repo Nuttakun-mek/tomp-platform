@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ResetPasswordButton } from "@/components/superadmin/reset-password-button";
@@ -19,7 +20,7 @@ const STATUS_TONE: Record<string, "neutral" | "ready" | "warning" | "critical"> 
   inactive: "neutral"
 };
 
-export function UserList({ rows }: { rows: ProfileRow[] }) {
+export function UserList({ rows, currentProfileId }: { rows: ProfileRow[]; currentProfileId: string }) {
   if (!rows.length) {
     return <EmptyState title="ยังไม่มีผู้ใช้" description="เพิ่มผู้ใช้คนแรกจากฟอร์มด้านซ้าย" />;
   }
@@ -48,7 +49,13 @@ export function UserList({ rows }: { rows: ProfileRow[] }) {
                   <span className="rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700">ยังไม่มีบทบาท</span>
                 )}
               </div>
-              <ResetPasswordButton profileId={row.id} hasLogin={row.hasLogin} />
+              {row.id === currentProfileId ? (
+                <Link href="/account/password" className="text-[11px] font-semibold text-operation hover:underline">
+                  บัญชีของคุณ · เปลี่ยนรหัสผ่านที่นี่
+                </Link>
+              ) : (
+                <ResetPasswordButton profileId={row.id} hasLogin={row.hasLogin} />
+              )}
             </div>
           </div>
         ))}

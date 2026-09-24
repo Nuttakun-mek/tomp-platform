@@ -5,7 +5,7 @@ import { KeyRound } from "lucide-react";
 import { changeOwnPasswordAction } from "@/app/actions/account";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ email }: { email: string | null }) {
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "danger">("danger");
   const [isPending, startTransition] = useTransition();
@@ -29,13 +29,18 @@ export function ChangePasswordForm() {
 
   return (
     <form action={submit} className="enterprise-panel grid content-start gap-4 p-4 max-w-md">
+      {/* The account name plus autocomplete="new-password" tell the browser's
+          password manager which saved login this replaces. Without them it kept
+          the old password and filled it in at the next sign-in, which looked
+          like the new password did not work. */}
+      <input type="text" name="username" autoComplete="username" value={email ?? ""} readOnly hidden />
       <label className="field-label">
         รหัสผ่านใหม่
-        <input className="field-input" name="newPassword" type="password" required minLength={8} placeholder="อย่างน้อย 8 ตัวอักษร" />
+        <input className="field-input" name="newPassword" type="password" autoComplete="new-password" required minLength={8} placeholder="อย่างน้อย 8 ตัวอักษร" />
       </label>
       <label className="field-label">
         ยืนยันรหัสผ่านใหม่
-        <input className="field-input" name="confirmPassword" type="password" required minLength={8} placeholder="พิมพ์ซ้ำอีกครั้ง" />
+        <input className="field-input" name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} placeholder="พิมพ์ซ้ำอีกครั้ง" />
       </label>
       <ActionFeedback message={message} tone={tone} />
       <button
