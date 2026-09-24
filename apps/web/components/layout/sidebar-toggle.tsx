@@ -2,8 +2,7 @@
 
 import { useRef, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-
-export const SIDEBAR_COOKIE = "tomp_sidebar";
+import { SIDEBAR_COOKIE } from "@/lib/workspace/sidebar";
 
 // Collapses the desktop sidebar to an icon rail. The shell reads the cookie on
 // the server so the page never renders wide and then snaps narrow; the toggle

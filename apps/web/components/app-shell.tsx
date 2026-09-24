@@ -5,7 +5,7 @@ import { UserMenu } from "@/components/auth/user-menu";
 import { BuildVersionBadge } from "@/components/layout/build-version-badge";
 import { EnvironmentBadge } from "@/components/layout/environment-badge";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
-import { SIDEBAR_COOKIE, SidebarToggle } from "@/components/layout/sidebar-toggle";
+import { SidebarToggle } from "@/components/layout/sidebar-toggle";
 import { WorkspaceShell } from "@/components/layout/workspace-shell";
 import { ToastProvider } from "@/components/ui/toast";
 import { ProjectScopePill } from "@/components/workspace/project-scope-pill";
@@ -15,6 +15,7 @@ import { getVisibleProjects } from "@/lib/data/projects";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { SCOPE_COOKIE, resolveActiveScope } from "@/lib/workspace/scope";
+import { SIDEBAR_COOKIE } from "@/lib/workspace/sidebar";
 
 export async function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const { permissions, roleKeys, primaryRole, profile } = await getViewerAccess();

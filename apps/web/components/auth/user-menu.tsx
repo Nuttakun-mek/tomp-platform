@@ -54,12 +54,14 @@ export function UserMenu({ name, email, roleKey, signedIn, variant = "dark" }: U
   }
 
   return (
-    <div className={`grid gap-2 rounded-xl border p-2.5 ${dark ? "border-white/10 bg-white/[0.06]" : "border-border bg-white"}`}>
+    // The light variant sits in the phone's pinned top row, so it drops the card
+    // and, on the narrowest screens, the name — the initials carry it as a tooltip.
+    <div className={dark ? "grid gap-2 rounded-xl border border-white/10 bg-white/[0.06] p-2.5" : "grid gap-1"}>
       <div className="flex items-center gap-2.5">
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold ${dark ? "bg-teal-300 text-teal-950" : "bg-operation-soft text-operation"}`}>
+        <span title={name} className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold ${dark ? "bg-teal-300 text-teal-950" : "bg-operation-soft text-operation"}`}>
           {initials(name)}
         </span>
-        <span className="min-w-0 flex-1">
+        <span className={dark ? "min-w-0 flex-1" : "hidden min-w-0 max-w-[10rem] flex-1 min-[480px]:block"}>
           <span className={`block truncate text-[13px] font-semibold ${dark ? "text-white" : "text-ink"}`}>{name}</span>
           <span className={`block truncate text-[11px] ${dark ? "text-slate-400" : "text-ink-faint"}`}>
             {roleLabelTh(roleKey)}
