@@ -53,6 +53,16 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
               <p className="text-xs text-ink-faint">ชื่อและเบอร์โทรเป็นข้อมูลที่ต้องมีสำหรับติดต่อระหว่างปฏิบัติงาน</p>
             </div>
           </div>
+          {/* The Call Sign names the unit (this driver in that vehicle) and heads
+              the form. It sits on the driver side, the shorter column, so the
+              two columns come out about even instead of leaving a gap here. */}
+          <label className="field-label">
+            <span className="field-title">
+              Call Sign
+              <FieldHelp content="รหัสประจำหน่วยรถ ใช้ค้นหา มอบหมายงาน และออก QR ในศูนย์ควบคุมและหน้าคนขับ เว้นว่างได้ ระบบจะตั้งให้" />
+            </span>
+            <input className="field-input" name="callSign" placeholder="เช่น VAN-01 หรือเว้นว่างให้ระบบตั้งให้" />
+          </label>
           <label className="field-label">
             <span className="field-title">ชื่อ-นามสกุล <span className="field-required-badge">*</span></span>
             <input className="field-input" name="fullName" placeholder="เช่น สมชาย ใจดี" required />
@@ -157,21 +167,9 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
         </div>
       </section>
 
-      {/* The unit's name is the last decision before saving the pair, so it sits
-          beside the save button. On its own row at the top it left most of the
-          form's width empty. The explanation lives in the help icon. */}
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="field-label w-full sm:w-80">
-          <span className="field-title">
-            Call Sign
-            <FieldHelp content="รหัสประจำหน่วยรถ ใช้ค้นหา มอบหมายงาน และออก QR ในศูนย์ควบคุมและหน้าคนขับ เว้นว่างได้ ระบบจะตั้งให้" />
-          </span>
-          <input className="field-input" name="callSign" placeholder="เช่น VAN-01 หรือเว้นว่างให้ระบบตั้งให้" />
-        </label>
-        <button className="min-h-11 rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
-          {isPending ? "กำลังบันทึก..." : "บันทึกชุดคนขับและรถ"}
-        </button>
-      </div>
+      <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
+        {isPending ? "กำลังบันทึก..." : "บันทึกชุดคนขับและรถ"}
+      </button>
     </form>
   );
 }

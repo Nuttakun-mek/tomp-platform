@@ -41,19 +41,17 @@ const VEHICLE_ICON_OPTIONS: VehicleIconOption[] = [
   { key: "airport", label: "Airport", description: "สนามบิน", icon: Plane, tone: "from-blue-50 to-white text-blue-700 ring-blue-200" }
 ];
 
+// Icons only: the symbol exists to tell units apart on the map, so the tiles
+// carry no text. The name stays in the tooltip and for screen readers.
 export function VehicleIconPicker({ defaultValue = "van" }: { defaultValue?: VehicleIconKey }) {
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 2xl:grid-cols-4">
+    <div className="flex flex-wrap gap-2">
       {VEHICLE_ICON_OPTIONS.map(({ key, label, description, icon: Icon, emoji, tone }) => (
-        <label key={key} className="group min-w-0 cursor-pointer">
-          <input className="peer sr-only" type="radio" name="vehicleIcon" value={key} defaultChecked={key === defaultValue} />
-          <span className="grid min-h-[4.35rem] min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-2.5 rounded-2xl border border-border bg-white px-3 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-operation/40 hover:shadow-md peer-checked:border-operation peer-checked:bg-operation-soft/70 peer-checked:ring-2 peer-checked:ring-operation/15">
-            <span className={`grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br shadow-inner ring-1 ${tone}`}>
+        <label key={key} className="cursor-pointer" title={`${label} · ${description}`}>
+          <input className="peer sr-only" type="radio" name="vehicleIcon" value={key} defaultChecked={key === defaultValue} aria-label={label} />
+          <span className="grid h-12 w-12 place-items-center rounded-xl border border-border bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-operation/40 hover:shadow-md peer-checked:border-operation peer-checked:bg-operation-soft/70 peer-checked:ring-2 peer-checked:ring-operation/25 peer-focus-visible:ring-2 peer-focus-visible:ring-operation/40">
+            <span className={`grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br shadow-inner ring-1 ${tone}`} aria-hidden>
               {Icon ? <Icon className="h-5 w-5" /> : <span className="text-lg font-black leading-none">{emoji}</span>}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[13px] font-bold leading-5 text-ink">{label}</span>
-              <span className="block text-[11px] font-medium leading-4 text-ink-faint">{description}</span>
             </span>
           </span>
         </label>
