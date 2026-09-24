@@ -52,23 +52,22 @@ export function ProjectSystemToggles({ projectId, enabledSystems, editable }: { 
   }
 
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap gap-2">
-        {SYSTEMS.map((system) => {
-          // Every project must keep ground_transfer enabled — the action
-          // rejects a request to disable it (toggleProjectSystemAction), so
-          // this checkbox is locked once it's already saved on.
-          const lockedOn = system.key === "ground_transfer" && saved.has(system.key);
-          return (
-            <label key={system.key} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
-              <input type="checkbox" checked={draft.has(system.key)} disabled={!editable || pending || lockedOn} onChange={() => toggle(system.key)} />
-              {system.label}
-            </label>
-          );
-        })}
-      </div>
+    // One row: the choices, then the button that saves them.
+    <div className="flex flex-wrap items-center gap-2">
+      {SYSTEMS.map((system) => {
+        // Every project must keep ground_transfer enabled — the action
+        // rejects a request to disable it (toggleProjectSystemAction), so
+        // this checkbox is locked once it's already saved on.
+        const lockedOn = system.key === "ground_transfer" && saved.has(system.key);
+        return (
+          <label key={system.key} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <input type="checkbox" checked={draft.has(system.key)} disabled={!editable || pending || lockedOn} onChange={() => toggle(system.key)} />
+            {system.label}
+          </label>
+        );
+      })}
       {editable ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:ml-2">
           <button
             type="button"
             onClick={save}
