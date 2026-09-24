@@ -42,17 +42,6 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
     // No panel or heading of its own: the only place this renders is inside the
     // "เพิ่มคนขับและรถเข้าโครงการนี้" collapsible, which already frames and titles it.
     <form action={submit} className="clean-form grid gap-4">
-      {/* One field, not a titled card: the explanation lives in the help icon.
-          The old "ควรกำหนดก่อนบันทึก" badge also contradicted the placeholder,
-          which (correctly) says it can be left blank. */}
-      <label className="field-label max-w-md">
-        <span className="field-title">
-          Call Sign
-          <FieldHelp content="รหัสประจำหน่วยรถ ใช้ค้นหา มอบหมายงาน และออก QR ในศูนย์ควบคุมและหน้าคนขับ เว้นว่างได้ ระบบจะตั้งให้" />
-        </span>
-        <input className="field-input" name="callSign" placeholder="เช่น VAN-01 หรือเว้นว่างให้ระบบตั้งให้" />
-      </label>
-
       {/* content-start: the two columns share a row height, and without it the
           shorter driver column spread its fields out to match the vehicle one. */}
       <div className="grid gap-4 xl:grid-cols-2">
@@ -168,9 +157,21 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
         </div>
       </section>
 
-      <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
-        {isPending ? "กำลังบันทึก..." : "บันทึกชุดคนขับและรถ"}
-      </button>
+      {/* The unit's name is the last decision before saving the pair, so it sits
+          beside the save button. On its own row at the top it left most of the
+          form's width empty. The explanation lives in the help icon. */}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="field-label w-full sm:w-80">
+          <span className="field-title">
+            Call Sign
+            <FieldHelp content="รหัสประจำหน่วยรถ ใช้ค้นหา มอบหมายงาน และออก QR ในศูนย์ควบคุมและหน้าคนขับ เว้นว่างได้ ระบบจะตั้งให้" />
+          </span>
+          <input className="field-input" name="callSign" placeholder="เช่น VAN-01 หรือเว้นว่างให้ระบบตั้งให้" />
+        </label>
+        <button className="min-h-11 rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={isPending} type="submit">
+          {isPending ? "กำลังบันทึก..." : "บันทึกชุดคนขับและรถ"}
+        </button>
+      </div>
     </form>
   );
 }

@@ -23,10 +23,16 @@ export function ProjectContactForm({
   const router = useRouter();
   const [coordinator, setCoordinator] = useState(coordinatorPhone);
   const [operation, setOperation] = useState(operationPhone);
-  const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [result, setResult] = useState<{ tone: "ok" | "err"; text: string; values: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const dirty = coordinator.trim() !== coordinatorPhone.trim() || operation.trim() !== operationPhone.trim();
+
+  // A result describes the values it saved; editing again hides it so the
+  // "unsaved" hint comes back instead of a stale "saved".
+  const values = JSON.stringify([coordinator, operation]);
+  const msg = result && result.values === values ? result : null;
+  const setMsg = (next: { tone: "ok" | "err"; text: string } | null) => setResult(next ? { ...next, values } : null);
 
   function save() {
     if (!dirty) return;
@@ -81,10 +87,15 @@ export function ProjectContactForm({
           type="button"
           onClick={save}
           disabled={isPending || !dirty}
-          className="rounded-xl bg-operation px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="rounded-xl bg-operation px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
         >
           {isPending ? "กำลังบันทึก..." : "บันทึกเบอร์ติดต่อ"}
         </button>
+        {!msg && !isPending ? (
+          <span className={`text-xs ${dirty ? "font-semibold text-amber-700" : "text-slate-500"}`}>
+            {dirty ? "มีการแก้ไขที่ยังไม่บันทึก" : "แก้ไขข้อมูลด้านบนก่อน ปุ่มบันทึกจึงจะกดได้"}
+          </span>
+        ) : null}
         {msg ? (
           <span className={`text-xs font-semibold ${msg.tone === "ok" ? "text-emerald-700" : "text-rose-700"}`}>{msg.text}</span>
         ) : null}

@@ -12,10 +12,12 @@ export function ProjectSystemToggles({ projectId, enabledSystems, editable }: { 
   const [enabled, setEnabled] = useState(new Set(enabledSystems));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   function toggle(systemKey: string) {
     const nextEnabled = !enabled.has(systemKey);
     setError(null);
+    setSaved(false);
     startTransition(async () => {
       const result = await toggleProjectSystemAction({ projectId, systemKey, enabled: nextEnabled });
       if (result.success) {
@@ -25,6 +27,7 @@ export function ProjectSystemToggles({ projectId, enabledSystems, editable }: { 
           else next.delete(systemKey);
           return next;
         });
+        setSaved(true);
       } else {
         setError(result.error || "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
       }
@@ -49,7 +52,17 @@ export function ProjectSystemToggles({ projectId, enabledSystems, editable }: { 
           );
         })}
       </div>
-      {error ? <p className="text-xs font-medium text-rose-600">{error}</p> : null}
+      {/* There is no save button here on purpose — each tick saves at once — so
+          say that, and say when it has happened. */}
+      {error ? (
+        <p className="text-xs font-medium text-rose-600">{error}</p>
+      ) : pending ? (
+        <p className="text-xs text-slate-500">กำลังบันทึก...</p>
+      ) : saved ? (
+        <p className="text-xs font-semibold text-emerald-700">บันทึกแล้ว</p>
+      ) : editable ? (
+        <p className="text-xs text-slate-500">ติ๊กเลือกแล้วระบบบันทึกทันที ไม่ต้องกดปุ่มบันทึก</p>
+      ) : null}
     </div>
   );
 }

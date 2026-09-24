@@ -35,7 +35,7 @@ export function ProjectDetailsForm({
   const [start, setStart] = useState(startDate?.slice(0, 10) ?? "");
   const [end, setEnd] = useState(endDate?.slice(0, 10) ?? "");
   const [zone, setZone] = useState(timezone || "Asia/Bangkok");
-  const [msg, setMsg] = useState<{ tone: "ok" | "warn" | "err"; text: string } | null>(null);
+  const [result, setResult] = useState<{ tone: "ok" | "warn" | "err"; text: string; values: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const dirty =
@@ -44,6 +44,12 @@ export function ProjectDetailsForm({
     start !== (startDate?.slice(0, 10) ?? "") ||
     end !== (endDate?.slice(0, 10) ?? "") ||
     zone !== (timezone || "Asia/Bangkok");
+
+  // A result describes the values it saved; editing again hides it so the
+  // "unsaved" hint comes back instead of a stale "saved".
+  const values = JSON.stringify([name, code, start, end, zone]);
+  const msg = result && result.values === values ? result : null;
+  const setMsg = (next: { tone: "ok" | "warn" | "err"; text: string } | null) => setResult(next ? { ...next, values } : null);
 
   function save() {
     if (!dirty) return;
@@ -108,10 +114,15 @@ export function ProjectDetailsForm({
           type="button"
           onClick={save}
           disabled={isPending || !dirty}
-          className="rounded-xl bg-operation px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="rounded-xl bg-operation px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
         >
           {isPending ? "กำลังบันทึก..." : "บันทึกข้อมูลโครงการ"}
         </button>
+        {!msg && !isPending ? (
+          <span className={`text-xs ${dirty ? "font-semibold text-amber-700" : "text-slate-500"}`}>
+            {dirty ? "มีการแก้ไขที่ยังไม่บันทึก" : "แก้ไขข้อมูลด้านบนก่อน ปุ่มบันทึกจึงจะกดได้"}
+          </span>
+        ) : null}
         {msg ? (
           <span
             className={`text-xs font-semibold ${

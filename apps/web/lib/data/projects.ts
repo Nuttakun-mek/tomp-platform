@@ -70,7 +70,10 @@ async function getProjectsViaPostgres(): Promise<Project[]> {
   }
 }
 
-export async function getProjectByCode(projectCode: string): Promise<Project | null> {
+// cache(): the project layout, the Ground Transfer layout and the page all
+// resolve the same code on one request. Layouts render before their children,
+// so uncached that was three database round trips in a row on every page.
+export const getProjectByCode = cache(async function getProjectByCode(projectCode: string): Promise<Project | null> {
   const { client: supabase } = await resolveReadClient();
   if (!supabase) return getProjectByCodeViaPostgres(projectCode);
 
@@ -81,7 +84,7 @@ export async function getProjectByCode(projectCode: string): Promise<Project | n
   } catch {
     return getProjectByCodeViaPostgres(projectCode);
   }
-}
+});
 
 async function getProjectByCodeViaPostgres(projectCode: string): Promise<Project | null> {
   const sql = getPostgresClient();

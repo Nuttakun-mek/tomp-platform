@@ -14,11 +14,10 @@ const SYSTEM_SEGMENT: Record<SystemKey, string> = { ground_transfer: "ground-tra
 
 const TAB = "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition";
 
-// The project's one navigation bar: back to all projects, the systems, settings,
-// and — inside Ground Transfer — its sections. These used to be three stacked
-// pieces (this bar, a back link, and a second tab bar on every Ground Transfer
-// page) before any content. One row now; it scrolls sideways on a narrow screen
-// rather than wrapping into several.
+// The project's navigation: back to all projects, the systems and settings on
+// the first row; inside Ground Transfer, its sections on a second row beneath.
+// Both live in one card (they used to be three separate stacked pieces) and
+// each row scrolls sideways on a narrow screen rather than wrapping.
 export function ProjectSystemTabs({
   projectCode,
   enabledSystems,
@@ -40,55 +39,75 @@ export function ProjectSystemTabs({
   const activeSection = sections.find((tab) => tab.href === pathname)?.key ?? "overview";
 
   return (
-    <nav aria-label="เมนูโครงการ" className="flex items-center gap-1 overflow-x-auto rounded-xl border border-border bg-white p-1">
-      <Link href="/projects" className={`${TAB} text-slate-500 hover:bg-slate-100 hover:text-operation`} title="โครงการทั้งหมด">
-        <ArrowLeft className="h-4 w-4" />
-        <span className="hidden sm:inline">โครงการทั้งหมด</span>
-      </Link>
-      <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden />
+    <nav aria-label="เมนูโครงการ" className="rounded-xl border border-border bg-white">
+      <div className="flex items-center gap-1 overflow-x-auto p-1">
+        <Link href="/projects" className={`${TAB} text-slate-500 hover:bg-slate-100 hover:text-operation`} title="โครงการทั้งหมด">
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">โครงการทั้งหมด</span>
+        </Link>
+        <span className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden />
 
-      {systems.map((key) => {
-        const Icon = SYSTEM_ICON[key];
-        const enabled = enabledSystems.includes(key);
-        const accessible = viewerSystems.includes(key);
-        const on = resolvedActive === key;
+        {systems.map((key) => {
+          const Icon = SYSTEM_ICON[key];
+          const enabled = enabledSystems.includes(key);
+          const accessible = viewerSystems.includes(key);
 
-        if (!enabled || !accessible) {
-          // The reason goes in the tooltip, not the bar: two long parentheticals
-          // used to push the real tabs onto a second line.
-          const reason = !enabled ? "ยังไม่เปิดใช้ในโครงการนี้" : "ไม่มีสิทธิ์เข้าระบบนี้ในโครงการนี้";
+          if (!enabled || !accessible) {
+            // The reason goes in the tooltip, not the bar: two long parentheticals
+            // used to push the real tabs onto a second line.
+            const reason = !enabled ? "ยังไม่เปิดใช้ในโครงการนี้" : "ไม่มีสิทธิ์เข้าระบบนี้ในโครงการนี้";
+            return (
+              <span key={key} className={`${TAB} cursor-not-allowed text-slate-400`} title={reason} aria-disabled="true">
+                <Icon className="h-4 w-4" /> {SYSTEM_LABEL[key]} <Lock className="h-3.5 w-3.5" aria-label={reason} />
+              </span>
+            );
+          }
+
+          const on = resolvedActive === key;
           return (
-            <span key={key} className={`${TAB} cursor-not-allowed text-slate-400`} title={reason} aria-disabled="true">
-              <Icon className="h-4 w-4" /> {SYSTEM_LABEL[key]} <Lock className="h-3.5 w-3.5" aria-label={reason} />
-            </span>
-          );
-        }
-
-        return (
-          <div key={key} className={`flex shrink-0 items-center gap-1 ${on && sections.length ? "rounded-lg bg-operation-soft/60 pr-1" : ""}`}>
-            <Link href={`/projects/${projectCode}/${SYSTEM_SEGMENT[key]}`} className={`${TAB} ${on ? "bg-operation text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+            <Link
+              key={key}
+              href={`/projects/${projectCode}/${SYSTEM_SEGMENT[key]}`}
+              aria-current={on && !sections.length ? "page" : undefined}
+              className={`${TAB} ${on ? "bg-operation text-white" : "text-slate-600 hover:bg-slate-100"}`}
+            >
               <Icon className="h-4 w-4" /> {SYSTEM_LABEL[key]}
             </Link>
-            {on
-              ? sections.map((tab) => (
-                  <Link
-                    key={tab.key}
-                    href={tab.href}
-                    aria-current={tab.key === activeSection ? "page" : undefined}
-                    className={`${TAB} ${tab.key === activeSection ? "bg-white text-operation shadow-sm ring-1 ring-operation/25" : "text-slate-600 hover:bg-white"}`}
-                  >
-                    <tab.icon className="h-4 w-4" />
-                    {tab.label}
-                  </Link>
-                ))
-              : null}
-          </div>
-        );
-      })}
+          );
+        })}
 
-      <Link href={`/projects/${projectCode}/settings`} className={`${TAB} ${resolvedActive === "settings" ? "bg-operation text-white" : "text-slate-600 hover:bg-slate-100"}`}>
-        <Settings className="h-4 w-4" /> ตั้งค่า
-      </Link>
+        <Link
+          href={`/projects/${projectCode}/settings`}
+          aria-current={resolvedActive === "settings" ? "page" : undefined}
+          className={`${TAB} ${resolvedActive === "settings" ? "bg-operation text-white" : "text-slate-600 hover:bg-slate-100"}`}
+        >
+          <Settings className="h-4 w-4" /> ตั้งค่า
+        </Link>
+      </div>
+
+      {/* The active system's own sections sit one level down, on their own row
+          with a lighter style, so they read as part of Ground Transfer and not
+          as siblings of Airport Transfer. */}
+      {sections.length ? (
+        <div aria-label={`เมนูย่อย ${SYSTEM_LABEL.ground_transfer}`} className="flex items-center gap-1 overflow-x-auto border-t border-border bg-slate-50/70 px-2">
+          {sections.map((tab) => {
+            const current = tab.key === activeSection;
+            return (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                aria-current={current ? "page" : undefined}
+                className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-semibold transition ${
+                  current ? "border-operation text-operation" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-ink"
+                }`}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
     </nav>
   );
 }
