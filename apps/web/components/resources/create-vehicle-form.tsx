@@ -174,8 +174,6 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
             <span className="grid h-5 w-5 place-items-center rounded-full border border-border bg-white text-[11px] text-ink-faint">?</span>
           </Tooltip>
         </legend>
-        {/* Alignment lives on this inner row: .form-section is unlayered CSS after
-            @tailwind utilities, so its items-start beats an items-end utility on the fieldset. */}
         <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <label className="field-label">
             ค่าใช้จ่าย (บาท)

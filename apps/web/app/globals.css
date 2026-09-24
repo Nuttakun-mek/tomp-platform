@@ -134,6 +134,13 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* Component classes live in Tailwind's components layer so a utility written
+   beside one wins, as it does everywhere else (`form-section md:grid-cols-2`,
+   `enterprise-panel-soft bg-teal-50/60`). Unlayered, they were emitted after
+   the utilities and silently beat them on every equal-specificity tie.
+   Only classes that appear literally under app/ or components/ are kept by the
+   build; .tomp-map-marker* stays outside because it is only named in lib/. */
+@layer components {
 .focus-ring {
   @apply outline-none ring-offset-2 ring-offset-white focus-visible:ring-2 focus-visible:ring-operation/30;
 }
@@ -363,6 +370,7 @@ textarea.field-input {
 
 .status-pulse-live::after {
   background: #10b981;
+}
 }
 
 .tomp-map-marker {
