@@ -1,6 +1,7 @@
 import { roleLabelTh } from "@/lib/i18n/role-th";
 import type { ProjectMemberRow } from "@/lib/data/project-members";
 import { AddProjectMemberForm } from "@/components/projects/add-project-member-form";
+import { RemoveProjectMemberButton } from "@/components/projects/remove-project-member-button";
 
 const SYSTEM_LABEL: Record<string, string> = { ground_transfer: "Ground Transfer", airport_transfer: "Airport Transfer" };
 
@@ -25,9 +26,10 @@ export function ProjectMemberList({
                 <span className="font-medium text-ink">{m.fullName}</span>
                 {m.email ? <span className="ml-2 text-xs text-slate-500">{m.email}</span> : null}
               </span>
-              <span className="flex gap-1">
+              <span className="flex flex-wrap items-center gap-1">
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{SYSTEM_LABEL[m.systemKey] ?? m.systemKey}</span>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{roleLabelTh(m.roleKey)}</span>
+                {editable ? <RemoveProjectMemberButton projectId={projectId} profileId={m.profileId} systemKey={m.systemKey} name={m.fullName} /> : null}
               </span>
             </li>
           ))}

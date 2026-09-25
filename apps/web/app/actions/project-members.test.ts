@@ -23,6 +23,8 @@ vi.mock("@/lib/airport-transfer/access", () => ({
   getAirportTransferAccess: vi.fn(async () => ({ allowed: false, canManage: false, role: null, profileId: "p", signedIn: true }))
 }));
 
+vi.mock("@/lib/auth/current-user", () => ({ getCurrentUserProfile: vi.fn(async () => ({ id: "viewer" })) }));
+
 const PROJECT_ID = "10000000-0000-4000-8000-000000000003";
 
 import { addProjectMemberAction, issueProjectHelperAction } from "./project-members";

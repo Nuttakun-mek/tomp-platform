@@ -37,6 +37,8 @@ function mapFlat(row: Row): ProjectMemberRow {
 }
 
 // cache(): one render often needs this list from several components; keep it to one query per request.
+// Active members only: a removed member keeps their row (for history and so a
+// re-grant can revive it) but is no longer part of the project.
 // No system_key filter here on purpose: after migration 0035/0043 project_members
 // holds rows for every system a project has enabled, and this list is meant to
 // show all of them together — filtering by system is the caller's job, not this
@@ -47,7 +49,8 @@ export const getProjectMembers = cache(async function getProjectMembers(projectI
     const { data, error } = await client
       .from("project_members")
       .select("profile_id, status, system_key, profiles(full_name, email), roles(role_key)")
-      .eq("project_id", projectId);
+      .eq("project_id", projectId)
+      .eq("status", "active");
     if (!error && data) return (data as Row[]).map(mapNested);
   }
 
@@ -59,7 +62,7 @@ export const getProjectMembers = cache(async function getProjectMembers(projectI
       from project_members pm
       left join profiles p on p.id = pm.profile_id
       left join roles r on r.id = pm.role_id
-      where pm.project_id = ${projectId}
+      where pm.project_id = ${projectId} and pm.status = 'active'
     `;
     return rows.map(mapFlat);
   } catch {

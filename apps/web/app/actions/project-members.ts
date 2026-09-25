@@ -1,10 +1,12 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/rbac";
 import { isRoleAllowedForSystem } from "@/lib/auth/system-roles";
 import { getProjectById } from "@/lib/data/projects";
@@ -124,12 +126,80 @@ export async function addProjectMemberAction(input: unknown): Promise<ActionResu
   });
   if (insertError) {
     if (/duplicate key|unique/i.test(insertError.message)) {
+      // (project, system, profile) is unique, so a person who was removed
+      // still has their row. Granting them again brings that row back.
+      const { data: previous } = await client
+        .from("project_members")
+        .select("id, status")
+        .eq("project_id", parsed.data.projectId)
+        .eq("profile_id", profileId)
+        .eq("system_key", parsed.data.systemKey)
+        .maybeSingle();
+      if (previous && previous.status !== "active") {
+        const { error: reactivateError } = await client.from("project_members").update({ role_id: role.id, status: "active" }).eq("id", previous.id);
+        if (reactivateError) return actionFailure(getDatabaseErrorMessage(reactivateError, "เพิ่มสมาชิกไม่สำเร็จ"));
+        return actionSuccess({ profileId, created, tempPassword });
+      }
       return actionFailure("บุคคลนี้มีบทบาทในระบบนี้ของโครงการนี้อยู่แล้ว");
     }
     return actionFailure(getDatabaseErrorMessage(insertError, "เพิ่มสมาชิกไม่สำเร็จ"));
   }
 
   return actionSuccess({ profileId, created, tempPassword });
+}
+
+const removeMemberSchema = z.object({
+  projectId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  systemKey: z.enum(["ground_transfer", "airport_transfer"])
+});
+
+// The missing half of project.manage_members ("add, remove, or change"): a
+// grant could be given but never taken back. Marks the row "removed" rather
+// than deleting it — every access check reads status = 'active' only, and the
+// row keeps the history. When the person holds no other active role in this
+// project, their helper QR links are revoked too, so a PIN-only helper cannot
+// keep opening the project.
+export async function removeProjectMemberAction(input: unknown): Promise<ActionResult> {
+  const parsed = removeMemberSchema.safeParse(input);
+  if (!parsed.success) return actionFailure("ข้อมูลไม่ครบถ้วน");
+
+  const permission = await canManageProjectMembers(parsed.data.projectId);
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์จัดการสมาชิกโครงการนี้");
+
+  // A manager removing themselves locks the project's settings away from them.
+  const viewer = await getCurrentUserProfile();
+  if (viewer.id === parsed.data.profileId) return actionFailure("นำสิทธิ์ของตัวเองออกไม่ได้ ให้ผู้จัดการคนอื่นดำเนินการแทน");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const { error: removeError } = await client
+    .from("project_members")
+    .update({ status: "removed" })
+    .eq("project_id", parsed.data.projectId)
+    .eq("profile_id", parsed.data.profileId)
+    .eq("system_key", parsed.data.systemKey);
+  if (removeError) return actionFailure(getDatabaseErrorMessage(removeError, "นำสมาชิกออกไม่สำเร็จ"));
+
+  const { data: stillActive } = await client
+    .from("project_members")
+    .select("id")
+    .eq("project_id", parsed.data.projectId)
+    .eq("profile_id", parsed.data.profileId)
+    .eq("status", "active")
+    .limit(1);
+  if (!stillActive?.length) {
+    await client
+      .from("project_helper_tokens")
+      .update({ status: "revoked" })
+      .eq("project_id", parsed.data.projectId)
+      .eq("profile_id", parsed.data.profileId)
+      .eq("status", "active");
+  }
+
+  revalidatePath("/projects", "layout");
+  return actionSuccess({});
 }
 
 const issueHelperSchema = z

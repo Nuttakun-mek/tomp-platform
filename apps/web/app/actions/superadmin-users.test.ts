@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const resetUserPasswordMock = vi.fn(async (_id: string) => ({ ok: true as const, tempPassword: "temp-123" }));
+const resetUserPasswordMock = vi.fn(async (id: string) => ({ ok: true as const, tempPassword: `temp-${id}` }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth/rbac", () => ({ requirePermission: vi.fn(async () => ({ allowed: true })) }));
