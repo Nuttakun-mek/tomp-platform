@@ -211,6 +211,13 @@ export async function createAppleReviewDemoAction(): Promise<ActionResult> {
         })
     },
     {
+      // Every project has Ground Transfer on (create_project_command, 0047).
+      // Without the row the demo still works for the reviewer — the driver
+      // path never reads it — but its Ground Transfer tab shows as locked.
+      label: "เปิดระบบ Ground Transfer",
+      run: () => client.from("project_systems").insert({ project_id: ids.project, system_key: "ground_transfer" })
+    },
+    {
       label: "สร้างวันปฏิบัติการ",
       run: () =>
         client.from("project_days").insert({
