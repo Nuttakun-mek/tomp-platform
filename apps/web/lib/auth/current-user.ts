@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { getSessionAwareAuthClient } from "@/lib/auth/auth-server";
 import { resolvePrimaryRole } from "@/lib/auth/role-model";
 import { roleLabelTh } from "@/lib/i18n/role-th";
+import { escapeLikePattern } from "@/lib/supabase/like-pattern";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 export interface CurrentUserProfile {
@@ -127,7 +128,8 @@ async function linkInvitedProfile(authUserId: string, email: string | null) {
   const { data: invited } = await adminClient
     .from("profiles")
     .select("id, auth_user_id, organization_id, full_name, email")
-    .ilike("email", email)
+    // Escaped, or a login as "a_min@x.com" could claim the invite for "admin@x.com".
+    .ilike("email", escapeLikePattern(email))
     .is("auth_user_id", null)
     .maybeSingle();
 

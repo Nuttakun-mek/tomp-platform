@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes, randomUUID } from "crypto";
+import { escapeLikePattern } from "@/lib/supabase/like-pattern";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 export interface ProvisionUserInput {
@@ -117,7 +118,8 @@ export async function provisionUser(
   const client = getSupabaseServerDataClient();
   if (!client) return { ok: false, error: "ยังไม่ได้ตั้งค่าการเชื่อมต่อฐานข้อมูล" };
 
-  const { data: existing } = await client.from("profiles").select("id").ilike("email", input.email).maybeSingle();
+  // Escaped: "_" and "%" are LIKE wildcards an email may legally contain.
+  const { data: existing } = await client.from("profiles").select("id").ilike("email", escapeLikePattern(input.email)).maybeSingle();
   if (existing) return { ok: false, error: "อีเมลนี้มีผู้ใช้อยู่แล้ว" };
 
   const roleKeys = [input.globalRoleKey, input.projectRoleKey].filter(Boolean) as string[];
