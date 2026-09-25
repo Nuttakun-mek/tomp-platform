@@ -10,6 +10,7 @@ import { metaString } from "@/lib/data/location-meta";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
+import { messageWindow } from "@/lib/domain/message-window";
 import { estimateVehicleUsageCost, evaluateVehicleServiceTimeAlert, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
@@ -108,6 +109,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
     document.querySelector(`[data-fleet-card="${CSS.escape(expanded)}"]`)?.scrollIntoView({ block: "nearest" });
   }, [expanded]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [fullHistory, setFullHistory] = useState<Set<string>>(new Set());
   const [, startResolve] = useTransition();
 
   const focusOnMap = useCallback((pointId: string) => {
@@ -551,12 +553,34 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                       ) : null}
                     </div>
 
-                    {group.messages.length ? (
+                    {group.messages.length ? (() => {
+                      const isDone = (message: DriverInboundMessage) => message.status === "closed" || resolvedIds.has(message.id);
+                      const showAll = fullHistory.has(group.key);
+                      const { visible, hidden } = messageWindow(group.messages, isDone, { showAll });
+                      return (
                       <div className="grid gap-1.5">
-                        <p className="text-xs font-semibold text-slate-600">ข้อความจากคนขับ</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold text-slate-600">ข้อความจากคนขับ</p>
+                          {hidden || showAll ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFullHistory((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(group.key)) next.delete(group.key);
+                                  else next.add(group.key);
+                                  return next;
+                                })
+                              }
+                              className="text-[11px] font-semibold text-operation hover:underline"
+                            >
+                              {showAll ? "แสดงเฉพาะล่าสุด" : `ดูข้อความก่อนหน้า (${hidden})`}
+                            </button>
+                          ) : null}
+                        </div>
                         <div className="grid gap-1.5 md:grid-cols-2">
-                        {group.messages.slice(-4).map((message) => {
-                          const done = message.status === "closed" || resolvedIds.has(message.id);
+                        {visible.map((message) => {
+                          const done = isDone(message);
                           return (
                             <div
                               key={message.id}
@@ -585,7 +609,8 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         })}
                         </div>
                       </div>
-                    ) : null}
+                      );
+                    })() : null}
 
                     {group.evidence && (group.evidence.vehiclePhotoUrl || group.evidence.platePhotoUrl) ? (
                       <p className="text-xs font-semibold text-blue-700">มีหลักฐานรูปถ่ายตรวจรถแล้ว</p>
