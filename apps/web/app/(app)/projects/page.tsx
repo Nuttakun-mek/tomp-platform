@@ -3,6 +3,7 @@ import { ArrowRight, FolderKanban, Plus } from "lucide-react";
 import { ProjectArchiveButton } from "@/components/projects/project-archive-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getVisibleProjects } from "@/lib/data/projects";
+import { isAppleReviewProject } from "@/lib/domain/apple-review";
 import { getViewerAccess } from "@/lib/auth/access";
 import { canCreateProject } from "@/lib/auth/rbac";
 import { formatStatusTh } from "@/lib/i18n/status-th";
@@ -63,7 +64,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <article key={project.id} className="grid content-start gap-3 rounded-panel border border-border/80 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 truncate text-xs font-semibold text-operation">{project.projectCode}</p>
-                <StatusBadge label={formatStatusTh(project.status)} tone={project.status === "published" || project.status === "operating" ? "ready" : "neutral"} />
+                <span className="flex shrink-0 items-center gap-1">
+                  {isAppleReviewProject(project) ? (
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800">ทดสอบ Apple</span>
+                  ) : null}
+                  <StatusBadge label={formatStatusTh(project.status)} tone={project.status === "published" || project.status === "operating" ? "ready" : "neutral"} />
+                </span>
               </div>
               <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink">{project.projectName}</h3>
               <p className="text-xs text-slate-500">

@@ -28,8 +28,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 //      the job screen. A `ready` row with the four confirmations set skips
 //      straight to the job, which is what Apple is there to look at.
 //
-// The project is real and every function works on it. It is only hidden from the
-// operator's project list — see getVisibleProjects().
+// The project is real and every function works on it. It is listed with the
+// other projects and labelled "ทดสอบ Apple" — see lib/domain/apple-review.ts.
 
 const APPLE_TAG = { appleReview: true, source: "apple-review-demo" } as const;
 

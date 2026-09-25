@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import { getProjectByCode } from "@/lib/data/projects";
+import { isAppleReviewProject } from "@/lib/domain/apple-review";
 import { getEnabledSystemKeys, getViewerSystemKeys } from "@/lib/data/project-systems";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getViewerAccess } from "@/lib/auth/access";
 import { ProjectSystemTabs } from "@/components/projects/project-system-tabs";
+import { AppleReviewBanner } from "@/components/projects/apple-review-banner";
 
 // Same set ProjectSystemTabs itself renders — kept in one place there
 // (`SYSTEM_LABEL`'s keys) and mirrored here rather than round-tripping to
@@ -38,6 +40,7 @@ export default async function ProjectShellLayout({
   return (
     <div className="grid gap-4">
       <ProjectSystemTabs projectCode={project.projectCode} enabledSystems={enabledSystems} viewerSystems={viewerSystems} active="ground_transfer" />
+      {isAppleReviewProject(project) ? <AppleReviewBanner /> : null}
       {children}
     </div>
   );

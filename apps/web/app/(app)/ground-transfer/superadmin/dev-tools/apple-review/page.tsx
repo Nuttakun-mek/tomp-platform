@@ -11,7 +11,7 @@ export default async function AppleReviewDemoPage() {
       <PageHeader
         eyebrow="เครื่องมือพัฒนา"
         title="งานสาธิตสำหรับ Apple App Review"
-        description="QR ถาวรที่ผู้ตรวจของ Apple ใช้เปิดงานจริงได้ครบทุกฟังก์ชัน — โครงการนี้ถูกซ่อนจากรายการโครงการ แต่ยังเห็นได้ในศูนย์ควบคุมเพื่อให้ตรวจสอบก่อนส่ง"
+        description="QR ถาวรที่ผู้ตรวจของ Apple ใช้เปิดงานจริงได้ครบทุกฟังก์ชัน — โครงการนี้แสดงในรายการโครงการพร้อมป้าย “ทดสอบ Apple” เพื่อติดตามงานระหว่างรอรีวิว"
       />
       <AppleReviewDemoPanel status={status} />
     </>
