@@ -142,10 +142,12 @@ export const TOUCH_MIN = 44;
 
 export type ThemeColors = typeof lightColors;
 export type ThemeOverlay = typeof lightOverlay;
+export type ThemePreference = "system" | "light" | "dark";
 
-/** Picks the active palette from the OS appearance setting. */
-export function useAppTheme(): { scheme: "light" | "dark"; colors: ThemeColors; overlay: ThemeOverlay } {
-  const scheme = useColorScheme() === "dark" ? "dark" : "light";
+/** Picks the active palette from the OS appearance setting unless overridden. */
+export function useAppTheme(preference: ThemePreference = "system"): { scheme: "light" | "dark"; colors: ThemeColors; overlay: ThemeOverlay } {
+  const systemScheme = useColorScheme() === "dark" ? "dark" : "light";
+  const scheme = preference === "system" ? systemScheme : preference;
   return scheme === "dark"
     ? { scheme, colors: darkColors, overlay: darkOverlay }
     : { scheme, colors: lightColors, overlay: lightOverlay };

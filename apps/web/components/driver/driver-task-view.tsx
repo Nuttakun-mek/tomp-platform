@@ -14,7 +14,7 @@ import { enqueueDriverOutbox, flushDriverOutbox, readDriverOutbox, type DriverOu
 import { createDriverMessageClientEventId, extractDriverMessageClientEventId } from "@/lib/driver/message-idempotency";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import type { DriverNotification } from "@tomp/types/domain";
-import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail, parseViewSwitchDetail, VIEW_SWITCH_EVENT, type DriverWebViewKey } from "@tomp/driver-core";
+import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, isInsideMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail, parseViewSwitchDetail, VIEW_SWITCH_EVENT, type DriverWebViewKey } from "@tomp/driver-core";
 import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
 
 type DriverGpsLight = "off" | "live" | "stale";
@@ -157,7 +157,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     Boolean(driverAccess.latestStatus) || ["acknowledged", "active", "completed"].includes(driverAccess.assignment.status)
   ));
   const [outboxCount, setOutboxCount] = useState(0);
-  const [insideNativeShell, setInsideNativeShell] = useState(false);
+  const [insideNativeShell, setInsideNativeShell] = useState(() => (typeof window === "undefined" ? false : isInsideMobileShell(window)));
   // Which section is on screen is now state, not a fixed prop: the native shell
   // switches tabs by posting over the bridge rather than reloading this page.
   // The URL's `view` seeds it, and still wins whenever it *changes* — the
@@ -267,7 +267,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
   }, [driverAccess.token, ids.assignmentId, setMeta]);
 
   useEffect(() => {
-    const updateShellState = () => setInsideNativeShell(Boolean(getMobileShell(window)));
+    const updateShellState = () => setInsideNativeShell(isInsideMobileShell(window));
     updateShellState();
     window.addEventListener("tomp:mobile-shell-ready", updateShellState);
     return () => window.removeEventListener("tomp:mobile-shell-ready", updateShellState);

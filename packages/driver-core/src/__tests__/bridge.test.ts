@@ -6,6 +6,7 @@ import {
   buildNativeStatusMessage,
   buildViewSwitchMessage,
   getMobileShell,
+  isInsideMobileShell,
   isMobileShell,
   parseBridgeMessage,
   parseNativeStatusDetail,
@@ -38,6 +39,12 @@ describe("mobile shell detection", () => {
     expect(getMobileShell({})).toBeNull();
     expect(getMobileShell(undefined)).toBeNull();
     expect(getMobileShell({ TOMP_MOBILE_SHELL: { namespace: "tomp.driver" } })).toBeNull();
+  });
+
+  it("still detects the native WebView when the typed shell handle is unavailable", () => {
+    expect(isInsideMobileShell({ ReactNativeWebView: { postMessage: () => undefined } })).toBe(true);
+    expect(isInsideMobileShell({ TOMP_MOBILE_SHELL: { namespace: "tomp.driver" }, ReactNativeWebView: { postMessage: () => undefined } })).toBe(true);
+    expect(isInsideMobileShell({})).toBe(false);
   });
 });
 

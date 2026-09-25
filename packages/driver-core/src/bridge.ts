@@ -118,6 +118,21 @@ export function getMobileShell(container: unknown): MobileShellHandle | null {
   return isMobileShell(shell) ? shell : null;
 }
 
+/**
+ * True when the page is running inside the native app's WebView. This is
+ * intentionally a little looser than getMobileShell(): older app builds can
+ * expose ReactNativeWebView before they expose a protocol-compatible shell
+ * handle. In that case the web page must still hide browser-only chrome such as
+ * the fallback bottom tab bar, while feature commands continue to require
+ * getMobileShell().
+ */
+export function isInsideMobileShell(container: unknown): boolean {
+  if (!isRecord(container)) return false;
+  if (getMobileShell(container)) return true;
+  const bridge = (container as { ReactNativeWebView?: unknown }).ReactNativeWebView;
+  return isRecord(bridge) && typeof bridge.postMessage === "function";
+}
+
 /** Payload shape per message type. `gps.*` payloads are optional. */
 export interface BridgePayloadMap {
   "gps.start": { reason?: string };

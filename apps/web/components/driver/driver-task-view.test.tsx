@@ -137,6 +137,26 @@ describe("DriverTaskView view switching", () => {
     expect(screen.getByText("ลำดับงานที่ต้องดำเนินการถัดไป")).toBeTruthy();
   });
 
+  it("shows the browser-only fallback nav in a plain browser", () => {
+    delete (window as { ReactNativeWebView?: unknown; TOMP_MOBILE_SHELL?: unknown }).ReactNativeWebView;
+    delete (window as { ReactNativeWebView?: unknown; TOMP_MOBILE_SHELL?: unknown }).TOMP_MOBILE_SHELL;
+
+    render(<DriverTaskView driverAccess={buildDriverAccess()} view="home" />);
+
+    expect(screen.getByText(/เมนูนี้แสดงเฉพาะเมื่อเปิดหน้าคนขับผ่านเว็บเบราว์เซอร์/)).toBeTruthy();
+  });
+
+  it("hides the browser-only fallback nav inside the native WebView", () => {
+    (window as { ReactNativeWebView?: unknown }).ReactNativeWebView = { postMessage: vi.fn() };
+    try {
+      render(<DriverTaskView driverAccess={buildDriverAccess()} view="home" />);
+
+      expect(screen.queryByText(/เมนูนี้แสดงเฉพาะเมื่อเปิดหน้าคนขับผ่านเว็บเบราว์เซอร์/)).toBeNull();
+    } finally {
+      delete (window as { ReactNativeWebView?: unknown }).ReactNativeWebView;
+    }
+  });
+
   function stubPoll(data: Record<string, unknown>) {
     const fetchMock = vi.fn(async () => ({
       status: 200,

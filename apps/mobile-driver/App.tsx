@@ -23,7 +23,6 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { CameraView, type BarcodeScanningResult, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as ExpoLinking from "expo-linking";
-import * as Network from "expo-network";
 import { useFonts } from "expo-font";
 // Three weights, matching src/theme's `font`. Medium and Black were loaded and
 // barely used — Black on nearly every label, which is what made the shell shout
@@ -39,7 +38,7 @@ import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webvie
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, buildViewSwitchMessage, parseBridgeMessage, VIEW_SWITCH_EVENT } from "./src/bridge/protocol";
 import { BACKGROUND_GPS_ENABLED, buildDriverWebUrl, EAS_PROJECT_ID, type DriverWebViewKey } from "./src/config";
 import { APP_VERSION, APP_VERSION_LABEL } from "./src/services/app-version";
-import { font, radius, space, text, TOUCH_MIN, useAppTheme, type ThemeColors, type ThemeOverlay } from "./src/theme";
+import { font, radius, space, text, TOUCH_MIN, useAppTheme, type ThemeColors, type ThemeOverlay, type ThemePreference } from "./src/theme";
 import {
   getLastSharedLocation,
   hasBackgroundLocationPermission,
@@ -74,6 +73,7 @@ import { parseDriverLink } from "./src/services/driver-link";
 import { decideWebViewNavigation } from "./src/services/webview-navigation";
 import { mt, type MobileLocale } from "./src/i18n";
 import { getMobileLocale, saveMobileLocale } from "./src/services/locale-store";
+import { getThemePreference, saveThemePreference } from "./src/services/theme-store";
 
 const DriverWebView = WebView as unknown as ComponentType<WebViewProps & RefAttributes<WebView>>;
 
@@ -128,7 +128,8 @@ function usePulse() {
 
 function DriverShell() {
   const insets = useSafeAreaInsets();
-  const { colors, overlay } = useAppTheme();
+  const [themePreference, setThemePreference] = useState<ThemePreference>("system");
+  const { colors, overlay, scheme } = useAppTheme(themePreference);
   const styles = useMemo(() => createStyles(colors, overlay), [colors, overlay]);
   const bottomSafeInset = Math.max(insets.bottom, Platform.OS === "android" ? 24 : 0);
   const [fontsLoaded] = useFonts({
@@ -149,9 +150,6 @@ function DriverShell() {
   const [message, setMessage] = useState("สแกน QR งานที่ได้รับจากศูนย์ควบคุม");
   const [locale, setLocale] = useState<MobileLocale>("th");
   const localeRef = useRef<MobileLocale>("th");
-  const [sessionReady, setSessionReady] = useState(false);
-  const [networkLabel, setNetworkLabel] = useState("กำลังตรวจสอบสัญญาณ");
-  const [networkConnected, setNetworkConnected] = useState<boolean | null>(null);
   const [locationSharingActive, setLocationSharingActive] = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -159,22 +157,13 @@ function DriverShell() {
   const [outboxCount, setOutboxCount] = useState(0);
   const [syncLabel, setSyncLabel] = useState("");
   const [activeDriverMenu, setActiveDriverMenu] = useState<DriverMenuKey>("home");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const activeDriverMenuRef = useRef<DriverMenuKey>("home");
   const currentTokenRef = useRef("");
 
-  const networkTone = locationSharingActive ? "live" : networkConnected === false ? "offline" : "idle";
-  const networkDisplayLabel =
-    // "ยังไม่ได้ส่ง GPS" read as a fault to drivers, when it is simply the
-    // normal state before a shift starts. Say what is true and what is next.
-    networkConnected === false
-      ? "ออฟไลน์"
-      : locationSharingActive
-        ? "กำลังส่งจากอุปกรณ์"
-        : "ยังไม่แชร์ตำแหน่ง";
-  const networkIcon = networkTone === "live" ? "✓" : networkTone === "offline" ? "!" : "GPS";
   const currentScreenLabel = mode === "web"
     ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
-    : `เวอร์ชัน ${APP_VERSION_LABEL}`;
+    : "รับงานจากศูนย์ควบคุม";
   // Deliberately independent of the active tab: the URL is the page's one and
   // only load, and which section it shows after that is the shell's to say over
   // the bridge. Baking the tab in here is what made every tab tap a reload.
@@ -314,13 +303,13 @@ function DriverShell() {
     setCurrentToken("");
     setWebUrl("");
     setMode("activation");
-    setSessionReady(false);
     setLocationSharingActive(false);
     setHasUnreadMessages(false);
     setOutboxCount(0);
     setSyncLabel("");
     setScannerOpen(false);
     setManualEntryOpen(false);
+    setSettingsOpen(false);
     setQrLocked(false);
     setActiveDriverMenu("home");
     setMessage("ออกจากงานนี้แล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
@@ -333,7 +322,6 @@ function DriverShell() {
 
       if (parsed.type === "mobile-session.set") {
         await saveMobileDriverSession(parsed.payload);
-        setSessionReady(true);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         void flushOutbox();
         void registerPush(parsed.payload);
@@ -348,12 +336,10 @@ function DriverShell() {
           installationId
         });
         if (!result.success || !result.data) {
-          setSessionReady(false);
           postStatusToWeb("session_missing", result.error || "ยืนยันสิทธิ์แอปไม่สำเร็จ");
           return;
         }
         await saveMobileDriverSession(result.data);
-        setSessionReady(true);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         void flushOutbox();
         void registerPush(result.data);
@@ -408,7 +394,6 @@ function DriverShell() {
 
       const session = await getMobileDriverSession();
       if (!session) {
-        setSessionReady(false);
         setLocationSharingActive(false);
         postStatusToWeb("session_missing", "ยังไม่พร้อมส่งตำแหน่ง GPS เบื้องหลัง กรุณายืนยันงานในหน้าคนขับก่อน");
         return;
@@ -509,6 +494,7 @@ function DriverShell() {
 
   const openDriverMenu = useCallback((item: { key: DriverMenuKey; view?: DriverWebViewKey }) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSettingsOpen(false);
     activeDriverMenuRef.current = item.key;
     setActiveDriverMenu(item.key);
     if (item.key === "messages") {
@@ -546,6 +532,7 @@ function DriverShell() {
     void clearLegacyDriverTokens();
     void clearLegacyMobileDriverSessions();
 
+    getThemePreference().then(setThemePreference);
     getMobileLocale().then((savedLocale) => {
       localeRef.current = savedLocale;
       setLocale(savedLocale);
@@ -558,15 +545,9 @@ function DriverShell() {
     // returning with a session already in SecureStore never got a token, so
     // dispatch could not reach them once the app was backgrounded.
     getMobileDriverSession().then((session) => {
-      setSessionReady(Boolean(session));
       if (session) void registerPush(session);
     });
     void flushOutbox();
-    Network.getNetworkStateAsync().then((state) => {
-      setNetworkConnected(Boolean(state.isConnected));
-      setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
-    });
-
     // Tapping a dispatch notification should land on the job, not just open the
     // shell — the driver is being told to look at something.
     const tapSubscription = addNotificationTapListener(() => {
@@ -608,10 +589,6 @@ function DriverShell() {
         // shade has been seen. Clearing it here is what actually brings the
         // launcher badge back down.
         void clearDeliveredNotifications();
-        Network.getNetworkStateAsync().then((state) => {
-          setNetworkConnected(Boolean(state.isConnected));
-          setNetworkLabel(state.isConnected ? "ออนไลน์" : "ออฟไลน์");
-        });
       }
     };
 
@@ -628,6 +605,10 @@ function DriverShell() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (settingsOpen) {
+        setSettingsOpen(false);
+        return true;
+      }
       if (mode === "web" && canGoBack) {
         webViewRef.current?.goBack();
         return true;
@@ -639,9 +620,9 @@ function DriverShell() {
       return false;
     });
     return () => subscription.remove();
-  }, [canGoBack, confirmResetAssignment, mode]);
+  }, [canGoBack, confirmResetAssignment, mode, settingsOpen]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded && Platform.OS !== "web") {
     return (
       <View style={[styles.safe, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" backgroundColor={colors.command} />
@@ -661,129 +642,128 @@ function DriverShell() {
       <View style={styles.shell}>
         {/* The bar owns the status-bar area itself, so its colour runs to the
             top of the screen instead of leaving a pale strip above it. */}
-        <View style={[styles.topbar, { paddingTop: insets.top + space.xs }]}>
-          <View style={styles.identity}>
-            <Text numberOfLines={1} style={styles.product}>TOMP Driver</Text>
-            <Text numberOfLines={1} style={styles.title}>{currentScreenLabel}</Text>
+        <View style={[styles.topbar, mode === "web" && styles.topbarCompact, { paddingTop: insets.top + space.xs }]}>
+          <View style={styles.topbarCard}>
+            <View style={styles.brandMark}>
+              <Text style={styles.brandMarkText}>T</Text>
+            </View>
+            <View style={styles.identity}>
+              <Text numberOfLines={1} style={styles.product}>TOMP Driver</Text>
+              <Text numberOfLines={1} style={styles.title}>{currentScreenLabel}</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="เปิดการตั้งค่าแอป"
+              accessibilityState={{ expanded: settingsOpen }}
+              style={({ pressed }) => [styles.topSettingsButton, settingsOpen && styles.topSettingsButtonActive, pressed && styles.pressablePressed]}
+              onPress={() => setSettingsOpen((value) => !value)}
+            >
+              <Text style={[styles.topSettingsButtonText, settingsOpen && styles.topSettingsButtonTextActive]}>ตั้งค่า</Text>
+            </Pressable>
           </View>
         </View>
 
         {mode === "web" && effectiveWebUrl ? (
           <View style={styles.webContainer}>
-            <View style={styles.operationStrip}>
-              <View
-                style={[
-                  styles.networkBadge,
-                  networkTone === "live" ? styles.networkLive : networkTone === "offline" ? styles.networkOffline : styles.networkIdle
-                ]}
-              >
-                <View style={[styles.networkIcon, networkTone === "live" ? styles.networkIconLive : networkTone === "offline" ? styles.networkIconOffline : styles.networkIconIdle]}>
-                  <Text style={[styles.networkIconText, networkTone === "live" ? styles.networkIconTextLive : networkTone === "offline" ? styles.networkIconTextOffline : styles.networkIconTextIdle]}>
-                    {networkIcon}
-                  </Text>
-                </View>
-                <Text numberOfLines={1} style={[styles.networkText, networkTone === "live" ? styles.networkTextLive : networkTone === "offline" ? styles.networkTextOffline : styles.networkTextIdle]}>
-                  {networkDisplayLabel || networkLabel}
-                </Text>
-              </View>
-              <View style={styles.operationStatusItem}>
-                <View style={[styles.statusDot, sessionReady ? styles.statusDotOk : styles.statusDotPending]} />
-                <View style={styles.operationStatusCopy}>
-                  <Text style={styles.operationStatusTitle}>{sessionReady ? "พร้อมส่งข้อมูลให้ศูนย์ควบคุม" : "รอการยืนยันงาน"}</Text>
-                </View>
-              </View>
-              <Text numberOfLines={1} style={styles.webVersionText}>เวอร์ชัน {APP_VERSION_LABEL}</Text>
-            </View>
             {outboxCount > 0 || syncLabel ? (
               <View style={styles.syncNotice}>
                 {outboxCount > 0 ? <Text style={styles.syncNoticeText}>มีข้อมูลรอส่ง {outboxCount} รายการ ระบบจะส่งซ้ำเมื่อสัญญาณพร้อม</Text> : null}
                 {syncLabel ? <Text style={styles.syncNoticeText}>{syncLabel}</Text> : null}
               </View>
             ) : null}
-            {activeDriverMenu === "location" ? (
-              // Two account-level actions used to be squeezed into a 112px
-              // column beside the GPS copy, where a mis-tap costs a driver
-              // their session. They get a full-width row of their own.
-              <View style={styles.locationAssist}>
-                <View style={styles.locationAssistCopy}>
-                  <Text style={styles.locationAssistTitle}>การส่งตำแหน่ง GPS</Text>
-                  <Text style={styles.locationAssistText}>
-                    หากศูนย์ควบคุมมองไม่เห็นตำแหน่งของคุณ ให้ตรวจสิทธิ์ตำแหน่งในการตั้งค่าอุปกรณ์
-                  </Text>
-                </View>
-                <View style={styles.locationActionGroup}>
-                  <Pressable
-                    accessibilityLabel="เปิดหน้าตั้งค่าอุปกรณ์"
-                    accessibilityRole="button"
-                    style={({ pressed }) => [styles.locationSettingsButton, pressed && styles.pressablePressed]}
-                    onPress={() => Linking.openSettings()}
-                  >
-                    <Text style={styles.locationSettingsButtonText}>ตั้งค่าอุปกรณ์</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityLabel="ออกจากงานนี้และกลับไปสแกน QR ใหม่"
-                    accessibilityRole="button"
-                    style={({ pressed }) => [styles.locationResetButton, pressed && styles.pressablePressed]}
-                    onPress={confirmResetAssignment}
-                  >
-                    <Text style={styles.locationResetButtonText}>ออกจากงานนี้</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
             <View style={styles.webFrame}>
-              <DriverWebView
-                ref={webViewRef}
-                source={{ uri: effectiveWebUrl }}
-                injectedJavaScriptBeforeContentLoaded={bridgeBootstrap}
-                onMessage={handleBridgeMessage}
-                onNavigationStateChange={handleNavigation}
-                onShouldStartLoadWithRequest={handleShouldStartLoad}
-                sharedCookiesEnabled
-                thirdPartyCookiesEnabled
-                javaScriptEnabled
-                domStorageEnabled
-                scalesPageToFit={false}
-                setBuiltInZoomControls={false}
-                setDisplayZoomControls={false}
-                textZoom={100}
-                // Android WebView ships with Geolocation OFF, so navigator.geolocation
-                // was silently dead inside the shell while the app's own GPS kept
-                // reporting normally over the bridge. The driver page uses it directly
-                // when stamping a photo, so every picture waited out the 8s timeout and
-                // then printed "GPS ไม่มีพิกัด" — the one thing the stamp exists to carry.
-                // iOS ignores this prop; the manifest already carries ACCESS_FINE_LOCATION.
-                geolocationEnabled
-                // iOS only — WKWebView's own back/forward swipe gesture. Android's hardware
-                // back button is already handled above via BackHandler; this is the iOS
-                // equivalent affordance, which WebView does not enable by default.
-                allowsBackForwardNavigationGestures
-                startInLoadingState
-                renderLoading={() => (
-                  <View style={styles.loading}>
-                    <Animated.View style={[styles.skeletonStrip, { opacity: pulse }]} />
-                    <Animated.View style={[styles.skeletonCard, { opacity: pulse }]} />
+              {Platform.OS === "web" ? (
+                <View style={styles.webPreviewFrame}>
+                  <View style={styles.previewHeroCard}>
+                    <View style={styles.previewHeroTopRow}>
+                      <View style={styles.previewCallSignGroup}>
+                        <Text style={styles.previewKicker}>CALL SIGN</Text>
+                        <Text numberOfLines={1} style={styles.previewCallSign}>TEST-Sedan-001</Text>
+                        <Text numberOfLines={1} style={styles.previewProject}>Chevron</Text>
+                      </View>
+                      <View style={styles.previewStatusPill}>
+                        <Text style={styles.previewStatusText}>กำลังส่ง GPS</Text>
+                      </View>
+                    </View>
+                    <View style={styles.previewMetaRow}>
+                      <View style={styles.previewMetaCell}>
+                        <Text style={styles.previewMetaLabel}>คนขับ</Text>
+                        <Text numberOfLines={1} style={styles.previewMetaValue}>Driver-test</Text>
+                      </View>
+                      <View style={styles.previewMetaCell}>
+                        <Text style={styles.previewMetaLabel}>รถ</Text>
+                        <Text numberOfLines={1} style={styles.previewMetaValue}>1 TS 444 / รถเก๋ง</Text>
+                      </View>
+                    </View>
                   </View>
-                )}
-                onError={(syntheticEvent) => {
-                  const { description } = syntheticEvent.nativeEvent;
-                  setWebViewError(description || "เชื่อมต่อไม่สำเร็จ");
-                }}
-                renderError={() => (
-                  <View style={styles.webErrorBox}>
-                    <Text style={styles.webErrorGlyph}>⚠️</Text>
-                    <Text style={styles.webErrorTitle}>เปิดหน้าคนขับไม่สำเร็จ</Text>
-                    <Text style={styles.webErrorText}>ตรวจสอบสัญญาณอินเทอร์เน็ตแล้วลองอีกครั้ง</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      style={({ pressed }) => [styles.webErrorRetryButton, pressed && styles.pressablePressed]}
-                      onPress={() => webViewRef.current?.reload()}
-                    >
-                      <Text style={styles.webErrorRetryText}>ลองใหม่</Text>
-                    </Pressable>
+                  <View style={styles.previewTaskCard}>
+                    <View style={styles.previewTaskHeader}>
+                      <Text style={styles.previewTaskTitle}>
+                        {activeDriverMenu === "messages" ? "ข้อความจากศูนย์ควบคุม" : activeDriverMenu === "next" ? "ลำดับงานที่ต้องดำเนินการถัดไป" : activeDriverMenu === "location" ? "การส่งตำแหน่ง" : "รายการปฏิบัติงาน"}
+                      </Text>
+                      <Text style={styles.previewTaskChip}>{activeDriverMenu === "messages" ? "พร้อมส่ง" : activeDriverMenu === "location" ? "พร้อมแชร์" : "ตัวอย่าง"}</Text>
+                    </View>
+                    <View style={styles.previewRouteBox}>
+                      <Text style={styles.previewRouteLine}>จุดรับ / Mandarin</Text>
+                      <Text style={styles.previewRouteLine}>จุดส่ง / Bitec</Text>
+                      <Text style={styles.previewRouteMuted}>เวลาที่ต้องถึง ยังไม่ระบุเวลา</Text>
+                    </View>
                   </View>
-                )}
-              />
+                </View>
+              ) : (
+                <DriverWebView
+                  ref={webViewRef}
+                  source={{ uri: effectiveWebUrl }}
+                  injectedJavaScriptBeforeContentLoaded={bridgeBootstrap}
+                  onMessage={handleBridgeMessage}
+                  onNavigationStateChange={handleNavigation}
+                  onShouldStartLoadWithRequest={handleShouldStartLoad}
+                  sharedCookiesEnabled
+                  thirdPartyCookiesEnabled
+                  javaScriptEnabled
+                  domStorageEnabled
+                  scalesPageToFit={false}
+                  setBuiltInZoomControls={false}
+                  setDisplayZoomControls={false}
+                  textZoom={100}
+                  // Android WebView ships with Geolocation OFF, so navigator.geolocation
+                  // was silently dead inside the shell while the app's own GPS kept
+                  // reporting normally over the bridge. The driver page uses it directly
+                  // when stamping a photo, so every picture waited out the 8s timeout and
+                  // then printed "GPS ไม่มีพิกัด" — the one thing the stamp exists to carry.
+                  // iOS ignores this prop; the manifest already carries ACCESS_FINE_LOCATION.
+                  geolocationEnabled
+                  // iOS only — WKWebView's own back/forward swipe gesture. Android's hardware
+                  // back button is already handled above via BackHandler; this is the iOS
+                  // equivalent affordance, which WebView does not enable by default.
+                  allowsBackForwardNavigationGestures
+                  startInLoadingState
+                  renderLoading={() => (
+                    <View style={styles.loading}>
+                      <Animated.View style={[styles.skeletonStrip, { opacity: pulse }]} />
+                      <Animated.View style={[styles.skeletonCard, { opacity: pulse }]} />
+                    </View>
+                  )}
+                  onError={(syntheticEvent) => {
+                    const { description } = syntheticEvent.nativeEvent;
+                    setWebViewError(description || "เชื่อมต่อไม่สำเร็จ");
+                  }}
+                  renderError={() => (
+                    <View style={styles.webErrorBox}>
+                      <Text style={styles.webErrorGlyph}>⚠️</Text>
+                      <Text style={styles.webErrorTitle}>เปิดหน้าคนขับไม่สำเร็จ</Text>
+                      <Text style={styles.webErrorText}>ตรวจสอบสัญญาณอินเทอร์เน็ตแล้วลองอีกครั้ง</Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        style={({ pressed }) => [styles.webErrorRetryButton, pressed && styles.pressablePressed]}
+                        onPress={() => webViewRef.current?.reload()}
+                      >
+                        <Text style={styles.webErrorRetryText}>ลองใหม่</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                />
+              )}
             </View>
             <View style={[styles.bottomBar, { paddingBottom: bottomSafeInset + space.sm }]}>
               {DRIVER_MENU_ITEMS.map((item) => (
@@ -815,7 +795,6 @@ function DriverShell() {
             <View style={styles.heroCard}>
               <View style={styles.heroMetaRow}>
                 <Text style={styles.kicker}>พื้นที่ปฏิบัติงานคนขับ</Text>
-                <Text style={styles.heroVersion}>v{APP_VERSION_LABEL}</Text>
               </View>
               <Text style={styles.heroTitle}>รับงานจากศูนย์ควบคุม</Text>
               <Text style={styles.heroCopy}>
@@ -897,6 +876,74 @@ function DriverShell() {
             </View>
           </ScrollView>
         )}
+
+        {settingsOpen ? (
+          <View style={styles.settingsOverlay}>
+            <Pressable
+              accessibilityLabel="ปิดการตั้งค่า"
+              accessibilityRole="button"
+              style={styles.settingsScrim}
+              onPress={() => setSettingsOpen(false)}
+            />
+            <View style={[styles.settingsSheet, { paddingBottom: bottomSafeInset + space.md }]}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.settingsHeader}>
+                <View style={styles.settingsTitleGroup}>
+                  <Text style={styles.settingsTitle}>ตั้งค่าแอป</Text>
+                  <Text style={styles.settingsSubtitle}>โหมดสี สิทธิ์อุปกรณ์ และการออกจากงานอยู่ในจุดเดียว</Text>
+                </View>
+                <Text style={styles.settingsVersion}>เวอร์ชัน {APP_VERSION_LABEL}</Text>
+              </View>
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsSectionTitle}>สีของระบบ</Text>
+                <View style={styles.themeSegment}>
+                  {([
+                    ["system", "ตามเครื่อง"],
+                    ["light", "สว่าง"],
+                    ["dark", "มืด"]
+                  ] as const).map(([value, label]) => (
+                    <Pressable
+                      key={value}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: themePreference === value }}
+                      style={({ pressed }) => [
+                        styles.themeSegmentButton,
+                        themePreference === value && styles.themeSegmentButtonActive,
+                        pressed && styles.pressablePressed
+                      ]}
+                      onPress={() => {
+                        setThemePreference(value);
+                        void saveThemePreference(value);
+                      }}
+                    >
+                      <Text style={[styles.themeSegmentText, themePreference === value && styles.themeSegmentTextActive]}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.settingsMetaText}>กำลังใช้โหมด{scheme === "dark" ? "มืด" : "สว่าง"}</Text>
+              </View>
+              <View style={styles.settingsActionRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.settingsSecondaryButton, pressed && styles.pressablePressed]}
+                  onPress={() => {
+                    if (typeof Linking.openSettings === "function") void Linking.openSettings();
+                  }}
+                >
+                  <Text style={styles.settingsSecondaryButtonText}>สิทธิ์อุปกรณ์</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={mode !== "web"}
+                  style={({ pressed }) => [styles.settingsDangerButton, mode !== "web" && styles.settingsDangerButtonDisabled, pressed && styles.pressablePressed]}
+                  onPress={confirmResetAssignment}
+                >
+                  <Text style={[styles.settingsDangerButtonText, mode !== "web" && styles.settingsDangerButtonTextDisabled]}>ออกจากงานนี้</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -953,129 +1000,246 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
   },
   topbar: {
     alignItems: "center",
-    backgroundColor: colors.command,
-    borderBottomColor: colors.commandMid,
-    borderBottomWidth: 1,
+    backgroundColor: colors.canvas,
     flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 68,
+    minHeight: 72,
     paddingBottom: space.xs,
-    paddingHorizontal: space.lg
+    paddingHorizontal: space.sm
+  },
+  topbarCompact: {
+    minHeight: 64,
+    paddingBottom: space.xs
+  },
+  topbarCard: {
+    alignItems: "center",
+    backgroundColor: colors.commandDeep,
+    borderColor: overlay.faint,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: "row",
+    gap: space.sm,
+    minHeight: 52,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    shadowColor: colors.ink,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.10,
+    shadowRadius: 18
+  },
+  brandMark: {
+    alignItems: "center",
+    backgroundColor: overlay.soft,
+    borderColor: overlay.faint,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: "center",
+    width: 34
+  },
+  brandMarkText: {
+    color: colors.accent,
+    fontFamily: font.bold,
+    ...text.body
   },
   identity: {
     flex: 1,
-    gap: 2,
+    gap: 1,
     minWidth: 0
   },
   product: {
     color: colors.accent,
     fontFamily: font.bold,
-    ...text.strong
+    ...text.body
   },
   title: {
-    color: colors.onCommand,
+    color: colors.onCommandMuted,
     fontFamily: font.semibold,
-    ...text.caption
+    ...text.micro
   },
-  statusPill: {
+  topSettingsButton: {
+    alignItems: "center",
     backgroundColor: overlay.soft,
+    borderColor: overlay.faint,
     borderRadius: radius.pill,
-    color: colors.surface,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 34,
+    paddingHorizontal: space.md
+  },
+  topSettingsButtonActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent
+  },
+  topSettingsButtonText: {
+    color: colors.onCommand,
     fontFamily: font.bold,
-    paddingHorizontal: space.md,
-    paddingVertical: 6,
+    ...text.micro
+  },
+  topSettingsButtonTextActive: {
+    color: colors.command
+  },
+  settingsOverlay: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 30
+  },
+  settingsScrim: {
+    backgroundColor: "rgba(4,16,26,0.42)",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  settingsSheet: {
+    backgroundColor: colors.surface,
+    borderColor: colors.lineSoft,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: 1,
+    bottom: 0,
+    elevation: 18,
+    gap: space.md,
+    left: 0,
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    position: "absolute",
+    right: 0,
+    shadowColor: colors.ink,
+    shadowOffset: { height: -10, width: 0 },
+    shadowOpacity: 0.14,
+    shadowRadius: 26
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    backgroundColor: colors.lineSoft,
+    borderRadius: radius.pill,
+    height: 4,
+    marginBottom: space.xs,
+    width: 44
+  },
+  settingsHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: space.md,
+    justifyContent: "space-between"
+  },
+  settingsTitleGroup: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  settingsTitle: {
+    color: colors.ink,
+    fontFamily: font.bold,
+    ...text.body
+  },
+  settingsSubtitle: {
+    color: colors.muted,
+    fontFamily: font.regular,
+    ...text.micro
+  },
+  settingsVersion: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.line,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    color: colors.muted,
+    fontFamily: font.semibold,
+    overflow: "hidden",
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    ...text.micro
+  },
+  settingsSection: {
+    gap: space.sm
+  },
+  settingsSectionTitle: {
+    color: colors.ink,
+    fontFamily: font.bold,
     ...text.caption
   },
-  networkBadge: {
-    alignItems: "center",
-    alignSelf: "center",
-    borderRadius: radius.pill,
+  themeSegment: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.line,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     flexDirection: "row",
-    gap: 6,
-    flexShrink: 1,
-    maxWidth: 172,
-    overflow: "hidden",
-    paddingHorizontal: 6,
-    paddingVertical: 4
+    gap: space.xs,
+    padding: space.xs
   },
-  networkLive: {
-    backgroundColor: overlay.successFill
-  },
-  networkIdle: {
-    backgroundColor: overlay.warningFill
-  },
-  networkOffline: {
-    backgroundColor: overlay.dangerFill
-  },
-  networkDot: {
-    borderRadius: radius.pill,
-    height: 7,
-    width: 7
-  },
-  networkDotLive: {
-    backgroundColor: colors.successOnDark
-  },
-  networkDotIdle: {
-    backgroundColor: colors.warningOnDark
-  },
-  networkDotOffline: {
-    backgroundColor: colors.dangerOnDark
-  },
-  networkIcon: {
+  themeSegmentButton: {
     alignItems: "center",
-    borderRadius: radius.pill,
-    height: 24,
+    borderRadius: radius.md,
+    flex: 1,
     justifyContent: "center",
-    width: 24
+    minHeight: 42,
+    paddingHorizontal: space.xs
   },
-  networkIconLive: {
-    backgroundColor: colors.success
+  themeSegmentButtonActive: {
+    backgroundColor: colors.operation
   },
-  networkIconIdle: {
-    backgroundColor: colors.warning
+  themeSegmentText: {
+    color: colors.muted,
+    fontFamily: font.semibold,
+    textAlign: "center",
+    ...text.micro
   },
-  networkIconOffline: {
-    backgroundColor: colors.danger
+  themeSegmentTextActive: {
+    color: colors.surface,
+    fontFamily: font.bold
   },
-  networkIconText: {
+  settingsMetaText: {
+    color: colors.muted,
+    fontFamily: font.regular,
+    ...text.micro
+  },
+  settingsActionRow: {
+    flexDirection: "row",
+    gap: space.sm
+  },
+  settingsSecondaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: TOUCH_MIN,
+    paddingHorizontal: space.sm
+  },
+  settingsSecondaryButtonText: {
+    color: colors.ink,
+    fontFamily: font.semibold,
+    ...text.micro
+  },
+  settingsDangerButton: {
+    alignItems: "center",
+    backgroundColor: colors.warningSoft,
+    borderColor: colors.warningLine,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: TOUCH_MIN,
+    paddingHorizontal: space.sm
+  },
+  settingsDangerButtonDisabled: {
+    opacity: 0.45
+  },
+  settingsDangerButtonText: {
+    color: colors.warning,
     fontFamily: font.bold,
     textAlign: "center",
     ...text.micro
   },
-  networkIconTextLive: {
-    color: colors.surface
-  },
-  networkIconTextIdle: {
-    color: colors.command
-  },
-  networkIconTextOffline: {
-    color: colors.surface
-  },
-  networkText: {
-    flexShrink: 1,
-    fontFamily: font.semibold,
-    ...text.micro
-  },
-  networkTextLive: {
-    color: colors.successOnDark
-  },
-  networkTextIdle: {
-    color: colors.warningOnDark
-  },
-  networkTextOffline: {
-    color: colors.dangerOnDark
-  },
-  outboxText: {
-    color: colors.warningOnDark,
-    fontFamily: font.bold,
-    ...text.micro
-  },
-  syncText: {
-    color: colors.accent,
-    fontFamily: font.semibold,
-    maxWidth: 180,
-    textAlign: "right",
-    ...text.micro
+  settingsDangerButtonTextDisabled: {
+    color: colors.muted
   },
   activationScroller: {
     flex: 1
@@ -1107,16 +1271,6 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     color: colors.operationDeep,
     fontFamily: font.bold,
     ...text.caption
-  },
-  heroVersion: {
-    backgroundColor: colors.operationSoft,
-    borderRadius: radius.pill,
-    color: colors.operationDeep,
-    fontFamily: font.semibold,
-    overflow: "hidden",
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
-    ...text.micro
   },
   heroTitle: {
     color: colors.ink,
@@ -1331,18 +1485,6 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     fontFamily: font.regular,
     ...text.body
   },
-  versionText: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    color: colors.ink,
-    fontFamily: font.semibold,
-    paddingHorizontal: space.md,
-    paddingVertical: space.xs,
-    ...text.caption
-  },
   noteText: {
     color: colors.muted,
     fontFamily: font.regular,
@@ -1351,60 +1493,6 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
   webContainer: {
     backgroundColor: colors.canvas,
     flex: 1
-  },
-  operationStrip: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.line,
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    gap: space.xs,
-    justifyContent: "space-between",
-    paddingHorizontal: space.md,
-    paddingVertical: space.xs
-  },
-  operationStatusItem: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 1,
-    gap: space.xs,
-    minWidth: 0
-  },
-  statusDot: {
-    borderRadius: radius.pill,
-    height: 10,
-    width: 10
-  },
-  statusDotOk: {
-    backgroundColor: colors.success
-  },
-  statusDotPending: {
-    backgroundColor: colors.warning
-  },
-  operationStatusCopy: {
-    flex: 1
-  },
-  operationStatusTitle: {
-    color: colors.ink,
-    fontFamily: font.bold,
-    ...text.micro
-  },
-  operationStatusText: {
-    color: colors.muted,
-    fontFamily: font.regular,
-    ...text.micro
-  },
-  webVersionText: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    color: colors.muted,
-    flexShrink: 0,
-    fontFamily: font.semibold,
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
-    ...text.micro
   },
   syncNotice: {
     backgroundColor: colors.warningSoft,
@@ -1419,68 +1507,141 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     fontFamily: font.semibold,
     ...text.micro
   },
-  locationAssist: {
-    backgroundColor: colors.surfaceRaised,
-    borderBottomColor: colors.line,
-    borderBottomWidth: 1,
-    gap: space.sm,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm
-  },
-  locationAssistCopy: {
-    flex: 1,
-    gap: 2
-  },
-  locationAssistTitle: {
-    color: colors.operationDeep,
-    fontFamily: font.bold,
-    ...text.caption
-  },
-  locationAssistText: {
-    color: colors.muted,
-    fontFamily: font.regular,
-    ...text.micro
-  },
-  locationActionGroup: {
-    flexDirection: "row",
-    gap: space.sm
-  },
-  locationSettingsButton: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: TOUCH_MIN,
-    paddingHorizontal: space.sm
-  },
-  locationSettingsButtonText: {
-    color: colors.ink,
-    fontFamily: font.semibold,
-    ...text.micro
-  },
-  locationResetButton: {
-    alignItems: "center",
-    backgroundColor: colors.warningSoft,
-    borderColor: colors.warningLine,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: TOUCH_MIN,
-    paddingHorizontal: space.sm
-  },
-  locationResetButtonText: {
-    color: colors.warning,
-    fontFamily: font.semibold,
-    textAlign: "center",
-    ...text.micro
-  },
   webFrame: {
     backgroundColor: colors.surface,
     flex: 1
+  },
+  webPreviewFrame: {
+    backgroundColor: colors.canvas,
+    flex: 1,
+    gap: space.md,
+    padding: space.md
+  },
+  previewHeroCard: {
+    backgroundColor: colors.command,
+    borderColor: overlay.soft,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: space.lg,
+    overflow: "hidden",
+    padding: space.lg,
+    shadowColor: colors.ink,
+    shadowOffset: { height: 12, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24
+  },
+  previewHeroTopRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: space.sm,
+    justifyContent: "space-between"
+  },
+  previewCallSignGroup: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  previewKicker: {
+    color: colors.accent,
+    fontFamily: font.bold,
+    letterSpacing: 0,
+    ...text.micro
+  },
+  previewCallSign: {
+    color: colors.surface,
+    fontFamily: font.bold,
+    ...text.display
+  },
+  previewProject: {
+    color: colors.onCommand,
+    fontFamily: font.semibold,
+    ...text.body
+  },
+  previewStatusPill: {
+    backgroundColor: overlay.successFill,
+    borderColor: colors.successOnDark,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs
+  },
+  previewStatusText: {
+    color: colors.successOnDark,
+    fontFamily: font.bold,
+    ...text.micro
+  },
+  previewMetaRow: {
+    flexDirection: "row",
+    gap: space.sm
+  },
+  previewMetaCell: {
+    backgroundColor: overlay.soft,
+    borderRadius: radius.lg,
+    flex: 1,
+    gap: 1,
+    minWidth: 0,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm
+  },
+  previewMetaLabel: {
+    color: colors.onCommandMuted,
+    fontFamily: font.semibold,
+    ...text.micro
+  },
+  previewMetaValue: {
+    color: colors.surface,
+    fontFamily: font.bold,
+    ...text.caption
+  },
+  previewTaskCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: space.md,
+    padding: space.lg,
+    shadowColor: colors.ink,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.07,
+    shadowRadius: 20
+  },
+  previewTaskHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: space.sm,
+    justifyContent: "space-between"
+  },
+  previewTaskTitle: {
+    color: colors.ink,
+    fontFamily: font.bold,
+    flex: 1,
+    ...text.strong
+  },
+  previewTaskChip: {
+    backgroundColor: colors.operationSoft,
+    borderRadius: radius.pill,
+    color: colors.operationDeep,
+    fontFamily: font.bold,
+    overflow: "hidden",
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    ...text.micro
+  },
+  previewRouteBox: {
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.lg,
+    gap: space.xs,
+    padding: space.md
+  },
+  previewRouteLine: {
+    color: colors.ink,
+    fontFamily: font.semibold,
+    ...text.body
+  },
+  previewRouteMuted: {
+    color: colors.muted,
+    fontFamily: font.regular,
+    ...text.caption
   },
   loading: {
     alignItems: "center",
@@ -1535,19 +1696,20 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
   },
   bottomBar: {
     backgroundColor: colors.surfaceRaised,
-    borderColor: colors.line,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
+    borderColor: colors.lineSoft,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    elevation: 14,
+    elevation: 10,
     flexDirection: "row",
     gap: space.xs,
-    paddingHorizontal: space.sm,
-    paddingTop: space.sm,
+    marginBottom: space.sm,
+    marginHorizontal: space.md,
+    marginTop: space.sm,
+    padding: 6,
     shadowColor: colors.ink,
-    shadowOffset: { height: -4, width: 0 },
+    shadowOffset: { height: -6, width: 0 },
     shadowOpacity: 0.08,
-    shadowRadius: 12
+    shadowRadius: 16
   },
   menuButton: {
     alignItems: "center",
@@ -1555,13 +1717,17 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     flex: 1,
     gap: 2,
     justifyContent: "center",
-    minHeight: TOUCH_MIN,
+    minHeight: 52,
     paddingHorizontal: space.xs,
-    paddingVertical: 2,
+    paddingVertical: space.xs,
     position: "relative"
   },
   menuButtonActive: {
-    backgroundColor: colors.operationSoft
+    backgroundColor: colors.operation,
+    shadowColor: colors.operationDeep,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12
   },
   menuButtonUnread: {
     backgroundColor: colors.dangerSoft,
@@ -1569,13 +1735,13 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     borderWidth: 1
   },
   menuIndicator: {
-    backgroundColor: colors.surface,
+    backgroundColor: "transparent",
     borderRadius: radius.pill,
-    height: 3,
+    height: 4,
     width: 16
   },
   menuIndicatorActive: {
-    backgroundColor: colors.operation,
+    backgroundColor: colors.accent,
     width: 24
   },
   menuButtonText: {
@@ -1585,7 +1751,7 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     ...text.micro
   },
   menuButtonTextActive: {
-    color: colors.operationDeep,
+    color: colors.surface,
     fontFamily: font.bold
   },
   menuBadge: {
@@ -1599,38 +1765,6 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     top: 7,
     width: 12,
     zIndex: 2
-  },
-  bottomPrimaryButton: {
-    alignItems: "center",
-    backgroundColor: colors.operation,
-    borderRadius: radius.md,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: TOUCH_MIN,
-    paddingHorizontal: space.md
-  },
-  // These two carried a fontWeight and no fontFamily, so they rendered in the
-  // system font while everything around them was Noto Sans Thai.
-  bottomPrimaryButtonText: {
-    color: colors.surface,
-    fontFamily: font.bold,
-    ...text.body
-  },
-  bottomSecondaryButton: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: TOUCH_MIN,
-    paddingHorizontal: space.md
-  },
-  bottomSecondaryButtonText: {
-    color: colors.ink,
-    fontFamily: font.semibold,
-    ...text.body
   }
   });
 }
