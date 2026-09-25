@@ -52,7 +52,6 @@ export type BridgeMessage =
     };
 
 export type NativeStatus =
-  | "shell_ready"
   | "session_ready"
   | "session_missing"
   | "gps_starting"
@@ -64,6 +63,10 @@ export type NativeStatus =
 export interface NativeStatusPayload {
   status: NativeStatus;
   message: string;
+  /** Whether this build can keep sharing GPS from the native side when the app
+   *  is backgrounded — the same value as `MobileShellHandle.canBackgroundLocation`.
+   *  It says nothing about whether the driver has granted "Always"; the native
+   *  status (`gps_error`, the message) reports that. */
   canBackgroundLocation: boolean;
   recordedAt: string;
   detail?: Record<string, unknown>;
@@ -175,8 +178,10 @@ export function parseBridgeMessage(raw: string): BridgeMessage | null {
 export function buildNativeStatusMessage(
   status: NativeStatus,
   message: string,
-  detail?: Record<string, unknown>,
-  options?: { canBackgroundLocation?: boolean }
+  detail: Record<string, unknown> | undefined,
+  // Required: the shell is the only party that knows. The old default guessed
+  // `status !== "session_missing"`, claiming the capability for every other status.
+  options: { canBackgroundLocation: boolean }
 ): NativeStatusMessage {
   return {
     namespace: BRIDGE_NAMESPACE,
@@ -185,7 +190,7 @@ export function buildNativeStatusMessage(
     payload: {
       status,
       message,
-      canBackgroundLocation: options?.canBackgroundLocation ?? status !== "session_missing",
+      canBackgroundLocation: options.canBackgroundLocation,
       recordedAt: new Date().toISOString(),
       detail
     }

@@ -30,7 +30,7 @@ describe("mobile bridge protocol", () => {
   });
 
   it("builds status messages for WebView", () => {
-    const status = buildNativeStatusMessage("session_missing", "รอ session จากระบบ");
+    const status = buildNativeStatusMessage("session_missing", "รอ session จากระบบ", undefined, { canBackgroundLocation: false });
     expect(status.payload.canBackgroundLocation).toBe(false);
     expect(status.payload.message).toBe("รอ session จากระบบ");
   });

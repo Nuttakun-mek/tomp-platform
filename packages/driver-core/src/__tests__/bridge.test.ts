@@ -86,18 +86,13 @@ describe("bridge messages", () => {
 });
 
 describe("native status", () => {
-  it("reports background capability except when the session is missing", () => {
-    expect(buildNativeStatusMessage("gps_sharing", "ok").payload.canBackgroundLocation).toBe(true);
-    expect(buildNativeStatusMessage("session_missing", "no session").payload.canBackgroundLocation).toBe(false);
-  });
-
-  it("lets the native shell report the real background capability", () => {
+  it("carries the background capability the shell reports, whatever the status", () => {
     expect(buildNativeStatusMessage("gps_sharing", "ok", undefined, { canBackgroundLocation: false }).payload.canBackgroundLocation).toBe(false);
     expect(buildNativeStatusMessage("session_missing", "no session", undefined, { canBackgroundLocation: true }).payload.canBackgroundLocation).toBe(true);
   });
 
   it("parses only a detail that carries a status", () => {
-    const message = buildNativeStatusMessage("gps_stopped", "stopped");
+    const message = buildNativeStatusMessage("gps_stopped", "stopped", undefined, { canBackgroundLocation: true });
     expect(parseNativeStatusDetail(message)?.status).toBe("gps_stopped");
     expect(parseNativeStatusDetail({ payload: {} })).toBeNull();
     expect(parseNativeStatusDetail(null)).toBeNull();
