@@ -1,0 +1,181 @@
+/*
+ * Dark theme for the driver pages only (the pages the TOMP Driver app shows in
+ * its WebView). The app's own frame went dark and the page inside it stayed
+ * white. Loaded only by app/ground-transfer/driver/layout.tsx and active only
+ * while <html data-driver-dark> is set — see the script in that layout — so no
+ * other page of the website is affected.
+ *
+ * It remaps the fixed-colour utilities the driver components use, inside
+ * .driver-theme, to the app's dark palette (apps/mobile-driver/src/theme.ts,
+ * darkColors). A new colour class on a driver page needs a line here too.
+ */
+
+html[data-driver-dark] {
+  color-scheme: dark;
+  background-color: #0f1c28;
+}
+
+html[data-driver-dark] body {
+  background-color: #0f1c28;
+}
+
+/* Surfaces */
+html[data-driver-dark] .driver-theme,
+html[data-driver-dark] .driver-theme .bg-canvas,
+html[data-driver-dark] .driver-theme .bg-canvas\/60,
+html[data-driver-dark] .driver-theme .bg-canvas\/70,
+html[data-driver-dark] .driver-theme .bg-canvas\/80 {
+  background-color: #0f1c28;
+}
+html[data-driver-dark] .driver-theme .bg-white,
+html[data-driver-dark] .driver-theme .bg-white\/80,
+html[data-driver-dark] .driver-theme .bg-white\/95 {
+  background-color: #16222f;
+}
+html[data-driver-dark] .driver-theme .bg-slate-100,
+html[data-driver-dark] .driver-theme .hover\:bg-canvas:hover,
+html[data-driver-dark] .driver-theme .active\:bg-canvas\/60:active {
+  background-color: #1e2f3f;
+}
+html[data-driver-dark] .driver-theme .bg-slate-300,
+html[data-driver-dark] .driver-theme .disabled\:bg-slate-300:disabled,
+html[data-driver-dark] .driver-theme .disabled\:bg-slate-100:disabled {
+  background-color: #2a3b4b;
+}
+html[data-driver-dark] .driver-theme .bg-operation-soft {
+  background-color: #123a37;
+}
+
+/* Text */
+html[data-driver-dark] .driver-theme,
+html[data-driver-dark] .driver-theme .text-ink {
+  color: #e8eef5;
+}
+html[data-driver-dark] .driver-theme .text-ink-soft,
+html[data-driver-dark] .driver-theme .text-slate-700 {
+  color: #b4c3d1;
+}
+html[data-driver-dark] .driver-theme .text-ink-faint {
+  color: #8a9db0;
+}
+html[data-driver-dark] .driver-theme .text-operation {
+  color: #3ecfc0;
+}
+html[data-driver-dark] .driver-theme .text-route {
+  color: #7fa6f2;
+}
+
+/* Lines */
+html[data-driver-dark] .driver-theme .border-border,
+html[data-driver-dark] .driver-theme .border-border\/70,
+html[data-driver-dark] .driver-theme .border-border\/80,
+html[data-driver-dark] .driver-theme .border-teal-100,
+html[data-driver-dark] .driver-theme .border-slate-300 {
+  border-color: #2a3b4b;
+}
+html[data-driver-dark] .driver-theme .ring-border\/70 {
+  --tw-ring-color: #2a3b4b;
+}
+html[data-driver-dark] .driver-theme .border-black\/5 {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+html[data-driver-dark] .driver-theme .focus\:ring-teal-100:focus {
+  --tw-ring-color: #123a37;
+}
+
+/* Status tints: success */
+html[data-driver-dark] .driver-theme .bg-emerald-50,
+html[data-driver-dark] .driver-theme .bg-emerald-50\/70 {
+  background-color: #10301f;
+}
+html[data-driver-dark] .driver-theme .bg-emerald-100,
+html[data-driver-dark] .driver-theme .active\:bg-emerald-100\/60:active {
+  background-color: #153d29;
+}
+html[data-driver-dark] .driver-theme .text-emerald-700,
+html[data-driver-dark] .driver-theme .text-emerald-800 {
+  color: #86efac;
+}
+html[data-driver-dark] .driver-theme .border-emerald-100,
+html[data-driver-dark] .driver-theme .border-emerald-200,
+html[data-driver-dark] .driver-theme .border-emerald-300 {
+  border-color: #1f5a3a;
+}
+html[data-driver-dark] .driver-theme .ring-emerald-200 {
+  --tw-ring-color: #1f5a3a;
+}
+
+/* Status tints: warning */
+html[data-driver-dark] .driver-theme .bg-amber-50,
+html[data-driver-dark] .driver-theme .bg-amber-50\/70 {
+  background-color: #3a2a12;
+}
+html[data-driver-dark] .driver-theme .bg-amber-100,
+html[data-driver-dark] .driver-theme .active\:bg-amber-100\/60:active {
+  background-color: #4a3616;
+}
+html[data-driver-dark] .driver-theme .text-amber-800,
+html[data-driver-dark] .driver-theme .text-amber-900 {
+  color: #f8d181;
+}
+html[data-driver-dark] .driver-theme .border-amber-200,
+html[data-driver-dark] .driver-theme .border-amber-300 {
+  border-color: #5a4420;
+}
+html[data-driver-dark] .driver-theme .ring-amber-200 {
+  --tw-ring-color: #5a4420;
+}
+
+/* Status tints: danger */
+html[data-driver-dark] .driver-theme .bg-rose-50,
+html[data-driver-dark] .driver-theme .bg-rose-50\/70 {
+  background-color: #3a1418;
+}
+html[data-driver-dark] .driver-theme .bg-rose-100,
+html[data-driver-dark] .driver-theme .active\:bg-rose-100\/60:active {
+  background-color: #4a1a1f;
+}
+html[data-driver-dark] .driver-theme .text-rose-700,
+html[data-driver-dark] .driver-theme .text-rose-900 {
+  color: #fecaca;
+}
+html[data-driver-dark] .driver-theme .border-rose-200 {
+  border-color: #5a2026;
+}
+html[data-driver-dark] .driver-theme .ring-rose-200 {
+  --tw-ring-color: #5a2026;
+}
+
+/* Status tints: info */
+html[data-driver-dark] .driver-theme .bg-blue-50,
+html[data-driver-dark] .driver-theme .bg-blue-50\/70 {
+  background-color: #132640;
+}
+html[data-driver-dark] .driver-theme .bg-blue-100,
+html[data-driver-dark] .driver-theme .active\:bg-blue-100\/60:active {
+  background-color: #1a3152;
+}
+html[data-driver-dark] .driver-theme .text-blue-800,
+html[data-driver-dark] .driver-theme .text-blue-950 {
+  color: #bfd4ff;
+}
+html[data-driver-dark] .driver-theme .border-blue-100,
+html[data-driver-dark] .driver-theme .border-blue-200 {
+  border-color: #24406a;
+}
+html[data-driver-dark] .driver-theme .ring-blue-200 {
+  --tw-ring-color: #24406a;
+}
+
+/* Form fields the driver types into (component classes from globals.css) */
+html[data-driver-dark] .driver-theme input,
+html[data-driver-dark] .driver-theme textarea,
+html[data-driver-dark] .driver-theme select {
+  background-color: #1b2a38;
+  color: #e8eef5;
+  border-color: #2a3b4b;
+}
+html[data-driver-dark] .driver-theme input::placeholder,
+html[data-driver-dark] .driver-theme textarea::placeholder {
+  color: #6d8194;
+}

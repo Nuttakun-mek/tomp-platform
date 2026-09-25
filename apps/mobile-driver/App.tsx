@@ -92,8 +92,11 @@ const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; shortLabel: 
 // that moment, so on every build up to 1.0.0 (9) the handle was never set — the
 // page shared GPS from the browser (stopping when the app left the screen) and
 // the zoom lock never applied. The viewport now waits for <head>.
-const bridgeBootstrap = `
+const buildBridgeBootstrap = (scheme: "light" | "dark") => `
   (function () {
+    // The page follows the app's theme, not only the phone's: its own script
+    // reads this attribute (apps/web driver layout, driver-dark.css).
+    document.documentElement.setAttribute("data-driver-theme", "${scheme}");
     window.TOMP_MOBILE_SHELL = {
       namespace: "${BRIDGE_NAMESPACE}",
       version: ${BRIDGE_VERSION},
@@ -142,6 +145,9 @@ function DriverShell() {
   const insets = useSafeAreaInsets();
   const [themePreference, setThemePreference] = useState<ThemePreference>("system");
   const { colors, overlay, scheme } = useAppTheme(themePreference);
+  // Set once per load; a later change is pushed by the effect below instead of
+  // reloading the page.
+  const bridgeBootstrap = useMemo(() => buildBridgeBootstrap(scheme), [scheme]);
   const styles = useMemo(() => createStyles(colors, overlay), [colors, overlay]);
   const bottomSafeInset = Math.max(insets.bottom, Platform.OS === "android" ? 24 : 0);
   const [fontsLoaded] = useFonts({
@@ -203,6 +209,10 @@ function DriverShell() {
       true;
     `);
   }, []);
+
+  useEffect(() => {
+    webViewRef.current?.injectJavaScript(`document.documentElement.setAttribute("data-driver-theme", "${scheme}"); true;`);
+  }, [scheme]);
 
   // A tab tap used to change the WebView's source.uri, which is a full HTTP
   // navigation and re-runs the page's server-side assignment fetch for data it
