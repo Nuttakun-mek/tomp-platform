@@ -4,6 +4,7 @@ import { VehicleProfileQr } from "@/components/resources/vehicle-profile-qr";
 import { VehicleTaskCard } from "@/components/resources/vehicle-task-card";
 import { Badge } from "@/components/ui/badge";
 import { getVehicleOperationProfileById } from "@/lib/data/vehicle-operations";
+import { EditVehicleForm } from "@/components/resources/edit-vehicle-form";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 
 export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string }) {
@@ -56,6 +57,16 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
           <VehicleProfileQr vehicleId={profile.vehicle.id} plateNumber={profile.vehicle.plateNumber || "รถ"} />
         </div>
       </section>
+
+      <EditVehicleForm
+        vehicle={{
+          id: profile.vehicle.id,
+          plateNumber: profile.vehicle.plateNumber,
+          vehicleType: profile.vehicle.vehicleType,
+          capacity: profile.vehicle.capacity,
+          metadata
+        }}
+      />
 
       <div className="grid gap-5 xl:grid-cols-[0.68fr_1.32fr]">
         <section className="enterprise-panel grid content-start gap-4 p-4">

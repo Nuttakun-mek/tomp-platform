@@ -2,20 +2,7 @@
 
 import type { ComponentType } from "react";
 import { Bike, BusFront, CarFront, Plane, ShipWheel, Truck, Van } from "lucide-react";
-
-type VehicleIconKey =
-  | "sedan"
-  | "suv"
-  | "van"
-  | "minibus"
-  | "bus"
-  | "pickup"
-  | "truck"
-  | "motorcycle"
-  | "vip"
-  | "luggage"
-  | "shuttle"
-  | "airport";
+import type { VehicleIconKey } from "@/lib/domain/vehicle-icon";
 
 type VehicleIconOption = {
   key: VehicleIconKey;

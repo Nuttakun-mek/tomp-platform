@@ -7,10 +7,9 @@ import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/a
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
 import { mapCallSign, mapDriver, mapVehicle } from "@/lib/data/mappers";
+import { normaliseVehicleIcon } from "@/lib/domain/vehicle-icon";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
-
-const VEHICLE_ICON_KEYS = new Set(["sedan", "suv", "van", "minibus", "bus", "pickup", "truck", "motorcycle"]);
 
 const createExistingProjectResourcePairSchema = z.object({
   projectId: z.string().uuid(),
@@ -188,7 +187,9 @@ export async function createProjectResourcePairAction(input: unknown): Promise<A
       brand: cleanText(data.brand),
       model: cleanText(data.model),
       colour: cleanText(data.colour),
-      icon: VEHICLE_ICON_KEYS.has(icon) ? icon : "van",
+      // The picker offers all twelve symbols; a local list of eight used to save
+      // VIP, luggage, shuttle and airport as "van" without a word.
+      icon: normaliseVehicleIcon(icon) ?? "van",
       packageHours,
       packageAmount,
       hourlyRate: derivedHourlyRate,
@@ -512,6 +513,63 @@ async function removeResource(table: Table, input: unknown): Promise<ActionResul
     revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
   }
   return actionSuccess({ deleted: id });
+}
+
+const updateVehicleSchema = z.object({
+  id: z.string().uuid(),
+  plateNumber: z.string().trim().min(1, "กรุณาระบุทะเบียนรถ").max(40),
+  vehicleType: z.string().trim().min(1, "กรุณาเลือกประเภทรถ").max(60),
+  capacity: z.coerce.number().int().min(1, "จำนวนที่นั่งต้องมากกว่า 0").max(100),
+  brand: z.string().trim().max(60).optional(),
+  model: z.string().trim().max(60).optional(),
+  colour: z.string().trim().max(40).optional(),
+  icon: z.string().optional()
+});
+
+/**
+ * The product's first vehicle edit path (981 Wave 5): before it, a plate typed
+ * wrong stayed wrong. The project comes from the row, never from the request,
+ * and editing takes the same permission as adding or removing a vehicle there.
+ * Only the fields shown are written; the rest of metadata (cost, notes, source)
+ * is kept as it is.
+ */
+export async function updateVehicleAction(input: unknown): Promise<ActionResult> {
+  const parsed = updateVehicleSchema.safeParse(input);
+  if (!parsed.success) return actionFailure("ข้อมูลรถไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const { data: current, error: readError } = await client.from("vehicles").select("id, project_id, metadata").eq("id", parsed.data.id).maybeSingle();
+  if (readError) return actionFailure(getDatabaseErrorMessage(readError, "อ่านข้อมูลรถไม่สำเร็จ"));
+  if (!current) return actionFailure("ไม่พบรถคันนี้");
+
+  const projectId = typeof current.project_id === "string" ? current.project_id : null;
+  const permission = projectId ? await requirePermission(projectId, "vehicle.create") : await requirePermission("vehicle.create");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขข้อมูลรถ");
+
+  const previous = (current.metadata && typeof current.metadata === "object" ? current.metadata : {}) as Record<string, unknown>;
+  const metadata = {
+    ...previous,
+    brand: parsed.data.brand ?? "",
+    model: parsed.data.model ?? "",
+    colour: parsed.data.colour ?? "",
+    icon: normaliseVehicleIcon(parsed.data.icon) ?? previous.icon ?? "van"
+  };
+
+  const { error: updateError } = await client
+    .from("vehicles")
+    .update({ plate_number: parsed.data.plateNumber, vehicle_type: parsed.data.vehicleType, capacity: parsed.data.capacity, metadata })
+    .eq("id", parsed.data.id);
+  if (updateError) {
+    const message = /duplicate key|unique/i.test(updateError.message) ? "ทะเบียนนี้มีอยู่แล้ว" : "บันทึกข้อมูลรถไม่สำเร็จ";
+    return actionFailure(getDatabaseErrorMessage(updateError, message));
+  }
+
+  revalidatePath("/resources");
+  revalidatePath(`/resources/vehicles/${parsed.data.id}`);
+  if (projectId) revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+  return actionSuccess({ id: parsed.data.id });
 }
 
 export async function deleteDriverAction(input: unknown): Promise<ActionResult> {
