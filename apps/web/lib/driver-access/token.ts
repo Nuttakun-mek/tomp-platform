@@ -55,6 +55,21 @@ export function getDefaultDriverTokenExpiry(hours = 24): string {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 
+/**
+ * How long a driver QR stays claimable: to the end of the project's last day
+ * (Bangkok), and never less than 24 hours. A flat 24 hours meant a QR handed
+ * out on day one of a five-day event died overnight if nobody had opened it —
+ * and it is what killed Apple's reviewer link, which is opened days later.
+ */
+export function driverTokenExpiryFor(projectEndDate: string | Date | null | undefined, now = Date.now()): string {
+  const floor = now + 24 * 60 * 60 * 1000;
+  // The Postgres fallback hands a `date` column back as a Date at UTC midnight.
+  const raw = projectEndDate instanceof Date ? (Number.isFinite(projectEndDate.getTime()) ? projectEndDate.toISOString() : "") : (projectEndDate ?? "");
+  const day = /^\d{4}-\d{2}-\d{2}/.exec(raw)?.[0];
+  const endOfDay = day ? new Date(`${day}T23:59:59+07:00`).getTime() : Number.NaN;
+  return new Date(Number.isFinite(endOfDay) ? Math.max(floor, endOfDay) : floor).toISOString();
+}
+
 // Second factor: a 6-digit PIN the control centre reads to the driver separately
 // from the QR link. Stored only as a hash on the token row.
 export function generateDriverPin(): string {

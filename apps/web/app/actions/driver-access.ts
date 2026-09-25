@@ -4,7 +4,7 @@ import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/a
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getPostgresClient } from "@/lib/db/postgres";
-import { generateDriverAccessToken, generateDriverPin, getDefaultDriverTokenExpiry, hashDriverAccessToken, hashDriverPin } from "@/lib/driver-access/token";
+import { driverTokenExpiryFor, generateDriverAccessToken, generateDriverPin, hashDriverAccessToken, hashDriverPin } from "@/lib/driver-access/token";
 import { buildDriverAccessUrl } from "@/lib/driver-access/url";
 import { getRequestBaseUrl } from "@/lib/request-origin";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -164,7 +164,7 @@ async function createDriverAccessTokenViaPostgres(
     driverId: String(data.driverId || assignment.driver_id),
     expiresAt: data.expiresAt
   });
-  const expiresAt = data.expiresAt || getDefaultDriverTokenExpiry();
+  const expiresAt = data.expiresAt || driverTokenExpiryFor(project.end_date as string | Date | null);
   const pin = generateDriverPin();
   const tokenMeta = JSON.stringify({ tokenVersion: 2, pinHash: hashDriverPin(pin), pinAttempts: 0, source: "postgres_fallback" });
 
@@ -307,7 +307,11 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
     driverId: data.driverId ?? assignmentForQr.driver_id,
     expiresAt: data.expiresAt
   });
-  const expiresAt = data.expiresAt || getDefaultDriverTokenExpiry();
+  let expiresAt = data.expiresAt ?? null;
+  if (!expiresAt) {
+    const { data: projectRow } = await client.from("projects").select("end_date").eq("id", data.projectId).maybeSingle();
+    expiresAt = driverTokenExpiryFor(typeof projectRow?.end_date === "string" ? projectRow.end_date : null);
+  }
   const pin = generateDriverPin();
 
   const { data: row, error: insertError } = await client
