@@ -603,9 +603,19 @@ function DriverShell() {
     };
   }, [flushOutbox, openDriverLink, registerPush]);
 
+  // When the app went to the background, for the stale-page reload below.
+  const backgroundedAtRef = useRef<number | null>(null);
+
   useEffect(() => {
     const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState === "background") backgroundedAtRef.current = Date.now();
       if (nextState === "active") {
+        // iOS does not always report the WebView's killed process while the
+        // app is suspended, and after this long the job, messages and statuses
+        // on the page are stale anyway: reload rather than show a blank or old page.
+        const away = backgroundedAtRef.current ? Date.now() - backgroundedAtRef.current : 0;
+        backgroundedAtRef.current = null;
+        if (away > 10 * 60 * 1000) webViewRef.current?.reload();
         void flushOutbox();
         // The driver is looking at the app, so anything still queued in the
         // shade has been seen. Clearing it here is what actually brings the
@@ -744,6 +754,14 @@ function DriverShell() {
                   onMessage={handleBridgeMessage}
                   onNavigationStateChange={handleNavigation}
                   onShouldStartLoadWithRequest={handleShouldStartLoad}
+                  // After a long time in the background (GPS keeps the app itself
+                  // alive), the OS kills the WebView's content process to reclaim
+                  // memory. The shell survives, the page does not: the driver came
+                  // back to the top bar and menu around an empty middle, and tab
+                  // taps went to a page that no longer existed. Reload it; the
+                  // load handler then re-announces the current tab.
+                  onContentProcessDidTerminate={() => webViewRef.current?.reload()}
+                  onRenderProcessGone={() => webViewRef.current?.reload()}
                   sharedCookiesEnabled
                   thirdPartyCookiesEnabled
                   javaScriptEnabled
