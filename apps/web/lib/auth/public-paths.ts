@@ -1,6 +1,9 @@
 export const PUBLIC_PREFIXES = [
   "/login",
   "/no-access",
+  // App Store Connect links to these as the app's privacy policy and support URL.
+  "/privacy",
+  "/support",
   "/auth/callback",
   "/ground-transfer/driver",
   "/helper",

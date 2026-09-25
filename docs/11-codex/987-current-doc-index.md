@@ -12,6 +12,8 @@ Use this file as the first stop before assigning another agent.
    audit, flow summary, verified strengths and release guidance.
 3. `982-remaining-work.md` - current backlog. Older notes are historical unless
    an item is still repeated in `982`.
+4. `988-ios-unlisted-app-store-release.md` - how the iOS app is released:
+   Unlisted App Store distribution, listing text, privacy answers, reviewer demo.
 
 ## Current System Position
 
