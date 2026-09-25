@@ -11,7 +11,8 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/ea9c91b8-049d-4287-bfcd-dad4ecc7981b"
+      "url": "https://u.expo.dev/ea9c91b8-049d-4287-bfcd-dad4ecc7981b",
+      "fallbackToCacheTimeout": 3000
     },
     "icon": "./assets/icon.png",
     "assetBundlePatterns": [
