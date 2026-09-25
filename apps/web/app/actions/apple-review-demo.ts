@@ -362,6 +362,6 @@ export async function createAppleReviewDemoAction(): Promise<ActionResult> {
     if (failure) return actionFailure(`${step.label}: ${failure}`);
   }
 
-  const accessUrl = buildDriverAccessUrl(await getRequestBaseUrl(), token);
+  const accessUrl = buildDriverAccessUrl({ token, baseUrl: await getRequestBaseUrl() });
   return actionSuccess({ accessUrl, pin, projectCode, callSign: "REVIEW-01" });
 }

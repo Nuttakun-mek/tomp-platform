@@ -190,7 +190,7 @@ async function createDriverAccessTokenViaPostgres(
   return actionSuccess({
     token,
     pin,
-    accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
+    accessUrl: buildDriverAccessUrl({ token, baseUrl: await getRequestBaseUrl() }),
     tokenRecord: { id: tokenRow.id, expires_at: tokenRow.expires_at, status: tokenRow.status },
     packetRecord: packetRows[0] || null
   });
@@ -361,7 +361,7 @@ export async function createDriverAccessTokenAction(input: unknown): Promise<Act
   return actionSuccess({
     token,
     pin,
-    accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
+    accessUrl: buildDriverAccessUrl({ token, baseUrl: await getRequestBaseUrl() }),
     tokenRecord: { id: row.id, expires_at: row.expires_at, status: row.status },
     packetRecord: packetResult?.packetRecord || null,
     timelineEvent: timelineResult.data

@@ -425,7 +425,7 @@ export async function createProductionPilotSmokeScenarioAction(): Promise<Action
     assignmentId: ids.assignment,
     callSignId: ids.callSign,
     driverId: ids.driver,
-    accessUrl: buildDriverAccessUrl(token, await getRequestBaseUrl()),
+    accessUrl: buildDriverAccessUrl({ token, baseUrl: await getRequestBaseUrl() }),
     pin: smokePin,
     missionControlUrl: `/projects/${projectCode}/ground-transfer/control`,
     assignmentsUrl: `/projects/${projectCode}/ground-transfer/dispatch`,

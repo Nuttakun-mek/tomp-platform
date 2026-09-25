@@ -5,6 +5,9 @@ function getFallbackBaseUrl() {
   return "http://localhost:3000";
 }
 
-export function buildDriverAccessUrl(token: string, baseUrl = getFallbackBaseUrl()): string {
+// Named, not positional: both arguments are strings, and the Apple review demo
+// once passed them the other way round — the reviewer's link came out as
+// "<token>/ground-transfer/driver?token=https%3A%2F%2F…".
+export function buildDriverAccessUrl({ token, baseUrl = getFallbackBaseUrl() }: { token: string; baseUrl?: string }): string {
   return `${baseUrl.replace(/\/$/, "")}/ground-transfer/driver?token=${encodeURIComponent(token)}`;
 }
