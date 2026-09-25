@@ -115,7 +115,9 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
   const [message, setMessage] = useState("ยังไม่ได้ส่งตำแหน่ง GPS");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
-  const [cardOpen, setCardOpen] = useState(true);
+  // Closed by default: on the ตำแหน่ง tab the driver needs the one-line status,
+  // not the full card; tapping the header opens the details.
+  const [cardOpen, setCardOpen] = useState(false);
   const [canResume, setCanResume] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   // The app reports whether "Always" was granted only in its answer to a start,
@@ -164,6 +166,12 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
       setMessage("ส่งตำแหน่งล่าสุดให้ศูนย์ควบคุมแล้ว");
       setSignal("live");
       if (staleTimerRef.current != null) window.clearTimeout(staleTimerRef.current);
+      staleTimerRef.current = null;
+      // 45 seconds is the browser's cadence. Inside the app the phone shares
+      // natively and posts a fix only when the vehicle moves, so a parked car
+      // went "GPS ขาดช่วง" on the header while the card — and the phone — said
+      // sharing. There the app's own status is the only truth.
+      if (getMobileShell(window)?.canBackgroundLocation) return;
       staleTimerRef.current = window.setTimeout(() => {
         setMessage("ยังเปิดการส่ง GPS อยู่ แต่ไม่มีพิกัดใหม่เกิน 45 วินาที");
         setSignal("stale");
@@ -302,7 +310,9 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
           startedRef.current = true;
           await sendPosition(position, event);
         } catch (error) {
-          setState("error");
+          // The watch keeps running, so this is a delay, not a stop: say the
+          // same thing here as the header does ("GPS ขาดช่วง").
+          setState("stale");
           setSignal("stale");
           setMessage(error instanceof Error ? error.message : "ส่งตำแหน่งไม่สำเร็จ");
         }
