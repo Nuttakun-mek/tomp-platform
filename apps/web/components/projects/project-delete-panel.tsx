@@ -56,6 +56,12 @@ export function ProjectDeletePanel({
             ลบ <span className="font-semibold">{projectName}</span> พร้อมงานทั้งหมด {counts.assignments} งาน ภารกิจ {counts.missions} รายการ
             QR คนขับ ประวัติ GPS และไทม์ไลน์ <span className="font-semibold">กู้คืนไม่ได้</span>
           </p>
+          {/* Airport Transfer cases cascade with the project (a decision taken
+              in 986) whether or not that system is still switched on, and
+              they hold passenger names and flights — say so before the delete. */}
+          <p className="mt-1 text-sm leading-6 text-rose-800">
+            รวมถึงข้อมูล Airport Transfer ของโครงการนี้ทั้งหมด ถ้ามี: เคส รายชื่อและเที่ยวบินผู้โดยสาร และประวัติการนำเข้าไฟล์
+          </p>
           <p className="mt-1 text-xs leading-5 text-rose-700">
             ถ้าแค่อยากซ่อนออกจากรายการ ใช้ “เก็บถาวร” แทน ข้อมูลจะยังอยู่ครบและกู้คืนได้
           </p>
