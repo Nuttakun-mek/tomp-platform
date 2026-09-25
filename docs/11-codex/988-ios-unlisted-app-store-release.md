@@ -4,7 +4,8 @@ Date: 2026-09-25. Decision (owner, 2026-09-25): distribute through the App Store
 as an **Unlisted** app — it goes through full App Review once, never appears in
 search, and installs only from its direct link. TestFlight stays for testing.
 
-Account holder and operator: **Nuttakun Mek**, contact `nuttakun.mek@gmail.com`
+Account holder: **Nuttakun Mek** (App Store seller name). Operator shown on the
+public pages: **Craftory Lab (Nuttakun Mek)**; App Store copyright **2026 Craftory Lab**. Contact `nuttakun.mek@gmail.com`
 (both public, set in `apps/web/lib/legal/operator.ts`).
 
 ## 0. Already in place
