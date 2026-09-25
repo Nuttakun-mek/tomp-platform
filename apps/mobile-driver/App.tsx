@@ -736,6 +736,10 @@ function DriverShell() {
                 <DriverWebView
                   ref={webViewRef}
                   source={{ uri: effectiveWebUrl }}
+                  // What shows when the page is pulled past its top or bottom
+                  // (iOS bounce) and while it loads. Unset, it was WebKit's
+                  // white, so dark mode flashed a white band on every overscroll.
+                  style={styles.webView}
                   injectedJavaScriptBeforeContentLoaded={bridgeBootstrap}
                   onMessage={handleBridgeMessage}
                   onNavigationStateChange={handleNavigation}
@@ -1529,7 +1533,13 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     ...text.micro
   },
   webFrame: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.canvas,
+    flex: 1
+  },
+  webView: {
+    // The page's own background, so the band a bounce exposes is the colour of
+    // the page it stretches.
+    backgroundColor: colors.webPage,
     flex: 1
   },
   webPreviewFrame: {

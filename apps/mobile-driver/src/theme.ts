@@ -8,6 +8,8 @@ export const lightColors = {
   ink: "#102034",
   muted: "#5c6f84",
   canvas: "#edf4f7",
+  /** The driver web page's background (web tailwind `canvas`), for the WebView behind it. */
+  webPage: "#f3f7fa",
   surface: "#ffffff",
   /** Cards and inputs that need to sit just off white. */
   surfaceSoft: "#f8fbfd",
@@ -57,6 +59,7 @@ export const darkColors: typeof lightColors = {
   ink: "#e8eef5",
   muted: "#9fb0c2",
   canvas: "#0f1c28",
+  webPage: "#0f1c28",
   surface: "#16222f",
   surfaceSoft: "#1b2a38",
   surfaceRaised: "#1e2f3f",
