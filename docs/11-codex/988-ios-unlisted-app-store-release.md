@@ -33,10 +33,10 @@ the demo link and PIN in the notes — §4), attaching the build, submitting.
 
 ## 1. Order of work
 
-1. **Production fixes first** (owner, Supabase dashboard): Auth → URL
-   Configuration — set Site URL and Redirect URLs to
-   `https://tomp-platform.vercel.app` (they still point at `localhost`), turn off
-   public sign-ups. Confirm migrations `0043`–`0047` are applied.
+1. **Production auth — done 2026-09-25**, verified by reading the config back:
+   Site URL `https://tomp-platform.vercel.app`, redirect allow-list
+   `https://tomp-platform.vercel.app/**`, public sign-up disabled (invites use the
+   admin API and are unaffected). Still confirm migrations `0043`–`0047` are applied.
 2. **Build** (owner): set `expo.version` to `1.0.0`, optionally set
    `EXPO_PUBLIC_SENTRY_DSN`, then `eas build -p ios --profile production`
    (`autoIncrement` bumps the build number).
