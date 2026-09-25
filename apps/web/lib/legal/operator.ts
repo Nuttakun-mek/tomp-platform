@@ -3,7 +3,7 @@
 export const SERVICE_OPERATOR = {
   // Brand and account holder together: the App Store lists the seller as the
   // individual account holder, and the listing's copyright is Craftory Lab.
-  name: "Craftory Lab (Nuttakun Mek)",
+  name: "Craftory Lab (Nuttakun Mekarun)",
   contactEmail: "nuttakun.mek@gmail.com",
   appName: "TOMP Driver",
   platformName: "TOMP",
