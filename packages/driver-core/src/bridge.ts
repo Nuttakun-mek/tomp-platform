@@ -30,7 +30,12 @@ export type BridgeMessageType =
   | "open.url"
   | "driver.notification.unread"
   | "mobile-session.challenge"
-  | "mobile-session.set";
+  | "mobile-session.set"
+  // The page asks the shell to leave the job and go back to scanning. Sent from
+  // "ไม่พบงานสำหรับลิงก์นี้": a token saved by an earlier install survives in the
+  // iOS Keychain, the app reopens it on every launch, and before this the only
+  // way out was a button hidden on the GPS tab.
+  | "job.leave";
 
 export type BridgeMessage =
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.start"; payload?: { reason?: string } }
@@ -38,6 +43,7 @@ export type BridgeMessage =
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "gps.status.request"; payload?: { reason?: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "open.url"; payload: { url: string } }
   | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "driver.notification.unread"; payload?: { count?: number } }
+  | { namespace: typeof BRIDGE_NAMESPACE; version: typeof BRIDGE_VERSION; type: "job.leave"; payload?: { reason?: string } }
   | {
       namespace: typeof BRIDGE_NAMESPACE;
       version: typeof BRIDGE_VERSION;
@@ -121,6 +127,7 @@ export interface BridgePayloadMap {
   "driver.notification.unread": { count?: number };
   "mobile-session.challenge": { code: string; expiresAt: string };
   "mobile-session.set": { session: string; expiresAt: string };
+  "job.leave": { reason?: string };
 }
 
 export function buildBridgeMessage<T extends BridgeMessageType>(
@@ -146,7 +153,7 @@ export function parseBridgeMessage(raw: string): BridgeMessage | null {
     return parsed as BridgeMessage;
   }
 
-  if (parsed.type === "driver.notification.unread") {
+  if (parsed.type === "driver.notification.unread" || parsed.type === "job.leave") {
     return parsed as BridgeMessage;
   }
 

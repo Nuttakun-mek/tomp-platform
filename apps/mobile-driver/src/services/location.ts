@@ -1,4 +1,4 @@
-import Constants from "expo-constants";
+import { APP_BUILD } from "./app-version";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
@@ -21,14 +21,6 @@ import { getMobileDriverSession, type MobileDriverSession } from "./mobile-sessi
 // for 59 minutes and nothing said whether that phone was even running the build
 // that reports why it stopped. Ten drivers over five days will not all install
 // the same day, so every ping has to say what it came from.
-const APP_BUILD = (() => {
-  const version = Constants.expoConfig?.version ?? "unknown";
-  const native =
-    Platform.OS === "ios"
-      ? Constants.expoConfig?.ios?.buildNumber
-      : String(Constants.expoConfig?.android?.versionCode ?? "");
-  return native ? `${version}+${native}` : version;
-})();
 
 type LocationCallback = (location: Location.LocationObject) => void;
 

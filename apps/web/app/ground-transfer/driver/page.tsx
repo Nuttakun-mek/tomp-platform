@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { DriverLeaveJobButton } from "@/components/driver/driver-leave-job-button";
 import { DriverPinGate } from "@/components/driver/driver-pin-gate";
 import { DriverPreflight } from "@/components/driver/driver-preflight";
 import { DriverSessionGate } from "@/components/driver/driver-session-gate";
@@ -11,11 +12,12 @@ interface DriverPageProps {
   searchParams?: Promise<{ token?: string; view?: string }>;
 }
 
-function DriverNotice({ title, detail }: { title: string; detail: string }) {
+function DriverNotice({ title, detail, action }: { title: string; detail: string; action?: React.ReactNode }) {
   return (
     <div className="grid min-h-[70vh] content-center gap-2 text-center">
       <h1 className="text-lg font-bold text-ink">{title}</h1>
       <p className="mx-auto max-w-sm text-[13px] leading-6 text-ink-soft">{detail}</p>
+      {action}
     </div>
   );
 }
@@ -53,6 +55,7 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
       <DriverNotice
         title="ไม่พบงานสำหรับลิงก์นี้"
         detail="ลิงก์อาจหมดอายุหรือถูกยกเลิก กรุณาติดต่อศูนย์ควบคุมเพื่อขอลิงก์และรหัสใหม่"
+        action={<DriverLeaveJobButton />}
       />
     );
   }

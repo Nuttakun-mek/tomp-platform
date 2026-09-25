@@ -19,7 +19,6 @@ export function originOf(rawUrl: string): string {
 }
 
 export const TOMP_WEB_ORIGIN = originOf(TOMP_API_BASE_URL);
-export const TOMP_DRIVER_APP_VERSION = "0.2.0";
 
 function normalizePathPrefix(value: string) {
   const trimmed = value.trim();

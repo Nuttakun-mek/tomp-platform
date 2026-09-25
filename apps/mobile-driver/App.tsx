@@ -37,7 +37,8 @@ import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, buildViewSwitchMessage, parseBridgeMessage, VIEW_SWITCH_EVENT } from "./src/bridge/protocol";
-import { BACKGROUND_GPS_ENABLED, buildDriverWebUrl, EAS_PROJECT_ID, TOMP_DRIVER_APP_VERSION, type DriverWebViewKey } from "./src/config";
+import { BACKGROUND_GPS_ENABLED, buildDriverWebUrl, EAS_PROJECT_ID, type DriverWebViewKey } from "./src/config";
+import { APP_VERSION, APP_VERSION_LABEL } from "./src/services/app-version";
 import { font, radius, space, text, TOUCH_MIN, useAppTheme, type ThemeColors, type ThemeOverlay } from "./src/theme";
 import {
   getLastSharedLocation,
@@ -99,7 +100,7 @@ const bridgeBootstrap = `
       namespace: "${BRIDGE_NAMESPACE}",
       version: ${BRIDGE_VERSION},
       platform: "${Platform.OS}",
-      appVersion: "${TOMP_DRIVER_APP_VERSION}",
+      appVersion: "${APP_VERSION}",
       canBackgroundLocation: ${BACKGROUND_GPS_ENABLED},
       postMessage: function(message) {
         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(message));
@@ -173,7 +174,7 @@ function DriverShell() {
   const networkIcon = networkTone === "live" ? "✓" : networkTone === "offline" ? "!" : "GPS";
   const currentScreenLabel = mode === "web"
     ? DRIVER_MENU_ITEMS.find((item) => item.key === activeDriverMenu)?.label ?? "ปฏิบัติงาน"
-    : `เวอร์ชัน ${TOMP_DRIVER_APP_VERSION}`;
+    : `เวอร์ชัน ${APP_VERSION_LABEL}`;
   // Deliberately independent of the active tab: the URL is the page's one and
   // only load, and which section it shows after that is the shell's to say over
   // the bridge. Baking the tab in here is what made every tab tap a reload.
@@ -302,6 +303,29 @@ function DriverShell() {
     [openDriverLink, qrLocked]
   );
 
+  const resetAssignment = useCallback(async () => {
+    await stopLocationSharing().catch(() => undefined);
+    await clearMobileDriverSession().catch(() => undefined);
+    await stopStaleBackgroundLocationTask().catch(() => undefined);
+    await clearDeliveredNotifications().catch(() => undefined);
+    await clearDriverToken();
+    currentTokenRef.current = "";
+    activeDriverMenuRef.current = "home";
+    setCurrentToken("");
+    setWebUrl("");
+    setMode("activation");
+    setSessionReady(false);
+    setLocationSharingActive(false);
+    setHasUnreadMessages(false);
+    setOutboxCount(0);
+    setSyncLabel("");
+    setScannerOpen(false);
+    setManualEntryOpen(false);
+    setQrLocked(false);
+    setActiveDriverMenu("home");
+    setMessage("ออกจากงานนี้แล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
+  }, []);
+
   const handleBridgeMessage = useCallback(
     async (event: WebViewMessageEvent) => {
       const parsed = parseBridgeMessage(event.nativeEvent.data);
@@ -357,6 +381,14 @@ function DriverShell() {
 
       if (parsed.type === "driver.notification.unread") {
         setHasUnreadMessages(activeDriverMenuRef.current !== "messages");
+        return;
+      }
+
+      // The driver tapped "สแกน QR ใหม่" on a job the server no longer knows.
+      // No confirm dialog: the page already told them the link is dead.
+      if (parsed.type === "job.leave") {
+        await resetAssignment();
+        setMessage("ลิงก์งานเดิมใช้ไม่ได้แล้ว กรุณาสแกน QR ใหม่จากศูนย์ควบคุม");
         return;
       }
 
@@ -425,7 +457,7 @@ function DriverShell() {
         { backgroundGps: backgroundResult }
       );
     },
-    [flushOutbox, postLocationSharingStatus, postStatusToWeb]
+    [flushOutbox, postLocationSharingStatus, postStatusToWeb, resetAssignment]
   );
 
   const handleNavigation = useCallback(
@@ -486,28 +518,6 @@ function DriverShell() {
     if (item.view) postViewSwitchToWeb(item.view);
   }, [postViewSwitchToWeb]);
 
-  const resetAssignment = useCallback(async () => {
-    await stopLocationSharing().catch(() => undefined);
-    await clearMobileDriverSession().catch(() => undefined);
-    await stopStaleBackgroundLocationTask().catch(() => undefined);
-    await clearDeliveredNotifications().catch(() => undefined);
-    await clearDriverToken();
-    currentTokenRef.current = "";
-    activeDriverMenuRef.current = "home";
-    setCurrentToken("");
-    setWebUrl("");
-    setMode("activation");
-    setSessionReady(false);
-    setLocationSharingActive(false);
-    setHasUnreadMessages(false);
-    setOutboxCount(0);
-    setSyncLabel("");
-    setScannerOpen(false);
-    setManualEntryOpen(false);
-    setQrLocked(false);
-    setActiveDriverMenu("home");
-    setMessage("ออกจากงานนี้แล้ว กรุณาสแกน QR ใหม่เมื่อได้รับงานถัดไป");
-  }, []);
 
   const confirmResetAssignment = useCallback(() => {
     Alert.alert(
@@ -682,7 +692,7 @@ function DriverShell() {
                   <Text style={styles.operationStatusTitle}>{sessionReady ? "พร้อมส่งข้อมูลให้ศูนย์ควบคุม" : "รอการยืนยันงาน"}</Text>
                 </View>
               </View>
-              <Text numberOfLines={1} style={styles.webVersionText}>เวอร์ชัน {TOMP_DRIVER_APP_VERSION}</Text>
+              <Text numberOfLines={1} style={styles.webVersionText}>เวอร์ชัน {APP_VERSION_LABEL}</Text>
             </View>
             {outboxCount > 0 || syncLabel ? (
               <View style={styles.syncNotice}>
@@ -805,7 +815,7 @@ function DriverShell() {
             <View style={styles.heroCard}>
               <View style={styles.heroMetaRow}>
                 <Text style={styles.kicker}>พื้นที่ปฏิบัติงานคนขับ</Text>
-                <Text style={styles.heroVersion}>v{TOMP_DRIVER_APP_VERSION}</Text>
+                <Text style={styles.heroVersion}>v{APP_VERSION_LABEL}</Text>
               </View>
               <Text style={styles.heroTitle}>รับงานจากศูนย์ควบคุม</Text>
               <Text style={styles.heroCopy}>

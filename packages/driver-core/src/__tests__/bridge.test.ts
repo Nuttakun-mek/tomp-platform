@@ -51,6 +51,11 @@ describe("bridge messages", () => {
     });
   });
 
+  it("lets the page ask the shell to leave a job that no longer exists", () => {
+    const message = buildBridgeMessage("job.leave", { reason: "link_not_found" });
+    expect(parseBridgeMessage(JSON.stringify(message))).toEqual(message);
+  });
+
   it("round-trips through parseBridgeMessage", () => {
     const message = buildBridgeMessage("mobile-session.challenge", { code: "abc", expiresAt: "2026-01-01T00:00:00.000Z" });
     expect(parseBridgeMessage(JSON.stringify(message))).toEqual(message);

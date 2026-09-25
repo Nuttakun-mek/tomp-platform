@@ -102,6 +102,9 @@ Current bridge messages to preserve:
 - `gps.stop`
 - `gps.status.request`
 - `driver.notification.unread`
+- `job.leave` (page → shell, 2026-09-25): the driver tapped "สแกน QR ใหม่" on
+  "ไม่พบงานสำหรับลิงก์นี้"; the shell clears its saved token and session and
+  returns to the scan screen. Needs app build 1.0.0 (8) or later.
 - native status events such as `session_ready`, `gps_sharing`, `gps_stopped`,
   `gps_error`, `session_missing`
 
