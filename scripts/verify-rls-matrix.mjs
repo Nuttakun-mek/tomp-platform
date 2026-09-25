@@ -118,6 +118,21 @@ try {
   expect("super_admin sees both", await asPersona("authenticated", admin.authId, (tx) => countIn(tx)("projects")), 2);
   expect("service_role sees both (bypassrls)", await asPersona("service_role", null, (tx) => countIn(tx)("projects")), 2);
 
+  // Airport Transfer (0050): scoped to the case's project through project_members
+  // with system_key = 'airport_transfer' — not the retired memberships table.
+  const atMember = await mkUser("at-member@test");
+  const [atViewerRole] = await sql`select id from roles where role_key = 'airport_viewer'`;
+  await sql`insert into project_members (project_id, profile_id, role_id, system_key, status) values (${projA.id}, ${atMember.profileId}, ${atViewerRole.id}, 'airport_transfer', 'active')`;
+  for (const [code, project] of [["AT-A", projA.id], ["AT-B", projB.id]]) {
+    await sql`insert into airport_transfer_cases (project_id, case_code, direction, passenger_first_name, passenger_last_name, travel_date, flight_number, pickup_name, dropoff_name)
+              values (${project}, ${code}, 'arrival', 'P', 'Q', '2026-01-01', 'TG1', 'BKK', 'Hotel')`;
+  }
+  console.log("\nAirport Transfer cases visible per persona (one in A, one in B):");
+  expect("airport member of A sees only A's case", await asPersona("authenticated", atMember.authId, (tx) => countIn(tx)("airport_transfer_cases")), 1);
+  expect("ground-transfer member of A sees no airport cases", await asPersona("authenticated", member.authId, (tx) => countIn(tx)("airport_transfer_cases")), 0);
+  expect("outsider sees no airport cases", await asPersona("authenticated", outsider.authId, (tx) => countIn(tx)("airport_transfer_cases")), 0);
+  expect("super_admin sees both airport cases", await asPersona("authenticated", admin.authId, (tx) => countIn(tx)("airport_transfer_cases")), 2);
+
   // Design: there are no write RLS policies. Every INSERT/UPDATE/DELETE through
   // the cookie-bound `authenticated` client is denied by RLS default-deny;
   // writes go only through server actions on the service-role client, which
