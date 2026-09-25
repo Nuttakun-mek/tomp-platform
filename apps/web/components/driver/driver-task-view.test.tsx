@@ -6,6 +6,8 @@
 // exists inside a real React render pass.
 import { describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { VIEW_SWITCH_EVENT, buildViewSwitchMessage } from "@tomp/driver-core";
 import { DriverTaskView } from "./driver-task-view";
 import type { DriverAccessAssignment } from "@/lib/data/driver-access";
@@ -154,6 +156,27 @@ describe("DriverTaskView view switching", () => {
       expect(screen.queryByText(/เมนูนี้แสดงเฉพาะเมื่อเปิดหน้าคนขับผ่านเว็บเบราว์เซอร์/)).toBeNull();
     } finally {
       delete (window as { ReactNativeWebView?: unknown }).ReactNativeWebView;
+    }
+  });
+
+  it("hydrates the server HTML inside the app without a mismatch", async () => {
+    // The server cannot know about the app, so its HTML includes the browser nav.
+    const html = renderToString(<DriverTaskView driverAccess={buildDriverAccess()} view="home" />);
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    (window as { ReactNativeWebView?: unknown }).ReactNativeWebView = { postMessage: vi.fn() };
+    const recoverable = vi.fn();
+    try {
+      await act(async () => {
+        hydrateRoot(container, <DriverTaskView driverAccess={buildDriverAccess()} view="home" />, { onRecoverableError: recoverable });
+      });
+      expect(recoverable).not.toHaveBeenCalled();
+      // …and the layout effect still removes the browser-only nav.
+      expect(container.textContent).not.toMatch(/เมนูนี้แสดงเฉพาะเมื่อเปิดหน้าคนขับผ่านเว็บเบราว์เซอร์/);
+    } finally {
+      delete (window as { ReactNativeWebView?: unknown }).ReactNativeWebView;
+      container.remove();
     }
   });
 

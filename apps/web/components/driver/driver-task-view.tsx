@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CarFront, CheckCircle2, ChevronDown, Clock3, Home, ListChecks, LogIn, LogOut, MapPin, MessageCircle, Navigation, Phone, RotateCcw, TriangleAlert, UserRound } from "lucide-react";
@@ -157,7 +157,12 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     Boolean(driverAccess.latestStatus) || ["acknowledged", "active", "completed"].includes(driverAccess.assignment.status)
   ));
   const [outboxCount, setOutboxCount] = useState(0);
-  const [insideNativeShell, setInsideNativeShell] = useState(() => (typeof window === "undefined" ? false : isInsideMobileShell(window)));
+  // Starts false on both server and client so hydration matches the server HTML;
+  // the layout effect below corrects it before the first paint, so the
+  // browser-only nav never flashes inside the app. Reading window in the
+  // initializer made the app's first client render differ from the server's,
+  // and React threw the server HTML away on every open.
+  const [insideNativeShell, setInsideNativeShell] = useState(false);
   // Which section is on screen is now state, not a fixed prop: the native shell
   // switches tabs by posting over the bridge rather than reloading this page.
   // The URL's `view` seeds it, and still wins whenever it *changes* — the
@@ -266,7 +271,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     };
   }, [driverAccess.token, ids.assignmentId, setMeta]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateShellState = () => setInsideNativeShell(isInsideMobileShell(window));
     updateShellState();
     window.addEventListener("tomp:mobile-shell-ready", updateShellState);
