@@ -37,7 +37,19 @@ interface LastLocation {
 interface DriverLocationShareProps {
   driverAccess: DriverAccessAssignment;
   onStatusChange?: (status: LocationSignal) => void;
+  /** Bumped by the page when the driver clocks in: start sharing without a second tap. */
+  startRequest?: number;
 }
+
+function alwaysKey(token: string) {
+  return `tomp_gps_always_needed_${token.slice(-16)}`;
+}
+
+// iOS and Android name the setting differently; say it the way the phone does.
+const ALWAYS_STEPS: Record<string, string> = {
+  ios: "ตั้งค่า → TOMP Driver → ตำแหน่ง → เลือก “ตลอดเวลา” และเปิด “ตำแหน่งที่แม่นยำ”",
+  android: "ตั้งค่า → แอป → TOMP Driver → สิทธิ์ → ตำแหน่ง → เลือก “อนุญาตตลอดเวลา” และเปิด “ใช้ตำแหน่งที่แน่นอน”"
+};
 
 function buildGoogleMapsUrl(location: LastLocation) {
   return `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
@@ -98,7 +110,7 @@ function shareStateClasses(state: ShareState) {
   };
 }
 
-export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLocationShareProps) {
+export function DriverLocationShare({ driverAccess, onStatusChange, startRequest = 0 }: DriverLocationShareProps) {
   const [state, setState] = useState<ShareState>("idle");
   const [message, setMessage] = useState("ยังไม่ได้ส่งตำแหน่ง GPS");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
@@ -106,6 +118,13 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
   const [cardOpen, setCardOpen] = useState(true);
   const [canResume, setCanResume] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  // The app reports whether "Always" was granted only in its answer to a start,
+  // so it is remembered per job: a tab switch remounts this card, and the
+  // warning must outlast the location pings that replace `message` every few
+  // seconds — that is why drivers never saw it before.
+  const [alwaysNeeded, setAlwaysNeeded] = useState(false);
+  const [shellPlatform, setShellPlatform] = useState<string | null>(null);
+  const handledStartRef = useRef(0);
   const lastSentRef = useRef<LastSentFix | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
@@ -300,6 +319,15 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
     );
   }, [driverAccess.token, requestWakeLock, sendPosition, setSignal]);
 
+  // Clocking in means the driver is working now, and a working driver shares
+  // their location — so the clock-in button starts sharing too, instead of
+  // leaving a second button to remember.
+  useEffect(() => {
+    if (!startRequest || startRequest === handledStartRef.current) return;
+    handledStartRef.current = startRequest;
+    void startSharing();
+  }, [startRequest, startSharing]);
+
   const stopSharing = useCallback(async () => {
     setConfirmStop(false);
     const shell = getMobileShell(window);
@@ -342,6 +370,17 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       if (!payload) return;
 
       if (payload.message) setMessage(payload.message);
+      const background = (payload.detail as { backgroundGps?: { started?: boolean; reason?: string } } | undefined)?.backgroundGps;
+      if (background) {
+        const needed = !background.started && background.reason === "permission_denied";
+        setAlwaysNeeded(needed);
+        try {
+          if (needed) window.localStorage.setItem(alwaysKey(driverAccess.token), "1");
+          else window.localStorage.removeItem(alwaysKey(driverAccess.token));
+        } catch {
+          // Storage can be unavailable; the warning still shows for this visit.
+        }
+      }
       if (payload.status === "gps_sharing") {
         setConfirmStop(false);
         const locationDetail = payload.detail as
@@ -371,6 +410,12 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       }
     };
 
+    try {
+      setAlwaysNeeded(window.localStorage.getItem(alwaysKey(driverAccess.token)) === "1");
+    } catch {
+      // ignore
+    }
+    setShellPlatform(getMobileShell(window)?.platform ?? null);
     window.addEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
     window.addEventListener(MOBILE_SHELL_READY_EVENT, requestNativeStatus);
     const requestTimer = window.setTimeout(requestNativeStatus, 50);
@@ -379,7 +424,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
       window.removeEventListener(NATIVE_STATUS_EVENT, handleNativeStatus);
       window.removeEventListener(MOBILE_SHELL_READY_EVENT, requestNativeStatus);
     };
-  }, [markFresh, setSignal]);
+  }, [driverAccess.token, markFresh, setSignal]);
 
   useEffect(() => {
     const storedConsent = window.localStorage.getItem(consentKey(driverAccess.token)) === "1";
@@ -495,6 +540,14 @@ export function DriverLocationShare({ driverAccess, onStatusChange }: DriverLoca
           <ChevronDown className={`h-4 w-4 text-ink-faint transition ${cardOpen ? "rotate-180" : ""}`} />
         </span>
       </button>
+      {alwaysNeeded && shellPlatform ? (
+        <div className="mx-3.5 mb-3 grid gap-1 rounded-xl border border-amber-300 bg-amber-50 p-3 text-[12px] leading-5 text-amber-900">
+          <p className="text-[13px] font-bold">ตั้งค่าตำแหน่งเป็น “ตลอดเวลา”</p>
+          <p>ตอนนี้ส่งตำแหน่งได้เฉพาะตอนเปิดแอป เมื่อปิดจอหรือสลับแอป ศูนย์ควบคุมจะไม่เห็นรถของคุณ</p>
+          <p className="font-semibold">{ALWAYS_STEPS[shellPlatform] ?? ALWAYS_STEPS.ios}</p>
+          <p>กดปุ่ม “ตั้งค่าอุปกรณ์” ด้านบนเพื่อไปที่การตั้งค่าได้ทันที</p>
+        </div>
+      ) : null}
 
       {cardOpen ? (
       <div className="grid gap-3 border-t border-border/70 p-3.5">

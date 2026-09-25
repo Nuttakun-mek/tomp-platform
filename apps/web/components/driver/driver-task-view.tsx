@@ -157,6 +157,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     Boolean(driverAccess.latestStatus) || ["acknowledged", "active", "completed"].includes(driverAccess.assignment.status)
   ));
   const [outboxCount, setOutboxCount] = useState(0);
+  const [gpsStartRequest, setGpsStartRequest] = useState(0);
   // Starts false on both server and client so hydration matches the server HTML;
   // the layout effect below corrects it before the first paint, so the
   // browser-only nav never flashes inside the app. Reading window in the
@@ -357,10 +358,13 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
           endedAt: status === "work_ended" ? now : null,
           latestAt: now
         }));
-        setBanner({ tone: "ok", text: status === "work_started" ? "บันทึกเวลาเริ่มปฏิบัติงานแล้ว" : "บันทึกเวลาสิ้นสุดปฏิบัติงานแล้ว" });
+        setBanner({ tone: "ok", text: status === "work_started" ? "บันทึกเวลาเริ่มปฏิบัติงานแล้ว และเริ่มส่งตำแหน่ง GPS" : "บันทึกเวลาสิ้นสุดปฏิบัติงานแล้ว" });
       } else {
         enqueueFailed("status", payload, result.error || "บันทึกเวลาปฏิบัติงานไม่สำเร็จ ระบบจะส่งข้อมูลอีกครั้งเมื่อเชื่อมต่อได้");
       }
+      // Sharing starts either way: a clock-in queued for a weak signal still
+      // means the driver is on the road now.
+      if (status === "work_started") setGpsStartRequest((count) => count + 1);
     });
   }
 
@@ -655,7 +659,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
         >
           เปิดในแอป TOMP Driver เพื่อส่ง GPS ต่อเนื่องเมื่อปิดจอ
         </a>
-        <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} />
+        <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} startRequest={gpsStartRequest} />
       </section> : null}
 
       {showAssignments ? (

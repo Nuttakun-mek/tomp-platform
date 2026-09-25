@@ -6,6 +6,7 @@ import type { DriverNotification } from "@tomp/types/domain";
 import { buildBridgeMessage, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail } from "@tomp/driver-core";
 import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import type { DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
+import { PhotoViewer } from "@/components/driver/photo-viewer";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 
 export interface ChatBubble {
@@ -183,6 +184,7 @@ export function DriverChatThread({
   const [now, setNow] = useState<number | null>(null);
   const [photo, setPhoto] = useState<PendingPhoto | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<{ src: string; alt: string } | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -318,10 +320,15 @@ export function DriverChatThread({
                 {b.tone === "issue" && b.from === "driver" ? <span className="font-semibold">[เหตุขัดข้อง] </span> : null}
                 {b.text}
                 {b.attachment?.signedUrl ? (
-                  <a href={b.attachment.signedUrl} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-xl border border-white/40 bg-black/5">
+                  <button
+                    type="button"
+                    onClick={() => setViewing({ src: b.attachment!.signedUrl!, alt: b.from === "driver" ? "รูปจากคนขับ" : "รูปจากศูนย์ควบคุม" })}
+                    aria-label="ดูรูปเต็มจอ"
+                    className="mt-2 block w-full overflow-hidden rounded-xl border border-white/40 bg-black/5"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL preview */}
                     <img src={b.attachment.signedUrl} alt={b.from === "driver" ? "รูปจากคนขับ" : "รูปจากศูนย์ควบคุม"} className="max-h-56 w-full object-cover" />
-                  </a>
+                  </button>
                 ) : null}
                 {b.attachment ? (
                   <span className={`mt-1 block text-[10px] ${b.from === "driver" ? "text-white/70" : "text-ink-faint"}`}>
@@ -436,6 +443,7 @@ export function DriverChatThread({
           </button>
         </div>
       </div>
+      {viewing ? <PhotoViewer src={viewing.src} alt={viewing.alt} onClose={() => setViewing(null)} /> : null}
     </section>
   );
 }
