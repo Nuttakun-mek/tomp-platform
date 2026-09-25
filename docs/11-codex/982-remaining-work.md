@@ -24,11 +24,11 @@
   luggage / shuttle / airport as "van".
 - **986 follow-ups**: members can be removed (helper links revoked with them);
   the delete dialog names the Airport Transfer passenger data; Airport
-  Transfer RLS reads `project_members` per project (`0050` — **written and
-  CI-verified, NOT yet applied to production**); the `.ilike` email lookups
-  are escaped.
+  Transfer RLS reads `project_members` per project (`0050`, applied to
+  production 2026-09-25 and checked in `pg_policies`); the `.ilike` email
+  lookups are escaped.
 
-Still open: apply `0050`; the helper-QR `project_manager` decision (owner);
+Still open: the helper-QR `project_manager` decision (owner);
 the background freeze (needs field data from 1.0.0); running
 `smoke:driver-flow` / `monitor:driver-ops` / `e2e:visual` against production;
 device testing (§6); bilingual rollout (parked).
