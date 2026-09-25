@@ -33,6 +33,7 @@ import {
   NotoSansThai_700Bold
 } from "@expo-google-fonts/noto-sans-thai";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { WebView, type WebViewProps } from "react-native-webview";
 import type { WebViewMessageEvent, WebViewNavigation } from "react-native-webview/lib/WebViewTypes";
 import { BRIDGE_NAMESPACE, BRIDGE_VERSION, buildNativeStatusMessage, buildViewSwitchMessage, parseBridgeMessage, VIEW_SWITCH_EVENT } from "./src/bridge/protocol";
@@ -690,7 +691,7 @@ function DriverShell() {
               style={({ pressed }) => [styles.topSettingsButton, settingsOpen && styles.topSettingsButtonActive, pressed && styles.pressablePressed]}
               onPress={() => setSettingsOpen((value) => !value)}
             >
-              <Text style={[styles.topSettingsButtonText, settingsOpen && styles.topSettingsButtonTextActive]}>ตั้งค่า</Text>
+              <Ionicons name={settingsOpen ? "settings" : "settings-outline"} size={20} color={settingsOpen ? colors.command : colors.onCommand} />
             </Pressable>
           </View>
         </View>
@@ -1103,27 +1104,21 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     fontFamily: font.semibold,
     ...text.micro
   },
+  // A round gear the size of the "T" mark opposite it (brandMark), so the bar
+  // is symmetrical; the accessibility label still says what it is.
   topSettingsButton: {
     alignItems: "center",
     backgroundColor: overlay.soft,
     borderColor: overlay.faint,
     borderRadius: radius.pill,
     borderWidth: 1,
+    height: 40,
     justifyContent: "center",
-    minHeight: 34,
-    paddingHorizontal: space.md
+    width: 40
   },
   topSettingsButtonActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent
-  },
-  topSettingsButtonText: {
-    color: colors.onCommand,
-    fontFamily: font.bold,
-    ...text.micro
-  },
-  topSettingsButtonTextActive: {
-    color: colors.command
   },
   settingsOverlay: {
     bottom: 0,
