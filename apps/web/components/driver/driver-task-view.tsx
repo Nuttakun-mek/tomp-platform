@@ -653,12 +653,16 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
       </section> : null}
 
       {showGps ? <section id="driver-gps" className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-white/95 p-3.5 shadow-[0_12px_30px_rgba(16,32,51,0.07)] scroll-mt-3">
-        <a
-          href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
-          className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
-        >
-          เปิดในแอป TOMP Driver เพื่อส่ง GPS ต่อเนื่องเมื่อปิดจอ
-        </a>
+        {/* Only in a browser: inside the app it pointed the driver at the app
+            they were already in. */}
+        {!insideNativeShell ? (
+          <a
+            href={`tompdriver://?token=${encodeURIComponent(driverAccess.token)}`}
+            className="rounded-card border border-operation/30 bg-operation-soft px-3 py-2 text-center text-[12px] font-semibold text-operation"
+          >
+            เปิดในแอป TOMP Driver เพื่อส่ง GPS ต่อเนื่องเมื่อปิดจอ
+          </a>
+        ) : null}
         <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} startRequest={gpsStartRequest} />
       </section> : null}
 

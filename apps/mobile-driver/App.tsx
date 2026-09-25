@@ -791,7 +791,10 @@ function DriverShell() {
                 />
               )}
             </View>
-            <View style={[styles.bottomBar, { paddingBottom: bottomSafeInset + space.sm }]}>
+            {/* The home-indicator space goes outside the capsule. Inside it, as
+                padding, it made the capsule a tall slab with the labels at its top
+                edge and its corners running into the screen's own curve. */}
+            <View style={[styles.bottomBar, { marginBottom: Math.max(bottomSafeInset, space.sm) }]}>
               {DRIVER_MENU_ITEMS.map((item) => (
                 <Pressable
                   accessibilityRole="tab"

@@ -53,6 +53,21 @@ describe("DriverTaskView view switching", () => {
     expect(screen.getByText(/เมนูนี้แสดงเฉพาะเมื่อเปิดหน้าคนขับผ่านเว็บเบราว์เซอร์/)).toBeTruthy();
   });
 
+  it("offers 'open in the app' only in a browser, not inside the app", () => {
+    delete (window as { ReactNativeWebView?: unknown }).ReactNativeWebView;
+    const browser = render(<DriverTaskView driverAccess={buildDriverAccess()} view="gps" />);
+    expect(screen.queryByText(/เปิดในแอป TOMP Driver/)).toBeTruthy();
+    browser.unmount();
+
+    (window as { ReactNativeWebView?: unknown }).ReactNativeWebView = { postMessage: vi.fn() };
+    try {
+      render(<DriverTaskView driverAccess={buildDriverAccess()} view="gps" />);
+      expect(screen.queryByText(/เปิดในแอป TOMP Driver/)).toBeNull();
+    } finally {
+      delete (window as { ReactNativeWebView?: unknown }).ReactNativeWebView;
+    }
+  });
+
   it("hides the browser-only fallback nav inside the native WebView", () => {
     (window as { ReactNativeWebView?: unknown }).ReactNativeWebView = { postMessage: vi.fn() };
     try {
