@@ -41,6 +41,28 @@ describe("mobile shell detection", () => {
     expect(getMobileShell({ TOMP_MOBILE_SHELL: { namespace: "tomp.driver" } })).toBeNull();
   });
 
+  it("builds a working handle from ReactNativeWebView when the app's handle never arrived", () => {
+    // Every app build up to 1.0.0 (9) injected its handle at document start,
+    // before <head> existed; document.head.appendChild threw and the handle was
+    // never set. The page then shared GPS from the browser, which stops as soon
+    // as the app leaves the screen. The WebView's own bridge is always there.
+    const sent: string[] = [];
+    const container = {
+      ReactNativeWebView: { postMessage: (raw: string) => sent.push(raw) },
+      navigator: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148" }
+    };
+    const handle = getMobileShell(container);
+    expect(handle?.canBackgroundLocation).toBe(true);
+    expect(handle?.platform).toBe("ios");
+    handle?.postMessage(buildBridgeMessage("gps.start", { reason: "driver_requested" }));
+    expect(parseBridgeMessage(sent[0])?.type).toBe("gps.start");
+  });
+
+  it("prefers the app's own handle when it exists", () => {
+    const withBoth = { TOMP_MOBILE_SHELL: shell, ReactNativeWebView: { postMessage: () => undefined } };
+    expect(getMobileShell(withBoth)).toBe(shell);
+  });
+
   it("still detects the native WebView when the typed shell handle is unavailable", () => {
     expect(isInsideMobileShell({ ReactNativeWebView: { postMessage: () => undefined } })).toBe(true);
     expect(isInsideMobileShell({ TOMP_MOBILE_SHELL: { namespace: "tomp.driver" }, ReactNativeWebView: { postMessage: () => undefined } })).toBe(true);

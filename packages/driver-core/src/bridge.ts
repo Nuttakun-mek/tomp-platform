@@ -115,22 +115,37 @@ export function isMobileShell(value: unknown): value is MobileShellHandle {
 export function getMobileShell(container: unknown): MobileShellHandle | null {
   if (!isRecord(container)) return null;
   const shell = (container as { TOMP_MOBILE_SHELL?: unknown }).TOMP_MOBILE_SHELL;
-  return isMobileShell(shell) ? shell : null;
+  if (isMobileShell(shell)) return shell;
+  return shellFromWebViewBridge(container);
+}
+
+// Every app build up to 1.0.0 (9) injected TOMP_MOBILE_SHELL at document start,
+// before <head> existed: `document.head.appendChild` threw and the handle was
+// never set. The page then shared GPS from the browser, which stops the moment
+// the app leaves the screen. react-native-webview's own ReactNativeWebView is
+// always present and the shell reads the same JSON from it, so a handle built on
+// it speaks the full protocol. Background GPS is on in every build
+// (EXPO_PUBLIC_TOMP_ENABLE_BACKGROUND_GPS defaults on), so it says so.
+function shellFromWebViewBridge(container: Record<string, unknown>): MobileShellHandle | null {
+  const bridge = (container as { ReactNativeWebView?: unknown }).ReactNativeWebView;
+  if (!isRecord(bridge) || typeof bridge.postMessage !== "function") return null;
+  const post = bridge.postMessage as (raw: string) => void;
+  const userAgent = String((container as { navigator?: { userAgent?: unknown } }).navigator?.userAgent ?? "");
+  return {
+    namespace: BRIDGE_NAMESPACE,
+    version: BRIDGE_VERSION,
+    platform: /android/i.test(userAgent) ? "android" : /iphone|ipad|ipod/i.test(userAgent) ? "ios" : undefined,
+    canBackgroundLocation: true,
+    postMessage: (message: BridgeMessage) => post.call(bridge, JSON.stringify(message))
+  };
 }
 
 /**
- * True when the page is running inside the native app's WebView. This is
- * intentionally a little looser than getMobileShell(): older app builds can
- * expose ReactNativeWebView before they expose a protocol-compatible shell
- * handle. In that case the web page must still hide browser-only chrome such as
- * the fallback bottom tab bar, while feature commands continue to require
- * getMobileShell().
+ * True when the page is running inside the native app's WebView. Same answer
+ * as getMobileShell() now that it falls back to ReactNativeWebView.
  */
 export function isInsideMobileShell(container: unknown): boolean {
-  if (!isRecord(container)) return false;
-  if (getMobileShell(container)) return true;
-  const bridge = (container as { ReactNativeWebView?: unknown }).ReactNativeWebView;
-  return isRecord(bridge) && typeof bridge.postMessage === "function";
+  return getMobileShell(container) !== null;
 }
 
 /** Payload shape per message type. `gps.*` payloads are optional. */

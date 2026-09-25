@@ -105,6 +105,15 @@ Current bridge messages to preserve:
 - `job.leave` (page → shell, 2026-09-25): the driver tapped "สแกน QR ใหม่" on
   "ไม่พบงานสำหรับลิงก์นี้"; the shell clears its saved token and session and
   returns to the scan screen. Needs app build 1.0.0 (8) or later.
+
+2026-09-25: every app build up to 1.0.0 (9) failed to set
+`window.TOMP_MOBILE_SHELL` — its document-start script called
+`document.head.appendChild` before `<head>` existed and threw — so the page
+shared GPS from the browser and nothing reached the shell. `getMobileShell()`
+now falls back to a handle built on `window.ReactNativeWebView` (always
+present, same JSON protocol), so installed builds get native/background GPS
+and every other bridge message; the shell's script is fixed for the next build.
+Driver pages also declare their own no-zoom viewport.
 - native status events such as `session_ready`, `gps_sharing`, `gps_stopped`,
   `gps_error`, `session_missing`
 

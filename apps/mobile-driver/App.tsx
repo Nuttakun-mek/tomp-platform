@@ -87,15 +87,13 @@ const DRIVER_MENU_ITEMS: Array<{ key: DriverMenuKey; label: string; shortLabel: 
   { key: "location", label: "ตำแหน่ง", shortLabel: "ตำแหน่ง", view: "gps" }
 ];
 
+// Runs at document start, before <head> exists. The handle goes first and on its
+// own: this script used to begin with document.head.appendChild, which threw at
+// that moment, so on every build up to 1.0.0 (9) the handle was never set — the
+// page shared GPS from the browser (stopping when the app left the screen) and
+// the zoom lock never applied. The viewport now waits for <head>.
 const bridgeBootstrap = `
   (function () {
-    var viewport = document.querySelector('meta[name="viewport"]');
-    if (!viewport) {
-      viewport = document.createElement('meta');
-      viewport.setAttribute('name', 'viewport');
-      document.head.appendChild(viewport);
-    }
-    viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
     window.TOMP_MOBILE_SHELL = {
       namespace: "${BRIDGE_NAMESPACE}",
       version: ${BRIDGE_VERSION},
@@ -106,6 +104,20 @@ const bridgeBootstrap = `
         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(message));
       }
     };
+    function pinViewport() {
+      if (!document.head) return false;
+      var viewport = document.querySelector('meta[name="viewport"]');
+      if (!viewport) {
+        viewport = document.createElement('meta');
+        viewport.setAttribute('name', 'viewport');
+        document.head.appendChild(viewport);
+      }
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+      return true;
+    }
+    try {
+      if (!pinViewport()) document.addEventListener('DOMContentLoaded', pinViewport, { once: true });
+    } catch (error) {}
     window.dispatchEvent(new CustomEvent("tomp:mobile-shell-ready", { detail: window.TOMP_MOBILE_SHELL }));
   })();
   true;
