@@ -5,6 +5,34 @@
 **Supersedes the open half of:** `977`, `980`, `981`
 **Status:** the list of record. Close items here, not in the older documents.
 
+## Closed 2026-09-25 (before the 1.0.0 iOS build)
+
+- **Migrations 0043–0047** are on production (checked against the live schema);
+  production records up to `0049`.
+- **Supabase Auth**: Site URL and redirect allow-list are the production domain,
+  public sign-up is off.
+- **Contract oddities (§5)**: `shell_ready` removed; `canBackgroundLocation` is
+  required, no longer guessed (see `978`).
+- **Wave 2 (§3)**: amber at 80% of the planned window (30 minutes when the start
+  is unknown); red past the end; "ยังไม่บันทึกเวลาออก" when done but not clocked out.
+- **Wave 3 (§3)**: centre → driver photos already worked both ways; the fleet
+  card no longer hides unacknowledged messages behind `slice(-4)` and can show
+  the full history.
+- **Wave 4 (§3)**: add driver + vehicle as a pair, Call Sign issued with it.
+- **Wave 5 (§3)**: symbols on the map (both data paths) and the first vehicle
+  edit path (`updateVehicleAction`); the add-pair action no longer saves VIP /
+  luggage / shuttle / airport as "van".
+- **986 follow-ups**: members can be removed (helper links revoked with them);
+  the delete dialog names the Airport Transfer passenger data; Airport
+  Transfer RLS reads `project_members` per project (`0050` — **written and
+  CI-verified, NOT yet applied to production**); the `.ilike` email lookups
+  are escaped.
+
+Still open: apply `0050`; the helper-QR `project_manager` decision (owner);
+the background freeze (needs field data from 1.0.0); running
+`smoke:driver-flow` / `monitor:driver-ops` / `e2e:visual` against production;
+device testing (§6); bilingual rollout (parked).
+
 Read next with:
 
 - `978-web-mobile-contract-boundary.md` for API/bridge ownership.

@@ -108,6 +108,19 @@ Current bridge messages to preserve:
 If the web driver page changes GPS controls, session handshake or notification
 indicators, verify the bridge message shape before merging.
 
+2026-09-25 change (driver-core, both tracks): `NativeStatus` no longer includes
+`shell_ready` — it was declared but never sent or read. `buildNativeStatusMessage`
+now **requires** `{ canBackgroundLocation }`; the old default guessed
+`status !== "session_missing"`. The field means "this build can share GPS from
+the native side in the background" — the same value as
+`window.TOMP_MOBILE_SHELL.canBackgroundLocation` — not "the driver granted
+Always"; the status and message report the permission. The shell already passed
+`BACKGROUND_GPS_ENABLED`, so its behaviour is unchanged.
+
+Ownership in practice (2026-09-25): the owner directs both tracks from one
+session; the split below is a code-ownership map for reviewers, not a rule about
+who may edit which directory.
+
 ## Mission Control Read Path
 
 Mission Control reads app-submitted data through web APIs and server data
