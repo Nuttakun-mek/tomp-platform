@@ -13,6 +13,9 @@
       },
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "preview": {
@@ -23,6 +26,9 @@
       },
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "production": {
@@ -33,6 +39,9 @@
       },
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
   },
