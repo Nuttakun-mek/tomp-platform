@@ -118,13 +118,15 @@ export const space = {
 // the lower vowels below it, so at 1.2 the marks are clipped by the line box.
 // Every step here is about 1.45, which is what stops ไม้โท and ไ from losing
 // their heads in the tab bar. Nothing in the shell sets a bare fontSize.
+// One step up across the board (2026-09-25): drivers read this at arm's length
+// in a moving vehicle, and 11px labels were too small to take in at a glance.
 export const text = {
-  micro: { fontSize: 11, lineHeight: 16 },
-  caption: { fontSize: 12, lineHeight: 18 },
-  body: { fontSize: 14, lineHeight: 21 },
-  strong: { fontSize: 16, lineHeight: 24 },
-  title: { fontSize: 18, lineHeight: 26 },
-  display: { fontSize: 24, lineHeight: 34 }
+  micro: { fontSize: 12, lineHeight: 18 },
+  caption: { fontSize: 13, lineHeight: 19 },
+  body: { fontSize: 15, lineHeight: 22 },
+  strong: { fontSize: 17, lineHeight: 25 },
+  title: { fontSize: 19, lineHeight: 28 },
+  display: { fontSize: 26, lineHeight: 37 }
 } as const;
 
 // Three weights, loaded and used. `fontWeight` is deliberately absent

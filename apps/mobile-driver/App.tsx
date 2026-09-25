@@ -802,7 +802,6 @@ function DriverShell() {
                   onPress={() => openDriverMenu(item)}
                 >
                   {item.key === "messages" && hasUnreadMessages ? <View style={styles.menuBadge} /> : null}
-                  <View style={[styles.menuIndicator, activeDriverMenu === item.key && styles.menuIndicatorActive]} />
                   <Text numberOfLines={1} style={[styles.menuButtonText, activeDriverMenu === item.key && styles.menuButtonTextActive]}>{item.shortLabel}</Text>
                 </Pressable>
               ))}
@@ -1570,7 +1569,9 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     ...text.micro
   },
   previewCallSign: {
-    color: colors.surface,
+    // On the command-coloured card, which is dark in both themes; surface is
+    // white only in the light palette, so this vanished in dark mode.
+    color: colors.onCommand,
     fontFamily: font.bold,
     ...text.display
   },
@@ -1611,7 +1612,9 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     ...text.micro
   },
   previewMetaValue: {
-    color: colors.surface,
+    // On the command-coloured card, which is dark in both themes; surface is
+    // white only in the light palette, so this vanished in dark mode.
+    color: colors.onCommand,
     fontFamily: font.bold,
     ...text.caption
   },
@@ -1716,69 +1719,60 @@ function createStyles(colors: ThemeColors, overlay: ThemeOverlay) {
     fontFamily: font.bold,
     ...text.strong
   },
+  // The same capsule as the top bar (topbarCard + topSettingsButton), so the
+  // two ends of the screen read as one set of controls.
   bottomBar: {
-    backgroundColor: colors.surfaceRaised,
-    borderColor: colors.lineSoft,
-    borderRadius: radius.lg,
+    alignItems: "center",
+    backgroundColor: colors.commandDeep,
+    borderColor: overlay.faint,
+    borderRadius: radius.pill,
     borderWidth: 1,
     elevation: 10,
     flexDirection: "row",
     gap: space.xs,
     marginBottom: space.sm,
-    marginHorizontal: space.md,
+    marginHorizontal: space.sm,
     marginTop: space.sm,
     padding: 6,
     shadowColor: colors.ink,
-    shadowOffset: { height: -6, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.10,
+    shadowRadius: 18
   },
   menuButton: {
     alignItems: "center",
-    borderRadius: radius.md,
+    borderColor: "transparent",
+    borderRadius: radius.pill,
+    borderWidth: 1,
     flex: 1,
-    gap: 2,
     justifyContent: "center",
-    minHeight: 52,
+    minHeight: 46,
     paddingHorizontal: space.xs,
     paddingVertical: space.xs,
     position: "relative"
   },
   menuButtonActive: {
-    backgroundColor: colors.operation,
-    shadowColor: colors.operationDeep,
-    shadowOffset: { height: 6, width: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12
+    backgroundColor: colors.accent,
+    borderColor: colors.accent
   },
   menuButtonUnread: {
     backgroundColor: colors.dangerSoft,
     borderColor: colors.dangerLine,
     borderWidth: 1
   },
-  menuIndicator: {
-    backgroundColor: "transparent",
-    borderRadius: radius.pill,
-    height: 4,
-    width: 16
-  },
-  menuIndicatorActive: {
-    backgroundColor: colors.accent,
-    width: 24
-  },
   menuButtonText: {
-    color: colors.muted,
+    color: colors.onCommandMuted,
     fontFamily: font.semibold,
     textAlign: "center",
-    ...text.micro
+    ...text.caption
   },
   menuButtonTextActive: {
-    color: colors.surface,
+    color: colors.command,
     fontFamily: font.bold
   },
   menuBadge: {
     backgroundColor: colors.danger,
-    borderColor: colors.surface,
+    borderColor: colors.commandDeep,
     borderRadius: radius.pill,
     borderWidth: 2,
     height: 12,
