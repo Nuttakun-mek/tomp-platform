@@ -18,6 +18,19 @@ Account holder and operator: **Nuttakun Mek**, contact `nuttakun.mek@gmail.com`
 | App Store Connect app | `ascAppId 6811029020`, team `32589P2H8M`, bundle `com.tomp.driver` |
 | Device family | iPhone only, portrait (`supportsTablet: false`) — no iPad screenshots needed |
 
+## 0.1 Set in App Store Connect through the API on 2026-09-25
+
+Version `1.0.0` (`b85af22c-…`, PREPARE_FOR_SUBMISSION), **release type MANUAL**;
+`app.json` / `package.json` version bumped to `1.0.0` to match. Category Business /
+Navigation. Content rights: no third-party content. Thai and en-US: subtitle,
+privacy policy URL, description, keywords, support URL (text as in §2). Age
+rating answers (all none; messaging and chat = yes, for the control-room chat).
+Availability **Thailand only**, new territories off. Price **free**.
+
+Still to do by hand in App Store Connect: **App Privacy** (no API for it; answers
+in §3), **screenshots**, **App Review Information** (contact phone number, plus
+the demo link and PIN in the notes — §4), attaching the build, submitting.
+
 ## 1. Order of work
 
 1. **Production fixes first** (owner, Supabase dashboard): Auth → URL
