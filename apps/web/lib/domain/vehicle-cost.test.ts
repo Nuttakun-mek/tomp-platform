@@ -109,6 +109,22 @@ describe("evaluateVehicleServiceTimeAlert", () => {
     expect(alert.label).toBe("ใกล้ครบเวลาบริการ");
   });
 
+  it("warns once 80% of the planned window has passed, so there is time to call the driver", () => {
+    const window = { assignmentStart: "2026-09-20T08:00:00.000Z", assignmentEnd: "2026-09-20T16:00:00.000Z", workSessionStatus: "active" };
+    // 8 h window: 80% is 14:24, i.e. 96 minutes left.
+    const before = evaluateVehicleServiceTimeAlert({ ...window, now: new Date("2026-09-20T14:20:00.000Z").getTime() });
+    const after = evaluateVehicleServiceTimeAlert({ ...window, now: new Date("2026-09-20T14:25:00.000Z").getTime() });
+    expect(before.tone).toBe("success");
+    expect(after.tone).toBe("warning");
+    expect(after.minutesRemaining).toBe(95);
+  });
+
+  it("falls back to warning 30 minutes before the end when the start is unknown", () => {
+    const base = { assignmentEnd: "2026-09-20T16:00:00.000Z", workSessionStatus: "active" };
+    expect(evaluateVehicleServiceTimeAlert({ ...base, now: new Date("2026-09-20T15:20:00.000Z").getTime() }).tone).toBe("success");
+    expect(evaluateVehicleServiceTimeAlert({ ...base, now: new Date("2026-09-20T15:31:00.000Z").getTime() }).tone).toBe("warning");
+  });
+
   it("marks active sessions as overtime after the planned end", () => {
     const alert = evaluateVehicleServiceTimeAlert({
       assignmentEnd: "2026-09-20T18:00:00.000Z",

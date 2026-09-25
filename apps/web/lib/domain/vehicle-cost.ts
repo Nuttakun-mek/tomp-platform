@@ -136,6 +136,8 @@ export function vehicleUsageCostBreakdown(cost: VehicleUsageCost): string {
 }
 
 export function evaluateVehicleServiceTimeAlert(input: {
+  /** Planned start. With it, the warning comes at 80% of the planned window. */
+  assignmentStart?: string | null;
   assignmentEnd?: string | null;
   workSessionStatus?: "pending" | "active" | "ended" | string | null;
   actualEnd?: string | null;
@@ -143,9 +145,9 @@ export function evaluateVehicleServiceTimeAlert(input: {
   /** The job itself is finished (driver or control room marked it done). */
   jobCompleted?: boolean;
   now?: number;
+  /** Used only when the planned start is unknown. */
   warnBeforeMinutes?: number;
 }): VehicleServiceTimeAlert {
-  const warnBeforeMinutes = input.warnBeforeMinutes ?? 30;
   const extraHours = input.extraHours ?? 0;
   if (input.workSessionStatus === "ended") {
     if (extraHours > 0) {
@@ -185,6 +187,12 @@ export function evaluateVehicleServiceTimeAlert(input: {
   }
 
   const minutesRemaining = Math.ceil((end - now) / 60000);
+  // Amber from 80% of the planned window (981 Wave 2): it exists so the control
+  // room can call the driver while there is still time, and a fixed 30 minutes
+  // is too late on a full-day job. Without a start time, fall back to that.
+  const start = input.assignmentStart ? new Date(input.assignmentStart).getTime() : Number.NaN;
+  const warnBeforeMinutes =
+    Number.isFinite(start) && start < end ? Math.floor(((end - start) / 60000) * 0.2) : (input.warnBeforeMinutes ?? 30);
   if (minutesRemaining < 0) {
     return {
       tone: "danger",

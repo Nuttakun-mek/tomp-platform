@@ -199,6 +199,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
           vehicleMetadata: vehicle?.metadata
         });
         const serviceAlert = evaluateVehicleServiceTimeAlert({
+          assignmentStart: assignment.startTime,
           assignmentEnd: assignment.endTime,
           workSessionStatus: workSession?.status,
           actualEnd: workSession?.endedAt,
