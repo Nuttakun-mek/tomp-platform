@@ -182,11 +182,14 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetB
         const meta = assignment.metadata;
         const vehicle = assignment.vehicleId ? vehicleById.get(assignment.vehicleId) : undefined;
         const workSession = workSessions[assignment.id];
+        // A finished job stops counting when it was marked done, even while the
+        // driver's shift (and so the clock-in) carries on into the next job.
+        const doneAt = statuses[assignment.id]?.status === "completed" ? statuses[assignment.id]?.at : null;
         const cost = estimateVehicleUsageCost({
           assignmentStart: assignment.startTime,
           assignmentEnd: assignment.endTime,
           actualStart: workSession?.startedAt,
-          actualEnd: workSession?.endedAt,
+          actualEnd: workSession?.endedAt ?? doneAt,
           vehicleMetadata: vehicle?.metadata,
           now: effectiveNow
         });

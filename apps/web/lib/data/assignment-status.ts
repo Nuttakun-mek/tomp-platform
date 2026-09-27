@@ -90,31 +90,71 @@ export const getLatestAssignmentStatuses = cache(async function getLatestAssignm
   }
 });
 
+// A clock-in belongs to the driver's shift, not to one job — the driver app
+// reads it that way (lib/data/driver-access.ts), so the control room must too,
+// or the second job of a shift shows "ยังไม่บันทึกเวลาเข้า" while the driver is
+// plainly working. A job with no clock-in rows of its own takes its driver's
+// shift, if that shift started within one shift's length and the job is still
+// open. Jobs keep their own rows where they have them.
+const SHIFT_WINDOW_MS = 18 * 60 * 60 * 1000;
+const CLOSED_JOB = new Set(["completed", "cancelled", "archived"]);
+
+export function withDriverShifts(rows: Row[], jobs: Row[], now = Date.now()): Record<string, AssignmentWorkSession> {
+  const byAssignment = collapseWorkSessions(rows);
+  const recent = rows.filter((row) => now - new Date(rowLoose(row, "created_at")).getTime() <= SHIFT_WINDOW_MS);
+  const byDriver = new Map<string, Row[]>();
+  for (const row of recent) {
+    const driverId = rowLoose(row, "driver_id");
+    if (!driverId) continue;
+    byDriver.set(driverId, [...(byDriver.get(driverId) ?? []), row]);
+  }
+  const shifts = new Map<string, AssignmentWorkSession>();
+  for (const [driverId, list] of byDriver) {
+    // Collapse the driver's rows as if they were one job.
+    const shift = collapseWorkSessions(list.map((row) => ({ ...row, assignment_id: driverId })))[driverId];
+    if (shift) shifts.set(driverId, shift);
+  }
+  for (const job of jobs) {
+    const id = rowLoose(job, "id");
+    const driverId = rowLoose(job, "driver_id");
+    if (!id || !driverId || byAssignment[id] || CLOSED_JOB.has(rowLoose(job, "status"))) continue;
+    const shift = shifts.get(driverId);
+    if (shift) byAssignment[id] = shift;
+  }
+  return byAssignment;
+}
+
 export const getAssignmentWorkSessions = cache(async function getAssignmentWorkSessions(projectId: string): Promise<Record<string, AssignmentWorkSession>> {
   const { client } = await resolveReadClient();
   if (client) {
-    const { data, error } = await client
-      .from("assignment_status_updates")
-      .select("assignment_id, status, created_at")
-      .eq("project_id", projectId)
-      .in("status", ["work_started", "work_ended"])
-      .order("created_at", { ascending: false })
-      .limit(500);
-    if (!error && data) return collapseWorkSessions(data as Row[]);
+    const [{ data, error }, { data: jobs }] = await Promise.all([
+      client
+        .from("assignment_status_updates")
+        .select("assignment_id, driver_id, status, created_at")
+        .eq("project_id", projectId)
+        .in("status", ["work_started", "work_ended"])
+        .order("created_at", { ascending: false })
+        .limit(500),
+      client.from("assignments").select("id, driver_id, status").eq("project_id", projectId)
+    ]);
+    if (!error && data) return withDriverShifts(data as Row[], (jobs || []) as Row[]);
   }
 
   const sql = getPostgresClient();
   if (!sql) return {};
   try {
-    const rows = await sql<Row[]>`
-      select assignment_id, status, created_at
-      from assignment_status_updates
-      where project_id = ${projectId}
-        and status in ('work_started', 'work_ended')
-      order by created_at desc
-      limit 500
-    `;
-    return collapseWorkSessions(rows);
+    const [rows, jobs] = await Promise.all([
+      sql<Row[]>`
+        select assignment_id, driver_id, status, created_at
+        from assignment_status_updates
+        where project_id = ${projectId}
+          and status in ('work_started', 'work_ended')
+        order by created_at desc
+        limit 500
+      `,
+      sql<Row[]>`select id, driver_id, status from assignments where project_id = ${projectId}`
+    ]);
+    return withDriverShifts(rows, jobs);
   } catch {
     return {};
   }

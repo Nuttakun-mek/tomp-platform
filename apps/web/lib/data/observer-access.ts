@@ -3,6 +3,7 @@ import "server-only";
 import { hashObserverAccessToken } from "@/lib/driver-access/token";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
+import { buildTrack, TRACK_WINDOW_MS, type TrackPoint } from "@/lib/map/location-track";
 
 type Row = Record<string, unknown>;
 
@@ -21,6 +22,8 @@ export interface ObserverAccessView {
   assignment: { id: string; status: string; pickup: string; dropoff: string; startTime: string | null; endTime: string | null } | null;
   vehicle: { id: string; plateNumber: string; vehicleType: string } | null;
   location: { latitude: number | null; longitude: number | null; accuracy: number | null; recordedAt: string | null; status: string; metadata: Record<string, unknown> } | null;
+  /** The recent path from the stored pings — lib/map/location-track.ts. */
+  track?: TrackPoint[];
 }
 
 function routeMeta(row: Row | null | undefined, key: string, fallback: string) {
@@ -53,7 +56,7 @@ export async function getObserverAccessView(token: string): Promise<ObserverAcce
       .update({ last_used_at: new Date().toISOString(), usage_count: Number(tokenRow.usage_count ?? 0) + 1 })
       .eq("id", tokenRow.id);
 
-    const [{ data: project }, { data: callSign }, { data: assignment }, { data: location }] = await Promise.all([
+    const [{ data: project }, { data: callSign }, { data: assignment }, { data: location }, { data: trackRows }] = await Promise.all([
       client.from("projects").select("id, project_code, project_name, status").eq("id", tokenRow.project_id).maybeSingle(),
       client.from("call_signs").select("id, call_sign, vehicle_id").eq("id", tokenRow.call_sign_id).maybeSingle(),
       client
@@ -72,7 +75,15 @@ export async function getObserverAccessView(token: string): Promise<ObserverAcce
         .eq("call_sign_id", tokenRow.call_sign_id)
         .order("recorded_at", { ascending: false })
         .limit(1)
-        .maybeSingle()
+        .maybeSingle(),
+      client
+        .from("gps_locations")
+        .select("latitude, longitude, accuracy, recorded_at")
+        .eq("project_id", tokenRow.project_id)
+        .eq("call_sign_id", tokenRow.call_sign_id)
+        .gte("recorded_at", new Date(Date.now() - TRACK_WINDOW_MS).toISOString())
+        .order("recorded_at", { ascending: false })
+        .limit(600)
     ]);
 
     if (!project || !callSign) return getObserverAccessViewViaPostgres(tokenHash);
@@ -81,7 +92,7 @@ export async function getObserverAccessView(token: string): Promise<ObserverAcce
       ? await client.from("vehicles").select("id, plate_number, vehicle_type").eq("id", vehicleId).maybeSingle()
       : { data: null };
 
-    return buildObserverView(project as Row, callSign as Row, assignment as Row | null, vehicle as Row | null, location as Row | null);
+    return buildObserverView(project as Row, callSign as Row, assignment as Row | null, vehicle as Row | null, location as Row | null, (trackRows || []) as Row[]);
   }
 
   return getObserverAccessViewViaPostgres(tokenHash);
@@ -107,7 +118,7 @@ async function getObserverAccessViewViaPostgres(tokenHash: string): Promise<Obse
     where id = ${String(tokenRow.id)}
   `.catch(() => undefined);
 
-  const [projectRows, callSignRows, assignmentRows, locationRows] = await Promise.all([
+  const [projectRows, callSignRows, assignmentRows, locationRows, trackRows] = await Promise.all([
     sql<Row[]>`select id, project_code, project_name, status from projects where id = ${String(tokenRow.project_id)} limit 1`,
     sql<Row[]>`select id, call_sign, vehicle_id from call_signs where id = ${String(tokenRow.call_sign_id)} limit 1`,
     sql<Row[]>`
@@ -126,6 +137,15 @@ async function getObserverAccessViewViaPostgres(tokenHash: string): Promise<Obse
         and call_sign_id = ${String(tokenRow.call_sign_id)}
       order by recorded_at desc nulls last, created_at desc
       limit 1
+    `,
+    sql<Row[]>`
+      select latitude, longitude, accuracy, recorded_at
+      from gps_locations
+      where project_id = ${String(tokenRow.project_id)}
+        and call_sign_id = ${String(tokenRow.call_sign_id)}
+        and recorded_at >= ${new Date(Date.now() - TRACK_WINDOW_MS).toISOString()}
+      order by recorded_at desc
+      limit 600
     `
   ]);
   const project = projectRows[0];
@@ -133,10 +153,10 @@ async function getObserverAccessViewViaPostgres(tokenHash: string): Promise<Obse
   if (!project || !callSign) return null;
   const vehicleId = text(assignmentRows[0], "vehicle_id") || text(callSign, "vehicle_id");
   const vehicleRows = vehicleId ? await sql<Row[]>`select id, plate_number, vehicle_type from vehicles where id = ${vehicleId} limit 1` : [];
-  return buildObserverView(project, callSign, assignmentRows[0] || null, vehicleRows[0] || null, locationRows[0] || null);
+  return buildObserverView(project, callSign, assignmentRows[0] || null, vehicleRows[0] || null, locationRows[0] || null, trackRows);
 }
 
-function buildObserverView(project: Row, callSign: Row, assignment: Row | null, vehicle: Row | null, location: Row | null): ObserverAccessView {
+function buildObserverView(project: Row, callSign: Row, assignment: Row | null, vehicle: Row | null, location: Row | null, trackRows: Row[] = []): ObserverAccessView {
   return {
     project: {
       id: text(project, "id"),
@@ -174,7 +194,15 @@ function buildObserverView(project: Row, callSign: Row, assignment: Row | null, 
           status: text(location, "sharing_event", "location_ping"),
           metadata: metadata(location)
         }
-      : null
+      : null,
+    track: buildTrack(
+      trackRows.map((row) => ({
+        latitude: numberValue(row, "latitude") ?? Number.NaN,
+        longitude: numberValue(row, "longitude") ?? Number.NaN,
+        accuracy: row.accuracy == null ? null : numberValue(row, "accuracy"),
+        recordedAt: row.recorded_at instanceof Date ? row.recorded_at.toISOString() : text(row, "recorded_at")
+      }))
+    )
   };
 }
 

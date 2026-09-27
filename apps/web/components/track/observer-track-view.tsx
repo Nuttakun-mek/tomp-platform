@@ -88,7 +88,8 @@ export function ObserverTrackView({ view, locale, serverNow }: { view: ObserverA
         title: `Call Sign ${view.callSign.label}`,
         subtitle: `${view.vehicle?.plateNumber ?? fallback(locale, "ยังไม่ระบุรถ", "Vehicle not assigned")} · ${view.project.name}`,
         ageLabel,
-        accuracy: location.accuracy
+        accuracy: location.accuracy,
+        track: view.track
       }
     ];
   }, [ageLabel, freshness, locale, view]);
