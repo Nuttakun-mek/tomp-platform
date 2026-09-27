@@ -232,8 +232,9 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
       </div>
 
       <div className="grid gap-4 p-4 sm:p-4 lg:grid-cols-[0.9fr_1.1fr]">
-        {/* composer */}
-        <div className="grid content-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        {/* Phone and tablet stack the two columns: the thread comes first and the
+            composer under it, as in any chat app. Side by side from lg. */}
+        <div className="order-last grid content-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:order-none">
           <label className="text-xs font-semibold text-slate-600">ส่งถึง Call Sign</label>
           <select
             className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"

@@ -1,16 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CarFront, Check, ChevronDown, LocateFixed, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
+import { CarFront, ChevronDown, LocateFixed, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
-import { resolveDriverMessageAction } from "@/app/actions/driver-notifications";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
 import { metaString } from "@/lib/data/location-meta";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
-import { messageWindow } from "@/lib/domain/message-window";
 import { estimateVehicleUsageCost, evaluateVehicleServiceTimeAlert, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
@@ -90,7 +88,8 @@ function formatAssignmentWindow(start?: string | null, end?: string | null) {
 function formatShortCost(cost: ReturnType<typeof estimateVehicleUsageCost>) {
   if (cost.estimatedCost == null) return "ยังไม่ระบุค่าใช้จ่าย";
   const hours = cost.billableHours ?? cost.packageHours;
-  return `${hours != null ? `${hours.toLocaleString("th-TH")} ชม. / ` : ""}${cost.estimatedCost.toLocaleString("th-TH")} บ.`;
+  const overtime = cost.extraHours && cost.extraHours > 0 ? ` · OT ${cost.extraHours.toLocaleString("th-TH")} ชม.` : "";
+  return `${hours != null ? `${hours.toLocaleString("th-TH")} ชม. / ` : ""}${cost.estimatedCost.toLocaleString("th-TH")} บ.${overtime}`;
 }
 
 function freshnessOf(location: DriverLocation | undefined, now: number): Freshness {
@@ -98,19 +97,16 @@ function freshnessOf(location: DriverLocation | undefined, now: number): Freshne
   return gpsFreshness(location.recordedAt, location.sharingEvent, now, location.metadata);
 }
 
-export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicles }: FleetBoardProps) {
+export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetBoardProps) {
   const { locations, comms, now } = useMissionControlFeed();
   const { statuses, workSessions, evidence, inbound } = comms;
   const [expanded, setExpanded] = useState<string | null>(null);
-  // An opened card moves to a full-width row of its own; keep it in view so the
-  // controller does not lose the card they just clicked.
+  // An opened card grows in place (it used to jump to a full-width row, which
+  // reflowed the whole board); keep it in view as it grows.
   useEffect(() => {
     if (!expanded) return;
     document.querySelector(`[data-fleet-card="${CSS.escape(expanded)}"]`)?.scrollIntoView({ block: "nearest" });
   }, [expanded]);
-  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
-  const [fullHistory, setFullHistory] = useState<Set<string>>(new Set());
-  const [, startResolve] = useTransition();
 
   const focusOnMap = useCallback((pointId: string) => {
     window.dispatchEvent(new CustomEvent("tomp:open-collapsible", { detail: { storageKey: "mc.map" } }));
@@ -119,13 +115,6 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
       window.dispatchEvent(new CustomEvent("tomp:focus-map-point", { detail: { id: pointId } }));
     }, 220);
   }, []);
-
-  function resolveMessage(id: string) {
-    setResolvedIds((current) => new Set(current).add(id));
-    startResolve(async () => {
-      await resolveDriverMessageAction({ id, projectId }).catch(() => undefined);
-    });
-  }
 
   const callSignById = useMemo(() => new Map(callSigns.map((item) => [item.id, item.callSign])), [callSigns]);
   const driverById = useMemo(() => new Map(drivers.map((item) => [item.id, item])), [drivers]);
@@ -189,7 +178,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         const location = locationByAssignment.get(assignment.id);
         const freshness = freshnessOf(location, effectiveNow);
         const messages = inboundByAssignment.get(assignment.id) ?? [];
-        const openMessages = messages.filter((message) => message.status !== "closed" && !resolvedIds.has(message.id));
+        const openMessages = messages.filter((message) => message.status !== "closed");
         const meta = assignment.metadata;
         const vehicle = assignment.vehicleId ? vehicleById.get(assignment.vehicleId) : undefined;
         const workSession = workSessions[assignment.id];
@@ -198,7 +187,8 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
           assignmentEnd: assignment.endTime,
           actualStart: workSession?.startedAt,
           actualEnd: workSession?.endedAt,
-          vehicleMetadata: vehicle?.metadata
+          vehicleMetadata: vehicle?.metadata,
+          now: effectiveNow
         });
         const serviceAlert = evaluateVehicleServiceTimeAlert({
           assignmentStart: assignment.startTime,
@@ -234,7 +224,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
         if (rank !== 0) return rank;
         return a.label.localeCompare(b.label, "th");
       });
-  }, [assignments, callSignById, driverById, effectiveNow, evidence, inboundByAssignment, locationByAssignment, resolvedIds, statuses, vehicleById, workSessions]);
+  }, [assignments, callSignById, driverById, effectiveNow, evidence, inboundByAssignment, locationByAssignment, statuses, vehicleById, workSessions]);
 
   // One card per driver, not per assignment. A driver with several jobs used to
   // fill the board with near-identical cards; GPS and phone are the driver's
@@ -357,7 +347,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
               <article
                 key={group.key}
                 data-fleet-card={group.key}
-                className={`overflow-hidden rounded-2xl border shadow-sm transition ${open ? "col-span-full" : ""} ${
+                className={`overflow-hidden rounded-2xl border shadow-sm transition ${
                   group.unread
                     ? "border-rose-300 bg-gradient-to-br from-rose-50 via-white to-white shadow-rose-100"
                     : "border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 hover:border-teal-200 hover:shadow-md"
@@ -460,7 +450,7 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         โทรหาคนขับ button below. */}
                     <div className="grid gap-1.5">
                       <p className="text-xs font-semibold text-slate-600">งานของคนขับคนนี้ ({group.jobs.length})</p>
-                      <div className="grid items-start gap-1.5 md:grid-cols-2 2xl:grid-cols-3">
+                      <div className="grid items-start gap-1.5">
                       {group.jobs.map((job) => {
                         const hasOt = Boolean(job.cost.extraHours && job.cost.extraHours > 0);
                         return (
@@ -552,65 +542,6 @@ export function FleetBoard({ projectId, assignments, callSigns, drivers, vehicle
                         </>
                       ) : null}
                     </div>
-
-                    {group.messages.length ? (() => {
-                      const isDone = (message: DriverInboundMessage) => message.status === "closed" || resolvedIds.has(message.id);
-                      const showAll = fullHistory.has(group.key);
-                      const { visible, hidden } = messageWindow(group.messages, isDone, { showAll });
-                      return (
-                      <div className="grid gap-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-slate-600">ข้อความจากคนขับ</p>
-                          {hidden || showAll ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFullHistory((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(group.key)) next.delete(group.key);
-                                  else next.add(group.key);
-                                  return next;
-                                })
-                              }
-                              className="text-[11px] font-semibold text-operation hover:underline"
-                            >
-                              {showAll ? "แสดงเฉพาะล่าสุด" : `ดูข้อความก่อนหน้า (${hidden})`}
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className="grid gap-1.5 md:grid-cols-2">
-                        {visible.map((message) => {
-                          const done = isDone(message);
-                          return (
-                            <div
-                              key={message.id}
-                              className={`flex items-start justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-xs ${
-                                done ? "border-slate-200 bg-slate-50 text-slate-400" : message.kind === "issue" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-700"
-                              }`}
-                            >
-                              <span>
-                                {message.kind === "issue" ? <span className="font-semibold">[เหตุขัดข้อง] </span> : null}
-                                {message.message || "(ไม่มีข้อความ)"}
-                                <span className="ml-1 text-slate-400">/ {formatRelativeTh(message.at, effectiveNow)}</span>
-                              </span>
-                              {done ? (
-                                <span className="shrink-0 text-emerald-600"><Check className="h-3.5 w-3.5" /></span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => resolveMessage(message.id)}
-                                  className="shrink-0 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:border-emerald-400 hover:text-emerald-700"
-                                >
-                                  รับทราบ
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                        </div>
-                      </div>
-                      );
-                    })() : null}
 
                     {group.evidence && (group.evidence.vehiclePhotoUrl || group.evidence.platePhotoUrl) ? (
                       <p className="text-xs font-semibold text-blue-700">มีหลักฐานรูปถ่ายตรวจรถแล้ว</p>

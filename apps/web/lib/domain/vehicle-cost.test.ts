@@ -2,6 +2,32 @@ import { describe, expect, it } from "vitest";
 import { estimateVehicleUsageCost, evaluateVehicleServiceTimeAlert, vehicleUsageCostBreakdown } from "./vehicle-cost";
 
 describe("estimateVehicleUsageCost", () => {
+  it("counts a driver still on the clock up to now, overtime and its cost included", () => {
+    const cost = estimateVehicleUsageCost({
+      assignmentStart: "2026-09-20T00:00:00.000Z",
+      assignmentEnd: "2026-09-20T10:00:00.000Z",
+      actualStart: "2026-09-20T00:00:00.000Z",
+      vehicleMetadata: { packageHours: 10, packageAmount: 3000 },
+      now: Date.parse("2026-09-20T12:30:00.000Z")
+    });
+    expect(cost.source).toBe("running_session");
+    expect(cost.extraHours).toBe(2.5);
+    expect(cost.extraAmount).toBe(750);
+    expect(cost.estimatedCost).toBe(3750);
+    expect(vehicleUsageCostBreakdown(cost)).toContain("เกินเวลาแล้ว (OT) 2.5 ชม. = 750 บ.");
+  });
+
+  it("without now, a clock-in with no clock-out still falls back to the plan", () => {
+    const cost = estimateVehicleUsageCost({
+      assignmentStart: "2026-09-20T00:00:00.000Z",
+      assignmentEnd: "2026-09-20T10:00:00.000Z",
+      actualStart: "2026-09-20T00:00:00.000Z",
+      vehicleMetadata: { packageHours: 10, packageAmount: 3000 }
+    });
+    expect(cost.source).toBe("assignment_window");
+    expect(cost.estimatedCost).toBe(3000);
+  });
+
   it("prefers assignment time window over vehicle defaults", () => {
     const cost = estimateVehicleUsageCost({
       assignmentStart: "2026-09-20T08:00:00.000Z",

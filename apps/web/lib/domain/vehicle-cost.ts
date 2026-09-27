@@ -10,7 +10,8 @@ export interface VehicleUsageCost {
   baseAmount: number | null;
   extraAmount: number | null;
   estimatedCost: number | null;
-  source: "actual_session" | "assignment_window" | "vehicle_default" | "missing";
+  /** running_session: clocked in, not out yet — counted up to `now`. */
+  source: "actual_session" | "running_session" | "assignment_window" | "vehicle_default" | "missing";
 }
 
 export interface VehicleServiceTimeAlert {
@@ -68,6 +69,11 @@ export function estimateVehicleUsageCost(input: {
   actualStart?: string | null;
   actualEnd?: string | null;
   vehicleMetadata?: Record<string, unknown> | null;
+  /**
+   * With it, a driver still on the clock is counted up to now, so overtime and
+   * its cost show while it builds up instead of only after the clock-out.
+   */
+  now?: number;
 }): VehicleUsageCost {
   const meta = input.vehicleMetadata ?? {};
   const packageHours = numberOrNull(meta.packageHours) ?? numberOrNull(meta.minimumHours);
@@ -77,7 +83,8 @@ export function estimateVehicleUsageCost(input: {
   const includedPackageHours = packageHours ?? 0;
   const assignmentHours = hoursBetweenIso(input.assignmentStart, input.assignmentEnd);
   const effectiveActualStart = laterIso(input.actualStart, input.assignmentStart);
-  const effectiveActualEnd = input.actualEnd ? earlierIso(input.actualEnd, null) : null;
+  const running = Boolean(input.actualStart && !input.actualEnd && input.now != null);
+  const effectiveActualEnd = input.actualEnd ? earlierIso(input.actualEnd, null) : running ? new Date(input.now as number).toISOString() : null;
   const actualHours = hoursBetweenIso(effectiveActualStart, effectiveActualEnd);
   const defaultHours = hoursBetweenTimeOnly(meta.defaultDutyStart, meta.defaultDutyEnd);
   const plannedHours = assignmentHours ?? defaultHours;
@@ -102,7 +109,7 @@ export function estimateVehicleUsageCost(input: {
     baseAmount,
     extraAmount,
     estimatedCost: billableHours != null && hourlyRate != null ? Math.round(billableHours * hourlyRate * 100) / 100 : null,
-    source: actualHours != null ? "actual_session" : assignmentHours != null ? "assignment_window" : defaultHours != null ? "vehicle_default" : "missing"
+    source: actualHours != null ? (running ? "running_session" : "actual_session") : assignmentHours != null ? "assignment_window" : defaultHours != null ? "vehicle_default" : "missing"
   };
 }
 
@@ -124,9 +131,12 @@ export function vehicleUsageCostBreakdown(cost: VehicleUsageCost): string {
   // "No overtime" is only a finding once the real clock-in and clock-out are
   // known. Before that the hours are the plan's, so say so instead of implying
   // the job finished on time.
+  const running = cost.source === "running_session";
   const extra = cost.extraHours && cost.extraHours > 0
-    ? `มีค่าล่วงเวลา (OT) ${cost.extraHours.toLocaleString("th-TH")} ชม.`
-    : cost.source === "actual_session"
+    ? `${running ? "เกินเวลาแล้ว" : "มีค่าล่วงเวลา"} (OT) ${cost.extraHours.toLocaleString("th-TH")} ชม.${cost.extraAmount != null ? ` = ${cost.extraAmount.toLocaleString("th-TH")} บ.` : ""}${running ? " นับถึงตอนนี้ ยังไม่บันทึกเวลาออก" : ""}`
+    : running
+      ? "ยังอยู่ในเวลาที่กำหนด นับถึงตอนนี้"
+      : cost.source === "actual_session"
       ? "ไม่เกินเวลาที่กำหนด"
       : "ประมาณการตามเวลาในแผน (ยังไม่มีเวลาออกจริง)";
   const base = cost.packageHours != null && cost.packageAmount != null
@@ -171,7 +181,7 @@ export function evaluateVehicleServiceTimeAlert(input: {
     return {
       tone: "warning",
       label: "ยังไม่บันทึกเวลาออก",
-      detail: "งานเสร็จแล้วแต่คนขับยังไม่บันทึกเวลาออก ค่าใช้จ่ายคิดตามเวลาในแผนไปก่อน",
+      detail: "งานเสร็จแล้วแต่คนขับยังไม่บันทึกเวลาออก ค่าใช้จ่ายนับต่อจนกว่าจะบันทึกเวลาออก",
       minutesRemaining: null
     };
   }
