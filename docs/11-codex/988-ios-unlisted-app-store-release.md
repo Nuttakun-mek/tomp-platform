@@ -149,6 +149,11 @@ for location (when in use, always) and camera, set in both `ios.infoPlist` and
 the plugin options (the `expo-location` plugin overrides `infoPlist`), a Thai
 translation in `locales/th.json`, and the unused prompts removed (microphone
 from `expo-camera`, Face ID from `expo-secure-store`, motion from
-`expo-location`). Check any new permission with
+`expo-location`).
+
+Motion cannot be removed: build 11 got ITMS-90683 because `expo-location` links
+CoreMotion, so `NSMotionUsageDescription` must exist even though the app never
+asks for it. Build 12 restores it with a string saying exactly that. Check any
+new permission with
 `npx expo config --type introspect` — every `*UsageDescription` needs its own
 reason and example.
