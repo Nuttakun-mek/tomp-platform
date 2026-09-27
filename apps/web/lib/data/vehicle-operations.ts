@@ -1,5 +1,5 @@
 import type { Assignment, Driver, DriverLocation, DriverNotification, Mission, Project, Vehicle } from "@tomp/types/domain";
-import { getAssignmentsByProjectIds, getAssignmentsByVehicleIds } from "@/lib/data/assignments";
+import { getAssignmentsByVehicleIds } from "@/lib/data/assignments";
 import { getLatestAssignmentStatuses, type AssignmentStatusUpdate } from "@/lib/data/assignment-status";
 import { getVehicleEvidenceByProjectId, type VehicleEvidence } from "@/lib/data/vehicle-evidence";
 import { getDriverNotificationsByAssignmentIds } from "@/lib/data/driver-operations";
@@ -102,12 +102,6 @@ async function buildProfiles(vehicles: Vehicle[], assignments: Assignment[]): Pr
   });
 }
 
-export async function getVehicleOperationProfiles(): Promise<VehicleOperationProfile[]> {
-  const [projects, vehicles] = await Promise.all([getProjects(), getVehicles()]);
-  const assignments = await getAssignmentsByProjectIds(projects.map((project) => project.id));
-  return buildProfiles(vehicles, assignments);
-}
-
 export async function getVehicleOperationProfileById(vehicleId: string): Promise<VehicleOperationProfile | null> {
   const vehicle = (await getVehicles()).find((item) => item.id === vehicleId);
   if (!vehicle) return null;
@@ -119,6 +113,8 @@ export async function getVehicleOperationProfileById(vehicleId: string): Promise
   return profile ?? emptyProfile(vehicle);
 }
 
+// getVehicleOperationProfiles (every vehicle across every project) went with the
+// /resources/vehicles board that was its only caller (989 wave D).
 // getVehicleOperationProfilesByProjectId was deleted with the mission-control
 // vehicle panel that was its only caller. It fanned out to every project, every
 // driver, 100 locations and per-project status lookups on every control-room

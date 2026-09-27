@@ -1,59 +1,9 @@
-import { LiveLocationMap } from "@/components/mission-control/live-location-map";
-import { ResourceQualityCard } from "@/components/resources/resource-quality-card";
-import { VehicleOperationsBoard } from "@/components/resources/vehicle-operations-board";
-import { ProjectWorkspaceTabs } from "@/components/projects/project-workspace-tabs";
-import { BackLink } from "@/components/ui/back-link";
-import { getProjectById } from "@/lib/data/projects";
-import { getVehicleOperationProfiles } from "@/lib/data/vehicle-operations";
+import { redirect } from "next/navigation";
 
-interface VehiclesPageProps {
-  searchParams?: Promise<{ projectId?: string }>;
-}
-
-export default async function VehiclesPage({ searchParams }: VehiclesPageProps) {
-  const params = searchParams ? await searchParams : {};
-  const project = params.projectId ? await getProjectById(params.projectId) : null;
-  const profiles = await getVehicleOperationProfiles();
-  const vehicles = profiles.map((profile) => profile.vehicle);
-  const activeVehicles = profiles.filter((profile) => profile.currentTasks.length > 0).length;
-  const pendingTasks = profiles.reduce((sum, profile) => sum + profile.remainingTasks.length, 0);
-  const completedTasks = profiles.reduce((sum, profile) => sum + profile.completedTasks.length, 0);
-  const locations = profiles
-    .map((profile) => profile.latestLocation)
-    .filter((location): location is NonNullable<typeof location> => Boolean(location));
-
-  return (
-    <>
-      {project ? (
-        <ProjectWorkspaceTabs projectCode={project.projectCode} active="resources" />
-      ) : (
-        <BackLink href="/resources" label="ทรัพยากร" />
-      )}
-      <section className="enterprise-panel p-4">
-        <p className="page-kicker">จัดการรถ</p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="page-title">ศูนย์จัดการรถและคิวงาน</h1>
-            <p className="mt-2 page-description">
-              ดูโปรไฟล์รถแต่ละคัน งานที่กำลังทำ งานคงเหลือ งานที่ทำแล้ว QR ประจำรถ และตำแหน่ง GPS ล่าสุดบนแผนที่รวม
-            </p>
-          </div>
-          <span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">ข้อมูลจากระบบจริง / fallback เมื่อไม่มีการเชื่อมต่อ</span>
-        </div>
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <ResourceQualityCard title="รถทั้งหมด" value={`${vehicles.length}`} detail="โปรไฟล์รถในระบบ" />
-        <ResourceQualityCard title="กำลังปฏิบัติงาน" value={`${activeVehicles}`} detail="มีงานปัจจุบันผูกกับรถ" />
-        <ResourceQualityCard title="งานคงเหลือ" value={`${pendingTasks}`} detail="งานที่ยังรอออกปฏิบัติการ" />
-        <ResourceQualityCard title="งานที่ทำแล้ว" value={`${completedTasks}`} detail="ประวัติงานที่เสร็จสิ้น" />
-      </div>
-
-      <LiveLocationMap initialLocations={locations} height={420} />
-
-      <div className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr] xl:items-start">
-        <VehicleOperationsBoard profiles={profiles} />
-      </div>
-    </>
-  );
+// This board repeated the control room: the same units, their jobs and a second
+// live map, gathered across every project. Live work is followed in each
+// project's ศูนย์ควบคุม; a vehicle's history is its own page,
+// /resources/vehicles/[vehicleId]. Old links land on the resource library.
+export default function VehiclesPage() {
+  redirect("/resources");
 }

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, CarFront, Library } from "lucide-react";
+import { Library } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { CreateResourcePairForm } from "@/components/resources/create-resource-pair-form";
@@ -60,17 +60,6 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
       </CollapsibleSection>
 
       <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} />
-
-      <Link className="smart-card group flex items-center justify-between gap-3 p-4" href={`/resources/vehicles?projectId=${encodeURIComponent(projectId)}`}>
-        <span className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-ink-soft"><CarFront className="h-5 w-5" /></span>
-          <span>
-            <span className="block text-sm font-semibold text-ink">มุมมองปฏิบัติการของรถ</span>
-            <span className="block text-xs text-ink-soft">แผนที่ตำแหน่งรถ คิวงาน และงานคงเหลือของแต่ละคัน</span>
-          </span>
-        </span>
-        <ArrowRight className="h-5 w-5 text-ink-faint transition group-hover:translate-x-1 group-hover:text-operation" />
-      </Link>
     </div>
   );
 }

@@ -14,9 +14,9 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
     return (
       <div className="grid gap-5">
         <section className="enterprise-panel p-4">
-          <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-operation" href="/resources/vehicles">
+          <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-operation" href="/resources">
             <ArrowLeft className="h-4 w-4" />
-            กลับไปศูนย์จัดการรถ
+            กลับไปทรัพยากร
           </Link>
           <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
             <p className="text-base font-semibold text-ink">ไม่พบข้อมูลรถคันนี้</p>
@@ -36,9 +36,9 @@ export async function VehicleProfileDetail({ vehicleId }: { vehicleId: string })
   return (
     <div className="grid gap-5">
       <section className="enterprise-panel p-4">
-        <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-operation" href="/resources/vehicles">
+        <Link className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-operation" href="/resources">
           <ArrowLeft className="h-4 w-4" />
-          กลับไปศูนย์จัดการรถ
+          กลับไปทรัพยากร
         </Link>
         <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_auto]">
           <div>
