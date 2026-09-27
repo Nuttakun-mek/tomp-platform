@@ -9,6 +9,7 @@ import type { DriverInboundMessage, DriverOutboundMessage } from "@/lib/data/dri
 import type { DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { accentFor } from "@/lib/ui/unit-accent";
+import { OPEN_COMMS_EVENT } from "./fleet-board";
 import { useMissionControlFeed } from "./mission-control-feed";
 
 interface CommsConsoleProps {
@@ -42,6 +43,21 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
   }, [comms.outbound, optimisticOutbound]);
   const [filter, setFilter] = useState<string>("all");
   const [target, setTarget] = useState<string>(assignments[0]?.id ?? "");
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // "แชทกับคนขับ" on a fleet card: show that job's thread, address the reply to
+  // it, and bring the console into view.
+  useEffect(() => {
+    function open(event: Event) {
+      const assignmentId = (event as CustomEvent<{ assignmentId?: string }>).detail?.assignmentId;
+      if (!assignmentId) return;
+      setFilter(assignmentId);
+      setTarget(assignmentId);
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    window.addEventListener(OPEN_COMMS_EVENT, open);
+    return () => window.removeEventListener(OPEN_COMMS_EVENT, open);
+  }, []);
 
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<PendingPhoto | null>(null);
@@ -224,7 +240,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
   }
 
   return (
-    <section className="enterprise-panel overflow-hidden">
+    <section ref={sectionRef} className="enterprise-panel scroll-mt-20 overflow-hidden">
       <div className="border-b border-slate-200 px-5 py-4">
         <p className="text-xs font-semibold tracking-[0.16em] text-operation">การสื่อสารกับคนขับ</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">ข้อความสองทาง ศูนย์ ↔ คนขับ</h2>

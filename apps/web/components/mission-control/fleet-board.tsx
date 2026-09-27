@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CarFront, ChevronDown, LocateFixed, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
 import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
@@ -22,7 +22,14 @@ interface FleetBoardProps {
   callSigns: CallSign[];
   drivers: Driver[];
   vehicles: Vehicle[];
+  /** The same jobs as a table — shown instead of the cards on "ดูแบบรายการ". */
+  listView?: ReactNode;
 }
+
+type ChipFilter = "attention" | "unread" | "service" | "live";
+
+/** Asks the comms console to show one job's thread; see comms-console.tsx. */
+export const OPEN_COMMS_EVENT = "tomp:open-comms";
 
 // "none" = this assignment has never shared a location; the shared helper covers
 // the rest (live / slow / offline / stopped).
@@ -97,10 +104,13 @@ function freshnessOf(location: DriverLocation | undefined, now: number): Freshne
   return gpsFreshness(location.recordedAt, location.sharingEvent, now, location.metadata);
 }
 
-export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetBoardProps) {
+export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView }: FleetBoardProps) {
   const { locations, comms, now } = useMissionControlFeed();
   const { statuses, workSessions, evidence, inbound } = comms;
   const [expanded, setExpanded] = useState<string | null>(null);
+  // The header counts are also the way in: click one to see only those cards.
+  const [chipFilter, setChipFilter] = useState<ChipFilter | null>(null);
+  const [view, setView] = useState<"cards" | "list">("cards");
   // An opened card grows in place (it used to jump to a full-width row, which
   // reflowed the whole board); keep it in view as it grows.
   useEffect(() => {
@@ -299,8 +309,19 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetB
   const needsAttention = groups.filter((group) => group.unread || group.freshness !== "live").length;
   const serviceTimeAlertCount = rows.filter((row) => row.serviceAlert.tone === "warning" || row.serviceAlert.tone === "danger").length;
 
+  const filteredGroups = useMemo(() => {
+    if (!chipFilter) return groups;
+    return groups.filter((group) => {
+      if (chipFilter === "unread") return group.unread > 0;
+      if (chipFilter === "live") return group.freshness === "live";
+      if (chipFilter === "service") return group.jobs.some((job) => job.serviceAlert.tone === "warning" || job.serviceAlert.tone === "danger");
+      return group.unread > 0 || group.freshness !== "live";
+    });
+  }, [chipFilter, groups]);
+  const toggleChip = (key: ChipFilter) => setChipFilter((current) => (current === key ? null : key));
+
   // Attention-ranked groups are already on top, so a cap never hides something urgent.
-  const { visible: visibleGroups, hidden, hasMore, expanded: allShown, showAll, reset } = useVisibleSlice(groups, 15);
+  const { visible: visibleGroups, hidden, hasMore, expanded: allShown, showAll, reset } = useVisibleSlice(filteredGroups, 15);
 
   return (
     <section className="enterprise-panel overflow-hidden">
@@ -311,12 +332,26 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetB
             <h2 className="mt-1 text-lg font-semibold text-ink">สถานะคนขับรายคน</h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            <MetricChip label="คนขับทั้งหมด" value={groups.length} />
-            <MetricChip label="งานทั้งหมด" value={rows.length} />
-            <MetricChip label="GPS สด" value={liveCount} tone="success" />
-            <MetricChip label="ต้องติดตาม" value={needsAttention} tone="warning" />
-            <MetricChip label="มีข้อความใหม่" value={alertCount} tone={alertCount ? "warning" : "neutral"} />
-            <MetricChip label="ใกล้/เกินเวลาบริการ" value={serviceTimeAlertCount} tone={serviceTimeAlertCount ? "warning" : "neutral"} />
+            <MetricChip label="คนขับทั้งหมด" value={groups.length} active={!chipFilter && view === "cards"} onClick={() => setChipFilter(null)} />
+            <MetricChip label="GPS สด" value={liveCount} tone="success" active={chipFilter === "live"} onClick={() => toggleChip("live")} />
+            <MetricChip label="ต้องติดตาม" value={needsAttention} tone="warning" active={chipFilter === "attention"} onClick={() => toggleChip("attention")} />
+            <MetricChip label="มีข้อความใหม่" value={alertCount} tone={alertCount ? "warning" : "neutral"} active={chipFilter === "unread"} onClick={() => toggleChip("unread")} />
+            <MetricChip
+              label="ใกล้/เกินเวลาบริการ"
+              value={serviceTimeAlertCount}
+              tone={serviceTimeAlertCount ? "warning" : "neutral"}
+              active={chipFilter === "service"}
+              onClick={() => toggleChip("service")}
+            />
+            {listView ? (
+              <button
+                type="button"
+                onClick={() => setView((current) => (current === "cards" ? "list" : "cards"))}
+                className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-operation hover:text-operation"
+              >
+                {view === "cards" ? `ดูแบบรายการ (${rows.length} งาน)` : "ดูแบบการ์ด"}
+              </button>
+            ) : null}
             <Tooltip content="รายการที่ต้องติดตามรวมรถที่ไม่มี GPS สด รถที่ยังไม่ได้ส่งตำแหน่ง GPS และรถที่มีข้อความยังไม่รับทราบ">
               <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-300 text-xs font-semibold text-slate-500">?</span>
             </Tooltip>
@@ -324,7 +359,9 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetB
         </div>
       </div>
 
-      {groups.length ? (
+      {view === "list" && listView ? (
+        <div className="p-3 sm:p-4">{listView}</div>
+      ) : filteredGroups.length ? (
         // Cards stretch to fill the row (1fr) rather than capping at 24rem, which
         // left wide screens mostly empty and truncated card text. An open card
         // spans the whole row so its detail lays out sideways; dense packing fills
@@ -507,6 +544,17 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetB
                     {/* No "ไปยังรถบนแผนที่" here: the same action is the pin
                         button in the card header, one line above. */}
                     <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const withUnread = group.jobs.find((job) => job.unread) ?? group.jobs[0];
+                          if (!withUnread) return;
+                          window.dispatchEvent(new CustomEvent(OPEN_COMMS_EVENT, { detail: { assignmentId: withUnread.assignment.id } }));
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" /> แชทกับคนขับ{group.unread ? ` (${group.unread} ใหม่)` : ""}
+                      </button>
                       {phone ? (
                         <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
                           <Phone className="h-3.5 w-3.5" /> โทรหาคนขับ
@@ -564,17 +612,45 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetB
           ) : null}
         </div>
       ) : (
-        <div className="p-5 text-sm text-slate-600">ยังไม่มีงานที่จัดสรรในโครงการนี้ โปรดเปิดงานที่หน้า “จัดการโครงการ” ก่อน</div>
+        <div className="p-5 text-sm text-slate-600">
+          {groups.length ? (
+            <>
+              ไม่มีคนขับตรงกับตัวกรองนี้ ·{" "}
+              <button type="button" onClick={() => setChipFilter(null)} className="font-semibold text-operation hover:underline">
+                แสดงทั้งหมด
+              </button>
+            </>
+          ) : (
+            "ยังไม่มีงานในโครงการนี้ — เปิดงานได้ที่หน้า “ภารกิจและงาน”"
+          )}
+        </div>
       )}
     </section>
   );
 }
 
-function MetricChip({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "success" | "warning" }) {
+function MetricChip({
+  label,
+  value,
+  tone = "neutral",
+  active = false,
+  onClick
+}: {
+  label: string;
+  value: number;
+  tone?: "neutral" | "success" | "warning";
+  active?: boolean;
+  onClick?: () => void;
+}) {
   const className = tone === "success" ? "bg-emerald-50 text-emerald-800" : tone === "warning" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600";
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-full px-3 py-1 text-xs font-semibold transition hover:ring-1 hover:ring-slate-300 ${className} ${active ? "ring-2 ring-operation/50" : ""}`}
+    >
       {label}: {value}
-    </span>
+    </button>
   );
 }

@@ -4,9 +4,7 @@ import { CommsConsole } from "@/components/mission-control/comms-console";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
 import { LiveLocationMap } from "@/components/mission-control/live-location-map";
 import { MissionControlFeedProvider } from "@/components/mission-control/mission-control-feed";
-import { OperationKpiStrip } from "@/components/mission-control/operation-kpi-strip";
 import { OperationTimelinePanel } from "@/components/mission-control/operation-timeline-panel";
-import { RiskAndExceptionPanel } from "@/components/mission-control/risk-and-exception-panel";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { combineResults } from "@/lib/data/data-result";
@@ -54,17 +52,14 @@ export default async function ControlPage({ params }: ControlPageProps) {
   const assignments = assignmentsResult.data;
   const callSigns = callSignsResult.data;
 
-  const locationAssignmentIds = new Set(locations.map((location) => location.assignmentId).filter(Boolean));
-  const followUps = assignments.filter(
-    (assignment) => !assignment.driverId || !assignment.vehicleId || !assignment.callSignId || !locationAssignmentIds.has(assignment.id)
-  ).length;
-  const readiness = assignments.length ? Math.min(100, Math.round((locations.length / assignments.length) * 100)) : locations.length ? 100 : 0;
 
   return (
     <div className="grid gap-4">
       {!load.ok ? <DataUnavailable description="โหลดข้อมูลศูนย์ควบคุมบางส่วนไม่สำเร็จ" detail={load.error} /> : null}
-      <CommandCenterHeader project={project} liveCount={locations.length} issueCount={followUps} />
-      <OperationKpiStrip readiness={readiness} assignments={assignments.length} liveDrivers={locations.length} followUps={followUps} timeline={events.length} />
+      {/* The counts that used to sit here (header pills, a KPI strip with a
+          "readiness %" of positions ÷ jobs) repeated the fleet board's chips,
+          which now also filter the cards. */}
+      <CommandCenterHeader project={project} />
 
       {/* One shared live feed for the map, the fleet board and the comms console —
           one poll of /locations + /comms per cycle instead of three. */}
@@ -88,31 +83,17 @@ export default async function ControlPage({ params }: ControlPageProps) {
           callSigns={callSigns}
           drivers={drivers}
           vehicles={vehicles}
+          listView={
+            <JobStatusBoard assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
+          }
         />
 
         <CommsConsole projectId={project.id} assignments={assignments} callSigns={callSigns} />
       </MissionControlFeedProvider>
 
-      <CollapsibleSection title="สถานะงานทั้งหมด" storageKey="mc.jobstatus" defaultOpen>
-        <JobStatusBoard
-          assignments={assignments}
-          missions={missions}
-          callSigns={callSigns}
-          drivers={drivers}
-          vehicles={vehicles}
-        />
-      </CollapsibleSection>
-
-      {/* "รายละเอียดรถในโครงการ" is gone. It listed the same units as the fleet
-          board keyed by vehicle instead of by driver, and a Call Sign is one
-          driver in one vehicle, so the two lists had the same rows. Its data
-          call also ran on every load despite the section defaulting to closed,
-          fanning out to every project, every driver, 100 locations, missions,
-          and per-project status and evidence lookups. */}
-      <CollapsibleSection title="งานที่ยังขาดข้อมูล" storageKey="mc.risk" defaultOpen={false}>
-        <RiskAndExceptionPanel assignments={assignments} locations={locations} />
-      </CollapsibleSection>
-
+      {/* "สถานะงานทั้งหมด" is the fleet board's "ดูแบบรายการ" now, and
+          "งานที่ยังขาดข้อมูล" went: every card is a crewed Call Sign, and a
+          missing GPS signal is already the card's colour. */}
       <CollapsibleSection title="ไทม์ไลน์ปฏิบัติการ" storageKey="mc.timeline" defaultOpen={false}>
         <OperationTimelinePanel events={events} />
       </CollapsibleSection>
