@@ -142,8 +142,8 @@ function ProjectFleetAccessCard({
       setTone(data.reused ? "warning" : "success");
       setMessage(
         data.reused
-          ? `แสดงลิงก์ติดตามโครงการเดิมที่ยังใช้งานได้ หมดอายุ ${formatObserverExpiryLabel(nextExpiry)} หากต้องการเปลี่ยน PIN ขอบเขต หรือวันหมดอายุ ให้กดออกลิงก์ใหม่`
-          : `สร้างลิงก์ติดตามโครงการแล้ว หมดอายุ ${formatObserverExpiryLabel(nextExpiry)} ลิงก์นี้อ่านอย่างเดียวและไม่สามารถแก้ไขงานได้`
+          ? `ลิงก์เดิมยังใช้ได้ · หมดอายุ ${formatObserverExpiryLabel(nextExpiry)}`
+          : `สร้างลิงก์แล้ว (อ่านอย่างเดียว) · หมดอายุ ${formatObserverExpiryLabel(nextExpiry)}`
       );
     });
   }
@@ -258,7 +258,7 @@ function ProjectFleetAccessCard({
             <span className="truncate">ออกลิงก์ใหม่</span>
           </button>
           <p className="min-w-0 flex-1 text-[11px] leading-4 text-ink-faint">
-            การตั้งค่าด้านบนจะมีผลเมื่อกด “ออกลิงก์ใหม่” เท่านั้น — ลิงก์ที่แจกไปแล้วจะไม่เปลี่ยนตาม
+            มีผลเมื่อกด “ออกลิงก์ใหม่” เท่านั้น
           </p>
         </div>
 
@@ -297,20 +297,20 @@ function ProjectFleetAccessCard({
                   <p className="text-[10px] font-bold text-amber-900">รหัส PIN ของลิงก์นี้ (แสดงครั้งเดียว)</p>
                   <p className="text-center text-2xl font-bold leading-tight tracking-[0.25em] text-amber-900">{pin}</p>
                   <p className="mt-1 text-[10px] leading-4 text-amber-800">
-                    บันทึกหรือจดเดี๋ยวนี้ ก่อนปิดหรือรีเฟรชหน้านี้ — รหัสนี้เก็บเป็นค่าเข้ารหัสและจะไม่แสดงอีก ถ้าพลาดต้องกด “ออกลิงก์ใหม่” ซึ่งลิงก์เดิมจะใช้ไม่ได้ทันที · ส่งรหัสคนละช่องทางกับ QR
+                    จดไว้ตอนนี้ — ปิดหน้าแล้วจะไม่แสดงอีก · ส่งคนละช่องทางกับ QR
                   </p>
                 </div>
               ) : null}
               {!pin && projectObserverLink?.hasPin ? (
                 <p className="rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
-                  ลิงก์นี้มี PIN อยู่แล้ว แต่แสดงซ้ำไม่ได้ — ถ้าลืม ให้กด “ออกลิงก์ใหม่”
+                  PIN แสดงซ้ำไม่ได้ — ถ้าลืม กด “ออกลิงก์ใหม่”
                 </p>
               ) : null}
             </div>
           </div>
         ) : (
           <p className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-center text-[12px] leading-5 text-ink-soft">
-            ยังไม่มีลิงก์ติดตามของโครงการนี้ — ตั้งค่าด้านบนแล้วกด “สร้างลิงก์ติดตามโครงการ”
+            ยังไม่มีลิงก์ติดตามโครงการ
           </p>
         )}
     </div>
@@ -644,9 +644,6 @@ export function CallSignAccessPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-blue-950">หน่วยรถในโครงการนี้</h2>
-          <p className="mt-1 text-sm leading-6 text-blue-900">
-            แต่ละหน่วยเก็บ QR ของตัวเองและงานทั้งหมดที่ได้รับ เรียงตามเวลา — กดหัวการ์ดเพื่อย่อหรือขยาย
-          </p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-800 shadow-sm">
           {ready.length}/{units.length} หน่วยพร้อมออก QR

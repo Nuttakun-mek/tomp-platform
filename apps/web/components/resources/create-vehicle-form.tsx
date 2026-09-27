@@ -90,7 +90,7 @@ export function CreateVehicleForm({ projectId }: { projectId?: string } = {}) {
       <div>
         <h2 className="text-lg font-semibold text-ink">เพิ่มรถ</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          บันทึกรายละเอียดรถเพื่อเตรียมใช้งานในโครงการ คนขับจะถูกจับคู่ในขั้นตอนสร้างหน่วยรถ
+          คนขับจับคู่ภายหลังตอนสร้างหน่วยรถ
         </p>
       </div>
 

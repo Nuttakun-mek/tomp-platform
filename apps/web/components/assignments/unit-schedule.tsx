@@ -1,5 +1,5 @@
 import type { Mission } from "@tomp/types/domain";
-import { formatStatusTh } from "@/lib/i18n/status-th";
+import { JobStatusChip } from "@/components/ui/job-status-chip";
 import { mainJobDays } from "@/lib/domain/job-schedule";
 
 export interface ScheduleJob {
@@ -30,13 +30,6 @@ function daysBetween(from: string, to: string): string[] {
   }
   return days;
 }
-
-const STATUS_TONE: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-800",
-  completed: "bg-slate-100 text-ink-faint",
-  acknowledged: "bg-blue-50 text-blue-800",
-  ready: "bg-blue-50 text-blue-800"
-};
 
 /**
  * One unit's work over its whole main job, day by day: the control room sees
@@ -129,9 +122,7 @@ function JobLine({ job }: { job: ScheduleJob }) {
       <span className="min-w-0 flex-1 truncate text-ink-soft" title={job.route}>
         {job.route}
       </span>
-      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_TONE[job.status] ?? "bg-slate-100 text-ink-soft"}`}>
-        {formatStatusTh(job.status)}
-      </span>
+      <JobStatusChip status={job.status} />
     </div>
   );
 }

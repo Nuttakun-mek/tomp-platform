@@ -50,7 +50,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-operation shadow-sm"><UserRoundCheck className="h-5 w-5" /></span>
             <div>
               <p className="text-sm font-semibold text-ink">ข้อมูลคนขับ</p>
-              <p className="text-xs text-ink-faint">ชื่อและเบอร์โทรเป็นข้อมูลที่ต้องมีสำหรับติดต่อระหว่างปฏิบัติงาน</p>
+              <p className="text-xs text-ink-faint">ต้องมีชื่อและเบอร์โทร</p>
             </div>
           </div>
           <label className="field-label">
@@ -110,7 +110,7 @@ export function CreateResourcePairForm({ projectId }: { projectId: string }) {
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-              <span className="field-hint">เลือกให้ตรงกับลักษณะรถจริง เพื่อช่วยแยกสัญลักษณ์ในศูนย์ควบคุม</span>
+              
             </label>
             <label className="field-label">
               <span className="field-title">จำนวนที่นั่ง <span className="field-required-badge">*</span></span>

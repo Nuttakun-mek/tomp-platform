@@ -246,7 +246,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
             คนขับ {credentials.driverName} · รถ {credentials.vehicleLabel}
           </p>
           <p className="mt-1 text-[11px] leading-4 text-teal-800">
-            QR ผู้โดยสารดูซ้ำได้ทุกเมื่อ เพราะเป็นลิงก์อ่านอย่างเดียว — ส่วน QR คนขับกับรหัส PIN เก็บเป็นค่าเข้ารหัส จึงแสดงได้ครั้งเดียวเท่านั้น
+            QR คนขับและ PIN แสดงครั้งเดียว · QR ผู้โดยสารดูซ้ำได้
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5 print:hidden">
@@ -313,7 +313,7 @@ export function UnitCredentialSheet({ credentials }: { credentials: UnitCredenti
           url={credentials.driverUrl}
           filename={`QR-คนขับ-${safeName}.png`}
           pin={credentials.pin}
-          missingNote="QR คนขับแสดงได้ครั้งเดียวตอนออกใบ และไม่ได้เก็บไว้ในระบบ — กด “ออก QR ใหม่” ที่การ์ดหน่วยรถเพื่อออกใบใหม่ (ใบเดิมจะใช้ไม่ได้ทันที)"
+          missingNote="แสดงได้ครั้งเดียวตอนออกใบ — กด “ออก QR ใหม่” ที่การ์ด (ใบเดิมจะใช้ไม่ได้)"
         />
         <CredentialBlock
           tone="observer"

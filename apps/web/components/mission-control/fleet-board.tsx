@@ -309,9 +309,6 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles }: FleetB
           <div>
             <p className="section-label">ภาพรวมรถในโครงการ</p>
             <h2 className="mt-1 text-lg font-semibold text-ink">สถานะคนขับรายคน</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              หนึ่งการ์ดต่อคนขับหนึ่งคน เรียงรายการที่ต้องติดตามขึ้นก่อน กดการ์ดเพื่อดูงานทั้งหมดของคนขับ ตำแหน่ง และข้อความล่าสุด
-            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <MetricChip label="คนขับทั้งหมด" value={groups.length} />

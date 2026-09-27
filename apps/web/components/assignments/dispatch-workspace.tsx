@@ -77,7 +77,7 @@ export function DispatchWorkspace({
       <SetupStep
         step="ขั้นที่ 1"
         title="กำหนดภารกิจหลักให้ Call Sign"
-        description="เลือก Call Sign ที่เตรียมจากหน้าทรัพยากรโครงการ แล้วผูกเข้ากับภารกิจหลักก่อนเปิดงานย่อย ขั้นนี้ยังไม่ออก QR เพื่อป้องกันการแจกงานก่อนข้อมูลพร้อม"
+        description="เลือก Call Sign แล้วกำหนดภารกิจหลักและช่วงวันภายในโครงการ"
       >
         <MissionAssignmentStep
           projectId={projectId}
@@ -94,8 +94,8 @@ export function DispatchWorkspace({
       <SetupStep
         step="ขั้นที่ 2"
         title="เปิดงานย่อยให้ Call Sign"
-        description="เลือก Call Sign ที่ผ่านขั้นที่ 1 แล้วกำหนดวัน เวลา จุดรับ และจุดส่ง งานย่อยจะเรียงอยู่ในการ์ดของ Call Sign นั้น"
-        disabledNote={callSignsWithMission.length ? undefined : "ยังเปิดงานย่อยไม่ได้ ต้องกำหนดภารกิจหลักให้ Call Sign ในขั้นที่ 1 ก่อน"}
+        description="กำหนดวัน เวลา จุดรับ และจุดส่ง — เวลาห้ามทับกับงานเดิม"
+        disabledNote={callSignsWithMission.length ? undefined : "ทำขั้นที่ 1 ก่อน"}
       >
         {jobForm}
       </SetupStep>

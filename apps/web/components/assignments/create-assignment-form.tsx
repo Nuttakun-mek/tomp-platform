@@ -210,7 +210,7 @@ export function CreateAssignmentForm({
         </select>
         {selectedCallSign ? (
           <span className="mt-1 grid gap-2 text-xs">
-            <span className="field-hint">ระบบใช้คนขับและรถจาก Call Sign นี้โดยอัตโนมัติ ไม่ต้องจับคู่ซ้ำในขั้นตอนเปิดงาน</span>
+            
             <span className="grid gap-2 sm:grid-cols-3">
               <span className="rounded-xl border border-border bg-canvas/60 px-3 py-2">
                 <span className="block text-[11px] font-semibold text-ink-faint">Call Sign</span>
@@ -288,14 +288,14 @@ export function CreateAssignmentForm({
         <label className="field-label md:col-span-2">
           คำสั่งสำหรับคนขับ
           <textarea className="field-input min-h-24" name="driverInstruction" placeholder="เช่น โทรหาผู้ประสานงานก่อนถึงจุดรับ 10 นาที" />
-          <span className="field-hint">ข้อความนี้จะแสดงในหน้าคนขับ ควรสั้น ชัดเจน และเป็นคำสั่งที่ปฏิบัติได้จริง</span>
+          <span className="field-hint">แสดงในหน้าคนขับ</span>
         </label>
       </div>
 
       {!canCreate ? (
         <ActionFeedback
           tone="warning"
-          message="ต้องกำหนดภารกิจหลักให้ Call Sign ในขั้นที่ 1 และต้องมีคนขับกับรถครบถ้วนก่อน จึงจะเปิดงานย่อยและออก QR ได้"
+          message="ต้องทำขั้นที่ 1 และมีคนขับกับรถครบก่อน"
         />
       ) : null}
       <ConflictWarning conflicts={conflicts} />

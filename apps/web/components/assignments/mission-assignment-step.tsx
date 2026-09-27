@@ -177,7 +177,7 @@ export function MissionAssignmentStep({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold text-ink">Call Sign ที่พร้อมรับภารกิจหลัก</p>
-            <p className="text-xs leading-5 text-ink-soft">ข้อมูลนี้มาจากหน้าทรัพยากรโครงการ ต้องมีคนขับและรถครบก่อนจึงเลือกได้</p>
+            <p className="text-xs leading-5 text-ink-soft">เลือกได้เฉพาะหน่วยที่มีคนขับและรถครบ</p>
           </div>
           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-operation shadow-sm">
             เลือกแล้ว {selected.size.toLocaleString("th-TH")} / {readyUnits.length.toLocaleString("th-TH")}

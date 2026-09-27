@@ -29,7 +29,7 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
       <PageHeader
         eyebrow="ทรัพยากร"
         title="ทรัพยากรของโครงการนี้"
-        description={`คนขับ ${drivers.length} คน · รถ ${vehicles.length} คัน — นำเข้าจากคลังกลางหรือเพิ่มใหม่ก็ได้ หากเพิ่มเป็นคู่ ระบบจะสร้างหน่วยรถให้พร้อมใช้ในเมนู “จัดการโครงการ”`}
+        description={`คนขับ ${drivers.length} คน · รถ ${vehicles.length} คัน`}
       />
 
       {drivers.length === 0 && vehicles.length === 0 ? (
@@ -38,8 +38,7 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
             <Library className="h-4 w-4" /> เริ่มต้นด้วยการนำเข้าทรัพยากร
           </p>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-teal-900">
-            โครงการเก็บคนขับและรถเป็นสำเนาของตัวเอง เพื่อให้สถานะและการแก้ไขไม่ข้ามไปโครงการอื่น
-            โครงการนี้จึงยังว่างอยู่ — ไม่ใช่ข้อมูลหาย
+            แต่ละโครงการเก็บคนขับและรถเป็นสำเนาของตัวเอง
             {libraryDrivers.length + libraryVehicles.length > 0 ? (
               <> ตอนนี้คลังกลางมีคนขับ {libraryDrivers.length} คน และรถ {libraryVehicles.length} คัน กด <span className="font-semibold">“นำเข้าจากคลังกลาง”</span> ด้านล่างเพื่อดึงเข้าโครงการนี้</>
             ) : (
@@ -53,7 +52,7 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
 
       <CollapsibleSection
         title="เพิ่มคนขับและรถเข้าโครงการนี้"
-        description="สร้างข้อมูลเป็นคู่เดียวกัน แล้วระบบจะสร้างหน่วยรถให้พร้อมรับมอบภารกิจในหน้าจัดการโครงการ"
+        description="เพิ่มเป็นคู่ ระบบสร้างหน่วยรถ (Call Sign) ให้"
         storageKey={`res.${projectId}.newpair`}
         defaultOpen={drivers.length === 0 || vehicles.length === 0}
       >

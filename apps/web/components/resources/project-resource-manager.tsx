@@ -179,8 +179,8 @@ function Section({
       {mine.length === 0 ? (
         <p className="rounded-card bg-slate-50 px-3 py-4 text-center text-[13px] text-ink-soft">
           {projectId
-            ? "โครงการนี้ยังไม่มีรายการ — เพิ่มใหม่ด้านล่าง หรือนำเข้าจากคลังกลาง"
-            : "คลังกลางยังว่าง — เพิ่มรายการด้านล่างเพื่อเก็บไว้ใช้ข้ามโครงการ"}
+            ? "ยังไม่มีรายการ — เพิ่มใหม่หรือนำเข้าจากคลังกลาง"
+            : "คลังกลางยังว่าง"}
         </p>
       ) : (
         <ul className="grid gap-1.5">
@@ -279,9 +279,6 @@ export function ExistingResourcePairingPanel({
       >
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">สร้างหน่วยรถจากทรัพยากรที่มีอยู่</h2>
-          <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
-            ใช้สำหรับคนขับและรถที่นำเข้าจากคลังกลาง หรือรายการที่สร้างแยกไว้แล้ว จับคู่ให้เสร็จในหน้าทรัพยากรโครงการนี้
-          </p>
         </div>
         <span className="flex shrink-0 items-center gap-2">
           <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">
@@ -298,7 +295,7 @@ export function ExistingResourcePairingPanel({
       {message ? <ActionFeedback tone={tone} message={message} /> : null}
       {disabled ? (
         <p className="rounded-card border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-[13px] text-ink-soft">
-          ไม่มีคนขับหรือรถที่ยังว่างให้จับคู่ หากต้องการเพิ่มหน่วยใหม่ ให้เพิ่มชุดคนขับและรถด้านล่าง หรือนำเข้าจากคลังกลางก่อน
+          ไม่มีคนขับหรือรถที่ยังว่าง — เพิ่มใหม่หรือนำเข้าจากคลังกลางก่อน
         </p>
       ) : (
         <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(12rem,0.8fr)_auto] xl:items-end">
@@ -367,9 +364,6 @@ function UnitSummaryPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-ink">หน่วยรถพร้อมใช้งาน</h2>
-          <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
-            หน่วยรถคือข้อมูลรวมของ Call Sign คนขับ และรถ ใช้ตรวจความพร้อมก่อนรับมอบภารกิจและเปิดงานย่อยในหน้าจัดการโครงการ
-          </p>
         </div>
         <span className="rounded-full bg-operation-soft px-3 py-1 text-xs font-semibold text-operation">{active.length} หน่วย</span>
       </div>
@@ -436,7 +430,7 @@ export function ProjectResourceManager({
           subtitle={
             inProject
               ? "เฉพาะของโครงการนี้ — แก้ไขหรือลบที่นี่ไม่กระทบโครงการอื่น"
-              : "รายชื่อที่เก็บไว้ใช้ข้ามโครงการ โครงการจะนำเข้าไปเป็นสำเนาของตัวเอง"
+              : "ใช้ข้ามโครงการ — แต่ละโครงการนำเข้าเป็นสำเนา"
           }
           icon={<UserRoundCheck className="h-5 w-5" />}
           mine={drivers.map(asDriverRow)}
