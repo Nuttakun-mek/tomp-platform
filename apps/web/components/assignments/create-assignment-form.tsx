@@ -9,6 +9,7 @@ import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { ServiceTimeSummary } from "@/components/resources/service-time-summary";
 import { checkSubJob, mainJobDays } from "@/lib/domain/job-schedule";
+import { NEW_JOB_EVENT } from "./unit-schedule";
 import { isCallSignCrewed } from "@/lib/domain/call-sign-rules";
 import { createAssignmentSchema } from "@/lib/validation";
 
@@ -93,8 +94,8 @@ export function CreateAssignmentForm({
     return missionId ? missions.find((item) => item.id === missionId) : undefined;
   }, [missions, selectedCallSign]);
 
-  const window = useMemo(() => (mission ? mainJobDays(mission) : { from: "", to: "" }), [mission]);
-  const operationDate = window.from && window.from === window.to ? window.from : jobDate;
+  const missionDays = useMemo(() => (mission ? mainJobDays(mission) : { from: "", to: "" }), [mission]);
+  const operationDate = missionDays.from && missionDays.from === missionDays.to ? missionDays.from : jobDate;
   const startTime = operationDate && startClock ? bangkokLocalToUtcIso(operationDate, startClock) : "";
   const endTime = operationDate && endClock ? bangkokLocalToUtcIso(operationDate, endClock) : "";
   const selectedCrewReady = Boolean(selectedCallSign && isCallSignCrewed(selectedCallSign));
@@ -120,6 +121,21 @@ export function CreateAssignmentForm({
   }, [existingAssignments, selectedCallSign, startTime, endTime, mission, projectStartDate, projectEndDate]);
 
   const canCreate = Boolean(availableCallSigns.length && selectedCrewReady && mission?.id);
+
+  // "+ งาน" on a day of a unit card (unit-schedule.tsx) picks the unit and the day.
+  useEffect(() => {
+    function prefill(event: Event) {
+      const detail = (event as CustomEvent<{ callSignId?: string; date?: string }>).detail;
+      if (!detail?.callSignId) return;
+      setSelectedCallSignId(detail.callSignId);
+      if (detail.date) setJobDate(detail.date);
+      setStartClock("");
+      setEndClock("");
+      setMessage(null);
+    }
+    window.addEventListener(NEW_JOB_EVENT, prefill);
+    return () => window.removeEventListener(NEW_JOB_EVENT, prefill);
+  }, []);
 
   useEffect(() => {
     if (!selectedCallSignId) return;
@@ -238,17 +254,17 @@ export function CreateAssignmentForm({
       </label>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {window.from && window.from !== window.to ? (
+        {missionDays.from && missionDays.from !== missionDays.to ? (
           <div className="md:col-span-2 xl:max-w-2xl">
             <DateTimeField
             label="วันที่ของงานย่อย"
             name="jobDate"
             value={jobDate}
             onChange={setJobDate}
-            min={window.from}
-            max={window.to}
+            min={missionDays.from}
+            max={missionDays.to}
             required
-            hint={`เลือกได้ระหว่าง ${describeThai(window.from, false)} ถึง ${describeThai(window.to, false)}`}
+            hint={`เลือกได้ระหว่าง ${describeThai(missionDays.from, false)} ถึง ${describeThai(missionDays.to, false)}`}
             />
           </div>
         ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { OPEN_JOB_FORM_EVENT } from "./unit-schedule";
 import { useEffect, useMemo, useState } from "react";
 import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { CallSignAccessPanel } from "./call-sign-access-panel";
@@ -96,6 +97,7 @@ export function DispatchWorkspace({
         title="เปิดงานย่อยให้ Call Sign"
         description="กำหนดวัน เวลา จุดรับ และจุดส่ง — เวลาห้ามทับกับงานเดิม"
         disabledNote={callSignsWithMission.length ? undefined : "ทำขั้นที่ 1 ก่อน"}
+        openOn={OPEN_JOB_FORM_EVENT}
       >
         {jobForm}
       </SetupStep>

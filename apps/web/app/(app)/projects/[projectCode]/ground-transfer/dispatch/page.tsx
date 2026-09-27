@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { CreateAssignmentForm } from "@/components/assignments/create-assignment-form";
-import { DriverJobOrderPanel } from "@/components/assignments/driver-job-order-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
 import { combineResults } from "@/lib/data/data-result";
@@ -89,7 +88,6 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
         }
       />
 
-      <DriverJobOrderPanel projectId={projectId} assignments={assignments} callSigns={callSigns} drivers={drivers} />
     </div>
   );
 }

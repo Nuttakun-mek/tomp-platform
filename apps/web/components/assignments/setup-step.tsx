@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 /**
@@ -17,7 +17,8 @@ export function SetupStep({
   description,
   children,
   defaultOpen = true,
-  disabledNote
+  disabledNote,
+  openOn
 }: {
   step: string;
   title: string;
@@ -26,11 +27,24 @@ export function SetupStep({
   defaultOpen?: boolean;
   /** Shown instead of the body when the step cannot be used yet. */
   disabledNote?: string;
+  /** A window event that unfolds the step and scrolls it into view. */
+  openOn?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!openOn) return;
+    function reveal() {
+      setOpen(true);
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    window.addEventListener(openOn, reveal);
+    return () => window.removeEventListener(openOn, reveal);
+  }, [openOn]);
 
   return (
-    <section className="enterprise-panel overflow-visible">
+    <section ref={sectionRef} className="enterprise-panel scroll-mt-20 overflow-visible">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}

@@ -482,7 +482,8 @@ export function CallSignAccessPanel({
               status: job.status,
               day: row?.startTime ? bangkokDateOf(row.startTime) : "",
               time: jobClockRange(row?.startTime, row?.endTime),
-              route: `${pickup} → ${dropoff}`
+              route: `${pickup} → ${dropoff}`,
+              urgent: job.urgent
             };
           })
         };
@@ -844,6 +845,9 @@ export function CallSignAccessPanel({
               {/* Item 5: work shows up under the unit it was given to, right
                   after it is added — now as the whole main job, day by day. */}
               <UnitSchedule
+                projectId={projectId}
+                callSignId={unit.callSign.id}
+                canAddJobs={crewed && missionReady}
                 mission={missionById.get(callSignMissionId(unit.callSign))}
                 jobs={unit.jobs}
                 projectStartDate={projectStartDate}
