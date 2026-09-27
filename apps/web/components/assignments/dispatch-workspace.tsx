@@ -111,6 +111,9 @@ export function DispatchWorkspace({
         projectObserverLink={projectObserverLink}
         vehicleEvidence={vehicleEvidence}
         onIssued={rememberCredentials}
+        missions={missions}
+        projectStartDate={projectStartDate}
+        projectEndDate={projectEndDate}
       />
     </>
   );

@@ -7,6 +7,7 @@ import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { requirePermission } from "@/lib/auth/rbac";
 import { mapAssignment } from "@/lib/data/mappers";
 import { assertAssignmentCrewMatchesCallSign } from "@/lib/domain/call-sign-rules";
+import { checkSubJob, mainJobDays } from "@/lib/domain/job-schedule";
 import { assertPlanEditable } from "@/lib/domain/publish-locking";
 import { estimateVehicleUsageCost } from "@/lib/domain/vehicle-cost";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
@@ -55,6 +56,50 @@ export async function createAssignmentAction(input: unknown): Promise<ActionResu
   );
   if (!crewCheck.ok) {
     return actionFailure(crewCheck.reason);
+  }
+
+  // Sub-jobs of one unit follow each other in time: inside the main job's days,
+  // inside the project, never overlapping another job of the same driver or
+  // vehicle. Back to back is allowed.
+  if (!parsed.data.startTime || !parsed.data.endTime) {
+    return actionFailure("ระบุเวลาเริ่มและเวลาจบของงานย่อย");
+  }
+  const crewFilter = [inheritedDriverId ? `driver_id.eq.${inheritedDriverId}` : null, inheritedVehicleId ? `vehicle_id.eq.${inheritedVehicleId}` : null, `call_sign_id.eq.${parsed.data.callSignId}`]
+    .filter(Boolean)
+    .join(",");
+  const [{ data: missionRow }, { data: projectRow }, { data: otherRows, error: othersError }] = await Promise.all([
+    client.from("missions").select("planned_start_time, planned_end_time, metadata").eq("id", parsed.data.missionId).eq("project_id", parsed.data.projectId).maybeSingle(),
+    client.from("projects").select("start_date, end_date").eq("id", parsed.data.projectId).maybeSingle(),
+    client
+      .from("assignments")
+      .select("start_time, end_time, metadata")
+      .eq("project_id", parsed.data.projectId)
+      .not("status", "in", "(cancelled,archived)")
+      .or(crewFilter)
+  ]);
+  if (!missionRow) {
+    return actionFailure("ไม่พบภารกิจหลักของงานย่อยนี้ในโครงการ");
+  }
+  if (othersError) {
+    return actionFailure(getDatabaseErrorMessage(othersError, "ตรวจสอบเวลางานเดิมไม่สำเร็จ"));
+  }
+  const scheduleProblems = checkSubJob({
+    startTime: parsed.data.startTime,
+    endTime: parsed.data.endTime,
+    mainJob: mainJobDays({
+      plannedStartTime: missionRow.planned_start_time,
+      plannedEndTime: missionRow.planned_end_time,
+      metadata: missionRow.metadata as Record<string, unknown> | null
+    }),
+    project: { startDate: projectRow?.start_date ?? null, endDate: projectRow?.end_date ?? null },
+    others: (otherRows || []).map((row) => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      const route = [meta.pickupLocation, meta.dropoffLocation].filter((part) => typeof part === "string" && part).join(" → ");
+      return { startTime: row.start_time, endTime: row.end_time, label: route || null };
+    })
+  });
+  if (scheduleProblems.length) {
+    return actionFailure(scheduleProblems.join(" · "));
   }
 
   let vehicleMetadata: Record<string, unknown> = {};

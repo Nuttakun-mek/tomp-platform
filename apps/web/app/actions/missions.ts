@@ -7,6 +7,7 @@ import { mapMission } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createMissionTimelineEvent } from "@/lib/timeline";
+import { checkMainJobDays, mainJobDays } from "@/lib/domain/job-schedule";
 import { assertPlanEditable } from "@/lib/domain/publish-locking";
 
 type SupabaseWriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>;
@@ -122,6 +123,15 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
   }
   const editable = await assertPlanEditable(parsed.data.projectId);
   if (!editable.editable) return actionFailure(editable.reason || "โครงการถูกล็อกแล้ว กรุณาส่งคำขอเปลี่ยนแปลง");
+
+  // The main job must sit inside the project's days — the form limits the date
+  // picker, this is the check that holds when the form is bypassed.
+  const { data: projectRow } = await client.from("projects").select("start_date, end_date").eq("id", parsed.data.projectId).maybeSingle();
+  const dayProblem = checkMainJobDays(
+    mainJobDays({ plannedStartTime: parsed.data.plannedStartTime, plannedEndTime: parsed.data.plannedEndTime, metadata: parsed.data.metadata }),
+    { startDate: projectRow?.start_date ?? null, endDate: projectRow?.end_date ?? null }
+  );
+  if (dayProblem) return actionFailure(dayProblem);
 
   const planningContainer = await ensureMissionPlanningContainer(
     client,

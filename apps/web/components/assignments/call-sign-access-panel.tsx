@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Copy, ExternalLink, LockKeyhole, QrCode, RefreshCw, Trash2, Undo2 } from "lucide-react";
-import type { Assignment, CallSign, Driver, Vehicle } from "@tomp/types/domain";
+import type { Assignment, CallSign, Driver, Mission, Vehicle } from "@tomp/types/domain";
 import { deleteCallSignAction, revokeCallSignQrAction } from "@/app/actions/call-signs";
 import { createDriverAccessTokenAction } from "@/app/actions/driver-access";
 import { createObserverAccessTokenAction } from "@/app/actions/observer-access";
@@ -11,10 +11,11 @@ import { ActionFeedback } from "@/components/ui/action-feedback";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { DateTimeField } from "@/components/ui/datetime-field";
 import { UnitCredentialSheet, type UnitCredentials } from "./unit-credential-sheet";
+import { UnitSchedule, type ScheduleJob } from "./unit-schedule";
+import { bangkokDateOf } from "@/lib/domain/job-schedule";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { formatObserverExpiryLabel } from "@/lib/domain/observer-expiry";
-import { formatStatusTh } from "@/lib/i18n/status-th";
 import { accentFor } from "@/lib/ui/unit-accent";
 import type { ProjectObserverLink } from "@/lib/data/observer-access";
 import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
@@ -24,12 +25,6 @@ import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
 // filled Mission Control with duplicate cards and stranded job history on old
 // tokens — see docs/11-codex/967.
 
-interface UnitJob {
-  id: string;
-  status: string;
-  clock: string;
-  route: string;
-}
 
 interface Unit {
   callSign: CallSign;
@@ -38,7 +33,7 @@ interface Unit {
   evidence?: VehicleEvidence;
   /** A job on this unit, needed because the token still records one for compatibility. */
   anchorAssignmentId: string | null;
-  jobs: UnitJob[];
+  jobs: ScheduleJob[];
   /** Cancelled or archived work. Hidden from the list but it still blocks a delete. */
   retiredJobs: number;
 }
@@ -323,26 +318,17 @@ function ProjectFleetAccessCard({
 }
 
 
-/** "20 ก.ย. 2569 09:30 – 12:00", or a clear empty state when the job has no times yet. */
-function jobDateTimeRange(start?: string | null, end?: string | null) {
-  const parse = (value?: string | null) => {
-    if (!value) return null;
-    const date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return null;
-    return date;
-  };
-  const dateFormatter = new Intl.DateTimeFormat("th-TH", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Bangkok" });
-  const timeFormatter = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
-  const from = parse(start);
-  const to = parse(end);
-  if (!from && !to) return "ยังไม่ระบุวันและเวลา";
-  if (from && !to) return `${dateFormatter.format(from)} ${timeFormatter.format(from)}`;
-  if (!from && to) return `${dateFormatter.format(to)} ${timeFormatter.format(to)}`;
-  const fromDate = dateFormatter.format(from!);
-  const toDate = dateFormatter.format(to!);
-  const fromTime = timeFormatter.format(from!);
-  const toTime = timeFormatter.format(to!);
-  return fromDate === toDate ? `${fromDate} ${fromTime} – ${toTime}` : `${fromDate} ${fromTime} – ${toDate} ${toTime}`;
+/** "09:30–12:00" — the day is the row it sits in; a job running past midnight names its end day. */
+function jobClockRange(start?: string | null, end?: string | null) {
+  const clock = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
+  const day = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "Asia/Bangkok" });
+  const from = start ? new Date(start) : null;
+  const to = end ? new Date(end) : null;
+  const valid = (date: Date | null): date is Date => Boolean(date && Number.isFinite(date.getTime()));
+  if (!valid(from)) return valid(to) ? `ถึง ${day.format(to)} ${clock.format(to)}` : "ยังไม่ระบุเวลา";
+  if (!valid(to)) return clock.format(from);
+  const sameDay = bangkokDateOf(from.toISOString()) === bangkokDateOf(to.toISOString());
+  return `${clock.format(from)}–${sameDay ? "" : `${day.format(to)} `}${clock.format(to)}`;
 }
 
 
@@ -377,10 +363,16 @@ export function CallSignAccessPanel({
   observerLinks = {},
   projectObserverLink,
   vehicleEvidence = {},
-  onIssued
+  onIssued,
+  missions = [],
+  projectStartDate,
+  projectEndDate
 }: {
   projectId: string;
   assignments: Assignment[];
+  missions?: Mission[];
+  projectStartDate?: string | null;
+  projectEndDate?: string | null;
   callSigns: CallSign[];
   drivers: Driver[];
   vehicles: Vehicle[];
@@ -479,15 +471,17 @@ export function CallSignAccessPanel({
           evidence,
           anchorAssignmentId: anchor?.id ?? null,
           retiredJobs,
-          jobs: ordered.map((job) => {
+          jobs: ordered.map((job, index) => {
             const row = byId.get(job.id);
             const meta = (row?.metadata ?? {}) as Record<string, unknown>;
             const pickup = typeof meta.pickupLocation === "string" ? meta.pickupLocation : "ยังไม่ระบุจุดรับ";
             const dropoff = typeof meta.dropoffLocation === "string" ? meta.dropoffLocation : "ยังไม่ระบุจุดส่ง";
             return {
               id: job.id,
+              order: index + 1,
               status: job.status,
-              clock: jobDateTimeRange(row?.startTime, row?.endTime),
+              day: row?.startTime ? bangkokDateOf(row.startTime) : "",
+              time: jobClockRange(row?.startTime, row?.endTime),
               route: `${pickup} → ${dropoff}`
             };
           })
@@ -496,6 +490,7 @@ export function CallSignAccessPanel({
       .sort((a, b) => a.callSign.callSign.localeCompare(b.callSign.callSign, "th"));
   }, [assignments, callSigns, drivers, vehicleEvidence, vehicles]);
 
+  const missionById = useMemo(() => new Map(missions.map((mission) => [mission.id, mission])), [missions]);
   const ready = units.filter((u) => u.driver && u.vehicle && callSignMissionId(u.callSign));
 
   /**
@@ -748,8 +743,11 @@ export function CallSignAccessPanel({
               </button>
 
               {open ? (
-              <div className="grid gap-3 border-t border-black/5 py-3 pl-4 pr-3">
-              <dl className="grid gap-x-4 gap-y-1 text-[12px] sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid items-start gap-x-5 gap-y-3 border-t border-black/5 py-3 pl-4 pr-3 xl:grid-cols-[minmax(19rem,24rem)_minmax(0,1fr)]">
+              {/* Left: the unit and what can be done with it. Right: its whole
+                  plan, day by day — the part that grows with the project. */}
+              <div className="grid min-w-0 content-start gap-3">
+              <dl className="grid gap-x-4 gap-y-1 text-[12px] sm:grid-cols-2">
                 {detailRows(unit).map((row) => (
                   <div key={row.label} className="flex gap-1.5">
                     <dt className="shrink-0 font-semibold text-ink-faint">{row.label}</dt>
@@ -782,8 +780,6 @@ export function CallSignAccessPanel({
                   </div>
                 </div>
               ) : null}
-
-              {sheet ? <UnitCredentialSheet credentials={sheet} /> : null}
 
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -846,29 +842,22 @@ export function CallSignAccessPanel({
                 </p>
               ) : null}
 
-              {/* Item 5: work shows up under the unit it was given to, right
-                  after it is added, instead of only as a number. */}
-              {unit.jobs.length ? (
-                <ol className="mt-2 grid gap-1 border-t border-black/5 pt-2">
-                  {unit.jobs.map((job, index) => (
-                    <li key={job.id} className="flex flex-wrap items-center gap-2 text-[12px]">
-                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-100 text-[10px] font-bold text-ink-soft">
-                        {index + 1}
-                      </span>
-                      <span className="font-semibold text-ink">{job.clock}</span>
-                      <span className="min-w-0 flex-1 truncate text-ink-soft">{job.route}</span>
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-ink-soft">
-                        {formatStatusTh(job.status)}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : crewed ? (
-                <p className="mt-2 rounded-card bg-slate-100 px-2.5 py-1.5 text-[12px] text-ink-soft">
-                  ยังไม่มีงานสำหรับหน่วยนี้ เพิ่มได้ที่ “ขั้นที่ 2” ด้านล่าง
-                </p>
-              ) : null}
+              </div>
 
+              {/* Item 5: work shows up under the unit it was given to, right
+                  after it is added — now as the whole main job, day by day. */}
+              <UnitSchedule
+                mission={missionById.get(callSignMissionId(unit.callSign))}
+                jobs={unit.jobs}
+                projectStartDate={projectStartDate}
+                projectEndDate={projectEndDate}
+              />
+
+              {sheet ? (
+                <div className="min-w-0 xl:col-span-2">
+                  <UnitCredentialSheet credentials={sheet} />
+                </div>
+              ) : null}
 
               </div>
               ) : null}

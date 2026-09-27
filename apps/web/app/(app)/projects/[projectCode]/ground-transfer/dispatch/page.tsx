@@ -74,8 +74,11 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
             callSigns={callSigns}
             drivers={drivers}
             vehicles={vehicles}
-            existingAssignments={assignments.map((assignment) => ({
+            projectStartDate={project.startDate}
+            projectEndDate={project.endDate}
+            existingAssignments={assignments.filter((assignment) => !["cancelled", "archived"].includes(assignment.status)).map((assignment) => ({
               id: assignment.id,
+              callSignId: assignment.callSignId,
               driverId: assignment.driverId,
               vehicleId: assignment.vehicleId,
               startTime: assignment.startTime,

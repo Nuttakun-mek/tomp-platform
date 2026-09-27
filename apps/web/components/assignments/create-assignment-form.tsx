@@ -8,12 +8,13 @@ import { DateRangeFields, DateTimeField, describeThai } from "@/components/ui/da
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { ServiceTimeSummary } from "@/components/resources/service-time-summary";
-import { describeAssignmentConflicts } from "@/lib/domain/assignment-rules";
+import { checkSubJob, mainJobDays } from "@/lib/domain/job-schedule";
 import { isCallSignCrewed } from "@/lib/domain/call-sign-rules";
 import { createAssignmentSchema } from "@/lib/validation";
 
 export interface ExistingAssignmentWindow {
   id: string;
+  callSignId?: string | null;
   driverId?: string | null;
   vehicleId?: string | null;
   startTime?: string | null;
@@ -28,6 +29,8 @@ interface CreateAssignmentFormProps {
   drivers: Driver[];
   vehicles: Vehicle[];
   existingAssignments?: ExistingAssignmentWindow[];
+  projectStartDate?: string | null;
+  projectEndDate?: string | null;
 }
 
 function callSignMissionId(callSign?: CallSign): string {
@@ -51,17 +54,8 @@ function bangkokLocalToUtcIso(date: string, clock: string): string {
   return new Date(Date.UTC(year, month - 1, day, hour - 7, minute, 0, 0)).toISOString();
 }
 
-function missionWindow(mission: Mission): { from: string; to: string } {
-  const meta = (mission.metadata ?? {}) as Record<string, unknown>;
-  const metaFrom = typeof meta.operationStartDate === "string" ? meta.operationStartDate : typeof meta.operationDate === "string" ? meta.operationDate : "";
-  const metaTo = typeof meta.operationEndDate === "string" ? meta.operationEndDate : "";
-  const from = (metaFrom || (mission.plannedStartTime ? String(mission.plannedStartTime) : "")).slice(0, 10);
-  const to = (metaTo || (mission.plannedEndTime ? String(mission.plannedEndTime) : "") || from).slice(0, 10);
-  return { from, to: to || from };
-}
-
 function windowLabel(mission: Mission): string {
-  const { from, to } = missionWindow(mission);
+  const { from, to } = mainJobDays(mission);
   if (!from) return "";
   return from === to ? describeThai(from, false) : `${describeThai(from, false)} ถึง ${describeThai(to, false)}`;
 }
@@ -72,7 +66,9 @@ export function CreateAssignmentForm({
   callSigns,
   drivers,
   vehicles,
-  existingAssignments = []
+  existingAssignments = [],
+  projectStartDate,
+  projectEndDate
 }: CreateAssignmentFormProps) {
   const router = useRouter();
   const availableCallSigns = useMemo(() => callSigns.filter((callSign) => Boolean(callSignMissionId(callSign))), [callSigns]);
@@ -97,21 +93,31 @@ export function CreateAssignmentForm({
     return missionId ? missions.find((item) => item.id === missionId) : undefined;
   }, [missions, selectedCallSign]);
 
-  const window = useMemo(() => (mission ? missionWindow(mission) : { from: "", to: "" }), [mission]);
+  const window = useMemo(() => (mission ? mainJobDays(mission) : { from: "", to: "" }), [mission]);
   const operationDate = window.from && window.from === window.to ? window.from : jobDate;
   const startTime = operationDate && startClock ? bangkokLocalToUtcIso(operationDate, startClock) : "";
   const endTime = operationDate && endClock ? bangkokLocalToUtcIso(operationDate, endClock) : "";
   const selectedCrewReady = Boolean(selectedCallSign && isCallSignCrewed(selectedCallSign));
 
+  // The same rules the server applies (lib/domain/job-schedule.ts): inside the
+  // main job and the project, no overlap with this unit's other jobs. There is
+  // no "book it anyway" — back to back is allowed, an overlap is not.
   const conflicts = useMemo(() => {
     if (!startTime || !endTime || !selectedCallSign) return [];
-    const relevant = existingAssignments.filter(
+    const others = existingAssignments.filter(
       (item) =>
+        item.callSignId === selectedCallSign.id ||
         (selectedCallSign.driverId && item.driverId === selectedCallSign.driverId) ||
         (selectedCallSign.vehicleId && item.vehicleId === selectedCallSign.vehicleId)
     );
-    return describeAssignmentConflicts({ startTime, endTime }, relevant);
-  }, [existingAssignments, selectedCallSign, startTime, endTime]);
+    return checkSubJob({
+      startTime,
+      endTime,
+      mainJob: mission ? mainJobDays(mission) : null,
+      project: { startDate: projectStartDate, endDate: projectEndDate },
+      others
+    });
+  }, [existingAssignments, selectedCallSign, startTime, endTime, mission, projectStartDate, projectEndDate]);
 
   const canCreate = Boolean(availableCallSigns.length && selectedCrewReady && mission?.id);
 
@@ -144,9 +150,9 @@ export function CreateAssignmentForm({
       setMessage("เลือกวันและช่วงเวลาของงานย่อยให้ครบถ้วน");
       return;
     }
-    if (conflicts.length && !String(formData.get("overrideReason") || "").trim()) {
+    if (conflicts.length) {
       setTone("danger");
-      setMessage("ช่วงเวลาซ้ำกับงานเดิม กรุณาระบุเหตุผลก่อนเปิดงาน");
+      setMessage(conflicts[0]);
       return;
     }
 
@@ -159,8 +165,7 @@ export function CreateAssignmentForm({
       metadata: {
         pickupLocation: formData.get("pickupLocation") || "ยังไม่ระบุจุดรับ",
         dropoffLocation: formData.get("dropoffLocation") || "ยังไม่ระบุจุดส่ง",
-        driverInstruction: formData.get("driverInstruction") || "",
-        ...(conflicts.length ? { overrideReason: String(formData.get("overrideReason") || "").trim(), overrideConflicts: conflicts } : {})
+        driverInstruction: formData.get("driverInstruction") || ""
       }
     });
 
@@ -294,14 +299,8 @@ export function CreateAssignmentForm({
         />
       ) : null}
       <ConflictWarning conflicts={conflicts} />
-      {conflicts.length ? (
-        <label className="field-label">
-          เหตุผลการจองซ้ำช่วงเวลา
-          <textarea className="field-input min-h-20" name="overrideReason" placeholder="อธิบายเหตุผลที่ต้องให้ Call Sign นี้รับงานซ้อนช่วงเวลาเดิม" />
-        </label>
-      ) : null}
       <ActionFeedback message={message} tone={tone} />
-      <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={!canCreate || isPending} type="submit">
+      <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={!canCreate || isPending || conflicts.length > 0} type="submit">
         {isPending ? "กำลังเปิดงาน..." : "เปิดงานย่อย"}
       </button>
     </form>
