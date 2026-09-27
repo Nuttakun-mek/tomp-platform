@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Library } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { SideDrawer } from "@/components/ui/side-drawer";
 import { CreateResourcePairForm } from "@/components/resources/create-resource-pair-form";
 import { ExistingResourcePairingPanel, ProjectResourceManager } from "@/components/resources/project-resource-manager";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
@@ -30,6 +30,17 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
         eyebrow="ทรัพยากร"
         title="ทรัพยากรของโครงการนี้"
         description={`คนขับ ${drivers.length} คน · รถ ${vehicles.length} คัน`}
+        actions={
+          // The two ways to make a unit, out of the page until needed: a new
+          // driver and vehicle together, or a pair from what the project has.
+          <SideDrawer label="เพิ่มหน่วยรถ" title="เพิ่มหน่วยรถเข้าโครงการนี้" defaultOpen={drivers.length + vehicles.length + libraryDrivers.length + libraryVehicles.length === 0}>
+            <section className="enterprise-panel grid gap-3 p-4">
+              <h3 className="text-sm font-semibold text-ink">คนขับและรถชุดใหม่</h3>
+              <CreateResourcePairForm projectId={projectId} />
+            </section>
+            <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} />
+          </SideDrawer>
+        }
       />
 
       {drivers.length === 0 && vehicles.length === 0 ? (
@@ -42,7 +53,7 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
             {libraryDrivers.length + libraryVehicles.length > 0 ? (
               <> ตอนนี้คลังกลางมีคนขับ {libraryDrivers.length} คน และรถ {libraryVehicles.length} คัน กด <span className="font-semibold">“นำเข้าจากคลังกลาง”</span> ด้านล่างเพื่อดึงเข้าโครงการนี้</>
             ) : (
-              <> คลังกลางยังไม่มีรายการ เพิ่มคนขับและรถได้ที่ด้านล่าง หรือที่เมนู <Link href="/resources" className="font-semibold underline">ทรัพยากรกลาง</Link> เพื่อเก็บไว้ใช้ข้ามโครงการ</>
+              <> คลังกลางยังไม่มีรายการ กด <span className="font-semibold">“เพิ่มหน่วยรถ”</span> ด้านบน หรือเพิ่มที่เมนู <Link href="/resources" className="font-semibold underline">ทรัพยากรกลาง</Link> เพื่อเก็บไว้ใช้ข้ามโครงการ</>
             )}
           </p>
         </section>
@@ -50,16 +61,6 @@ export default async function ProjectResourcesPage({ params }: { params: Promise
 
       <ProjectResourceManager projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} libraryDrivers={libraryDrivers} libraryVehicles={libraryVehicles} />
 
-      <CollapsibleSection
-        title="เพิ่มคนขับและรถเข้าโครงการนี้"
-        description="เพิ่มเป็นคู่ ระบบสร้างหน่วยรถ (Call Sign) ให้"
-        storageKey={`res.${projectId}.newpair`}
-        defaultOpen={drivers.length === 0 || vehicles.length === 0}
-      >
-        <CreateResourcePairForm projectId={projectId} />
-      </CollapsibleSection>
-
-      <ExistingResourcePairingPanel projectId={projectId} drivers={drivers} vehicles={vehicles} callSigns={callSigns} />
     </div>
   );
 }

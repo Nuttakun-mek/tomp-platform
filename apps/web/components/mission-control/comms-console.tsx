@@ -240,7 +240,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
   }
 
   return (
-    <section ref={sectionRef} className="enterprise-panel scroll-mt-20 overflow-hidden">
+    <section ref={sectionRef} id="mission-comms" className="enterprise-panel scroll-mt-20 overflow-hidden">
       <div className="border-b border-slate-200 px-5 py-4">
         <p className="text-xs font-semibold tracking-[0.16em] text-operation">การสื่อสารกับคนขับ</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">ข้อความสองทาง ศูนย์ ↔ คนขับ</h2>

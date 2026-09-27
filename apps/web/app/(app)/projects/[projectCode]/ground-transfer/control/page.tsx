@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
+import { CommsJumpButton } from "@/components/mission-control/comms-jump-button";
 import { CommsConsole } from "@/components/mission-control/comms-console";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
 import { LiveLocationMap } from "@/components/mission-control/live-location-map";
@@ -68,27 +69,33 @@ export default async function ControlPage({ params }: ControlPageProps) {
         initialLocations={locations}
         initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, workSessions, evidence }}
       >
-        <CollapsibleSection
-          title="แผนที่ติดตามตำแหน่ง"
-          storageKey="mc.map"
-          description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ"
-          defaultOpen={locations.length > 0}
-        >
-          <LiveLocationMap projectId={project.id} initialLocations={locations} />
-        </CollapsibleSection>
-
-        <FleetBoard
-          projectId={project.id}
-          assignments={assignments}
-          callSigns={callSigns}
-          drivers={drivers}
-          vehicles={vehicles}
-          listView={
-            <JobStatusBoard assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
-          }
-        />
+        {/* On a wide screen the map stays beside the fleet board (and in view
+            while the cards scroll); below that they stack as before. */}
+        <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className="min-w-0 2xl:sticky 2xl:top-20">
+            <CollapsibleSection
+              title="แผนที่ติดตามตำแหน่ง"
+              storageKey="mc.map"
+              description="หมุดคนขับแบบเรียลไทม์ พร้อมเส้นทางและความสดของสัญญาณ"
+              defaultOpen={locations.length > 0}
+            >
+              <LiveLocationMap projectId={project.id} initialLocations={locations} />
+            </CollapsibleSection>
+          </div>
+          <FleetBoard
+            projectId={project.id}
+            assignments={assignments}
+            callSigns={callSigns}
+            drivers={drivers}
+            vehicles={vehicles}
+            listView={
+              <JobStatusBoard assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
+            }
+          />
+        </div>
 
         <CommsConsole projectId={project.id} assignments={assignments} callSigns={callSigns} />
+        <CommsJumpButton />
       </MissionControlFeedProvider>
 
       {/* "สถานะงานทั้งหมด" is the fleet board's "ดูแบบรายการ" now, and
