@@ -127,15 +127,18 @@ Owner said go on all waves. What shipped, and where it differs from the plan:
 - **B** — fleet board chips filter the cards; "ดูแบบรายการ" shows
   `JobStatusBoard`; `OperationKpiStrip`, `RiskAndExceptionPanel` and the header
   pills are gone; "แชทกับคนขับ" on a card opens the console on that thread
-  (`OPEN_COMMS_EVENT`). Map/fleet side by side and the chat drawer were not done.
+  (`OPEN_COMMS_EVENT`). Follow-up the same night: from `2xl` the map sits beside the
+  fleet board (sticky); below `lg` a floating chat button (`CommsJumpButton`)
+  jumps to the console — a jump, not a drawer.
 - **C** — `UnitSchedule` reorders jobs within a day, flags urgent, saves with
   `setAssignmentOrderAction`, and "+ งาน" unfolds step 2 pre-filled
   (`OPEN_JOB_FORM_EVENT`, `NEW_JOB_EVENT`). `DriverJobOrderPanel` and
   `findDriverTimeConflicts` deleted (overlaps are refused at creation, `lib/domain/job-schedule.ts`).
 - **D** — `/resources/vehicles` redirects to `/resources`; its board, quality card
-  and `getVehicleOperationProfiles` deleted. The resources table-plus-drawer was
-  **not** done: the two add panels have their own multi-column layouts and were
-  left stacked rather than squeezed side by side unseen.
+  and `getVehicleOperationProfiles` deleted. Follow-up: the two add-unit forms
+  open from "เพิ่มหน่วยรถ" in a 72rem `SideDrawer` (wide enough for their own
+  column layouts); it opens by itself only when the project and the library are
+  both empty. The units list itself was not turned into a table.
 - **E** — §4 overstated it: admin already shared one shell with tabs and one
   menu entry. `/superadmin` (three cards repeating the tabs) now redirects to
   users; dev tools split into four in-use tools and a folded "เอกสารช่วงทดลองใช้".
