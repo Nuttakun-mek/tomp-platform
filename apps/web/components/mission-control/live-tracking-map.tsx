@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import type { DriverLocation } from "@tomp/types/domain";
+import { splitTrack, type TrackPoint } from "@/lib/map/location-track";
 import { spreadOverlappingMapPoints } from "@/lib/map/marker-overlap";
 import { inferVehicleIcon, vehicleIconSvgMarkup, type VehicleIconKey } from "@/lib/domain/vehicle-icon";
 
@@ -20,6 +21,8 @@ export interface TrackedPoint {
   accuracy: number | null;
   vehicleIcon?: VehicleIconKey;
   vehicleType?: string | null;
+  /** The path from the pings the phone sent, oldest first — see lib/map/location-track.ts. */
+  track?: TrackPoint[];
 }
 
 export const TRACKING_MARKER_COLORS: Record<MarkerFreshness, string> = {
@@ -51,7 +54,6 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
-  const trailsRef = useRef<Map<string, Array<[number, number]>>>(new Map());
   const firstFitRef = useRef(true);
   const [focusedPointId, setFocusedPointId] = useState<string | null>(null);
 
@@ -100,17 +102,14 @@ export function LiveTrackingMap({ points, height = 480 }: { points: TrackedPoint
 
       for (const spread of valid) {
         const point = spread.point;
-        const trail = trailsRef.current.get(point.id) ?? [];
-        const last = trail[trail.length - 1];
-        if (!last || last[0] !== point.latitude || last[1] !== point.longitude) {
-          trail.push([point.latitude, point.longitude]);
-          if (trail.length > 30) trail.shift();
-          trailsRef.current.set(point.id, trail);
-        }
-
         const color = TRACKING_MARKER_COLORS[point.freshness];
-        if (trail.length > 1) {
-          L.polyline(trail, { color, weight: 3, opacity: 0.5 }).addTo(layer);
+        // The trail comes from the stored pings, not from the positions this page
+        // happened to poll: those joined into straight lines through buildings and
+        // across signal gaps. A gap is dashed — the route across it is unknown.
+        if (point.track && point.track.length > 1) {
+          const { driven, gaps } = splitTrack(point.track);
+          for (const line of driven) L.polyline(line, { color, weight: 3, opacity: 0.55 }).addTo(layer);
+          for (const gap of gaps) L.polyline(gap, { color, weight: 2, opacity: 0.45, dashArray: "2 7" }).addTo(layer);
         }
 
         if (spread.isOffset) {
@@ -172,6 +171,7 @@ export function toTrackedPoint(location: DriverLocation, freshness: MarkerFreshn
     ageLabel,
     accuracy: location.accuracy ?? null,
     vehicleIcon: inferVehicleIcon({ icon: location.metadata.vehicleIcon, vehicleType, capacity }),
-    vehicleType
+    vehicleType,
+    track: location.track
   };
 }

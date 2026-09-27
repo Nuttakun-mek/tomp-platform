@@ -218,6 +218,8 @@ export interface DriverLocation {
   source: DriverLocationSource;
   createdAt: string;
   metadata: Record<string, unknown>;
+  /** The recent path, oldest first: [latitude, longitude, recordedAt epoch ms]. */
+  track?: Array<[number, number, number]>;
 }
 
 export interface ReadinessCheckItem {

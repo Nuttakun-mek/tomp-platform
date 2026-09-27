@@ -4,6 +4,7 @@ import { withTimeout } from "@/lib/async/timeout";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { demoKernel } from "@/lib/demo/demo-kernel";
 import { inferVehicleIcon } from "@/lib/domain/vehicle-icon";
+import { buildTrack, TRACK_WINDOW_MS } from "@/lib/map/location-track";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
@@ -195,6 +196,80 @@ async function enrichLocationMetadataViaPostgres(locations: DriverLocation[]) {
   }
 }
 
+// One marker per vehicle, with the path it actually drove.
+//
+// This used to read the project's 50 newest rows and keep the newest per job.
+// A moving phone reports every 2–3 s, so one car on the road filled all 50 rows
+// in about two minutes and every parked unit (one ping per two minutes) dropped
+// off the map — it looked as if their GPS had stopped. It also keyed by job, so
+// a unit moving on to its next job split into two markers.
+//
+// Now: every ping of the last TRACK_WINDOW_MS (a few columns only) gives both
+// the newest position per unit and its trail; the old 50-row read stays to keep
+// units that went quiet longer ago on the map as offline.
+const TRACK_COLUMNS = "id, project_id, assignment_id, call_sign_id, driver_id, latitude, longitude, accuracy, recorded_at, source";
+const TRACK_ROW_LIMIT = 4000;
+
+function unitKey(row: LocationRow) {
+  return nullableText(row, "call_sign_id") || nullableText(row, "assignment_id") || nullableText(row, "driver_id") || text(row, "id");
+}
+
+function isRealFix(row: LocationRow) {
+  return !["placeholder", "demo"].includes(text(row, "source")) && (numberValue(row, "latitude") !== 0 || numberValue(row, "longitude") !== 0);
+}
+
+function recordedAtMs(row: LocationRow) {
+  return Date.parse(text(row, "recorded_at", text(row, "created_at")));
+}
+
+async function latestWithTracks(fetch: {
+  window: (sinceIso: string) => Promise<LocationRow[]>;
+  recent: () => Promise<LocationRow[]>;
+  byIds: (ids: string[]) => Promise<LocationRow[]>;
+}): Promise<DriverLocation[]> {
+  const now = Date.now();
+  const [windowRows, recentRows] = await Promise.all([fetch.window(new Date(now - TRACK_WINDOW_MS).toISOString()), fetch.recent()]);
+
+  const newest = new Map<string, LocationRow>();
+  for (const row of [...windowRows, ...recentRows]) {
+    if (!isRealFix(row)) continue;
+    const key = unitKey(row);
+    const held = newest.get(key);
+    if (!held || recordedAtMs(row) > recordedAtMs(held)) newest.set(key, row);
+  }
+
+  // Window rows carry only the columns a trail needs; read the full newest row
+  // (metadata: build, diagnostics) where the 50-row read did not already have it.
+  const fullById = new Map(recentRows.map((row) => [text(row, "id"), row]));
+  const missing = [...newest.values()].map((row) => text(row, "id")).filter((id) => !fullById.has(id));
+  if (missing.length) (await fetch.byIds(missing)).forEach((row) => fullById.set(text(row, "id"), row));
+
+  const pingsByUnit = new Map<string, LocationRow[]>();
+  for (const row of windowRows) {
+    if (!isRealFix(row)) continue;
+    const key = unitKey(row);
+    const list = pingsByUnit.get(key);
+    if (list) list.push(row);
+    else pingsByUnit.set(key, [row]);
+  }
+
+  return [...newest.entries()]
+    .sort(([, a], [, b]) => recordedAtMs(b) - recordedAtMs(a))
+    .map(([key, row]) => {
+      const location = mapDriverLocation(fullById.get(text(row, "id")) ?? row);
+      const track = buildTrack(
+        (pingsByUnit.get(key) ?? []).map((ping) => ({
+          latitude: numberValue(ping, "latitude"),
+          longitude: numberValue(ping, "longitude"),
+          accuracy: ping.accuracy == null ? null : numberValue(ping, "accuracy"),
+          recordedAt: text(ping, "recorded_at")
+        })),
+        now
+      );
+      return track.length > 1 ? { ...location, track } : location;
+    });
+}
+
 const LOCATIONS_UNAVAILABLE_MESSAGE = "บริการตำแหน่งคนขับไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่อีกครั้ง";
 
 // Fallback path when the Supabase data client is unavailable or fails.
@@ -211,25 +286,25 @@ async function getLatestDriverLocationsFallback(
     if (allowDemo) return getDemoDriverLocations(projectId, limit);
     throw new Error(LOCATIONS_UNAVAILABLE_MESSAGE);
   }
-  let data: LocationRow[];
+  let locations: DriverLocation[];
   try {
-    data = projectId
-      ? await sql<LocationRow[]>`select * from gps_locations where project_id = ${projectId} order by recorded_at desc limit ${limit}`
-      : await sql<LocationRow[]>`select * from gps_locations order by recorded_at desc limit ${limit}`;
+    locations = await latestWithTracks({
+      window: (since) =>
+        projectId
+          ? sql<LocationRow[]>`select ${sql.unsafe(TRACK_COLUMNS)} from gps_locations where project_id = ${projectId} and recorded_at >= ${since} order by recorded_at desc limit ${TRACK_ROW_LIMIT}`
+          : sql<LocationRow[]>`select ${sql.unsafe(TRACK_COLUMNS)} from gps_locations where recorded_at >= ${since} order by recorded_at desc limit ${TRACK_ROW_LIMIT}`,
+      recent: () =>
+        projectId
+          ? sql<LocationRow[]>`select * from gps_locations where project_id = ${projectId} order by recorded_at desc limit ${limit}`
+          : sql<LocationRow[]>`select * from gps_locations order by recorded_at desc limit ${limit}`,
+      byIds: (ids) => sql<LocationRow[]>`select * from gps_locations where id in ${sql(ids)}`
+    });
   } catch {
     if (allowDemo) return getDemoDriverLocations(projectId, limit);
     throw new Error(LOCATIONS_UNAVAILABLE_MESSAGE);
   }
 
-  const latestByAssignment = new Map<string, DriverLocation>();
-  data.map(mapDriverLocation).forEach((location) => {
-    const key = location.assignmentId || location.driverId || location.id;
-    if (!latestByAssignment.has(key)) {
-      latestByAssignment.set(key, location);
-    }
-  });
-
-  return enrichLocationMetadataViaPostgres(Array.from(latestByAssignment.values()));
+  return enrichLocationMetadataViaPostgres(locations);
 }
 
 // cache(): one render often needs this list from several components; keep it to one query per request.
@@ -240,41 +315,34 @@ export const getLatestDriverLocationsByProjectId = cache(async function getLates
     return getLatestDriverLocationsFallback(projectId, 50, { allowDemo: true });
   }
 
-  let data: LocationRow[] | null | undefined;
-  let error: unknown;
+  let locations: DriverLocation[];
   try {
-    const result = await withTimeout(
-      client.from("gps_locations").select("*").eq("project_id", projectId).order("recorded_at", { ascending: false }).limit(50),
+    locations = await withTimeout(
+      latestWithTracks({
+        window: async (since) => {
+          const { data, error } = await client.from("gps_locations").select(TRACK_COLUMNS).eq("project_id", projectId).gte("recorded_at", since).order("recorded_at", { ascending: false }).limit(TRACK_ROW_LIMIT);
+          if (error) throw error;
+          return (data || []) as LocationRow[];
+        },
+        recent: async () => {
+          const { data, error } = await client.from("gps_locations").select("*").eq("project_id", projectId).order("recorded_at", { ascending: false }).limit(50);
+          if (error) throw error;
+          return (data || []) as LocationRow[];
+        },
+        byIds: async (ids) => {
+          const { data, error } = await client.from("gps_locations").select("*").in("id", ids);
+          if (error) throw error;
+          return (data || []) as LocationRow[];
+        }
+      }),
       6000,
       "project driver locations"
     );
-    data = result.data as LocationRow[] | null;
-    error = result.error;
   } catch {
     return getLatestDriverLocationsFallback(projectId, 50, { allowDemo: false });
   }
 
-  if (error) {
-    return getLatestDriverLocationsFallback(projectId, 50, { allowDemo: false });
-  }
-
-  if (!data?.length) {
-    return [];
-  }
-
-  const latestByAssignment = new Map<string, DriverLocation>();
-  data
-    .map(mapDriverLocation)
-    // drop seed/placeholder rows — they never move and read as a "stuck" marker
-    .filter((location) => !["placeholder", "demo"].includes(String(location.source)) && (location.latitude !== 0 || location.longitude !== 0))
-    .forEach((location) => {
-      const key = location.assignmentId || location.driverId || location.id;
-      if (!latestByAssignment.has(key)) {
-        latestByAssignment.set(key, location);
-      }
-    });
-
-  return enrichLocationMetadata(client, Array.from(latestByAssignment.values()));
+  return enrichLocationMetadata(client, locations);
 });
 // cache(): one render often needs this list from several components; keep it to one query per request.
 export const getLatestDriverLocations = cache(async function getLatestDriverLocations(limit = 50): Promise<DriverLocation[]> {
@@ -284,37 +352,34 @@ export const getLatestDriverLocations = cache(async function getLatestDriverLoca
     return getLatestDriverLocationsFallback(null, limit, { allowDemo: true });
   }
 
-  let data: LocationRow[] | null | undefined;
-  let error: unknown;
+  let locations: DriverLocation[];
   try {
-    const result = await withTimeout(client.from("gps_locations").select("*").order("recorded_at", { ascending: false }).limit(limit), 6000, "driver locations");
-    data = result.data as LocationRow[] | null;
-    error = result.error;
+    locations = await withTimeout(
+      latestWithTracks({
+        window: async (since) => {
+          const { data, error } = await client.from("gps_locations").select(TRACK_COLUMNS).gte("recorded_at", since).order("recorded_at", { ascending: false }).limit(TRACK_ROW_LIMIT);
+          if (error) throw error;
+          return (data || []) as LocationRow[];
+        },
+        recent: async () => {
+          const { data, error } = await client.from("gps_locations").select("*").order("recorded_at", { ascending: false }).limit(limit);
+          if (error) throw error;
+          return (data || []) as LocationRow[];
+        },
+        byIds: async (ids) => {
+          const { data, error } = await client.from("gps_locations").select("*").in("id", ids);
+          if (error) throw error;
+          return (data || []) as LocationRow[];
+        }
+      }),
+      6000,
+      "driver locations"
+    );
   } catch {
     return getLatestDriverLocationsFallback(null, limit, { allowDemo: false });
   }
 
-  if (error) {
-    return getLatestDriverLocationsFallback(null, limit, { allowDemo: false });
-  }
-
-  if (!data?.length) {
-    return [];
-  }
-
-  const latestByAssignment = new Map<string, DriverLocation>();
-  data
-    .map(mapDriverLocation)
-    // drop seed/placeholder rows — they never move and read as a "stuck" marker
-    .filter((location) => !["placeholder", "demo"].includes(String(location.source)) && (location.latitude !== 0 || location.longitude !== 0))
-    .forEach((location) => {
-      const key = location.assignmentId || location.driverId || location.id;
-      if (!latestByAssignment.has(key)) {
-        latestByAssignment.set(key, location);
-      }
-    });
-
-  return enrichLocationMetadata(client, Array.from(latestByAssignment.values()));
+  return enrichLocationMetadata(client, locations);
 });
 
 export interface LatestLocationByCallSign {
