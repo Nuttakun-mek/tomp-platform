@@ -28,11 +28,11 @@
         "NSCameraUsageDescription": "TOMP Driver uses the camera to scan the job QR code your control room gives you and to take photos for the job. For example, you photograph the vehicle and its licence plate before starting, or a delivery as proof of work.",
         "NSLocationAlwaysUsageDescription": "TOMP Driver keeps sharing your location with the control room during a job even when the screen is off or you switch to a navigation app, so dispatchers can follow your vehicle. For example, they can send you to a new pickup point if a flight is delayed. Sharing stops when the job ends."
       },
-      "buildNumber": "10"
+      "buildNumber": "11"
     },
     "android": {
       "package": "com.tomp.driver",
-      "versionCode": 8,
+      "versionCode": 9,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#d9effd"
