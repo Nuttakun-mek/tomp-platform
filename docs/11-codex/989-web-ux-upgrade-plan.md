@@ -1,6 +1,6 @@
 # 989 — Web UX upgrade plan (web only, mobile untouched)
 
-Date: 2026-09-27. Status: **proposal, awaiting owner decisions** (§6).
+Date: 2026-09-27. Status: **shipped the same day — see §7 for what differs from the plan.**
 Builds on `981` (screen cleanup, wave 1). Evidence below comes from reading the
 pages and a scan of every `.tsx` for Thai UI strings of 60+ characters.
 
@@ -115,3 +115,29 @@ Rules to apply everywhere under `app/(app)`:
 | E | §4 admin consolidation | low | which dev tools to keep |
 
 Each wave: its own commit, tests, deploy, and the §0 check.
+
+## 7. Done 2026-09-27
+
+Owner said go on all waves. What shipped, and where it differs from the plan:
+
+- **A** — helper text cut to one line or removed across dispatch, resources and
+  the fleet board; QR/PIN warnings kept, shorter. `JobStatusChip`
+  (`components/ui/job-status-chip.tsx`) for job status. `FieldHelp` already
+  existed and is the `?` tip — no new component.
+- **B** — fleet board chips filter the cards; "ดูแบบรายการ" shows
+  `JobStatusBoard`; `OperationKpiStrip`, `RiskAndExceptionPanel` and the header
+  pills are gone; "แชทกับคนขับ" on a card opens the console on that thread
+  (`OPEN_COMMS_EVENT`). Map/fleet side by side and the chat drawer were not done.
+- **C** — `UnitSchedule` reorders jobs within a day, flags urgent, saves with
+  `setAssignmentOrderAction`, and "+ งาน" unfolds step 2 pre-filled
+  (`OPEN_JOB_FORM_EVENT`, `NEW_JOB_EVENT`). `DriverJobOrderPanel` and
+  `findDriverTimeConflicts` deleted (overlaps are refused at creation, `lib/domain/job-schedule.ts`).
+- **D** — `/resources/vehicles` redirects to `/resources`; its board, quality card
+  and `getVehicleOperationProfiles` deleted. The resources table-plus-drawer was
+  **not** done: the two add panels have their own multi-column layouts and were
+  left stacked rather than squeezed side by side unseen.
+- **E** — §4 overstated it: admin already shared one shell with tabs and one
+  menu entry. `/superadmin` (three cards repeating the tabs) now redirects to
+  users; dev tools split into four in-use tools and a folded "เอกสารช่วงทดลองใช้".
+
+§0 held: none of the driver paths changed.

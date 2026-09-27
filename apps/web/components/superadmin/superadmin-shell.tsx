@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 
 const TABS = [
-  { href: "/superadmin", label: "ภาพรวม" },
   { href: "/superadmin/users", label: "ผู้ใช้และสิทธิ์" },
   { href: "/permission/roles", label: "บทบาท" },
   { href: "/permission/projects", label: "โครงการ" },
   { href: "/permission/audit", label: "บันทึกกิจกรรม" },
-  { href: "/ground-transfer/superadmin/dev-tools", label: "เครื่องมือพัฒนา" }
+  { href: "/ground-transfer/superadmin/dev-tools", label: "เครื่องมือ" }
 ];
 
 export function SuperadminShell({ children }: { children: React.ReactNode }) {
@@ -23,7 +22,7 @@ export function SuperadminShell({ children }: { children: React.ReactNode }) {
       </div>
       <nav className="flex flex-wrap gap-1.5">
         {TABS.map((tab) => {
-          const active = tab.href === "/superadmin" ? pathname === "/superadmin" : pathname.startsWith(tab.href);
+          const active = pathname.startsWith(tab.href);
           return (
             <Link
               key={tab.href}
