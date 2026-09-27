@@ -29,7 +29,7 @@
         "NSLocationAlwaysUsageDescription": "TOMP Driver keeps sharing your location with the control room during a job even when the screen is off or you switch to a navigation app, so dispatchers can follow your vehicle. For example, they can send you to a new pickup point if a flight is delayed. Sharing stops when the job ends.",
         "NSMotionUsageDescription": "TOMP Driver does not read your motion or fitness data. The location component it uses to share your position during a job includes motion detection, for example to tell a moving vehicle from a parked one, so iOS requires this description; the app never asks for this permission."
       },
-      "buildNumber": "11"
+      "buildNumber": "12"
     },
     "android": {
       "package": "com.tomp.driver",
