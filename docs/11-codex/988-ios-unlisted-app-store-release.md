@@ -139,3 +139,16 @@ Review Notes (English):
 - Do not purge smoke-test data while a review is open without checking the
   demo project is not tagged.
 - Do not re-use a demo QR that anyone has already opened.
+
+## 6. Rejection 2026-09-27 — Guideline 5.1.1(ii), purpose strings
+
+Build 1.0.0 (10) was rejected: the location prompt ("อนุญาตให้ TOMP ใช้ตำแหน่ง…")
+did not say how the data is used or give an example. Fixed for build 11 in
+`apps/mobile-driver/app.json`: English purpose strings with a concrete example
+for location (when in use, always) and camera, set in both `ios.infoPlist` and
+the plugin options (the `expo-location` plugin overrides `infoPlist`), a Thai
+translation in `locales/th.json`, and the unused prompts removed (microphone
+from `expo-camera`, Face ID from `expo-secure-store`, motion from
+`expo-location`). Check any new permission with
+`npx expo config --type introspect` — every `*UsageDescription` needs its own
+reason and example.

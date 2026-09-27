@@ -23,9 +23,10 @@
       "bundleIdentifier": "com.tomp.driver",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "TOMP ใช้ตำแหน่งเพื่อให้ศูนย์ควบคุมเห็นสถานะระหว่างปฏิบัติงาน",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "TOMP ใช้ตำแหน่งเบื้องหลังเมื่อคนขับอนุญาต เพื่อให้ศูนย์ควบคุมติดตามงานได้ต่อเนื่อง",
-        "NSCameraUsageDescription": "TOMP ใช้กล้องเพื่อสแกน QR รับงาน และถ่ายรูปหลักฐานระหว่างปฏิบัติงาน"
+        "NSLocationWhenInUseUsageDescription": "TOMP Driver shares your location with your event's control room while you are on a job, so dispatchers can see where your vehicle is. For example, the control room can tell a waiting passenger how far away you are from the pickup point.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "TOMP Driver keeps sharing your location with the control room during a job even when the screen is off or you switch to a navigation app, so dispatchers can follow your vehicle. For example, they can send you to a new pickup point if a flight is delayed. Sharing stops when the job ends.",
+        "NSCameraUsageDescription": "TOMP Driver uses the camera to scan the job QR code your control room gives you and to take photos for the job. For example, you photograph the vehicle and its licence plate before starting, or a delivery as proof of work.",
+        "NSLocationAlwaysUsageDescription": "TOMP Driver keeps sharing your location with the control room during a job even when the screen is off or you switch to a navigation app, so dispatchers can follow your vehicle. For example, they can send you to a new pickup point if a flight is delayed. Sharing stops when the job ends."
       },
       "buildNumber": "10"
     },
@@ -54,15 +55,29 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "อนุญาตให้ TOMP ใช้ตำแหน่งระหว่างปฏิบัติงาน",
-          "locationWhenInUsePermission": "อนุญาตให้ TOMP ใช้ตำแหน่งขณะเปิดแอป",
+          "locationAlwaysAndWhenInUsePermission": "TOMP Driver keeps sharing your location with the control room during a job even when the screen is off or you switch to a navigation app, so dispatchers can follow your vehicle. For example, they can send you to a new pickup point if a flight is delayed. Sharing stops when the job ends.",
+          "locationWhenInUsePermission": "TOMP Driver shares your location with your event's control room while you are on a job, so dispatchers can see where your vehicle is. For example, the control room can tell a waiting passenger how far away you are from the pickup point.",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true,
-          "isIosBackgroundLocationEnabled": true
+          "isIosBackgroundLocationEnabled": true,
+          "locationAlwaysPermission": "TOMP Driver keeps sharing your location with the control room during a job even when the screen is off or you switch to a navigation app, so dispatchers can follow your vehicle. For example, they can send you to a new pickup point if a flight is delayed. Sharing stops when the job ends.",
+          "motionUsagePermission": false
         }
       ],
-      "expo-secure-store",
-      "expo-camera",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "TOMP Driver uses the camera to scan the job QR code your control room gives you and to take photos for the job. For example, you photograph the vehicle and its licence plate before starting, or a delivery as proof of work.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -90,6 +105,9 @@
       "eas": {
         "projectId": "ea9c91b8-049d-4287-bfcd-dad4ecc7981b"
       }
+    },
+    "locales": {
+      "th": "./locales/th.json"
     }
   }
 }
