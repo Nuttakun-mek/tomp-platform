@@ -140,9 +140,10 @@ and check with what the system already has.
 
 | Step | Items | Why this order |
 |---|---|---|
-| 1 | GT-1, GT-2 | Daily value now, no migration, no new dependency |
-| 2 | AT-2 (+ `0051`) | Makes AT cases real jobs with QR/GPS/chat |
-| 3 | AT-1 then GT-4 | Shared parser, adds `exceljs` once |
+| 1 | AT-1 (template + import) | Asked for by the owner; AT has no way in for data today |
+| 2 | GT-1, GT-2 | Daily value, no migration; GT-1 can export `.xlsx` with the same library |
+| 3 | AT-2 (+ `0051`) | Makes AT cases real jobs with QR/GPS/chat |
+| 3b | GT-4 | Reuses the AT-1 parser |
 | 4 | AT-3, AT-4, GT-3 | Build on 2 and 3 |
 | 5 | GT-5 | Locks the flows above in |
 
