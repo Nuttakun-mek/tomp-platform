@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { CommandCenterHeader } from "@/components/mission-control/command-center-header";
 import { CommsJumpButton } from "@/components/mission-control/comms-jump-button";
+import { ControlAlerts } from "@/components/mission-control/control-alerts";
 import { CommsConsole } from "@/components/mission-control/comms-console";
 import { FleetBoard } from "@/components/mission-control/fleet-board";
 import { LiveLocationMap } from "@/components/mission-control/live-location-map";
@@ -69,6 +70,8 @@ export default async function ControlPage({ params }: ControlPageProps) {
         initialLocations={locations}
         initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, workSessions, evidence }}
       >
+        <ControlAlerts projectId={project.id} assignments={assignments} callSigns={callSigns} vehicles={vehicles} />
+
         {/* On a wide screen the map stays beside the fleet board (and in view
             while the cards scroll); below that they stack as before. */}
         <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">

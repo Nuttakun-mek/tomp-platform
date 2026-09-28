@@ -1,11 +1,11 @@
 "use server";
 
-import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { createCaseSchema, updateCaseSchema } from "@/lib/airport-transfer/case-schema";
+import { airportTransferTaskTemplate, insertAirportTransferCase } from "@/lib/airport-transfer/case-insert";
 import { FLIGHT_PROVIDER, verifyFlightByNumberAndDate } from "@/lib/airport-transfer/flight-provider";
 import { flightNumberHelpMessage } from "@/lib/airport-transfer/flight-number";
 import { syncActiveAirportTransferFlights } from "@/lib/airport-transfer/flight-sync";
@@ -67,30 +67,6 @@ function recommendedPickup(direction: "arrival" | "departure", departureAt: stri
   const timestamp = new Date(base).getTime();
   const adjustment = direction === "departure" ? -3 * 60 * 60 * 1000 : 45 * 60 * 1000;
   return new Date(timestamp + adjustment).toISOString();
-}
-
-function taskTemplate(direction: "arrival" | "departure") {
-  const shared = [
-    ["flight_verified", "ตรวจสอบเที่ยวบินแล้ว", "airport_dispatcher"],
-    ["vehicle_assigned", "จัดรถและคนขับแล้ว", "airport_dispatcher"],
-    ["driver_notified", "แจ้งงานคนขับแล้ว", "airport_dispatcher"],
-    ["driver_confirmed", "คนขับรับทราบแล้ว", "airport_driver"]
-  ];
-  const arrival = [
-    ["vehicle_at_airport", "รถถึงจุดรอสนามบิน", "airport_driver"],
-    ["flight_landed", "เครื่องบินลงจอดแล้ว", "airport_coordinator"],
-    ["passenger_met", "พบผู้โดยสารแล้ว", "airport_coordinator"],
-    ["passenger_on_board", "ผู้โดยสารขึ้นรถแล้ว", "airport_driver"],
-    ["destination_arrived", "ถึงที่พักแล้ว", "airport_driver"]
-  ];
-  const departure = [
-    ["vehicle_en_route", "รถออกเดินทางไปรับ", "airport_driver"],
-    ["vehicle_at_pickup", "รถถึงจุดรับแล้ว", "airport_driver"],
-    ["passenger_on_board", "รับผู้โดยสารแล้ว", "airport_driver"],
-    ["airport_arrived", "ถึงสนามบินแล้ว", "airport_driver"],
-    ["passenger_handed_over", "ส่งมอบผู้โดยสารแล้ว", "airport_coordinator"]
-  ];
-  return [...shared, ...(direction === "arrival" ? arrival : departure), ["completed", "ปิดงาน", "airport_dispatcher"]] as Array<[string, string, string]>;
 }
 
 export async function lookupAirportTransferFlight(input: {
@@ -208,9 +184,6 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
   const arrivalAt = input.scheduledArrivalUtc || thailandTimeToIso(input.scheduledArrivalLocal);
   const suggestedPickup = recommendedPickup(input.direction, departureAt, arrivalAt);
   const confirmedPickup = thailandTimeToIso(input.confirmedPickupLocal);
-  const caseId = randomUUID();
-  const caseCode = `APT-${input.travelDate.replaceAll("-", "")}-${randomUUID().slice(0, 6).toUpperCase()}`;
-
   const verification = await verifyFlightByNumberAndDate(input.flightNumber, input.travelDate);
   let verificationStatus = "pending";
   let providerCheckedAt: string | null = null;
@@ -227,82 +200,47 @@ export async function createAirportTransferCase(_previous: CreateTransferCaseSta
     verificationStatus = matching.length === 1 ? "verified" : matching.length > 1 ? "multiple_matches" : "route_mismatch";
   }
 
-  const { error: caseError } = await supabase.from("airport_transfer_cases").insert({
-    id: caseId,
-    organization_id: profile.organizationId,
-    project_id: input.projectId,
-    case_code: caseCode,
+  const created = await insertAirportTransferCase(supabase, {
+    projectId: input.projectId,
+    organizationId: profile.organizationId,
+    createdBy: profile.id,
     direction: input.direction,
-    client_name: input.clientName,
-    passenger_title: input.passengerTitle,
-    passenger_first_name: input.passengerFirstName,
-    passenger_last_name: input.passengerLastName,
-    passenger_email: input.passengerEmail,
-    passenger_mobile: input.passengerMobile,
-    passenger_count: input.passengerCount,
-    luggage_count: input.luggageCount,
-    travel_date: input.travelDate,
-    flight_number: input.flightNumber,
-    origin_airport: input.originAirport,
-    destination_airport: input.destinationAirport,
-    scheduled_departure_at: departureAt,
-    scheduled_arrival_at: arrivalAt,
-    pickup_name: input.pickupName,
-    pickup_address: input.pickupAddress,
-    pickup_maps_url: input.pickupMapsUrl,
-    dropoff_name: input.dropoffName,
-    dropoff_address: input.dropoffAddress,
-    dropoff_maps_url: input.dropoffMapsUrl,
-    recommended_pickup_at: suggestedPickup,
-    confirmed_pickup_at: confirmedPickup || suggestedPickup,
-    pickup_time_override_reason: input.pickupTimeOverrideReason,
-    vehicle_type: input.vehicleType,
-    vehicle_plate_snapshot: input.vehiclePlate,
-    driver_name_snapshot: input.driverName,
-    driver_phone_snapshot: input.driverPhone,
-    fast_track: input.fastTrack,
+    clientName: input.clientName,
+    passengerTitle: input.passengerTitle,
+    passengerFirstName: input.passengerFirstName,
+    passengerLastName: input.passengerLastName,
+    passengerEmail: input.passengerEmail,
+    passengerMobile: input.passengerMobile,
+    passengerCount: input.passengerCount,
+    luggageCount: input.luggageCount,
+    travelDate: input.travelDate,
+    flightNumber: input.flightNumber,
+    originAirport: input.originAirport,
+    destinationAirport: input.destinationAirport,
+    departureAt,
+    arrivalAt,
+    pickupName: input.pickupName,
+    pickupAddress: input.pickupAddress,
+    pickupMapsUrl: input.pickupMapsUrl,
+    dropoffName: input.dropoffName,
+    dropoffAddress: input.dropoffAddress,
+    dropoffMapsUrl: input.dropoffMapsUrl,
+    recommendedPickupAt: suggestedPickup,
+    confirmedPickupAt: confirmedPickup,
+    pickupTimeOverrideReason: input.pickupTimeOverrideReason,
+    vehicleType: input.vehicleType,
+    vehiclePlate: input.vehiclePlate,
+    driverName: input.driverName,
+    driverPhone: input.driverPhone,
+    fastTrack: input.fastTrack,
     notes: input.notes,
-    flight_verification_status: verificationStatus,
-    flight_provider: verification.ok || verification.reason !== "not_configured" ? FLIGHT_PROVIDER : null,
-    flight_provider_checked_at: providerCheckedAt,
-    operational_status: verificationStatus === "verified" ? "verified" : "needs_review",
-    next_action_at: confirmedPickup || suggestedPickup,
-    created_by: profile.id
+    verificationStatus,
+    providerConsulted: verification.ok || verification.reason !== "not_configured",
+    providerCheckedAt,
+    snapshots: verification.ok ? verification.candidates : []
   });
-
-  if (caseError) return { ok: false, message: `บันทึกเคสไม่สำเร็จ: ${caseError.message}` };
-
-  const tasks = taskTemplate(input.direction).map(([taskKey, label, ownerRole], sequence) => ({
-    case_id: caseId,
-    task_key: taskKey,
-    label,
-    owner_role: ownerRole,
-    sequence: sequence + 1
-  }));
-
-  await Promise.all([
-    supabase.from("airport_transfer_tasks").insert(tasks),
-    supabase.from("airport_transfer_status_events").insert({ case_id: caseId, to_status: verificationStatus === "verified" ? "verified" : "needs_review", event_type: "case_created", actor_profile_id: profile.id }),
-    supabase.from("airport_transfer_audit_logs").insert({ case_id: caseId, entity_type: "transfer_case", entity_id: caseId, action: "created", new_value: { caseCode, direction: input.direction, flightNumber: input.flightNumber }, actor_profile_id: profile.id }),
-    verification.ok
-      ? supabase.from("airport_transfer_flight_snapshots").insert(
-          verification.candidates.map((candidate) => ({
-            case_id: caseId,
-            provider: FLIGHT_PROVIDER,
-            verification_status: verificationStatus,
-            scheduled_departure_at: candidate.scheduledDepartureAt,
-            estimated_departure_at: candidate.estimatedDepartureAt,
-            actual_departure_at: candidate.actualDepartureAt,
-            scheduled_arrival_at: candidate.scheduledArrivalAt,
-            estimated_arrival_at: candidate.estimatedArrivalAt,
-            actual_arrival_at: candidate.actualArrivalAt,
-            provider_status: candidate.status,
-            confidence: "confirmed",
-            raw_payload: candidate.raw
-          }))
-        )
-      : Promise.resolve()
-  ]);
+  if (!created.ok) return { ok: false, message: `บันทึกเคสไม่สำเร็จ: ${created.message}` };
+  const caseCode = created.caseCode;
 
   // The pages moved to /projects/<code>/airport-transfer (984): 'layout'
   // revalidates every project's cases/dashboard under that dynamic segment
@@ -446,7 +384,7 @@ export async function updateAirportTransferCase(_previous: UpdateTransferCaseSta
   if (auditError) return { ok: false, message: `แก้ไขเคสแล้ว แต่บันทึกประวัติไม่สำเร็จ: ${auditError.message}` };
 
   if (current.direction !== input.direction) {
-    const desiredTasks = taskTemplate(input.direction).map(([taskKey, label, ownerRole], sequence) => ({
+    const desiredTasks = airportTransferTaskTemplate(input.direction).map(([taskKey, label, ownerRole], sequence) => ({
       case_id: input.caseId,
       task_key: taskKey,
       label,

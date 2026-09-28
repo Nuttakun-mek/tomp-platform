@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ClipboardList, LayoutDashboard, MapPinned, Users } from "lucide-react";
+import { ArrowLeft, ClipboardList, LayoutDashboard, MapPinned, ReceiptText, Users } from "lucide-react";
 
-export type GroundTransferTabKey = "overview" | "dispatch" | "control" | "resources";
+export type GroundTransferTabKey = "overview" | "dispatch" | "control" | "resources" | "day-close";
 
 /** The Ground Transfer sections of a project, shared by the project bar and this standalone bar. */
 export function groundTransferTabs(projectCode: string): Array<{ key: GroundTransferTabKey; label: string; href: string; icon: typeof LayoutDashboard }> {
@@ -13,7 +13,8 @@ export function groundTransferTabs(projectCode: string): Array<{ key: GroundTran
     { key: "overview", label: "ภาพรวม", href: base, icon: LayoutDashboard },
     { key: "dispatch", label: "จัดการโครงการ", href: `${base}/dispatch`, icon: ClipboardList },
     { key: "control", label: "ศูนย์ควบคุม", href: `${base}/control`, icon: MapPinned },
-    { key: "resources", label: "ทรัพยากร", href: `${base}/resources`, icon: Users }
+    { key: "resources", label: "ทรัพยากร", href: `${base}/resources`, icon: Users },
+    { key: "day-close", label: "สรุปปิดวัน", href: `${base}/day-close`, icon: ReceiptText }
   ];
 }
 

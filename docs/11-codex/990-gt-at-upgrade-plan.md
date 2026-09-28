@@ -166,3 +166,41 @@ driver paths).
 4. **Flight re-check** — on-open re-check (no cost), or pay for Vercel Pro /
    an external pinger for a real 30-minute schedule?
 5. **Playwright** — local only, or also a CI job?
+
+## 6. Shipped 2026-09-28 — steps 1 and 2
+
+Owner: "ทำ 1-2 ก่อน ให้ละเอียด". Defaults taken for §5: `.xlsx` export, alert
+thresholds as proposed.
+
+**AT-1 Excel import** (`lib/airport-transfer/import/**`, imports pages)
+- `columns.ts` is the single definition; `workbook.ts` builds the form from it
+  and reads files back (template detected by a very-hidden `_tomp` sheet).
+- `normalize.ts`: dates (ISO, d/m/y, Buddhist year, Excel serial, date cells),
+  direction in Thai/English, header synonyms for customers' own files.
+- `flight-match.ts`: picks the leg that lands in (arrival) or leaves (departure)
+  a Thai airport; codeshare duplicates count once.
+- `batch.ts`: upload → rows → check (flights looked up once per flight + date,
+  4 at a time, 120 per pass, reused for 30 min; duplicates against the file and
+  the project's cases) → "ยืนยันนำเข้า" (valid rows, and warnings if ticked).
+- Arrival rows become pickup = the flight's airport, dropoff = the hotel;
+  departure the other way round. Pickup time = landing + 45 min / take-off − 3 h.
+- `case-insert.ts` now holds the case write shared with the case form.
+- New dependency: `exceljs@4.4.0` (web only). It brings a moderate `uuid`
+  advisory for v3/v5/v6 with a buffer, a path exceljs does not use.
+
+**GT-1 Day close** (`/ground-transfer/day-close`, tab "สรุปปิดวัน")
+- `lib/domain/day-close.ts`: one row per unit per Bangkok day, priced once
+  from first planned start to last planned end against the real clock-in/out
+  (a clock-out after midnight belongs to the day it started); notes say what
+  is missing instead of guessing. Today counts a running shift to now.
+- Export: `day-close/export?date=` → `.xlsx` with a totals row.
+
+**GT-2 Alerts** (`components/mission-control/control-alerts.tsx`)
+- `lib/domain/control-alerts.ts`: not moving 15 min before start (danger once
+  late, for an hour), GPS offline by the app's own freshness rule and silent
+  ≥ 5 min on a running job, OT 15 min before the end and priced once running.
+- Sticky bar on the control room; each alert announced once per browser for
+  12 h: a tone (sound is opt-in, browsers need a click first) and a desktop
+  notification when the tab is hidden. Clicking an alert opens that chat.
+
+§0 held — no driver paths touched.
