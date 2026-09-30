@@ -72,9 +72,10 @@ export default async function ControlPage({ params }: ControlPageProps) {
       >
         <ControlAlerts projectId={project.id} assignments={assignments} callSigns={callSigns} vehicles={vehicles} />
 
-        {/* On a wide screen the map stays beside the fleet board (and in view
-            while the cards scroll); below that they stack as before. */}
-        <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        {/* On a wide screen the map takes the width and the fleet board is a
+            fixed column of one-card-wide rows beside it (and the map stays in
+            view while the cards scroll); below that they stack as before. */}
+        <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,1fr)_26rem]">
           <div className="min-w-0 2xl:sticky 2xl:top-20">
             <CollapsibleSection
               title="แผนที่ติดตามตำแหน่ง"
