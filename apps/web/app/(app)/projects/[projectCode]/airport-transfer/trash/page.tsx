@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
 import { Trash2 } from "lucide-react";
 import { RestoreAirportTransferCaseButton } from "@/components/airport-transfer/restore-case-button";
 import { ButtonLink } from "@/components/ui/button";
@@ -17,7 +18,7 @@ export default async function AirportTransferTrashPage({ params }: { params: Pro
   const cases = await getDeletedAirportTransferCases(project.id);
   return (
     <>
-      <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Recycle Bin</p><h1 className="mt-1 text-2xl font-semibold">ข้อมูลที่ลบแล้ว</h1><p className="mt-2 text-sm text-slate-500">ข้อมูล ประวัติการแก้ไข และ Snapshot เที่ยวบินยังคงอยู่ สามารถกู้คืนกลับเข้าสู่รายการงานได้</p></header>
+      <PageHeader eyebrow="Airport Transfer" title="ข้อมูลที่ลบแล้ว" description="กู้คืนกลับเข้ารายการได้ ประวัติและข้อมูลเที่ยวบินยังอยู่ครบ" />
       <section className="grid gap-3">
         {cases.length ? cases.map((item) => (
           <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

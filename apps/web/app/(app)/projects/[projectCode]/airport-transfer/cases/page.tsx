@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
 import { AirportTransferCaseCard } from "@/components/airport-transfer/case-card";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ export default async function AirportTransferCasesPage({ params, searchParams }:
   const cancelledCases = cases.filter((item) => item.operationalStatus === "cancelled");
   return (
     <>
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Travel Cases</p><h1 className="mt-1 text-2xl font-semibold">ข้อมูลการเดินทางทั้งหมด</h1><p className="mt-2 text-sm text-slate-500">ค้นหาและกรองตามทิศทาง สถานะ และข้อมูลผู้โดยสาร</p></div><ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/new`}>สร้างการ์ดข้อมูล</ButtonLink></header>
+      <PageHeader eyebrow="Airport Transfer" title="ข้อมูลการเดินทางทั้งหมด" actions={<ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/new`}>สร้างการ์ดข้อมูล</ButtonLink>} />
       {query.created ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">สร้างเคส {query.created} เรียบร้อยแล้ว</div> : null}
       {query.trashed ? <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">ย้ายเคสไปยัง “ข้อมูลที่ลบแล้ว” เรียบร้อย สามารถกู้คืนได้ภายหลัง</div> : null}
       <form className="grid items-stretch gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_180px_200px_88px]" method="get">

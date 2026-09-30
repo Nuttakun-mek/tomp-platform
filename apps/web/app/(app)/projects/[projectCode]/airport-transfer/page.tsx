@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
 import { AlertTriangle, CarFront, CheckCircle2, ClipboardList, Clock3, FileSpreadsheet, Plus, ShieldCheck } from "lucide-react";
 import { AirportTransferCaseCard, getAirportTransferOperationalAlerts } from "@/components/airport-transfer/case-card";
 import { AirportTransferApiHealthCard } from "@/components/airport-transfer/api-health-card";
@@ -46,15 +47,16 @@ export default async function AirportTransferDashboardPage({ params }: { params:
 
   return (
     <>
-      <section className="overflow-hidden rounded-2xl bg-[#0b2d46] p-4 text-white shadow-lg lg:p-5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Operations Control Center</p><h1 className="mt-2 text-2xl font-semibold lg:text-3xl">ศูนย์ควบคุม Airport Transfer</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">เรียงงานตามเวลาที่ต้องดำเนินการ ตรวจเที่ยวบิน จัดรถ และติดตามการรับ–ส่งผู้โดยสารจากจุดเดียว</p></div>
-          <div className="flex flex-wrap gap-2">
-            <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/new`} className="gap-2 bg-cyan-300 text-cyan-950 hover:bg-cyan-200"><Plus className="h-4 w-4" />สร้างการ์ดข้อมูล</ButtonLink>
-            <ButtonLink href={`/projects/${projectCode}/airport-transfer/imports`} variant="secondary" className="gap-2"><FileSpreadsheet className="h-4 w-4" />นำเข้า Excel / แบบฟอร์มลูกค้า</ButtonLink>
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        eyebrow="Airport Transfer"
+        title="ศูนย์ควบคุม Airport Transfer"
+        actions={
+          <>
+            <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/new`} className="gap-2"><Plus className="h-4 w-4" />สร้างการ์ดข้อมูล</ButtonLink>
+            <ButtonLink href={`/projects/${projectCode}/airport-transfer/imports`} variant="secondary" className="gap-2"><FileSpreadsheet className="h-4 w-4" />นำเข้า Excel</ButtonLink>
+          </>
+        }
+      />
       <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map(({ label, value, icon: Icon, color }) => <article key={label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"><div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${color}`}><Icon className="h-4 w-4" /></div><div><p className="text-xl font-semibold leading-none tabular-nums">{value}</p><p className="mt-1 text-xs text-slate-500">{label}</p></div></article>)}
       </section>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Field, Section } from "./form-parts";
 import { useActionState, useMemo, useState, useTransition } from "react";
 import {
   createAirportTransferCase,
@@ -16,29 +17,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowDown, ArrowRight, Building2, MapPin, PlaneLanding, PlaneTakeoff } from "lucide-react";
 
 const initialState: CreateTransferCaseState = { ok: false, message: "" };
-
-function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string[]; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-      <span>{label}</span>
-      {children}
-      {hint ? <span className="text-xs font-normal text-slate-500">{hint}</span> : null}
-      {error?.length ? <span className="text-xs font-normal text-red-700">{error[0]}</span> : null}
-    </label>
-  );
-}
-
-function Section({ number, title, description, children }: { number: string; title: string; description: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-cyan-100 text-sm font-bold text-cyan-900">{number}</span>
-        <div><h2 className="text-lg font-semibold text-slate-950">{title}</h2><p className="mt-0.5 text-sm text-slate-500">{description}</p></div>
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function formatSuggestedTime(value: string) {
   if (!value) return "กรอกเวลาเที่ยวบินเพื่อคำนวณ";
@@ -148,13 +126,13 @@ export function CreateAirportTransferCaseForm({ projectId }: { projectId: string
       <Section number="2" title="ข้อมูลผู้โดยสาร" description="ระยะแรกสร้างหนึ่งการ์ดต่อผู้โดยสารหรือผู้ติดต่อหลัก">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <Field label="คำนำหน้า"><Select name="passengerTitle" defaultValue=""><option value="">ไม่ระบุ</option><option>Mr.</option><option>Mrs.</option><option>Ms.</option><option>Dr.</option></Select></Field>
-          <Field label="ชื่อ *" error={errors.passengerFirstName}><Input name="passengerFirstName" required /></Field>
-          <Field label="นามสกุล *" error={errors.passengerLastName}><Input name="passengerLastName" required /></Field>
+          <Field label="ชื่อ" required error={errors.passengerFirstName}><Input name="passengerFirstName" required /></Field>
+          <Field label="นามสกุล" required error={errors.passengerLastName}><Input name="passengerLastName" required /></Field>
           <Field label="เบอร์โทรศัพท์"><Input name="passengerMobile" inputMode="tel" /></Field>
           <Field label="อีเมล" error={errors.passengerEmail}><Input name="passengerEmail" type="email" /></Field>
           <Field label="จำนวนผู้โดยสาร"><Input name="passengerCount" type="number" min="1" defaultValue="1" /></Field>
           <Field label="จำนวนกระเป๋า"><Input name="luggageCount" type="number" min="0" defaultValue="0" /></Field>
-          <label className="flex items-center gap-2 self-end rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold"><input name="fastTrack" type="checkbox" /> Fast Track</label>
+          <label className="field-input flex cursor-pointer items-center gap-2 self-end text-[13px] font-semibold"><input name="fastTrack" type="checkbox" /> Fast Track</label>
         </div>
       </Section>
 
@@ -162,11 +140,11 @@ export function CreateAirportTransferCaseForm({ projectId }: { projectId: string
         <div className="grid gap-4">
           <div className="grid items-start gap-3 md:grid-cols-[minmax(220px,0.8fr)_minmax(220px,0.8fr)_minmax(180px,1fr)]">
           <div><DateTimeField label="วันเดินทาง" name="travelDate" required value={travelDate} onChange={(value) => { setTravelDate(value); invalidateFlightLookup(); }} />{errors.travelDate?.length ? <p className="text-xs text-red-700">{errors.travelDate[0]}</p> : null}</div>
-          <Field label="หมายเลขเที่ยวบิน *" hint="เช่น TG931" error={errors.flightNumber}>
+          <Field label="หมายเลขเที่ยวบิน" required help="เช่น TG931" error={errors.flightNumber}>
             <Input name="flightNumber" placeholder="TG931" required value={flightNumber} onChange={(event) => { setFlightNumber(event.target.value.toUpperCase()); invalidateFlightLookup(); }} />
           </Field>
-          <div className="flex items-start pt-[22px]">
-            <Button type="button" variant="secondary" className="w-full min-h-[42px]" disabled={isCheckingFlight || !travelDate || flightNumber.trim().length < 2} onClick={checkFlight}>
+          <div className="flex items-start pt-[26px]">
+            <Button type="button" variant="secondary" className="min-h-11 w-full border-operation/40 bg-operation-soft text-operation hover:bg-white" disabled={isCheckingFlight || !travelDate || flightNumber.trim().length < 2} onClick={checkFlight}>
               {isCheckingFlight ? "กำลังตรวจสอบเที่ยวบิน..." : "ตรวจสอบเที่ยวบิน"}
             </Button>
           </div>
@@ -191,7 +169,7 @@ export function CreateAirportTransferCaseForm({ projectId }: { projectId: string
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
               <div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-100 text-cyan-800"><PlaneTakeoff className="h-4 w-4" /></span><div><p className="text-sm font-bold text-slate-900">สนามบินต้นทาง</p><p className="text-xs text-slate-500">Departure</p></div></div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="สนามบิน" hint={originAirportName || "ระบบจะเติมหลังตรวจสอบ"}><Input name="originAirport" maxLength={3} placeholder="เช่น BKK" value={originAirport} onChange={(event) => setOriginAirport(event.target.value.toUpperCase())} /></Field>
+                <Field label="สนามบิน" help="ระบบเติมให้หลังกดตรวจสอบเที่ยวบิน" note={originAirportName || undefined}><Input name="originAirport" maxLength={3} placeholder="เช่น BKK" value={originAirport} onChange={(event) => setOriginAirport(event.target.value.toUpperCase())} /></Field>
                 <DateTimeField label="เวลาออก" name="scheduledDepartureLocal" withTime value={departureTime} hint="เวลาท้องถิ่นต้นทาง" onChange={(value) => { setDepartureTime(value); setDepartureUtc(""); if (direction === "departure") setConfirmedPickupTime(subtractHours(value, pickupLeadHours)); }} />
                 <input name="scheduledDepartureUtc" type="hidden" value={departureUtc} />
               </div>
@@ -200,7 +178,7 @@ export function CreateAirportTransferCaseForm({ projectId }: { projectId: string
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
               <div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-100 text-blue-800"><PlaneLanding className="h-4 w-4" /></span><div><p className="text-sm font-bold text-slate-900">สนามบินปลายทาง</p><p className="text-xs text-slate-500">Arrival</p></div></div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="สนามบิน" hint={destinationAirportName || "ระบบจะเติมหลังตรวจสอบ"}><Input name="destinationAirport" maxLength={3} placeholder="เช่น HKT" value={destinationAirport} onChange={(event) => setDestinationAirport(event.target.value.toUpperCase())} /></Field>
+                <Field label="สนามบิน" help="ระบบเติมให้หลังกดตรวจสอบเที่ยวบิน" note={destinationAirportName || undefined}><Input name="destinationAirport" maxLength={3} placeholder="เช่น HKT" value={destinationAirport} onChange={(event) => setDestinationAirport(event.target.value.toUpperCase())} /></Field>
                 <DateTimeField label="เวลาถึง" name="scheduledArrivalLocal" withTime value={arrivalTime} hint="เวลาท้องถิ่นปลายทาง" onChange={(value) => { setArrivalTime(value); setArrivalUtc(""); }} />
                 <input name="scheduledArrivalUtc" type="hidden" value={arrivalUtc} />
               </div>
@@ -213,15 +191,15 @@ export function CreateAirportTransferCaseForm({ projectId }: { projectId: string
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="rounded-2xl border border-cyan-200 bg-cyan-50/40 p-3">
             <div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-700 text-white"><MapPin className="h-4 w-4" /></span><div><p className="text-sm font-bold">จุดรับผู้โดยสาร</p><p className="text-xs text-slate-500">Pickup location</p></div></div>
-            <div className="grid gap-3"><Field label="ชื่อจุดรับ *" error={errors.pickupName}><Input name="pickupName" placeholder={direction === "arrival" ? "สนามบินสุวรรณภูมิ จุดนัดพบ" : "ชื่อโรงแรม"} required /></Field><Field label="ที่อยู่จุดรับ"><Input name="pickupAddress" /></Field><Field label="Google Maps จุดรับ"><Input name="pickupMapsUrl" type="url" placeholder="วางลิงก์ Google Maps" /></Field></div>
+            <div className="grid gap-3"><Field label="ชื่อจุดรับ" required error={errors.pickupName}><Input name="pickupName" placeholder={direction === "arrival" ? "สนามบินสุวรรณภูมิ จุดนัดพบ" : "ชื่อโรงแรม"} required /></Field><Field label="ที่อยู่จุดรับ"><Input name="pickupAddress" /></Field><Field label="Google Maps จุดรับ"><Input name="pickupMapsUrl" type="url" placeholder="วางลิงก์ Google Maps" /></Field></div>
           </div>
           <div className="rounded-2xl border border-blue-200 bg-blue-50/30 p-3">
             <div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-700 text-white"><Building2 className="h-4 w-4" /></span><div><p className="text-sm font-bold">จุดส่งผู้โดยสาร</p><p className="text-xs text-slate-500">Drop-off location</p></div></div>
-            <div className="grid gap-3"><Field label="ชื่อจุดส่ง *" error={errors.dropoffName}><Input name="dropoffName" placeholder={direction === "arrival" ? "ชื่อโรงแรม" : "สนามบินสุวรรณภูมิ"} required /></Field><Field label="ที่อยู่จุดส่ง"><Input name="dropoffAddress" /></Field><Field label="Google Maps จุดส่ง"><Input name="dropoffMapsUrl" type="url" placeholder="วางลิงก์ Google Maps" /></Field></div>
+            <div className="grid gap-3"><Field label="ชื่อจุดส่ง" required error={errors.dropoffName}><Input name="dropoffName" placeholder={direction === "arrival" ? "ชื่อโรงแรม" : "สนามบินสุวรรณภูมิ"} required /></Field><Field label="ที่อยู่จุดส่ง"><Input name="dropoffAddress" /></Field><Field label="Google Maps จุดส่ง"><Input name="dropoffMapsUrl" type="url" placeholder="วางลิงก์ Google Maps" /></Field></div>
           </div>
           <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 lg:col-span-2 lg:grid-cols-[minmax(0,1fr)_180px_minmax(220px,1fr)]">
             <DateTimeField label="เวลารับที่ยืนยัน" name="confirmedPickupLocal" withTime value={confirmedPickupTime} hint={direction === "departure" ? `อัตโนมัติก่อนเครื่องออก ${pickupLeadHours} ชั่วโมง` : "ปล่อยว่างเพื่อใช้เวลาที่ระบบแนะนำ"} onChange={setConfirmedPickupTime} />
-            <Field label="รับล่วงหน้า (ชั่วโมง)" hint="ค่าเริ่มต้น 3 ชั่วโมง"><Input name="pickupLeadHours" type="number" min="0" max="24" step="0.5" value={pickupLeadHours} disabled={direction !== "departure"} onChange={(event) => { const hours = Number(event.target.value); setPickupLeadHours(hours); setConfirmedPickupTime(subtractHours(departureTime, hours)); }} /></Field>
+            <Field label="รับล่วงหน้า (ชั่วโมง)" help="ค่าเริ่มต้น 3 ชั่วโมง"><Input name="pickupLeadHours" type="number" min="0" max="24" step="0.5" value={pickupLeadHours} disabled={direction !== "departure"} onChange={(event) => { const hours = Number(event.target.value); setPickupLeadHours(hours); setConfirmedPickupTime(subtractHours(departureTime, hours)); }} /></Field>
             <Field label="เหตุผลที่ปรับเวลา"><Input name="pickupTimeOverrideReason" placeholder="ระบุเมื่อเปลี่ยนจากเวลาที่ระบบแนะนำ" /></Field>
           </div>
         </div>

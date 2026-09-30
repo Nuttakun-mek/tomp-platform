@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 import { Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { ImportUploadForm } from "@/components/airport-transfer/import/upload-form";
@@ -32,10 +33,7 @@ export default async function AirportTransferImportsPage({ params }: { params: P
 
   return (
     <>
-      <header>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Import Center</p>
-        <h1 className="mt-1 text-2xl font-semibold">นำเข้าข้อมูลจาก Excel</h1>
-      </header>
+      <PageHeader eyebrow="Airport Transfer" title="นำเข้าข้อมูลจาก Excel" />
 
       <section className="grid items-start gap-4 lg:grid-cols-2">
         <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

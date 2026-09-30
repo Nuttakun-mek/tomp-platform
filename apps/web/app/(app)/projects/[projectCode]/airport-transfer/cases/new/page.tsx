@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
 import { CreateAirportTransferCaseForm } from "@/components/airport-transfer/create-case-form";
 import { getProjectByCode } from "@/lib/data/projects";
 
@@ -8,7 +9,7 @@ export default async function NewAirportTransferCasePage({ params }: { params: P
   if (!project) notFound();
   return (
     <>
-      <header><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-800">Create Case</p><h1 className="mt-1 text-2xl font-semibold">สร้างการ์ดข้อมูลการเดินทาง</h1><p className="mt-2 text-sm text-slate-500">กรอกข้อมูลผู้โดยสาร เที่ยวบิน จุดรับ–ส่ง รถ และคนขับ ระบบจะสร้างเช็กลิสต์ให้ตามประเภทบริการ</p></header>
+      <PageHeader eyebrow="Airport Transfer" title="สร้างการ์ดข้อมูลการเดินทาง" description="ระบบสร้างเช็กลิสต์ให้ตามประเภทบริการ" />
       <CreateAirportTransferCaseForm projectId={project.id} />
     </>
   );

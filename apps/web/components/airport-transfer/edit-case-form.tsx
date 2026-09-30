@@ -1,5 +1,6 @@
 "use client";
 
+import { Field, Section } from "./form-parts";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowRight, Building2, MapPin, PlaneLanding, PlaneTakeoff } from "lucide-react";
 import { updateAirportTransferCase, type UpdateTransferCaseState } from "@/app/airport-transfer/actions";
@@ -18,14 +19,6 @@ function serializeEditableFields(form: HTMLFormElement) {
     .filter(([name]) => !ignoredDirtyFields.has(name))
     .map(([name, value]) => [name, String(value)])
     .sort(([left], [right]) => left.localeCompare(right)));
-}
-
-function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string[]; children: React.ReactNode }) {
-  return <label className="grid gap-1.5 text-sm font-semibold text-slate-700"><span>{label}</span>{children}{hint ? <span className="text-xs font-normal text-slate-500">{hint}</span> : null}{error?.[0] ? <span className="text-xs font-normal text-red-700">{error[0]}</span> : null}</label>;
-}
-
-function Section({ number, title, description, children }: { number: string; title: string; description: string; children: React.ReactNode }) {
-  return <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5"><div className="mb-4 flex items-start gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-cyan-100 text-sm font-bold text-cyan-900">{number}</span><div><h2 className="text-lg font-semibold text-slate-950">{title}</h2><p className="mt-0.5 text-sm text-slate-500">{description}</p></div></div>{children}</section>;
 }
 
 function toBangkokDateTimeLocal(value: string | null) {
@@ -87,8 +80,8 @@ export function EditAirportTransferCaseForm({ item, projectCode }: { item: Airpo
       <Section number="2" title="ข้อมูลผู้โดยสาร" description="แก้ไขเฉพาะข้อมูลที่เปลี่ยนแปลง ระบบจะเก็บค่าเดิมและค่าใหม่ในประวัติ">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <Field label="คำนำหน้า"><Select name="passengerTitle" defaultValue={item.passengerTitle || ""}><option value="">ไม่ระบุ</option><option>Mr.</option><option>Mrs.</option><option>Ms.</option><option>Dr.</option></Select></Field>
-          <Field label="ชื่อ *" error={errors.passengerFirstName}><Input name="passengerFirstName" required defaultValue={item.passengerFirstName} /></Field>
-          <Field label="นามสกุล *" error={errors.passengerLastName}><Input name="passengerLastName" required defaultValue={item.passengerLastName} /></Field>
+          <Field label="ชื่อ" required error={errors.passengerFirstName}><Input name="passengerFirstName" required defaultValue={item.passengerFirstName} /></Field>
+          <Field label="นามสกุล" required error={errors.passengerLastName}><Input name="passengerLastName" required defaultValue={item.passengerLastName} /></Field>
           <Field label="เบอร์โทรศัพท์"><Input name="passengerMobile" inputMode="tel" defaultValue={item.passengerMobile || ""} /></Field>
           <Field label="อีเมล" error={errors.passengerEmail}><Input name="passengerEmail" type="email" defaultValue={item.passengerEmail || ""} /></Field>
           <Field label="จำนวนผู้โดยสาร"><Input name="passengerCount" type="number" min="1" defaultValue={item.passengerCount} /></Field>
@@ -101,7 +94,7 @@ export function EditAirportTransferCaseForm({ item, projectCode }: { item: Airpo
         <div className="grid gap-4">
           <div className="grid items-start gap-3 md:grid-cols-2">
             <div><DateTimeField label="วันเดินทาง" name="travelDate" required value={travelDate} onChange={(value) => markControlledChange(() => setTravelDate(value))} />{errors.travelDate?.[0] ? <p className="text-xs text-red-700">{errors.travelDate[0]}</p> : null}</div>
-            <Field label="หมายเลขเที่ยวบิน *" error={errors.flightNumber}><Input name="flightNumber" required defaultValue={item.flightNumber} /></Field>
+            <Field label="หมายเลขเที่ยวบิน" required error={errors.flightNumber}><Input name="flightNumber" required defaultValue={item.flightNumber} /></Field>
           </div>
           <div className="grid items-stretch gap-2 lg:grid-cols-[minmax(0,1fr)_44px_minmax(0,1fr)]">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3"><div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-100 text-cyan-800"><PlaneTakeoff className="h-4 w-4" /></span><div><p className="text-sm font-bold">สนามบินต้นทาง</p><p className="text-xs text-slate-500">Departure</p></div></div><div className="grid gap-3 sm:grid-cols-2"><Field label="สนามบิน"><Input name="originAirport" maxLength={3} defaultValue={item.originAirport || ""} /></Field><DateTimeField label="เวลาออก" name="scheduledDepartureLocal" withTime value={departureTime} onChange={(value) => markControlledChange(() => setDepartureTime(value))} /></div></div>
@@ -113,8 +106,8 @@ export function EditAirportTransferCaseForm({ item, projectCode }: { item: Airpo
 
       <Section number="4" title="จุดรับ จุดส่ง และเวลา" description="จัดกลุ่มข้อมูลตามจุดปฏิบัติงาน ลดการแก้ไขผิดช่อง">
         <div className="grid gap-3 lg:grid-cols-2">
-          <div className="rounded-2xl border border-cyan-200 bg-cyan-50/40 p-3"><div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-700 text-white"><MapPin className="h-4 w-4" /></span><div><p className="text-sm font-bold">จุดรับผู้โดยสาร</p><p className="text-xs text-slate-500">Pickup location</p></div></div><div className="grid gap-3"><Field label="ชื่อจุดรับ *" error={errors.pickupName}><Input name="pickupName" required defaultValue={item.pickupName} /></Field><Field label="ที่อยู่จุดรับ"><Input name="pickupAddress" defaultValue={item.pickupAddress || ""} /></Field><Field label="Google Maps จุดรับ"><Input name="pickupMapsUrl" type="url" defaultValue={item.pickupMapsUrl || ""} /></Field></div></div>
-          <div className="rounded-2xl border border-blue-200 bg-blue-50/30 p-3"><div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-700 text-white"><Building2 className="h-4 w-4" /></span><div><p className="text-sm font-bold">จุดส่งผู้โดยสาร</p><p className="text-xs text-slate-500">Drop-off location</p></div></div><div className="grid gap-3"><Field label="ชื่อจุดส่ง *" error={errors.dropoffName}><Input name="dropoffName" required defaultValue={item.dropoffName} /></Field><Field label="ที่อยู่จุดส่ง"><Input name="dropoffAddress" defaultValue={item.dropoffAddress || ""} /></Field><Field label="Google Maps จุดส่ง"><Input name="dropoffMapsUrl" type="url" defaultValue={item.dropoffMapsUrl || ""} /></Field></div></div>
+          <div className="rounded-2xl border border-cyan-200 bg-cyan-50/40 p-3"><div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-700 text-white"><MapPin className="h-4 w-4" /></span><div><p className="text-sm font-bold">จุดรับผู้โดยสาร</p><p className="text-xs text-slate-500">Pickup location</p></div></div><div className="grid gap-3"><Field label="ชื่อจุดรับ" required error={errors.pickupName}><Input name="pickupName" required defaultValue={item.pickupName} /></Field><Field label="ที่อยู่จุดรับ"><Input name="pickupAddress" defaultValue={item.pickupAddress || ""} /></Field><Field label="Google Maps จุดรับ"><Input name="pickupMapsUrl" type="url" defaultValue={item.pickupMapsUrl || ""} /></Field></div></div>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/30 p-3"><div className="mb-3 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-700 text-white"><Building2 className="h-4 w-4" /></span><div><p className="text-sm font-bold">จุดส่งผู้โดยสาร</p><p className="text-xs text-slate-500">Drop-off location</p></div></div><div className="grid gap-3"><Field label="ชื่อจุดส่ง" required error={errors.dropoffName}><Input name="dropoffName" required defaultValue={item.dropoffName} /></Field><Field label="ที่อยู่จุดส่ง"><Input name="dropoffAddress" defaultValue={item.dropoffAddress || ""} /></Field><Field label="Google Maps จุดส่ง"><Input name="dropoffMapsUrl" type="url" defaultValue={item.dropoffMapsUrl || ""} /></Field></div></div>
           <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 lg:col-span-2 md:grid-cols-2"><DateTimeField label="เวลารับที่ยืนยัน" name="confirmedPickupLocal" withTime value={pickupTime} onChange={(value) => markControlledChange(() => setPickupTime(value))} /><Field label="เหตุผลที่ปรับเวลารับ"><Input name="pickupTimeOverrideReason" defaultValue={item.pickupTimeOverrideReason || ""} /></Field></div>
         </div>
       </Section>
@@ -129,7 +122,7 @@ export function EditAirportTransferCaseForm({ item, projectCode }: { item: Airpo
       </Section>
 
       <Section number="6" title="หมายเหตุและเหตุผลการแก้ไข" description="เหตุผลช่วยให้ตรวจสอบประวัติและติดตามการเปลี่ยนแปลงได้ง่าย">
-        <div className="grid gap-3 md:grid-cols-2"><Field label="หมายเหตุ"><Textarea name="notes" rows={4} defaultValue={item.notes || ""} /></Field><Field label="เหตุผลในการแก้ไข" hint="ไม่ใช้เป็นตัวเปิดปุ่มบันทึก ต้องมีข้อมูลหลักเปลี่ยนแปลง"><Textarea name="editReason" rows={4} placeholder="เช่น ลูกค้าแจ้งเปลี่ยนโรงแรม หรือเปลี่ยนเที่ยวบิน" /></Field></div>
+        <div className="grid gap-3 md:grid-cols-2"><Field label="หมายเหตุ"><Textarea name="notes" rows={4} defaultValue={item.notes || ""} /></Field><Field label="เหตุผลในการแก้ไข" help="ไม่ใช้เป็นตัวเปิดปุ่มบันทึก ต้องมีข้อมูลหลักเปลี่ยนแปลง"><Textarea name="editReason" rows={4} placeholder="เช่น ลูกค้าแจ้งเปลี่ยนโรงแรม หรือเปลี่ยนเที่ยวบิน" /></Field></div>
       </Section>
 
       {state.message ? <div role="status" className={`rounded-xl border px-4 py-3 text-sm ${state.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{state.message}</div> : null}
