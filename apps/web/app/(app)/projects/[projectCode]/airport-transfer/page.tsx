@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { AlertTriangle, CarFront, CheckCircle2, ClipboardList, Clock3, Plus, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CarFront, CheckCircle2, ClipboardList, Clock3, FileSpreadsheet, Plus, ShieldCheck } from "lucide-react";
 import { AirportTransferCaseCard, getAirportTransferOperationalAlerts } from "@/components/airport-transfer/case-card";
 import { AirportTransferApiHealthCard } from "@/components/airport-transfer/api-health-card";
 import { ButtonLink } from "@/components/ui/button";
@@ -49,7 +49,10 @@ export default async function AirportTransferDashboardPage({ params }: { params:
       <section className="overflow-hidden rounded-2xl bg-[#0b2d46] p-4 text-white shadow-lg lg:p-5">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Operations Control Center</p><h1 className="mt-2 text-2xl font-semibold lg:text-3xl">ศูนย์ควบคุม Airport Transfer</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">เรียงงานตามเวลาที่ต้องดำเนินการ ตรวจเที่ยวบิน จัดรถ และติดตามการรับ–ส่งผู้โดยสารจากจุดเดียว</p></div>
-          <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/new`} className="gap-2 bg-cyan-300 text-cyan-950 hover:bg-cyan-200"><Plus className="h-4 w-4" />สร้างการ์ดข้อมูล</ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href={`/projects/${projectCode}/airport-transfer/cases/new`} className="gap-2 bg-cyan-300 text-cyan-950 hover:bg-cyan-200"><Plus className="h-4 w-4" />สร้างการ์ดข้อมูล</ButtonLink>
+            <ButtonLink href={`/projects/${projectCode}/airport-transfer/imports`} variant="secondary" className="gap-2"><FileSpreadsheet className="h-4 w-4" />นำเข้า Excel / แบบฟอร์มลูกค้า</ButtonLink>
+          </div>
         </div>
       </section>
       <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">

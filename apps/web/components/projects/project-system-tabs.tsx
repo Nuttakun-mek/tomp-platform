@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, CarFront, Lock, PlaneTakeoff, Settings } from "lucide-react";
+import { ArrowLeft, CarFront, FileSpreadsheet, LayoutDashboard, List, Lock, PlaneTakeoff, Settings, Trash2 } from "lucide-react";
 import { groundTransferTabs } from "./project-workspace-tabs";
 
 type SystemKey = "ground_transfer" | "airport_transfer";
@@ -35,8 +35,13 @@ export function ProjectSystemTabs({
   // wrapper always passes active="ground_transfer"; the pathname resolves it.
   const pathname = usePathname();
   const resolvedActive: OuterTabKey = resolveActiveFromPathname(pathname, projectCode) ?? active;
-  const sections = resolvedActive === "ground_transfer" ? groundTransferTabs(projectCode) : [];
-  const activeSection = sections.find((tab) => tab.href === pathname)?.key ?? "overview";
+  const sections: Array<{ key: string; label: string; href: string; icon: typeof CarFront }> =
+    resolvedActive === "ground_transfer" ? groundTransferTabs(projectCode) : resolvedActive === "airport_transfer" ? airportTransferTabs(projectCode) : [];
+  // The longest section path the page sits under (a case or an import batch
+  // page still lights up its list's tab); the system's home only on itself.
+  const activeSection =
+    [...sections].filter((tab, index) => pathname === tab.href || (index > 0 && pathname?.startsWith(`${tab.href}/`))).sort((a, b) => b.href.length - a.href.length)[0]?.key ??
+    sections[0]?.key;
 
   return (
     <nav aria-label="เมนูโครงการ" className="rounded-xl border border-border bg-white">
@@ -52,10 +57,13 @@ export function ProjectSystemTabs({
           const enabled = enabledSystems.includes(key);
           const accessible = viewerSystems.includes(key);
 
-          if (!enabled || !accessible) {
+          // A system the project does not use is not shown at all — a project set
+          // up for Airport Transfer only has no Ground Transfer tab.
+          if (!enabled) return null;
+          if (!accessible) {
             // The reason goes in the tooltip, not the bar: two long parentheticals
             // used to push the real tabs onto a second line.
-            const reason = !enabled ? "ยังไม่เปิดใช้ในโครงการนี้" : "ไม่มีสิทธิ์เข้าระบบนี้ในโครงการนี้";
+            const reason = "ไม่มีสิทธิ์เข้าระบบนี้ในโครงการนี้";
             return (
               <span key={key} className={`${TAB} cursor-not-allowed text-slate-400`} title={reason} aria-disabled="true">
                 <Icon className="h-4 w-4" /> {SYSTEM_LABEL[key]} <Lock className="h-3.5 w-3.5" aria-label={reason} />
@@ -89,7 +97,7 @@ export function ProjectSystemTabs({
           with a lighter style, so they read as part of Ground Transfer and not
           as siblings of Airport Transfer. */}
       {sections.length ? (
-        <div aria-label={`เมนูย่อย ${SYSTEM_LABEL.ground_transfer}`} className="flex items-center gap-1 overflow-x-auto overflow-y-hidden border-t border-border bg-slate-50/70 px-2">
+        <div aria-label={`เมนูย่อย ${resolvedActive === "airport_transfer" ? SYSTEM_LABEL.airport_transfer : SYSTEM_LABEL.ground_transfer}`} className="flex items-center gap-1 overflow-x-auto overflow-y-hidden border-t border-border bg-slate-50/70 px-2">
           {sections.map((tab) => {
             const current = tab.key === activeSection;
             return (
@@ -110,6 +118,17 @@ export function ProjectSystemTabs({
       ) : null}
     </nav>
   );
+}
+
+/** Airport Transfer's sections — the imports page (and its customer template) had no way in but the URL. */
+function airportTransferTabs(projectCode: string) {
+  const base = `/projects/${projectCode}/airport-transfer`;
+  return [
+    { key: "at-overview", label: "ภาพรวม", href: base, icon: LayoutDashboard },
+    { key: "at-cases", label: "ข้อมูลการเดินทาง", href: `${base}/cases`, icon: List },
+    { key: "at-imports", label: "นำเข้า Excel", href: `${base}/imports`, icon: FileSpreadsheet },
+    { key: "at-trash", label: "ที่ลบแล้ว", href: `${base}/trash`, icon: Trash2 }
+  ];
 }
 
 function resolveActiveFromPathname(pathname: string | null, projectCode: string): OuterTabKey | null {
