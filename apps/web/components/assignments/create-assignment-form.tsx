@@ -199,7 +199,12 @@ export function CreateAssignmentForm({
         return;
       }
       setTone("success");
-      setMessage(result.warning || "เปิดงานย่อยสำเร็จ ระบบบันทึกคนขับและรถจาก Call Sign แล้ว");
+      setMessage(result.warning || "เปิดงานย่อยสำเร็จ — เวลาเริ่มของงานถัดไปตั้งต่อจากงานนี้ให้แล้ว");
+      // The job just saved joins the list this form checks against, so keeping
+      // its times on screen showed it "overlapping" itself. Start the next one
+      // where this one ended (back to back is the usual case) and ask for its end.
+      setStartClock(endClock);
+      setEndClock("");
       router.refresh();
     });
   }
