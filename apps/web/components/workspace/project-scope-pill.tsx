@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronsUpDown, FolderKanban } from "lucide-react";
 import { SCOPE_COOKIE, type ScopeProject } from "@/lib/workspace/scope";
@@ -21,7 +21,18 @@ export function ProjectScopePill({
   variant?: "dark" | "light";
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  // On a project's pages the URL says which project is open — the cookie only
+  // remembered the last one picked here, so entering a project from the list
+  // left this showing the previous one. The URL wins, and is remembered.
+  const urlCode = /^\/projects\/([^/]+)/.exec(pathname ?? "")?.[1];
+  const urlProject = urlCode && urlCode !== "new" ? projects.find((project) => project.projectCode === decodeURIComponent(urlCode)) : undefined;
+  const currentId = urlProject?.id ?? activeId;
+  useEffect(() => {
+    if (urlProject && urlProject.id !== activeId) setScopeCookie(urlProject.id);
+  }, [activeId, urlProject]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,7 +44,7 @@ export function ProjectScopePill({
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
-  const active = projects.find((project) => project.id === activeId) ?? null;
+  const active = projects.find((project) => project.id === currentId) ?? null;
   const dark = variant === "dark";
 
   if (!projects.length) {
@@ -51,9 +62,13 @@ export function ProjectScopePill({
 
   function choose(projectId: string) {
     setOpen(false);
-    if (projectId === activeId) return;
+    if (projectId === currentId) return;
     setScopeCookie(projectId);
-    router.refresh();
+    // Inside a project, switching means going to the other project; its home
+    // opens the first system it uses.
+    const next = projects.find((project) => project.id === projectId);
+    if (urlProject && next) router.push(`/projects/${encodeURIComponent(next.projectCode)}`);
+    else router.refresh();
   }
 
   return (
@@ -87,7 +102,7 @@ export function ProjectScopePill({
           }`}
         >
           {projects.map((project) => {
-            const selected = project.id === activeId;
+            const selected = project.id === currentId;
             return (
               <button
                 key={project.id}
