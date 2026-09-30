@@ -1,14 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, Check, Loader2 } from "lucide-react";
+import { photoLocation, type CaptureLocation } from "./capture-location";
 
 type Kind = "vehicle" | "plate";
 
 const LABELS: Record<Kind, string> = { vehicle: "ถ่ายรูปรถ", plate: "ถ่ายรูปป้ายทะเบียน" };
 
 const MAX_INPUT_BYTES = 10 * 1024 * 1024;
-type CaptureLocation = { latitude: number; longitude: number; accuracy: number | null; recordedAt: string };
 
 function toBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality));
@@ -36,26 +36,6 @@ async function compressImage(file: File): Promise<Blob> {
     blob = await toBlob(canvas, quality);
   }
   return blob ?? file;
-}
-
-function getCaptureLocation(): Promise<CaptureLocation | null> {
-  return new Promise((resolve) => {
-    if (!("geolocation" in navigator)) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) =>
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy ?? null,
-          recordedAt: new Date(position.timestamp).toISOString()
-        }),
-      () => resolve(null),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 8000 }
-    );
-  });
 }
 
 async function stampEvidencePhoto(file: File, capturedAt: string, location: CaptureLocation | null): Promise<Blob> {
@@ -100,9 +80,15 @@ async function stampEvidencePhoto(file: File, capturedAt: string, location: Capt
 export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: string; plate?: string }) => void }) {
   const [paths, setPaths] = useState<{ vehicle?: string; plate?: string }>({});
   const [previews, setPreviews] = useState<{ vehicle?: string; plate?: string }>({});
-  const [busy, setBusy] = useState<Kind | null>(null);
+  // Per photo: the two can be taken back to back while the first still uploads.
+  const [busy, setBusy] = useState<Record<Kind, boolean>>({ vehicle: false, plate: false });
   const [error, setError] = useState<string | null>(null);
   const inputs = { vehicle: useRef<HTMLInputElement>(null), plate: useRef<HTMLInputElement>(null) };
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(() => {
+    if (paths.vehicle || paths.plate) onChangeRef.current(paths);
+  }, [paths]);
 
   async function handleFile(kind: Kind, file: File) {
     setError(null);
@@ -110,11 +96,11 @@ export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: s
       setError("รูปใหญ่เกิน 10 MB");
       return;
     }
-    setBusy(kind);
+    setBusy((current) => ({ ...current, [kind]: true }));
     setPreviews((p) => ({ ...p, [kind]: URL.createObjectURL(file) }));
     try {
       const capturedAt = new Date().toISOString();
-      const location = await getCaptureLocation();
+      const location = await photoLocation();
       const blob = await stampEvidencePhoto(file, capturedAt, location);
       const form = new FormData();
       form.set("kind", kind);
@@ -125,12 +111,14 @@ export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: s
         form.set("longitude", String(location.longitude));
         if (location.accuracy !== null) form.set("accuracy", String(location.accuracy));
       }
-      const res = await fetch("/api/driver/evidence", { method: "POST", body: form });
-      const json = (await res.json()) as { success?: boolean; path?: string; error?: string };
+      // A dead connection must end in "try again", not a spinner that never stops.
+      const res = await fetch("/api/driver/evidence", { method: "POST", body: form, signal: AbortSignal.timeout(60_000) });
+      const json = (await res.json().catch(() => ({}))) as { success?: boolean; path?: string; error?: string };
       if (res.ok && json.success && json.path) {
-        const next = { ...paths, [kind]: json.path };
-        setPaths(next);
-        onChange(next);
+        // Merge into the latest state, not the one this upload started with —
+        // otherwise the photo that finishes second wipes out the first.
+        const path = json.path;
+        setPaths((current) => ({ ...current, [kind]: path }));
       } else {
         setError(json.error || "อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง");
         setPreviews((p) => ({ ...p, [kind]: undefined }));
@@ -139,7 +127,7 @@ export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: s
       setError("อัปโหลดรูปไม่สำเร็จ ตรวจสอบสัญญาณแล้วลองใหม่");
       setPreviews((p) => ({ ...p, [kind]: undefined }));
     } finally {
-      setBusy(null);
+      setBusy((current) => ({ ...current, [kind]: false }));
     }
   }
 
@@ -173,14 +161,14 @@ export function DriverPhotoCheck({ onChange }: { onChange: (paths: { vehicle?: s
                 {previews[kind] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={previews[kind]} alt={LABELS[kind]} className="h-24 w-full object-cover" />
-                ) : busy === kind ? (
+                ) : busy[kind] ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : done ? (
                   <Check className="h-5 w-5" />
                 ) : (
                   <Camera className="h-5 w-5" />
                 )}
-                <span>{done ? `${LABELS[kind]} ✓` : busy === kind ? "กำลังอัปโหลด…" : LABELS[kind]}</span>
+                <span>{done ? `${LABELS[kind]} ✓` : busy[kind] ? "กำลังอัปโหลด…" : LABELS[kind]}</span>
               </button>
             </div>
           );

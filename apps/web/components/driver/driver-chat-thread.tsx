@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, ChevronDown, Loader2, Send, X } from "lucide-react";
 import type { DriverNotification } from "@tomp/types/domain";
 import { buildBridgeMessage, getMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail } from "@tomp/driver-core";
+import { browserLocation } from "./capture-location";
 import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import type { DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import { PhotoViewer } from "@/components/driver/photo-viewer";
@@ -71,24 +72,9 @@ function isRecentLocation(location: CaptureLocation | null, now = Date.now()) {
   return Number.isFinite(recordedAt) && now - recordedAt <= 5 * 60 * 1000;
 }
 
+// A hard deadline, not the Geolocation API's own timeout — see capture-location.ts.
 function getCaptureLocation(): Promise<CaptureLocation | null> {
-  return new Promise((resolve) => {
-    if (!("geolocation" in navigator)) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) =>
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy ?? null,
-          recordedAt: new Date(position.timestamp).toISOString()
-        }),
-      () => resolve(null),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 8000 }
-    );
-  });
+  return browserLocation(getMobileShell(window) ? 3000 : 8000);
 }
 
 async function resolvePlaceName(location: CaptureLocation | null): Promise<string | null> {
@@ -263,8 +249,7 @@ export function DriverChatThread({
     setUploadingPhoto(true);
     try {
       const capturedAt = new Date().toISOString();
-      const nativeSnapshot = requestNativeLocationSnapshot();
-      const location = (await getCaptureLocation()) ?? (await nativeSnapshot);
+      const location = (await requestNativeLocationSnapshot()) ?? (await getCaptureLocation());
       const placeName = await resolvePlaceName(location);
       const base: PendingPhoto = {
         type: "photo",
