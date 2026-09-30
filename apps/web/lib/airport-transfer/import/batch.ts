@@ -6,6 +6,7 @@ import { insertAirportTransferCase } from "@/lib/airport-transfer/case-insert";
 import { IMPORT_COLUMNS, type ImportField } from "./columns";
 import { chooseFlight, suggestedPickupAt, type FlightMatch, type FlightOption } from "./flight-match";
 import { duplicateKey, guessMapping, missingRequiredColumns, normalizeRow, type ColumnMapping, type NormalizedRow, type RawRow, type RowMessage } from "./normalize";
+import type { RowOps } from "./ops";
 import type { ReadWorkbook } from "./workbook";
 
 // One uploaded file is a batch (airport_transfer_import_batches) with one row
@@ -27,6 +28,8 @@ export interface FlightResult {
 
 export interface CheckedRow extends NormalizedRow {
   flight?: FlightResult;
+  /** What the control room added on the check page (pickup time, meeting point, unit). */
+  ops?: RowOps;
 }
 
 export interface BatchMeta {
@@ -312,6 +315,7 @@ export async function checkImportBatch(supabase: SupabaseClient, batchId: string
     if (status === "valid") valid += 1;
     else if (status === "warning") warning += 1;
     else errors += 1;
+    if (row.data?.ops) out.ops = row.data.ops;
     return { id: row.id, batch_id: batch.id, row_number: row.rowNumber, raw_data: row.raw, normalized_data: out, validation_status: status, validation_messages: all };
   });
 
@@ -346,24 +350,59 @@ function airportLabel(code: string | null | undefined, flightNumber: string) {
 /** Turn the rows that passed (and, if asked, those with warnings) into cases. */
 export async function commitImportBatch(
   supabase: SupabaseClient,
-  input: { batchId: string; projectId: string; organizationId: string | null; profileId: string; includeWarnings: boolean }
+  input: { batchId: string; projectId: string; organizationId: string | null; profileId: string; rowIds: string[] }
 ) {
   const loaded = await getImportBatch(supabase, input.batchId, input.projectId);
   if (!loaded) return { ok: false as const, message: "ไม่พบชุดนำเข้า" };
   const { batch, rows } = loaded;
   if (batch.status !== "ready") return { ok: false as const, message: "ต้องตรวจชุดนี้ให้เสร็จก่อนนำเข้า" };
 
-  const eligible = rows.filter((row) => row.data && (row.status === "valid" || (input.includeWarnings && row.status === "warning")));
+  // Only the rows ticked on the check page, and only ones that passed.
+  const picked = new Set(input.rowIds);
+  const eligible = rows.filter((row) => picked.has(row.id) && row.data && (row.status === "valid" || row.status === "warning"));
+  if (!eligible.length) return { ok: false as const, message: "ยังไม่ได้เลือกแถวที่นำเข้าได้" };
   let imported = 0;
   const failures: string[] = [];
+
+  // The units chosen for rows: their driver and vehicle, read now so the case
+  // carries today's plate and phone, and only from this project.
+  const unitIds = [...new Set(eligible.map((row) => row.data!.ops?.callSignId).filter((id): id is string => Boolean(id)))];
+  const units = new Map<string, { vehicleId: string | null; driverId: string | null; plate: string | null; vehicleType: string | null; driverName: string | null; driverPhone: string | null }>();
+  if (unitIds.length) {
+    const { data: callSigns } = await supabase.from("call_signs").select("id, vehicle_id, driver_id").eq("project_id", input.projectId).in("id", unitIds);
+    const vehicleIds = (callSigns || []).map((row) => row.vehicle_id).filter(Boolean) as string[];
+    const driverIds = (callSigns || []).map((row) => row.driver_id).filter(Boolean) as string[];
+    const [{ data: vehicles }, { data: drivers }] = await Promise.all([
+      vehicleIds.length ? supabase.from("vehicles").select("id, plate_number, vehicle_type").in("id", vehicleIds) : Promise.resolve({ data: [] as Row[] }),
+      driverIds.length ? supabase.from("drivers").select("id, full_name, phone").in("id", driverIds) : Promise.resolve({ data: [] as Row[] })
+    ]);
+    const vehicleById = new Map(((vehicles || []) as Row[]).map((row) => [String(row.id), row]));
+    const driverById = new Map(((drivers || []) as Row[]).map((row) => [String(row.id), row]));
+    for (const callSign of (callSigns || []) as Row[]) {
+      const vehicle = callSign.vehicle_id ? vehicleById.get(String(callSign.vehicle_id)) : undefined;
+      const driver = callSign.driver_id ? driverById.get(String(callSign.driver_id)) : undefined;
+      units.set(String(callSign.id), {
+        vehicleId: (callSign.vehicle_id as string | null) ?? null,
+        driverId: (callSign.driver_id as string | null) ?? null,
+        plate: (vehicle?.plate_number as string | undefined) ?? null,
+        vehicleType: (vehicle?.vehicle_type as string | undefined) ?? null,
+        driverName: (driver?.full_name as string | undefined) ?? null,
+        driverPhone: (driver?.phone as string | undefined) ?? null
+      });
+    }
+  }
 
   for (const row of eligible) {
     const data = row.data!;
     const flight = data.flight?.flight;
     const verified = data.flight?.status === "verified";
     const arrival = data.direction === "arrival";
-    const airport = airportLabel(arrival ? flight?.destinationAirport : flight?.originAirport, data.flightNumber!);
+    const ops = data.ops ?? {};
+    const unit = ops.callSignId ? units.get(ops.callSignId) : undefined;
+    const baseAirport = airportLabel(arrival ? flight?.destinationAirport : flight?.originAirport, data.flightNumber!);
+    const airport = ops.meetingPoint ? `${baseAirport} · ${ops.meetingPoint}` : baseAirport;
     const pickupAt = flight ? suggestedPickupAt(data.direction!, flight) : null;
+    const driverName = unit?.driverName ?? ops.driverName ?? null;
     const result = await insertAirportTransferCase(supabase, {
       projectId: input.projectId,
       organizationId: input.organizationId,
@@ -390,12 +429,16 @@ export async function commitImportBatch(
       dropoffAddress: arrival ? data.placeAddress : null,
       dropoffMapsUrl: arrival ? data.placeMapsUrl : null,
       recommendedPickupAt: pickupAt,
-      confirmedPickupAt: null,
-      pickupTimeOverrideReason: null,
-      vehicleType: null,
-      vehiclePlate: null,
-      driverName: null,
-      driverPhone: null,
+      confirmedPickupAt: ops.pickupAt ?? null,
+      pickupTimeOverrideReason: ops.pickupAt ? "กำหนดตอนนำเข้า" : null,
+      vehicleType: unit?.vehicleType ?? ops.vehicleType ?? null,
+      vehicleId: unit?.vehicleId ?? null,
+      driverId: unit?.driverId ?? null,
+      vehiclePlate: unit?.plate ?? ops.vehiclePlate ?? null,
+      driverName,
+      driverPhone: unit?.driverPhone ?? ops.driverPhone ?? null,
+      // A case whose flight checked out and has a driver is already assigned.
+      operationalStatus: data.flight?.status === "verified" && driverName ? "assigned" : undefined,
       fastTrack: data.fastTrack,
       notes: data.notes,
       verificationStatus: data.flight ? (data.flight.status === "unchecked" ? (data.flight.reason === "provider_error" ? "provider_unavailable" : "pending") : data.flight.status) : "pending",
@@ -451,6 +494,30 @@ export async function updateImportRowValues(
   const { error } = await supabase.from("airport_transfer_import_rows").update({ raw_data: raw, validation_status: "pending" }).eq("id", row.id);
   if (error) return { ok: false as const, message: error.message };
   return { ok: true as const };
+}
+
+/** Save the control room's part of one or more rows (the bulk bar sends several). */
+export async function setImportRowsOps(
+  supabase: SupabaseClient,
+  input: { batchId: string; projectId: string; rowIds: string[]; patch: RowOps }
+) {
+  const loaded = await getImportBatch(supabase, input.batchId, input.projectId);
+  if (!loaded) return { ok: false as const, message: "ไม่พบชุดนำเข้า" };
+  if (loaded.batch.status === "imported" || loaded.batch.status === "cancelled") return { ok: false as const, message: "ชุดนี้ปิดแล้ว" };
+  if (input.patch.callSignId) {
+    const { data } = await supabase.from("call_signs").select("id").eq("id", input.patch.callSignId).eq("project_id", input.projectId).maybeSingle();
+    if (!data) return { ok: false as const, message: "ไม่พบ Call Sign นี้ในโครงการ" };
+  }
+  const targets = loaded.rows.filter((row) => input.rowIds.includes(row.id) && row.status !== "imported" && row.data);
+  for (const row of targets) {
+    const ops: RowOps = { ...(row.data!.ops ?? {}), ...input.patch };
+    // Choosing a unit replaces a typed-in vehicle, and the other way round.
+    if (input.patch.callSignId) Object.assign(ops, { vehiclePlate: null, driverName: null, driverPhone: null, vehicleType: null });
+    if (input.patch.vehiclePlate || input.patch.driverName) ops.callSignId = null;
+    const { error } = await supabase.from("airport_transfer_import_rows").update({ normalized_data: { ...row.data, ops } }).eq("id", row.id);
+    if (error) return { ok: false as const, message: error.message };
+  }
+  return { ok: true as const, updated: targets.length };
 }
 
 export async function cancelImportBatch(supabase: SupabaseClient, batchId: string, projectId: string) {

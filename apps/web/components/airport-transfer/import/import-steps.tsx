@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 
-export const IMPORT_STEPS = ["ส่งแบบฟอร์มให้ลูกค้า", "อัปโหลดไฟล์", "ตรวจและแก้แถวที่มีปัญหา", "ยืนยันนำเข้า", "จัดรถและคนขับที่ “ข้อมูลการเดินทาง”"] as const;
+export const IMPORT_STEPS = ["ส่งแบบฟอร์มให้ลูกค้า", "อัปโหลดไฟล์", "ตรวจและแก้แถวที่มีปัญหา", "เติมข้อมูลปฏิบัติการ", "เลือกและนำเข้า", "ติดตามที่ “ข้อมูลการเดินทาง”"] as const;
 
 /**
  * Where the operator is in the import, the same strip on the import page and

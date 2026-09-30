@@ -6,7 +6,10 @@ import { ImportSteps } from "@/components/airport-transfer/import/import-steps";
 import { PageHeader } from "@/components/page-header";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { getImportBatch } from "@/lib/airport-transfer/import/batch";
+import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getProjectByCode } from "@/lib/data/projects";
+import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
+import type { UnitOption } from "@/lib/airport-transfer/import/ops";
 import { getSupabaseServerDataClient } from "@/lib/supabase/server";
 
 // A re-check looks flights up again; an import writes one case per row.
@@ -23,6 +26,28 @@ export default async function AirportTransferImportBatchPage({ params }: { param
   if (!loaded) notFound();
   const access = await getAirportTransferAccess(project.id);
   const { batch, rows } = loaded;
+
+  // The project's Ground Transfer units, to send on these trips (none on an
+  // Airport-Transfer-only project — a vehicle can still be typed in).
+  const [callSigns, drivers, vehicles] = await Promise.all([getCallSignsByProjectId(project.id), getProjectDrivers(project.id), getProjectVehicles(project.id)]);
+  const driverById = new Map(drivers.map((driver) => [driver.id, driver]));
+  const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+  const units: UnitOption[] = callSigns.data
+    .filter((callSign) => callSign.status === "active")
+    .map((callSign) => {
+      const driver = callSign.driverId ? driverById.get(callSign.driverId) : undefined;
+      const vehicle = callSign.vehicleId ? vehicleById.get(callSign.vehicleId) : undefined;
+      return {
+        id: callSign.id,
+        label: callSign.callSign,
+        plate: vehicle?.plateNumber ?? null,
+        vehicleType: vehicle?.vehicleType ?? null,
+        capacity: vehicle?.capacity ?? null,
+        driverName: driver?.fullName ?? null,
+        driverPhone: driver?.phone ?? null
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, "th"));
 
   return (
     <>
@@ -43,14 +68,14 @@ export default async function AirportTransferImportBatchPage({ params }: { param
       <ImportSteps
         current={
           batch.status === "imported"
-            ? 5
+            ? 6
             : batch.status === "ready" && !rows.some((row) => row.status === "error" || row.status === "duplicate")
               ? 4
               : 3
         }
       />
       {access.canManage ? (
-        <ImportBatchView projectId={project.id} projectCode={projectCode} batch={batch} rows={rows} />
+        <ImportBatchView projectId={project.id} projectCode={projectCode} batch={batch} rows={rows} units={units} />
       ) : (
         <p className="text-sm text-slate-500">ดูได้อย่างเดียว — นำเข้าได้เฉพาะผู้ดูแลหรือผู้จัดรถของโครงการ</p>
       )}

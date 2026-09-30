@@ -73,6 +73,9 @@ export interface NewAirportTransferCase {
   confirmedPickupAt: string | null;
   pickupTimeOverrideReason: string | null;
   vehicleType: string | null;
+  /** A Ground Transfer vehicle and driver of the same project, when a unit was chosen. */
+  vehicleId?: string | null;
+  driverId?: string | null;
   vehiclePlate: string | null;
   driverName: string | null;
   driverPhone: string | null;
@@ -85,6 +88,8 @@ export interface NewAirportTransferCase {
   snapshots: FlightSnapshotInput[];
   /** How the case arrived, for the audit trail (e.g. { importBatchId, rowNumber }). */
   source?: Record<string, unknown>;
+  /** Overrides the status the flight check would give (e.g. "assigned" when a unit is set). */
+  operationalStatus?: string;
 }
 
 export async function insertAirportTransferCase(
@@ -93,7 +98,7 @@ export async function insertAirportTransferCase(
 ): Promise<{ ok: true; caseId: string; caseCode: string } | { ok: false; message: string }> {
   const caseId = randomUUID();
   const caseCode = `APT-${input.travelDate.replaceAll("-", "")}-${randomUUID().slice(0, 6).toUpperCase()}`;
-  const status = input.verificationStatus === "verified" ? "verified" : "needs_review";
+  const status = input.operationalStatus ?? (input.verificationStatus === "verified" ? "verified" : "needs_review");
   const pickupAt = input.confirmedPickupAt || input.recommendedPickupAt;
 
   const { error: caseError } = await supabase.from("airport_transfer_cases").insert({
@@ -126,6 +131,8 @@ export async function insertAirportTransferCase(
     confirmed_pickup_at: pickupAt,
     pickup_time_override_reason: input.pickupTimeOverrideReason,
     vehicle_type: input.vehicleType,
+    vehicle_id: input.vehicleId ?? null,
+    driver_id: input.driverId ?? null,
     vehicle_plate_snapshot: input.vehiclePlate,
     driver_name_snapshot: input.driverName,
     driver_phone_snapshot: input.driverPhone,

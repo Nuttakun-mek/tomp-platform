@@ -67,7 +67,7 @@ export default async function AirportTransferImportsPage({ params }: { params: P
         )}
         <div className="grid gap-2 border-t border-slate-100 pt-3">
         <div className="flex items-center gap-1.5">
-          <h2 className="text-sm font-semibold text-ink">3–4. ตรวจ แก้ และยืนยันนำเข้า</h2>
+          <h2 className="text-sm font-semibold text-ink">3–5. ตรวจ เติมข้อมูล และนำเข้า</h2>
           <FieldHelp content="ระบบตรวจทุกแถว: ข้อมูลครบและรูปแบบถูก · เที่ยวบินมีจริงในวันนั้นและลง/ออกสนามบินในไทยตามขาเดินทาง · ไม่ซ้ำกับเคสที่มีหรือแถวอื่นในไฟล์ — ไม่มีอะไรเข้าระบบจนกว่าจะกดยืนยันนำเข้า" />
           <span className="text-xs text-ink-soft">— กดชื่อไฟล์เพื่อเปิด</span>
         </div>

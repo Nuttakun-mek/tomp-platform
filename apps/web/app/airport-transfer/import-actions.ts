@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
-import { cancelImportBatch, checkImportBatch, commitImportBatch, createImportBatch, getImportBatch, saveBatchMapping, updateImportRowValues } from "@/lib/airport-transfer/import/batch";
+import { cancelImportBatch, checkImportBatch, commitImportBatch, createImportBatch, getImportBatch, saveBatchMapping, setImportRowsOps, updateImportRowValues } from "@/lib/airport-transfer/import/batch";
+import type { RowOps } from "@/lib/airport-transfer/import/ops";
 import type { ImportField } from "@/lib/airport-transfer/import/columns";
 import type { ColumnMapping } from "@/lib/airport-transfer/import/normalize";
 import { readImportWorkbook } from "@/lib/airport-transfer/import/workbook";
@@ -90,11 +91,11 @@ export async function recheckAirportTransferImport(projectId: string, batchId: s
   };
 }
 
-export async function commitAirportTransferImport(projectId: string, batchId: string, includeWarnings: boolean): Promise<ImportActionState> {
+export async function commitAirportTransferImport(projectId: string, batchId: string, rowIds: string[]): Promise<ImportActionState> {
   const gate = await guard(projectId);
   if ("error" in gate) return { ok: false, message: gate.error! };
   const profile = await getCurrentUserProfile();
-  const result = await commitImportBatch(gate.supabase, { batchId, projectId, organizationId: profile.organizationId, profileId: profile.id, includeWarnings });
+  const result = await commitImportBatch(gate.supabase, { batchId, projectId, organizationId: profile.organizationId, profileId: profile.id, rowIds });
   revalidate();
   if (!result.ok) return { ok: false, message: result.message };
   const parts = [`นำเข้า ${result.imported} เคสแล้ว`];
@@ -124,4 +125,14 @@ export async function fixAirportTransferImportRow(
   const checked = await checkImportBatch(gate.supabase, batchId, projectId, bangkokToday());
   revalidate();
   return checked.ok ? { ok: true, message: "บันทึกและตรวจแถวนี้ใหม่แล้ว" } : { ok: false, message: checked.message };
+}
+
+/** Pickup time, meeting point and unit for one row, or for every row ticked (bulk). */
+export async function setAirportTransferImportOps(projectId: string, batchId: string, rowIds: string[], patch: RowOps): Promise<ImportActionState> {
+  const gate = await guard(projectId);
+  if ("error" in gate) return { ok: false, message: gate.error! };
+  if (!rowIds.length) return { ok: false, message: "ยังไม่ได้เลือกแถว" };
+  const result = await setImportRowsOps(gate.supabase, { batchId, projectId, rowIds, patch });
+  revalidate();
+  return result.ok ? { ok: true, message: `บันทึกข้อมูลปฏิบัติการ ${result.updated} แถวแล้ว` } : { ok: false, message: result.message };
 }
