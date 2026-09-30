@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock3 } from "lucide-react";
+import { FieldHelp } from "@/components/ui/field-help";
 import { daysBetween, dutyLengthHours, type DutyHours, type DutySchedule } from "@/lib/domain/duty-hours";
 
 const dayLabel = new Intl.DateTimeFormat("th-TH", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Bangkok" });
@@ -49,10 +50,11 @@ export function DutyHoursFields({
 
   return (
     <fieldset className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-      <legend className="flex items-center gap-1.5 px-1 text-sm font-semibold text-ink">
+      {/* A plain heading, not a <legend>: the fieldset border ran through the legend text. */}
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
         <Clock3 className="h-4 w-4 text-operation" /> เวลาเข้า-ออกงานของรถ <span className="field-required-badge">*</span>
-      </legend>
-      <p className="text-xs text-ink-soft">ใช้คิด OT: เข้าก่อนเวลาไม่นับ · ออกหลังเวลาออกงานนับเป็น OT ทุกนาที · แก้ภายหลังได้ที่การ์ด Call Sign</p>
+        <FieldHelp content="ใช้คิด OT: เข้าก่อนเวลาไม่นับ · ออกหลังเวลาออกงานนับเป็น OT ทุกนาที · แก้ภายหลังได้ที่การ์ด Call Sign ในหน้านี้" />
+      </div>
 
       <div role="radiogroup" aria-label="รูปแบบเวลาเข้า-ออก" className="inline-flex w-fit rounded-full border border-slate-300 bg-slate-50 p-0.5 text-xs font-semibold">
         {(

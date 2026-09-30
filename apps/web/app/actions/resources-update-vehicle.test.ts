@@ -92,14 +92,23 @@ describe("updateDriverAction", () => {
   beforeEach(() => {
     writes.length = 0;
     requirePermission.mockClear();
-    row = { id: ID, project_id: PROJECT };
+    row = { id: ID, project_id: PROJECT, metadata: { nickname: "ใจ" } };
   });
 
   it("fixes a typo in place, checked against the driver's own project", async () => {
     const result = await updateDriverAction({ id: ID, fullName: "สมใจ ชายดี", phone: "0895554478", licenseType: "ท.2" });
     expect(result.success).toBe(true);
     expect(requirePermission).toHaveBeenCalledWith(PROJECT, "driver.create");
-    expect(writes[0]).toEqual({ id: ID, patch: { full_name: "สมใจ ชายดี", phone: "0895554478", license_type: "ท.2" } });
+    expect(writes[0]).toEqual({ id: ID, patch: { full_name: "สมใจ ชายดี", phone: "0895554478", license_type: "ท.2", metadata: { nickname: "ใจ" } } });
+  });
+
+  it("updates every detail sent and keeps the ones it was not sent", async () => {
+    row = { id: ID, project_id: PROJECT, metadata: { nickname: "ใจ", licenseNumber: "123", note: "keep" } };
+    await updateDriverAction({ id: ID, fullName: "สมใจ ชายดี", phone: "0895554478", languages: ["ไทย", "อังกฤษ"], licenseNumber: "999", emergencyContactPhone: "0811111111" });
+    expect(writes[0].patch).toMatchObject({
+      languages: ["ไทย", "อังกฤษ"],
+      metadata: { nickname: "ใจ", note: "keep", licenseNumber: "999", emergencyContactPhone: "0811111111" }
+    });
   });
 
   it("refuses an empty name", async () => {

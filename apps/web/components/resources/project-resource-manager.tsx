@@ -12,7 +12,7 @@ import {
   importVehiclesFromLibraryAction
 } from "@/app/actions/resources";
 import { ActionFeedback } from "@/components/ui/action-feedback";
-import { ResourceRowEdit, type ResourceEdit } from "./resource-row-edit";
+import { ResourceRowEdit, type ResourceRecord } from "./resource-row-edit";
 import { inferVehicleIcon, vehicleIconLabel } from "@/lib/domain/vehicle-icon";
 
 // A project staffs itself: it holds its own copies of the people and vehicles it
@@ -28,8 +28,8 @@ interface Row {
   secondary: string;
   /** Why this record is not yet usable, or empty when it is fine. */
   missing: string;
-  /** The editable fields, for fixing a typo without deleting the record. */
-  edit: ResourceEdit;
+  /** The record itself, for editing every field in place. */
+  item: ResourceRecord;
 }
 
 const asDriverRow = (driver: Driver): Row => ({
@@ -39,7 +39,7 @@ const asDriverRow = (driver: Driver): Row => ({
   // Dispatch cannot reach a driver with no number, so it is flagged where the
   // record is, rather than on a separate readiness page nobody opened.
   missing: driver.phone ? "" : "ยังไม่มีเบอร์โทร",
-  edit: { kind: "driver", fullName: driver.fullName, phone: driver.phone ?? "", licenseType: driver.licenseType ?? "" }
+  item: { kind: "driver", record: driver }
 });
 
 const asVehicleRow = (vehicle: Vehicle): Row => ({
@@ -54,14 +54,7 @@ const asVehicleRow = (vehicle: Vehicle): Row => ({
       : typeof vehicle.metadata.hourlyRate === "number" ? `${vehicle.metadata.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : ""
   ].filter(Boolean).join(" · "),
   missing: !vehicle.plateNumber ? "ยังไม่มีทะเบียน" : !vehicle.capacity ? "ยังไม่ระบุจำนวนที่นั่ง" : "",
-  edit: {
-    kind: "vehicle",
-    plateNumber: vehicle.plateNumber,
-    vehicleType: vehicle.vehicleType ?? "",
-    capacity: vehicle.capacity ?? null,
-    packageHours: typeof vehicle.metadata.packageHours === "number" ? vehicle.metadata.packageHours : null,
-    packageAmount: typeof vehicle.metadata.packageAmount === "number" ? vehicle.metadata.packageAmount : null
-  }
+  item: { kind: "vehicle", record: vehicle }
 });
 
 function Section({
@@ -238,7 +231,7 @@ function Section({
               </span>
               {editingId === row.id ? (
                 <div className="w-full">
-                  <ResourceRowEdit id={row.id} initial={row.edit} onDone={() => setEditingId(null)} />
+                  <ResourceRowEdit item={row.item} onDone={() => setEditingId(null)} />
                 </div>
               ) : null}
             </li>
