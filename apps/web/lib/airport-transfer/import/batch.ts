@@ -426,6 +426,33 @@ export async function commitImportBatch(
   return { ok: true as const, imported, failures, left };
 }
 
+/**
+ * Fix one row on screen instead of editing the file and uploading it again.
+ * The new values are written into the row's raw cells (through the batch's
+ * column mapping), so the same checks run on them as on anything uploaded.
+ */
+export async function updateImportRowValues(
+  supabase: SupabaseClient,
+  input: { batchId: string; projectId: string; rowId: string; values: Partial<Record<ImportField, string>> }
+) {
+  const loaded = await getImportBatch(supabase, input.batchId, input.projectId);
+  if (!loaded) return { ok: false as const, message: "ไม่พบชุดนำเข้า" };
+  const { batch, rows } = loaded;
+  if (batch.status === "imported" || batch.status === "cancelled") return { ok: false as const, message: "ชุดนี้ปิดแล้ว" };
+  const row = rows.find((item) => item.id === input.rowId);
+  if (!row) return { ok: false as const, message: "ไม่พบแถวนี้" };
+  if (row.status === "imported") return { ok: false as const, message: "แถวนี้นำเข้าแล้ว — แก้ที่หน้าเคสแทน" };
+
+  const raw: RawRow = { ...row.raw };
+  for (const [field, value] of Object.entries(input.values) as Array<[ImportField, string | undefined]>) {
+    const header = batch.meta.mapping[field];
+    if (header && value !== undefined) raw[header] = value.trim() || null;
+  }
+  const { error } = await supabase.from("airport_transfer_import_rows").update({ raw_data: raw, validation_status: "pending" }).eq("id", row.id);
+  if (error) return { ok: false as const, message: error.message };
+  return { ok: true as const };
+}
+
 export async function cancelImportBatch(supabase: SupabaseClient, batchId: string, projectId: string) {
   const loaded = await getImportBatch(supabase, batchId, projectId);
   if (!loaded) return { ok: false as const, message: "ไม่พบชุดนำเข้า" };

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ImportBatchView } from "@/components/airport-transfer/import/batch-view";
+import { ImportSteps } from "@/components/airport-transfer/import/import-steps";
 import { PageHeader } from "@/components/page-header";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { getImportBatch } from "@/lib/airport-transfer/import/batch";
@@ -38,6 +39,15 @@ export default async function AirportTransferImportBatchPage({ params }: { param
         ]
           .filter(Boolean)
           .join(" · ")}
+      />
+      <ImportSteps
+        current={
+          batch.status === "imported"
+            ? 5
+            : batch.status === "ready" && !rows.some((row) => row.status === "error" || row.status === "duplicate")
+              ? 4
+              : 3
+        }
       />
       {access.canManage ? (
         <ImportBatchView projectId={project.id} projectCode={projectCode} batch={batch} rows={rows} />

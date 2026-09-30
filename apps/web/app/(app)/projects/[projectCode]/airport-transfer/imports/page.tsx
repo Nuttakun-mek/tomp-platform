@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
-import { Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import { Download, FileSpreadsheet } from "lucide-react";
+import { ImportSteps } from "@/components/airport-transfer/import/import-steps";
 import { ImportUploadForm } from "@/components/airport-transfer/import/upload-form";
+import { FieldHelp } from "@/components/ui/field-help";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
 import { listImportBatches, type ImportBatch } from "@/lib/airport-transfer/import/batch";
 import { getProjectByCode } from "@/lib/data/projects";
@@ -31,47 +33,44 @@ export default async function AirportTransferImportsPage({ params }: { params: P
   const batches = supabase ? await listImportBatches(supabase, project.id) : [];
   const base = `/projects/${projectCode}/airport-transfer/imports`;
 
+  const waiting = batches.filter((batch) => batch.status === "ready" || batch.status === "uploaded").length;
+
   return (
     <>
       <PageHeader eyebrow="Airport Transfer" title="นำเข้าข้อมูลจาก Excel" />
+      <ImportSteps current={waiting ? 3 : 2} />
 
-      <section className="grid items-start gap-4 lg:grid-cols-2">
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-cyan-800" />
-            <h2 className="font-semibold">1. ส่งแบบฟอร์มให้ลูกค้ากรอก</h2>
-          </div>
-          <p className="text-sm text-slate-600">
-            หนึ่งแถวต่อผู้โดยสารหนึ่งเที่ยว ลูกค้าใส่แค่ขาเดินทาง วันที่ เลขเที่ยวบิน ชื่อ และโรงแรม — เวลาเครื่องและสนามบินระบบดึงให้เอง
-          </p>
-          <ul className="grid gap-1 text-xs text-slate-500">
-            <li>· มีตัวเลือกให้กด ช่องที่ต้องกรอกเป็นสีเหลือง และมีแถวตัวอย่าง</li>
-            <li>· มีชีต “วิธีกรอก” อธิบายทุกคอลัมน์ (ไทย/อังกฤษ)</li>
-          </ul>
-          <a
-            href={`${base}/template`}
-            className="inline-flex w-fit items-center gap-2 rounded-xl border border-cyan-700 px-4 py-2 text-sm font-semibold text-cyan-800 hover:bg-cyan-50"
-          >
-            <Download className="h-4 w-4" /> ดาวน์โหลดแบบฟอร์ม (.xlsx)
+      {/* Step 1, one slim row: the form to send the customer, in either language. */}
+      <section className="enterprise-panel flex flex-wrap items-center justify-between gap-3 p-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <FileSpreadsheet className="h-5 w-5 shrink-0 text-operation" />
+          <h2 className="text-sm font-semibold text-ink">1. แบบฟอร์มสำหรับลูกค้า</h2>
+          <FieldHelp content="หนึ่งแถวต่อผู้โดยสารหนึ่งเที่ยว ลูกค้าเลือกขาเดินทาง วันที่ (เฉพาะวันในช่วงงาน) และค่าอื่นจากรายการ แล้วพิมพ์เลขเที่ยวบิน ชื่อ และโรงแรม — เวลาเครื่องและสนามบินระบบดึงให้เอง · มีชีตวิธีกรอก" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a href={`${base}/template`} className="inline-flex items-center gap-1.5 rounded-command border border-operation/40 bg-operation-soft px-3 py-1.5 text-[13px] font-semibold text-operation hover:bg-white">
+            <Download className="h-4 w-4" /> ภาษาไทย (.xlsx)
+          </a>
+          <a href={`${base}/template?lang=en`} className="inline-flex items-center gap-1.5 rounded-command border border-operation/40 bg-operation-soft px-3 py-1.5 text-[13px] font-semibold text-operation hover:bg-white">
+            <Download className="h-4 w-4" /> English (.xlsx)
           </a>
         </div>
+      </section>
 
+      {/* Steps 2–4 in one card: upload, and the files right under it, each one
+          opening on its check page (fix rows, then confirm). */}
+      <section className="enterprise-panel grid gap-4 p-4">
         {access.canManage ? (
           <ImportUploadForm projectId={project.id} projectCode={projectCode} />
         ) : (
-          <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">นำเข้าได้เฉพาะผู้ดูแลหรือผู้จัดรถของโครงการ</p>
+          <p className="text-sm text-slate-500">นำเข้าได้เฉพาะผู้ดูแลหรือผู้จัดรถของโครงการ</p>
         )}
-      </section>
-
-      <aside className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-800" />
-        <span>
-          ระบบตรวจทุกแถวก่อน: ข้อมูลครบและรูปแบบถูก · เที่ยวบินมีจริงในวันนั้นและลง/ออกสนามบินในไทยตามขาเดินทาง · ไม่ซ้ำกับเคสที่มีอยู่หรือแถวอื่นในไฟล์ — ไม่มีอะไรเข้าระบบจนกว่าจะกด “ยืนยันนำเข้า”
-        </span>
-      </aside>
-
-      <section className="grid gap-2">
-        <h2 className="text-lg font-semibold">ไฟล์ที่อัปโหลด</h2>
+        <div className="grid gap-2 border-t border-slate-100 pt-3">
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-sm font-semibold text-ink">3–4. ตรวจ แก้ และยืนยันนำเข้า</h2>
+          <FieldHelp content="ระบบตรวจทุกแถว: ข้อมูลครบและรูปแบบถูก · เที่ยวบินมีจริงในวันนั้นและลง/ออกสนามบินในไทยตามขาเดินทาง · ไม่ซ้ำกับเคสที่มีหรือแถวอื่นในไฟล์ — ไม่มีอะไรเข้าระบบจนกว่าจะกดยืนยันนำเข้า" />
+          <span className="text-xs text-ink-soft">— กดชื่อไฟล์เพื่อเปิด</span>
+        </div>
         {batches.length ? (
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full min-w-[40rem] text-left text-sm">
@@ -110,6 +109,7 @@ export default async function AirportTransferImportsPage({ params }: { params: P
         ) : (
           <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">ยังไม่มีไฟล์ที่อัปโหลด</p>
         )}
+        </div>
       </section>
     </>
   );

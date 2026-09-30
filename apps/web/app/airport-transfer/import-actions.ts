@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getAirportTransferAccess } from "@/lib/airport-transfer/access";
-import { cancelImportBatch, checkImportBatch, commitImportBatch, createImportBatch, getImportBatch, saveBatchMapping } from "@/lib/airport-transfer/import/batch";
+import { cancelImportBatch, checkImportBatch, commitImportBatch, createImportBatch, getImportBatch, saveBatchMapping, updateImportRowValues } from "@/lib/airport-transfer/import/batch";
+import type { ImportField } from "@/lib/airport-transfer/import/columns";
 import type { ColumnMapping } from "@/lib/airport-transfer/import/normalize";
 import { readImportWorkbook } from "@/lib/airport-transfer/import/workbook";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
@@ -108,4 +109,19 @@ export async function cancelAirportTransferImport(projectId: string, batchId: st
   const result = await cancelImportBatch(gate.supabase, batchId, projectId);
   revalidate();
   return result.ok ? { ok: true, message: "ยกเลิกชุดนี้แล้ว ไม่มีข้อมูลใดถูกนำเข้าเพิ่ม" } : { ok: false, message: result.message };
+}
+
+export async function fixAirportTransferImportRow(
+  projectId: string,
+  batchId: string,
+  rowId: string,
+  values: Partial<Record<ImportField, string>>
+): Promise<ImportActionState> {
+  const gate = await guard(projectId);
+  if ("error" in gate) return { ok: false, message: gate.error! };
+  const updated = await updateImportRowValues(gate.supabase, { batchId, projectId, rowId, values });
+  if (!updated.ok) return { ok: false, message: updated.message };
+  const checked = await checkImportBatch(gate.supabase, batchId, projectId, bangkokToday());
+  revalidate();
+  return checked.ok ? { ok: true, message: "บันทึกและตรวจแถวนี้ใหม่แล้ว" } : { ok: false, message: checked.message };
 }

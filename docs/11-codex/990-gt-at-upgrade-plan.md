@@ -204,3 +204,13 @@ thresholds as proposed.
   notification when the tab is hidden. Clicking an alert opens that chat.
 
 §0 held — no driver paths touched.
+
+### AT-1 follow-up (2026-09-30)
+- Template in Thai (`?lang=en` for English); every value that can be a choice
+  is a dropdown with a stop-error — flight date lists the project's days plus
+  one either side, passengers 1–30, bags 0–30 — held on a very-hidden `_lists`
+  sheet. Dates read as "2026-10-02 พฤ."; the importer takes the ISO prefix.
+- Import page is one flow: a step strip (form → upload → check/fix → confirm →
+  assign vehicles in "ข้อมูลการเดินทาง"), a slim form row, then upload with the
+  files right under it. A row that failed a check is fixed on its check page
+  (`fixAirportTransferImportRow`) instead of editing the file and re-uploading.

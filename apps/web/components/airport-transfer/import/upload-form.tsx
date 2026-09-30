@@ -17,37 +17,37 @@ export function ImportUploadForm({ projectId, projectCode }: { projectId: string
   }, [projectCode, router, state]);
 
   return (
-    <form action={action} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2">
-        <Upload className="h-5 w-5 text-cyan-800" />
-        <h2 className="font-semibold">อัปโหลดไฟล์ที่ลูกค้ากรอกมา</h2>
+    <form action={action} className="grid gap-2">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+        <Upload className="h-4 w-4 text-operation" /> 2. อัปโหลดไฟล์ที่ลูกค้ากรอกมา
+      </h2>
+      <div className="grid items-stretch gap-2 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-operation/40 bg-operation-soft/40 px-3 py-2 hover:border-operation">
+          <FileSpreadsheet className="h-5 w-5 shrink-0 text-operation" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-ink">{fileName || "เลือกไฟล์ .xlsx"}</span>
+            <span className="block text-[11px] text-ink-faint">แบบฟอร์มของเรา (ไทย/อังกฤษ) หรือไฟล์ของลูกค้าเอง · ไม่เกิน 5 MB · 500 แถว</span>
+          </span>
+          <input
+            type="file"
+            name="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="sr-only"
+            required
+            onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")}
+          />
+        </label>
+        <input name="clientName" className="field-input" placeholder="ชื่อลูกค้า / บริษัท (ถ้ามี)" aria-label="ชื่อลูกค้า / บริษัท" />
+        <button
+          type="submit"
+          disabled={pending || !fileName}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-operation px-4 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {pending ? "กำลังอ่านและตรวจ…" : "อัปโหลดและตรวจ"}
+        </button>
       </div>
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-cyan-300 bg-cyan-50/40 px-4 py-6 text-center hover:border-cyan-500">
-        <FileSpreadsheet className="h-7 w-7 text-cyan-800" />
-        <span className="text-sm font-semibold text-slate-700">{fileName || "เลือกไฟล์ .xlsx"}</span>
-        <span className="text-xs text-slate-500">แบบฟอร์มของเรา หรือไฟล์ของลูกค้าเองก็ได้ · ไม่เกิน 5 MB · 500 แถว</span>
-        <input
-          type="file"
-          name="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          className="sr-only"
-          required
-          onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")}
-        />
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span className="font-semibold text-slate-700">ชื่อลูกค้า / บริษัท (ถ้ามี)</span>
-        <input name="clientName" className="h-10 rounded-xl border border-slate-300 px-3" placeholder="ใช้กับทุกเคสในไฟล์นี้" />
-      </label>
       {state.message && !state.ok ? <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800">{state.message}</p> : null}
-      <button
-        type="submit"
-        disabled={pending || !fileName}
-        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-cyan-800 px-4 text-sm font-semibold text-white disabled:opacity-50"
-      >
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {pending ? "กำลังอ่านและตรวจ… (อาจใช้เวลาถ้ามีหลายเที่ยวบิน)" : "อัปโหลดและตรวจ"}
-      </button>
     </form>
   );
 }

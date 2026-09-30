@@ -14,6 +14,7 @@ import {
 import type { ImportBatch, ImportRow, RowStatus } from "@/lib/airport-transfer/import/batch";
 import { IMPORT_COLUMNS, type ImportField } from "@/lib/airport-transfer/import/columns";
 import { missingRequiredColumns, type ColumnMapping } from "@/lib/airport-transfer/import/normalize";
+import { RowFixForm } from "./row-fix-form";
 
 const STATUS: Record<RowStatus, { label: string; className: string }> = {
   valid: { label: "ผ่าน", className: "bg-emerald-50 text-emerald-800" },
@@ -131,7 +132,7 @@ export function ImportBatchView({ projectId, projectCode, batch, rows }: { proje
           <div className="grid gap-1 text-sm">
             <p className="font-semibold">
               พร้อมนำเข้า {ready} แถว
-              {counts.error + counts.duplicate ? <span className="font-normal text-slate-500"> · อีก {counts.error + counts.duplicate} แถวต้องแก้ในไฟล์แล้วอัปโหลดใหม่</span> : null}
+              {counts.error + counts.duplicate ? <span className="font-normal text-slate-500"> · อีก {counts.error + counts.duplicate} แถวต้องแก้ — กด “แก้ไข / เติมข้อมูล” ที่แถวนั้น</span> : null}
             </p>
             <label className="flex items-center gap-2 text-xs text-slate-600">
               <input type="checkbox" checked={includeWarnings} onChange={(event) => setIncludeWarnings(event.target.checked)} />
@@ -171,9 +172,9 @@ export function ImportBatchView({ projectId, projectCode, batch, rows }: { proje
 
       {closed ? (
         <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          {batch.status === "imported" ? "นำเข้าครบแล้ว" : "ชุดนี้ถูกยกเลิก"} ·{" "}
+          {batch.status === "imported" ? "นำเข้าครบแล้ว — ขั้นถัดไป: จัดรถและคนขับให้แต่ละเคส" : "ชุดนี้ถูกยกเลิก"} ·{" "}
           <Link href={`/projects/${projectCode}/airport-transfer/cases`} className="font-semibold text-cyan-800 underline">
-            ไปที่รายการเคส
+            ไปที่ข้อมูลการเดินทาง
           </Link>
         </p>
       ) : null}
@@ -193,7 +194,16 @@ export function ImportBatchView({ projectId, projectCode, batch, rows }: { proje
           </thead>
           <tbody>
             {visible.map((row) => (
-              <RowLine key={row.id} row={row} projectCode={projectCode} />
+              <RowLine
+                key={row.id}
+                row={row}
+                projectCode={projectCode}
+                fix={
+                  !closed && row.status !== "imported"
+                    ? { projectId, batchId: batch.id, mapping: batch.meta.mapping }
+                    : null
+                }
+              />
             ))}
             {!visible.length ? (
               <tr>
@@ -209,7 +219,17 @@ export function ImportBatchView({ projectId, projectCode, batch, rows }: { proje
   );
 }
 
-function RowLine({ row, projectCode }: { row: ImportRow; projectCode: string }) {
+function RowLine({
+  row,
+  projectCode,
+  fix
+}: {
+  row: ImportRow;
+  projectCode: string;
+  /** Present while the row can still be corrected on screen. */
+  fix: { projectId: string; batchId: string; mapping: ColumnMapping } | null;
+}) {
+  const [editing, setEditing] = useState(false);
   const data = row.data;
   const status = STATUS[row.status];
   const flight = data?.flight;
@@ -218,6 +238,7 @@ function RowLine({ row, projectCode }: { row: ImportRow; projectCode: string }) 
   const errorFields = new Set(row.messages.filter((m) => m.level === "error").map((m) => m.field).filter(Boolean) as ImportField[]);
   const bad = (field: ImportField) => (errorFields.has(field) ? "text-rose-700 font-semibold" : "");
   return (
+    <>
     <tr className="border-t border-slate-100 align-top">
       <td className="px-3 py-2 tabular-nums text-slate-500">{row.rowNumber}</td>
       <td className="px-3 py-2">
@@ -229,6 +250,10 @@ function RowLine({ row, projectCode }: { row: ImportRow; projectCode: string }) 
           <Link href={`/projects/${projectCode}/airport-transfer/cases/${row.caseId}`} className="mt-1 block text-xs font-semibold text-cyan-800 underline">
             เปิดเคส
           </Link>
+        ) : fix ? (
+          <button type="button" onClick={() => setEditing((current) => !current)} className="mt-1 block text-xs font-semibold text-cyan-800 underline">
+            {editing ? "ปิด" : row.status === "valid" ? "แก้ไข" : "แก้ไข / เติมข้อมูล"}
+          </button>
         ) : null}
       </td>
       <td className="px-3 py-2">
@@ -276,6 +301,14 @@ function RowLine({ row, projectCode }: { row: ImportRow; projectCode: string }) 
         )}
       </td>
     </tr>
+    {editing && fix ? (
+      <tr>
+        <td colSpan={7} className="px-3 pb-3">
+          <RowFixForm projectId={fix.projectId} batchId={fix.batchId} rowId={row.id} raw={row.raw} mapping={fix.mapping} onDone={() => setEditing(false)} />
+        </td>
+      </tr>
+    ) : null}
+    </>
   );
 }
 
