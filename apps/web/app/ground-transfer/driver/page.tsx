@@ -6,6 +6,7 @@ import { DriverSessionGate } from "@/components/driver/driver-session-gate";
 import { DriverTaskView } from "@/components/driver/driver-task-view";
 import { DriverWaitingView } from "@/components/driver/driver-waiting-view";
 import { getDriverAssignmentByToken, getDriverWaitingContext } from "@/lib/data/driver-access";
+import { isLaterDayJob } from "@/lib/domain/driver-current-job";
 import { DRIVER_DEVICE_COOKIE_PREFIX, DRIVER_PIN_COOKIE_PREFIX, hashDriverDeviceId } from "@/lib/driver-access/token";
 
 interface DriverPageProps {
@@ -85,6 +86,14 @@ export default async function DriverPage({ searchParams }: DriverPageProps) {
   if (driverAccess.pinRequired) {
     const verified = store.get(`${DRIVER_PIN_COOKIE_PREFIX}${driverAccess.tokenId}`)?.value === "1";
     if (!verified || otherDeviceHolds) return <DriverPinGate token={token} takeover={otherDeviceHolds} />;
+  }
+
+  // The unit's current job is on a later day and nothing is under way: today's
+  // work is over (or there was none). Wait for that day rather than open its
+  // pre-start check now — the check is the start of a working day.
+  if (isLaterDayJob({ status: driverAccess.assignment.status, startTime: driverAccess.assignment.startTime ?? null })) {
+    const waiting = await getDriverWaitingContext(token);
+    if (waiting) return <DriverWaitingView context={waiting} nextJobAt={driverAccess.assignment.startTime} />;
   }
 
   // Gate: identity confirmation + evidence photos happen before the driver sees

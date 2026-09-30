@@ -1,5 +1,8 @@
 import { CalendarClock, CarFront, RefreshCw, UserRound } from "lucide-react";
 import type { DriverWaitingContext } from "@/lib/data/driver-access";
+import { DriverPageRefresher } from "./driver-page-refresher";
+
+const nextJobFormat = new Intl.DateTimeFormat("th-TH", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" });
 
 /**
  * The driver is verified and their unit is ready — there is no work on it yet.
@@ -13,18 +16,34 @@ import type { DriverWaitingContext } from "@/lib/data/driver-access";
  * scheduled yet — and shows what it knows so the driver can confirm the sheet in
  * their hand belongs to the vehicle they are standing next to.
  */
-export function DriverWaitingView({ context }: { context: DriverWaitingContext }) {
+export function DriverWaitingView({ context, nextJobAt = null }: { context: DriverWaitingContext; nextJobAt?: string | null }) {
   return (
     <div className="grid min-h-[70vh] content-center gap-4 px-1">
+      <DriverPageRefresher />
       <div className="grid gap-1 text-center">
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-operation-soft text-operation">
           <CalendarClock className="h-7 w-7" />
         </span>
-        <h1 className="mt-2 text-lg font-bold text-ink">ยืนยันตัวเรียบร้อย รอรับงาน</h1>
-        <p className="mx-auto max-w-xs text-[13px] leading-6 text-ink-soft">
-          QR ของคุณใช้งานได้ปกติ ศูนย์ควบคุมยังไม่ได้เปิดงานให้หน่วยนี้
-          เมื่อมีงานเข้ามา หน้านี้จะแสดงรายละเอียดให้ทันที
-        </p>
+        {nextJobAt ? (
+          <>
+            {/* The unit's work is on a later day. The pre-start check belongs to
+                that day, so it opens then — not the moment today's last job closes. */}
+            <h1 className="mt-2 text-lg font-bold text-ink">วันนี้ไม่มีงานแล้ว</h1>
+            <p className="mx-auto max-w-xs text-[13px] leading-6 text-ink-soft">
+              งานถัดไปของหน่วยนี้ <span className="font-bold text-ink">{nextJobFormat.format(new Date(nextJobAt))}</span>
+              <br />
+              หน้าตรวจสอบก่อนเริ่มงานจะเปิดให้ในวันนั้น
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="mt-2 text-lg font-bold text-ink">ยืนยันตัวเรียบร้อย รอรับงาน</h1>
+            <p className="mx-auto max-w-xs text-[13px] leading-6 text-ink-soft">
+              QR ของคุณใช้งานได้ปกติ ศูนย์ควบคุมยังไม่ได้เปิดงานให้หน่วยนี้
+              เมื่อมีงานเข้ามา หน้านี้จะแสดงรายละเอียดให้ทันที
+            </p>
+          </>
+        )}
       </div>
 
       <section className="grid gap-2 rounded-card bg-white p-3 shadow-sm">

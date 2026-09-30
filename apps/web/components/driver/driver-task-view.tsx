@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CarFront, CheckCircle2, ChevronDown, Clock3, Home, ListChecks, LogIn, LogOut, MapPin, MessageCircle, Navigation, Phone, RotateCcw, TriangleAlert, UserRound } from "lucide-react";
+import { CarFront, CheckCircle2, ChevronDown, Clock3, Home, ListChecks, LogIn, LogOut, MapPin, MessageCircle, Navigation, Phone, Play, RotateCcw, TriangleAlert, UserRound } from "lucide-react";
 import { assignmentStatusUpdateAction, driverIssueReportAction } from "@/app/actions/driver";
 import { DriverChatThread } from "@/components/driver/driver-chat-thread";
 import { DriverLocationShare } from "@/components/driver/driver-location-share";
@@ -13,6 +13,7 @@ import type { DriverIssueMessage } from "@/lib/data/driver-operations";
 import { enqueueDriverOutbox, flushDriverOutbox, readDriverOutbox, type DriverOutboxItem } from "@/lib/driver/outbox";
 import { createDriverMessageClientEventId, extractDriverMessageClientEventId } from "@/lib/driver/message-idempotency";
 import { formatStatusTh } from "@/lib/i18n/status-th";
+import { NOT_STARTED_STATUSES } from "@/lib/domain/driver-current-job";
 import type { DriverNotification } from "@tomp/types/domain";
 import { buildBridgeMessage, buildGoogleMapsDirectionsUrl, getMobileShell, isInsideMobileShell, NATIVE_STATUS_EVENT, parseNativeStatusDetail, parseViewSwitchDetail, VIEW_SWITCH_EVENT, type DriverWebViewKey } from "@tomp/driver-core";
 import { resolveCoordinatorPhone, telHref } from "@/lib/domain/contact-numbers";
@@ -55,6 +56,15 @@ function metaText(value: unknown, fallback: string) {
 function stepFromStatus(status?: string | null) {
   const index = TRIP_STEPS.findIndex((step) => step.status === status);
   return index >= 0 ? index + 1 : 0;
+}
+
+function initialTripStep(access: DriverAccessAssignment) {
+  if (access.assignment.status === "completed") return TRIP_STEPS.length;
+  return stepFromStatus(access.latestStatus?.status);
+}
+
+function initiallyStarted(access: DriverAccessAssignment) {
+  return Boolean(access.latestStatus) || ["acknowledged", "active", "completed"].includes(access.assignment.status);
 }
 
 function jobTimeLabel(start?: string | null, end?: string | null) {
@@ -142,7 +152,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     driverId: driverAccess.driver.id
   }), [driverAccess.assignment.id, driverAccess.driver.id, driverAccess.project.id]);
 
-  const [tripStep, setTripStep] = useState(() => stepFromStatus(driverAccess.latestStatus?.status));
+  const [tripStep, setTripStep] = useState(() => initialTripStep(driverAccess));
   const [banner, setBanner] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [issueOpen, setIssueOpen] = useState(false);
@@ -153,9 +163,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
   const [dayAssignments, setDayAssignments] = useState(driverAccess.dayAssignments);
   const [workSession, setWorkSession] = useState<DriverWorkSessionState>(driverAccess.workSession);
   const [gpsLight, setGpsLight] = useState<DriverGpsLight>("off");
-  const [currentJobAcknowledged, setCurrentJobAcknowledged] = useState(() => (
-    Boolean(driverAccess.latestStatus) || ["acknowledged", "active", "completed"].includes(driverAccess.assignment.status)
-  ));
+  const [currentJobAcknowledged, setCurrentJobAcknowledged] = useState(() => initiallyStarted(driverAccess));
   const [outboxCount, setOutboxCount] = useState(0);
   const [gpsStartRequest, setGpsStartRequest] = useState(0);
   // Starts false on both server and client so hydration matches the server HTML;
@@ -174,6 +182,24 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
   const [view, setView] = useStateSyncedToProp<DriverTaskViewMode>(initialView);
   const seenIds = useRef(new Set(driverAccess.notifications.map((notification) => notification.id)));
   const pendingMessagesRef = useRef<Map<string, DriverIssueMessage>>(new Map());
+  const refreshedForJob = useRef<string | null>(null);
+
+  // The page follows the unit, not one job: when a job closes, router.refresh()
+  // hands this same mounted component the next one. Everything that described
+  // the old job starts over — the next job's pickup used to appear under the
+  // closed job's three ticks and "งานนี้เสร็จสิ้นแล้ว", as if it were done.
+  const [jobSeen, setJobSeen] = useState(driverAccess.assignment.id);
+  if (jobSeen !== driverAccess.assignment.id) {
+    setJobSeen(driverAccess.assignment.id);
+    setTripStep(initialTripStep(driverAccess));
+    setCurrentJobAcknowledged(initiallyStarted(driverAccess));
+    setMessages(mergePendingMessages(driverAccess.messages, pendingMessagesRef.current));
+    setNotifications(driverAccess.notifications);
+    setDayAssignments(driverAccess.dayAssignments);
+    setWorkSession(driverAccess.workSession);
+    setNextStepsOpen(false);
+    setOpenJobId(null);
+  }
 
   const sendOutboxItem = useCallback(async (item: DriverOutboxItem) => {
     if (item.kind === "status") return assignmentStatusUpdateAction(item.payload);
@@ -233,13 +259,20 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
           };
         };
         if (!json.success || !json.data) return;
-        if (json.data.latestStatus?.status) {
+        const sameJob = json.data.assignmentId === ids.assignmentId;
+        // The poll re-resolves the unit's current job. When that is another job
+        // (this one closed, the day turned, the centre moved work around), load
+        // it rather than paint its status and route onto this one — once per
+        // job, so a page that disagrees with the poll cannot refresh in a loop.
+        if (json.data.assignmentId && !sameJob && refreshedForJob.current !== json.data.assignmentId) {
+          refreshedForJob.current = json.data.assignmentId;
+          router.refresh();
+        }
+        if (sameJob && json.data.latestStatus?.status) {
           setCurrentJobAcknowledged(true);
           setTripStep((current) => Math.max(current, stepFromStatus(json.data?.latestStatus?.status)));
         }
-        // Only this page's own job: the poll re-resolves the current job, and the
-        // buttons below still post for ids.assignmentId.
-        if (json.data.assignmentId === ids.assignmentId && json.data.assignmentMetadata && typeof json.data.assignmentMetadata === "object") {
+        if (sameJob && json.data.assignmentMetadata && typeof json.data.assignmentMetadata === "object") {
           setMeta(json.data.assignmentMetadata);
         }
         if (json.data.workSession) setWorkSession(json.data.workSession);
@@ -270,7 +303,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [driverAccess.token, ids.assignmentId, setMeta]);
+  }, [driverAccess.token, ids.assignmentId, router, setMeta]);
 
   useLayoutEffect(() => {
     const updateShellState = () => setInsideNativeShell(isInsideMobileShell(window));
@@ -322,16 +355,31 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     });
   }
 
-  function acknowledgeCurrentJob() {
-    const payload = { ...ids, status: "acknowledged", source: "driver_qr", metadata: { via: "driver_next_job" } };
+  // Starting is the driver's call, made on the plan tab; the job then moves to
+  // หน้าหลัก. Not queued offline like the trip steps: a start the page cannot
+  // show, or one the server turns down (another job under way), is only noise.
+  function startJob(assignmentId: string) {
+    const payload = { ...ids, assignmentId, status: "acknowledged", source: "driver_qr", metadata: { via: "driver_plan" } };
     setBanner(null);
     startTransition(async () => {
-      const result = await assignmentStatusUpdateAction(payload);
-      if (result.success) {
-        setCurrentJobAcknowledged(true);
-        setBanner({ tone: "ok", text: "รับงานต่อเรียบร้อยแล้ว ศูนย์ควบคุมได้รับสถานะล่าสุด" });
+      try {
+        const result = await assignmentStatusUpdateAction(payload);
+        if (!result.success) {
+          setBanner({ tone: "error", text: result.error || "เริ่มงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" });
+          return;
+        }
+      } catch {
+        setBanner({ tone: "error", text: "เริ่มงานไม่สำเร็จ กรุณาตรวจสอบสัญญาณแล้วลองใหม่" });
+        return;
+      }
+      if (assignmentId === ids.assignmentId) setCurrentJobAcknowledged(true);
+      if (insideNativeShell) {
+        // The app owns the tab bar and cannot be switched from here; say where the job went.
+        setBanner({ tone: "ok", text: "เริ่มงานแล้ว งานนี้อยู่ที่ “หน้าหลัก” กดหน้าหลักด้านล่างเพื่อดำเนินการต่อ" });
+        if (assignmentId !== ids.assignmentId) router.refresh();
       } else {
-        enqueueFailed("status", payload, result.error || "รับงานต่อไม่สำเร็จ ระบบจะส่งข้อมูลอีกครั้งเมื่อเชื่อมต่อได้");
+        setBanner({ tone: "ok", text: "เริ่มงานแล้ว" });
+        router.push(`/ground-transfer/driver?token=${encodeURIComponent(driverAccess.token)}&view=home`);
       }
     });
   }
@@ -449,11 +497,19 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
     workSession.status === "active" ? "กำลังปฏิบัติงาน" : workSession.status === "ended" ? "บันทึกเวลาออกแล้ว" : "ยังไม่บันทึกเวลาเข้า";
   const workSessionClass =
     workSession.status === "active" ? "bg-emerald-300/18 text-emerald-50 ring-emerald-300/30" : workSession.status === "ended" ? "bg-white/10 text-slate-100 ring-white/20" : "bg-amber-300/16 text-amber-50 ring-amber-300/30";
-  const needsCurrentJobAcceptance = !currentJobAcknowledged && ["draft", "planned", "published", "parked"].includes(driverAccess.assignment.status);
+  // The unit's current job has not been started: it waits on the plan tab.
+  const needsCurrentJobAcceptance = !currentJobAcknowledged && NOT_STARTED_STATUSES.includes(driverAccess.assignment.status);
   const currentStep = TRIP_STEPS[tripStep];
   const doneSteps = TRIP_STEPS.slice(0, tripStep);
   const laterSteps = TRIP_STEPS.slice(tripStep + 1);
-  const upcomingAssignments = dayAssignments.filter((item) => !item.isCurrent && item.status !== "completed" && item.status !== "cancelled");
+  // Home shows a job only while it is under way; otherwise it is empty and
+  // points at the plan tab, or says the day is done.
+  const jobInProgress = !needsCurrentJobAcceptance && Boolean(currentStep);
+  const upcomingAssignments = dayAssignments.filter(
+    (item) => item.status !== "completed" && item.status !== "cancelled" && (!item.isCurrent || needsCurrentJobAcceptance)
+  );
+  const finishedEarlier = !needsCurrentJobAcceptance || dayAssignments.some((item) => item.status === "completed");
+  const planHref = `/ground-transfer/driver?token=${encodeURIComponent(driverAccess.token)}&view=next`;
   const showTask = view === "home";
   const showGps = view === "gps";
   const showAssignments = view === "next";
@@ -565,90 +621,106 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
 
       {showTask ? <section id="driver-current-task" className="grid gap-3 rounded-[1.15rem] border border-border/70 bg-white/95 p-3 shadow-[0_10px_24px_rgba(16,32,51,0.06)] scroll-mt-3">
         <p className="text-[13px] font-bold text-ink">รายการปฏิบัติงาน</p>
-        <div className="grid grid-cols-[1fr_5.25rem] gap-2 rounded-[1rem] bg-canvas/70 p-2.5">
-          <div className="grid min-w-0 gap-2">
-            <div className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-operation" />
-              <span className="text-[13px]"><span className="font-semibold text-ink">จุดรับ</span> / {pickup}</span>
+        {jobInProgress ? (
+          <>
+            <div className="grid grid-cols-[1fr_5.25rem] gap-2 rounded-[1rem] bg-canvas/70 p-2.5">
+              <div className="grid min-w-0 gap-2">
+                <div className="flex items-start gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-operation" />
+                  <span className="text-[13px]"><span className="font-semibold text-ink">จุดรับ</span> / {pickup}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                  <span className="text-[13px]"><span className="font-semibold text-ink">จุดส่ง</span> / {dropoff}</span>
+                </div>
+                <p className="text-[12px] text-ink-faint">เวลาที่ต้องถึง {commitmentTime}</p>
+              </div>
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-[0.9rem] bg-route px-2 text-center text-[12px] font-bold leading-4 text-white shadow-[0_8px_16px_rgba(37,99,235,0.2)] transition active:scale-[0.99]"
+              >
+                <Navigation className="h-4 w-4" />
+                <span>Google<br />Maps</span>
+              </a>
             </div>
-            <div className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-              <span className="text-[13px]"><span className="font-semibold text-ink">จุดส่ง</span> / {dropoff}</span>
-            </div>
-            <p className="text-[12px] text-ink-faint">เวลาที่ต้องถึง {commitmentTime}</p>
-          </div>
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-[0.9rem] bg-route px-2 text-center text-[12px] font-bold leading-4 text-white shadow-[0_8px_16px_rgba(37,99,235,0.2)] transition active:scale-[0.99]"
-          >
-            <Navigation className="h-4 w-4" />
-            <span>Google<br />Maps</span>
-          </a>
-        </div>
 
-        {doneSteps.length ? (
-          <div className="flex flex-wrap gap-1.5">
-            {doneSteps.map((step) => (
-              <span key={step.status} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
-                <CheckCircle2 className="h-3.5 w-3.5" /> {step.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
+            {doneSteps.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {doneSteps.map((step) => (
+                  <span key={step.status} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> {step.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
 
-        {needsCurrentJobAcceptance ? (
-          <div id="driver-next-action" className="grid gap-2 scroll-mt-3">
-            <p className="text-[12px] font-semibold text-ink-soft">งานถัดไปพร้อมให้ดำเนินการ</p>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={acknowledgeCurrentJob}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-[1rem] bg-operation px-4 text-[16px] font-bold text-white shadow-[0_10px_20px_rgba(8,123,115,0.22)] transition active:scale-[0.99] disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-5 w-5" />
-              รับงานต่อ
-            </button>
-            <p className="rounded-card bg-operation-soft px-3 py-2 text-[12px] leading-5 text-operation">
-              งานนี้ใช้การยืนยันความพร้อมและหลักฐานรถจากการเริ่มปฏิบัติงานวันนี้แล้ว ไม่ต้องถ่ายรูปหรือยืนยันข้อมูลซ้ำ
-            </p>
-          </div>
-        ) : currentStep ? (
-          <div id="driver-next-action" className="grid gap-2 scroll-mt-3">
-            <p className="text-[12px] font-semibold text-ink-soft">ขั้นตอนถัดไปที่ต้องดำเนินการ</p>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => advanceTrip(currentStep.status, tripStep + 1)}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-[1rem] bg-operation px-4 text-[16px] font-bold text-white shadow-[0_10px_20px_rgba(8,123,115,0.22)] transition active:scale-[0.99] disabled:opacity-60"
-            >
-              {currentStep.label}
-            </button>
-            {laterSteps.length ? (
-              <>
+            {currentStep ? (
+              <div id="driver-next-action" className="grid gap-2 scroll-mt-3">
+                <p className="text-[12px] font-semibold text-ink-soft">ขั้นตอนถัดไปที่ต้องดำเนินการ</p>
                 <button
                   type="button"
-                  onClick={() => setNextStepsOpen((value) => !value)}
-                  className="flex items-center justify-between rounded-card border border-border bg-white px-3 py-2 text-[12px] font-semibold text-ink-soft"
+                  disabled={isPending}
+                  onClick={() => advanceTrip(currentStep.status, tripStep + 1)}
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-[1rem] bg-operation px-4 text-[16px] font-bold text-white shadow-[0_10px_20px_rgba(8,123,115,0.22)] transition active:scale-[0.99] disabled:opacity-60"
                 >
-                  ขั้นตอนถัดไป ({laterSteps.length})
-                  <ChevronDown className={`h-4 w-4 transition ${nextStepsOpen ? "rotate-180" : ""}`} />
+                  {currentStep.label}
                 </button>
-                {nextStepsOpen ? (
-                  <div className="grid gap-1.5">
-                    {laterSteps.map((step) => (
-                      <p key={step.status} className="rounded-card border border-border bg-canvas px-3 py-2 text-[13px] text-ink-faint">
-                        {step.label}
-                      </p>
-                    ))}
-                  </div>
+                {laterSteps.length ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setNextStepsOpen((value) => !value)}
+                      className="flex items-center justify-between rounded-card border border-border bg-white px-3 py-2 text-[12px] font-semibold text-ink-soft"
+                    >
+                      ขั้นตอนถัดไป ({laterSteps.length})
+                      <ChevronDown className={`h-4 w-4 transition ${nextStepsOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {nextStepsOpen ? (
+                      <div className="grid gap-1.5">
+                        {laterSteps.map((step) => (
+                          <p key={step.status} className="rounded-card border border-border bg-canvas px-3 py-2 text-[13px] text-ink-faint">
+                            {step.label}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="grid gap-2 rounded-[1rem] border border-dashed border-border bg-canvas/80 px-4 py-6 text-center">
+            {finishedEarlier ? (
+              <p className="mx-auto inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" /> งานก่อนหน้าเสร็จสิ้นแล้ว
+              </p>
+            ) : null}
+            {upcomingAssignments.length ? (
+              <>
+                <p className="text-[15px] font-bold text-ink">ยังไม่ได้เริ่มงานถัดไป</p>
+                <p className="text-[12px] leading-5 text-ink-faint">
+                  มีงานรอ {upcomingAssignments.length} งาน เปิดแท็บ “แผนงาน” แล้วกด “เริ่มงานนี้” ที่งานที่จะทำ งานนั้นจะย้ายมาที่หน้านี้
+                </p>
+                {!insideNativeShell ? (
+                  <Link href={planHref} className="mx-auto mt-1 inline-flex min-h-10 items-center gap-2 rounded-[0.9rem] bg-operation px-4 text-[13px] font-bold text-white">
+                    <ListChecks className="h-4 w-4" /> เปิดแผนงาน
+                  </Link>
                 ) : null}
               </>
-            ) : null}
+            ) : (
+              <>
+                <p className="text-[15px] font-bold text-ink">งานวันนี้เสร็จครบแล้ว</p>
+                <p className="text-[12px] leading-5 text-ink-faint">
+                  {workSession.status === "active"
+                    ? "เมื่อเลิกงาน กด “สิ้นสุดปฏิบัติงาน” ที่แท็บ “ตำแหน่ง” งานของวันถัดไปจะแสดงเมื่อถึงวันนั้น"
+                    : "งานของวันถัดไปจะแสดงเมื่อถึงวันนั้น"}
+                </p>
+              </>
+            )}
           </div>
-        ) : (
-          <p className="rounded-card bg-emerald-50 px-3 py-3 text-center text-[14px] font-bold text-emerald-800">งานนี้เสร็จสิ้นแล้ว</p>
         )}
       </section> : null}
 
@@ -671,10 +743,19 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-[13px] font-bold text-ink">ลำดับงานที่ต้องดำเนินการถัดไป</p>
-              <p className="text-[12px] text-ink-faint">แสดงเฉพาะรายการที่ต้องดำเนินการหลังจากงานปัจจุบัน</p>
+              <p className="text-[12px] text-ink-faint">กด “เริ่มงานนี้” ที่งานที่จะทำ งานนั้นจะย้ายไปที่หน้าหลัก</p>
             </div>
             <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft">{upcomingAssignments.length} งาน</span>
           </div>
+          {jobInProgress && upcomingAssignments.length ? (
+            <p className="rounded-card bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800">
+              มีงานที่กำลังทำอยู่ที่หน้าหลัก ปิดงานนั้นก่อน จึงจะเริ่มงานถัดไปได้
+            </p>
+          ) : !jobInProgress && upcomingAssignments.length ? (
+            <p className="rounded-card bg-operation-soft px-3 py-2 text-[12px] leading-5 text-operation">
+              เริ่มงานได้เลย ไม่ต้องถ่ายรูปหรือยืนยันข้อมูลซ้ำ ระบบใช้หลักฐานจากการเริ่มปฏิบัติงานวันนี้
+            </p>
+          ) : null}
           {!upcomingAssignments.length ? (
             <div className="rounded-[1rem] border border-dashed border-border bg-canvas/80 px-4 py-8 text-center">
               <p className="text-[15px] font-bold text-ink">ยังไม่มีงานถัดไปในขณะนี้</p>
@@ -682,8 +763,9 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
             </div>
           ) : null}
           <div className="grid gap-2">
-            {upcomingAssignments.map((item) => {
+            {upcomingAssignments.map((item, index) => {
               const open = openJobId === item.assignmentId;
+              const startable = NOT_STARTED_STATUSES.includes(item.status);
               return (
                 <article
                   key={item.assignmentId}
@@ -701,7 +783,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
                       <p className="flex items-center gap-1.5 text-[13px] font-bold text-ink">
                         <span>{item.sequence}. หน่วย {item.callSign}</span>
                         {item.urgent ? <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">ด่วน</span> : null}
-                        {item.isNext ? <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">ทำต่อไป</span> : null}
+                        {index === 0 ? <span className="rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">ทำต่อไป</span> : null}
                       </p>
                       <p className="mt-1 truncate text-[12px] text-ink-soft">{item.pickup} ไป {item.dropoff}</p>
                     </div>
@@ -717,6 +799,20 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
                       <p><span className="font-semibold text-ink">จุดรับ</span> / {item.pickup}</p>
                       <p><span className="font-semibold text-ink">จุดส่ง</span> / {item.dropoff}</p>
                       <p><span className="font-semibold text-ink">เวลา</span> / {jobTimeLabel(item.startTime, item.endTime)}</p>
+                    </div>
+                  ) : null}
+                  {startable ? (
+                    <div className="border-t border-black/5 px-3 py-2">
+                      <button
+                        type="button"
+                        disabled={isPending || jobInProgress}
+                        onClick={() => startJob(item.assignmentId)}
+                        className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-[0.9rem] text-[14px] font-bold transition active:scale-[0.99] disabled:opacity-45 ${
+                          index === 0 ? "bg-operation text-white shadow-sm" : "border border-operation/40 bg-white text-operation"
+                        }`}
+                      >
+                        <Play className="h-4 w-4" /> เริ่มงานนี้
+                      </button>
                     </div>
                   ) : null}
                 </article>

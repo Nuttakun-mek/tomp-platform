@@ -2,39 +2,24 @@ import "server-only";
 
 import { getPostgresClient } from "@/lib/db/postgres";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
+import { pickCurrentJob } from "@/lib/domain/driver-current-job";
 
 type Row = Record<string, unknown>;
-
-const RANK: Record<string, number> = {
-  active: 0,
-  acknowledged: 1,
-  ready: 2,
-  published: 3,
-  planned: 4,
-  draft: 5,
-  parked: 6,
-  completed: 7,
-  cancelled: 8,
-  archived: 9
-};
 
 function text(row: Row | null | undefined, key: string): string {
   return typeof row?.[key] === "string" ? row[key] : "";
 }
 
-function rank(row: Row) {
-  return RANK[text(row, "status")] ?? 99;
+// postgres.js hands timestamps back as Date, supabase-js as strings.
+function iso(row: Row, key: string): string | null {
+  const value = row[key];
+  if (value instanceof Date) return value.toISOString();
+  return typeof value === "string" && value ? value : null;
 }
 
-function byOperationalOrder(a: Row, b: Row) {
-  const rankDelta = rank(a) - rank(b);
-  if (rankDelta !== 0) return rankDelta;
-  const aStart = Date.parse(text(a, "start_time"));
-  const bStart = Date.parse(text(b, "start_time"));
-  if (Number.isFinite(aStart) && Number.isFinite(bStart) && aStart !== bStart) return aStart - bStart;
-  if (Number.isFinite(aStart)) return -1;
-  if (Number.isFinite(bStart)) return 1;
-  return text(a, "created_at").localeCompare(text(b, "created_at"));
+function pick(rows: Row[]) {
+  const jobs = rows.map((row) => ({ id: text(row, "id"), status: text(row, "status"), startTime: iso(row, "start_time"), createdAt: iso(row, "created_at"), row }));
+  return pickCurrentJob(jobs)?.row;
 }
 
 export interface DriverCurrentAssignmentScope {
@@ -94,7 +79,7 @@ async function resolveByCallSign(projectId: string, callSignId: string, driverId
         const rowDriver = text(row, "driver_id");
         return !rowDriver || rowDriver === driverId;
       });
-      return toCurrent(rows.sort(byOperationalOrder)[0]);
+      return toCurrent(pick(rows));
     }
   }
 
@@ -107,24 +92,8 @@ async function resolveByCallSign(projectId: string, callSignId: string, driverId
       and call_sign_id = ${callSignId}
       and status <> 'cancelled'
       and (driver_id is null or driver_id = ${driverId})
-    order by
-      case status
-        when 'active' then 0
-        when 'acknowledged' then 1
-        when 'ready' then 2
-        when 'published' then 3
-        when 'planned' then 4
-        when 'draft' then 5
-        when 'parked' then 6
-        when 'completed' then 7
-        when 'archived' then 9
-        else 99
-      end,
-      start_time asc nulls last,
-      created_at asc
-    limit 1
   `;
-  return toCurrent(rows[0]);
+  return toCurrent(pick(rows));
 }
 
 async function resolveByAssignment(projectId: string, assignmentId: string, driverId: string): Promise<DriverCurrentAssignment | null> {

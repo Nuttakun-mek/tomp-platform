@@ -1,7 +1,6 @@
 import type { Assignment, CallSign, Driver, DriverAssignmentPacket, DriverNotification, Project, RouteChangeInstruction, Vehicle } from "@tomp/types/domain";
 import { hashDriverAccessToken } from "@/lib/driver-access/token";
-import { getDriverAssignmentPacketByAssignmentId, getDriverIssueMessagesByAssignmentId, getDriverNotificationsByAssignmentId, getRouteChangesByAssignmentId, type DriverIssueMessage } from "@/lib/data/driver-operations";
-import { attachmentFromMetadata, signDriverMessageAttachments, type DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
+import { getDriverAssignmentPacketByAssignmentId, getDriverDayThread, getRouteChangesByAssignmentId, type DriverIssueMessage } from "@/lib/data/driver-operations";
 import { resolveDriverCurrentAssignment } from "@/lib/data/driver-current-assignment";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { getPostgresClient } from "@/lib/db/postgres";
@@ -167,8 +166,11 @@ function workSessionFromRows(rows: Row[] | null | undefined): DriverWorkSessionS
   };
 }
 
+// postgres.js returns timestamps as Date; supabase-js as ISO strings. Reading a
+// Date as "no value" made the Postgres path treat every job as today's.
 function nullableText(row: Row | null | undefined, key: string) {
   const value = row?.[key];
+  if (value instanceof Date) return value.toISOString();
   return typeof value === "string" ? value : null;
 }
 
@@ -252,42 +254,6 @@ function buildDayAssignments(rows: Row[], currentAssignmentId: string, resolveCa
   });
 }
 
-function mapDriverIssueMessage(row: Row): DriverIssueMessage {
-  const meta = metadata(row);
-  return {
-    id: text(row, "id"),
-    text: text(row, "message"),
-    at: text(row, "created_at", new Date().toISOString()),
-    issueType: text(row, "issue_type", "message"),
-    severity: text(row, "severity", "info"),
-    clientEventId: typeof meta.clientEventId === "string" ? String(meta.clientEventId) : null,
-    deliveryStatus: "sent",
-    attachment: attachmentFromMetadata(meta)
-  };
-}
-
-function mapDriverNotification(row: Row): DriverNotification & { attachment?: DriverMessageAttachment | null } {
-  const meta = metadata(row);
-  return {
-    id: text(row, "id"),
-    projectId: text(row, "project_id"),
-    assignmentId: nullableText(row, "assignment_id"),
-    driverId: nullableText(row, "driver_id"),
-    notificationType: text(row, "notification_type"),
-    priority: text(row, "priority", "normal") as DriverNotification["priority"],
-    title: text(row, "title"),
-    body: text(row, "body"),
-    action: "acknowledge",
-    actionLabel: nullableText(row, "action_label"),
-    actionUrl: nullableText(row, "action_url"),
-    status: text(row, "status", "unread") as DriverNotification["status"],
-    createdAt: text(row, "sent_at", text(row, "created_at", new Date().toISOString())),
-    expiresAt: nullableText(row, "expires_at"),
-    metadata: meta,
-    attachment: attachmentFromMetadata(meta)
-  };
-}
-
 export async function getDriverAssignmentByToken(token: string): Promise<DriverAccessAssignment | null> {
   if (!token.startsWith("tomp_")) {
     return null;
@@ -349,11 +315,9 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     .eq("token_hash", tokenHash);
   if (usageError) console.warn("driver token usage not recorded:", usageError.message);
 
-  const [packet, notifications, routeChanges, messages, checkinRes, latestStatusRes, workSessionRes] = await Promise.all([
+  const [packet, routeChanges, checkinRes, latestStatusRes, workSessionRes] = await Promise.all([
     getDriverAssignmentPacketByAssignmentId(text(assignment, "id")),
-    getDriverNotificationsByAssignmentId(text(assignment, "id")),
     getRouteChangesByAssignmentId(text(assignment, "id")),
-    getDriverIssueMessagesByAssignmentId(text(assignment, "id")),
     client.from("driver_checkins").select("id").eq("assignment_id", text(assignment, "id")).eq("status", "ready").limit(1),
     client
       .from("assignment_status_updates")
@@ -394,6 +358,7 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
   const dayCallSignById = new Map(((dayCallSignRows || []) as Row[]).map((row) => [text(row, "id"), text(row, "call_sign")]));
   const dayAssignments = buildDayAssignments(visibleDayRows, text(assignment, "id"), (id) => dayCallSignById.get(id));
   const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const thread = await getDriverDayThread([text(assignment, "id"), ...visibleDayAssignmentIds]);
   const { data: unitReadyRows } = !currentAssignmentActivated && visibleDayAssignmentIds.length
     ? await client
         .from("driver_checkins")
@@ -415,9 +380,9 @@ export async function getDriverAssignmentByToken(token: string): Promise<DriverA
     deviceBoundTo: typeof tokenMeta.deviceHash === "string" && tokenMeta.deviceHash ? tokenMeta.deviceHash : null,
     tokenValidated: true,
     packet,
-    notifications,
+    notifications: thread.notifications,
     routeChanges,
-    messages,
+    messages: thread.messages,
     latestStatus: latestStatus(latestStatusRow),
     workSession: workSessionFromRows(workSessionRows),
     dayAssignments,
@@ -537,11 +502,9 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
     return getDriverAssignmentBySessionViaPostgres(context);
   }
 
-  const [packet, notifications, routeChanges, messages, checkinRes, latestStatusRes, workSessionRes] = await Promise.all([
+  const [packet, routeChanges, checkinRes, latestStatusRes, workSessionRes] = await Promise.all([
     getDriverAssignmentPacketByAssignmentId(current.id),
-    getDriverNotificationsByAssignmentId(current.id),
     getRouteChangesByAssignmentId(current.id),
-    getDriverIssueMessagesByAssignmentId(current.id),
     client.from("driver_checkins").select("id").eq("assignment_id", current.id).eq("status", "ready").limit(1),
     client
       .from("assignment_status_updates")
@@ -581,6 +544,7 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
   const workSessionRows = (workSessionRes.data || []) as Row[];
   const currentAssignmentActivated = Boolean((checkinRes.data as unknown[] | null)?.length);
   const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const thread = await getDriverDayThread([current.id, ...visibleDayAssignmentIds]);
   const { data: unitReadyRows } = !currentAssignmentActivated && visibleDayAssignmentIds.length
     ? await client
         .from("driver_checkins")
@@ -599,9 +563,9 @@ export async function getDriverAssignmentBySession(context: DriverAssignmentSess
     deviceBoundTo: typeof tokenMeta.deviceHash === "string" && tokenMeta.deviceHash ? tokenMeta.deviceHash : null,
     tokenValidated: true,
     packet,
-    notifications,
+    notifications: thread.notifications,
     routeChanges,
-    messages,
+    messages: thread.messages,
     latestStatus: latestStatus(latestStatusRow),
     workSession: workSessionFromRows(workSessionRows),
     dayAssignments: buildDayAssignments(visibleDayRows, current.id, (id) => dayCallSignById.get(id)),
@@ -692,15 +656,13 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   const assignment = assignmentRows[0];
   if (!assignment) return null;
 
-  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows, checkinRows, latestStatusRows, workSessionRows] = await Promise.all([
+  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, routeChangeRows, checkinRows, latestStatusRows, workSessionRows] = await Promise.all([
     sql<Row[]>`select * from projects where id = ${String(tokenRow.project_id)} limit 1`,
     sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
     tokenRow.driver_id ? sql<Row[]>`select * from drivers where id = ${String(tokenRow.driver_id)} limit 1` : Promise.resolve([]),
     assignment.vehicle_id ? sql<Row[]>`select * from vehicles where id = ${String(assignment.vehicle_id)} limit 1` : Promise.resolve([]),
     sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${current.id} order by created_at desc limit 1`,
-    sql<Row[]>`select * from driver_notifications where assignment_id = ${current.id} order by sent_at desc limit 10`,
     sql<Row[]>`select * from route_change_instructions where assignment_id = ${current.id} order by created_at desc limit 5`,
-    sql<Row[]>`select id, message, created_at, issue_type, severity, metadata from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
     sql<Row[]>`select id from driver_checkins where assignment_id = ${current.id} and status = 'ready' limit 1`,
     sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${current.id} and status not in ('work_started', 'work_ended') order by created_at desc limit 1`,
     sql<Row[]>`select status, created_at from assignment_status_updates where project_id = ${String(tokenRow.project_id)} and driver_id = ${String(tokenRow.driver_id)} and status in ('work_started', 'work_ended') and created_at >= ${workSessionSince()} order by created_at desc limit 5`
@@ -729,6 +691,7 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
   const dayAssignments = buildDayAssignments(visibleDayRows, text(assignment, "id"), (id) => dayCallSignById.get(id));
   const currentAssignmentActivated = checkinRows.length > 0;
   const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const thread = await getDriverDayThread([current.id, ...visibleDayAssignmentIds]);
   const unitReadyRows = !currentAssignmentActivated && visibleDayAssignmentIds.length
     ? await sql<Row[]>`
         select id from driver_checkins
@@ -761,8 +724,8 @@ async function getDriverAssignmentByTokenViaPostgres(token: string, tokenHash: s
     latestStatus: latestStatus(latestStatusRows[0]),
     workSession: workSessionFromRows(workSessionRows),
     dayAssignments,
-    messages: await signDriverMessageAttachments(messageRows.map(mapDriverIssueMessage)),
-    notifications: await signDriverMessageAttachments(notificationRows.map(mapDriverNotification)),
+    messages: thread.messages,
+    notifications: thread.notifications,
     routeChanges: routeChangeRows.map((row) => ({
       id: text(row, "id"),
       assignmentId: text(row, "assignment_id"),
@@ -867,15 +830,13 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
   if (!assignment) return null;
   if (text(assignment, "project_id") !== context.projectId || (text(assignment, "driver_id") && text(assignment, "driver_id") !== context.driverId)) return null;
 
-  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, notificationRows, routeChangeRows, messageRows, checkinRows, latestStatusRows, workSessionRows] = await Promise.all([
+  const [projectRows, callSignRows, driverRows, vehicleRows, packetRows, routeChangeRows, checkinRows, latestStatusRows, workSessionRows] = await Promise.all([
     sql<Row[]>`select * from projects where id = ${context.projectId} limit 1`,
     sql<Row[]>`select * from call_signs where id = ${String(assignment.call_sign_id)} limit 1`,
     sql<Row[]>`select * from drivers where id = ${context.driverId} limit 1`,
     assignment.vehicle_id ? sql<Row[]>`select * from vehicles where id = ${String(assignment.vehicle_id)} limit 1` : Promise.resolve([]),
     sql<Row[]>`select payload from driver_assignment_packets where assignment_id = ${current.id} order by created_at desc limit 1`,
-    sql<Row[]>`select * from driver_notifications where assignment_id = ${current.id} order by sent_at desc limit 10`,
     sql<Row[]>`select * from route_change_instructions where assignment_id = ${current.id} order by created_at desc limit 5`,
-    sql<Row[]>`select id, message, created_at, issue_type, severity, metadata from driver_issue_reports where assignment_id = ${current.id} order by created_at asc limit 50`,
     sql<Row[]>`select id from driver_checkins where assignment_id = ${current.id} and status = 'ready' limit 1`,
     sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${current.id} and status not in ('work_started', 'work_ended') order by created_at desc limit 1`,
     sql<Row[]>`select status, created_at from assignment_status_updates where project_id = ${context.projectId} and driver_id = ${context.driverId} and status in ('work_started', 'work_ended') and created_at >= ${workSessionSince()} order by created_at desc limit 5`
@@ -904,6 +865,7 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
   const tokenMeta = (tokenRow.metadata ?? {}) as Record<string, unknown>;
   const currentAssignmentActivated = checkinRows.length > 0;
   const visibleDayAssignmentIds = visibleDayRows.map((row) => text(row, "id")).filter(Boolean);
+  const thread = await getDriverDayThread([current.id, ...visibleDayAssignmentIds]);
   const unitReadyRows = !currentAssignmentActivated && visibleDayAssignmentIds.length
     ? await sql<Row[]>`
         select id from driver_checkins
@@ -926,8 +888,8 @@ async function getDriverAssignmentBySessionViaPostgres(context: DriverAssignment
     latestStatus: latestStatus(latestStatusRows[0]),
     workSession: workSessionFromRows(workSessionRows),
     dayAssignments: buildDayAssignments(visibleDayRows, current.id, (id) => dayCallSignById.get(id)),
-    messages: await signDriverMessageAttachments(messageRows.map(mapDriverIssueMessage)),
-    notifications: await signDriverMessageAttachments(notificationRows.map(mapDriverNotification)),
+    messages: thread.messages,
+    notifications: thread.notifications,
     routeChanges: routeChangeRows.map((row) => ({
       id: text(row, "id"),
       assignmentId: text(row, "assignment_id"),
@@ -1046,10 +1008,8 @@ export async function getDriverUpdatesFor({
     return getDriverUpdatesForViaPostgres(projectId, assignmentId, driverId);
   }
 
-  const [{ data: assignmentRow }, notifications, messages, latestStatusRes, workSessionRes] = await Promise.all([
+  const [{ data: assignmentRow }, latestStatusRes, workSessionRes] = await Promise.all([
     client.from("assignments").select("status, start_time, call_sign_id, metadata").eq("id", assignmentId).maybeSingle(),
-    getDriverNotificationsByAssignmentId(assignmentId),
-    getDriverIssueMessagesByAssignmentId(assignmentId),
     client.from("assignment_status_updates").select("status, created_at").eq("assignment_id", assignmentId).in("status", TASK_STATUS_FILTER).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     client.from("assignment_status_updates").select("status, created_at").eq("project_id", projectId).eq("driver_id", driverId).in("status", WORK_SESSION_STATUSES).gte("created_at", workSessionSince()).order("created_at", { ascending: false }).limit(5)
   ]);
@@ -1064,6 +1024,7 @@ export async function getDriverUpdatesFor({
 
   const operationAnchor = nullableText(assignmentRow as Row | null, "start_time") || new Date().toISOString();
   const visibleDayRows = ((dayRows || []) as Row[]).filter((row) => sameOperationDay(nullableText(row, "start_time"), operationAnchor));
+  const { notifications, messages } = await getDriverDayThread([assignmentId, ...visibleDayRows.map((row) => text(row, "id"))]);
   const dayCallSignIds = [...new Set(visibleDayRows.map((row) => text(row, "call_sign_id")).filter(Boolean))];
   const { data: dayCallSignRows } = dayCallSignIds.length
     ? await client.from("call_signs").select("id, call_sign").in("id", dayCallSignIds)
@@ -1113,10 +1074,8 @@ async function getDriverUpdatesForViaPostgres(projectId: string, assignmentId: s
   const sql = getPostgresClient();
   if (!sql) return null;
 
-  const [assignmentRows, notifications, messages, latestStatusRows, workSessionRows] = await Promise.all([
+  const [assignmentRows, latestStatusRows, workSessionRows] = await Promise.all([
     sql<Row[]>`select status, start_time, call_sign_id, metadata from assignments where id = ${assignmentId} limit 1`,
-    getDriverNotificationsByAssignmentId(assignmentId),
-    getDriverIssueMessagesByAssignmentId(assignmentId),
     sql<Row[]>`select status, created_at from assignment_status_updates where assignment_id = ${assignmentId} and status not in ('work_started', 'work_ended') order by created_at desc limit 1`,
     sql<Row[]>`select status, created_at from assignment_status_updates where project_id = ${projectId} and driver_id = ${driverId} and status in ('work_started', 'work_ended') and created_at >= ${workSessionSince()} order by created_at desc limit 5`
   ]);
@@ -1138,6 +1097,7 @@ async function getDriverUpdatesForViaPostgres(projectId: string, assignmentId: s
 
   const operationAnchor = nullableText(assignmentRows[0], "start_time") || new Date().toISOString();
   const visibleDayRows = dayRows.filter((row) => sameOperationDay(nullableText(row, "start_time"), operationAnchor));
+  const { notifications, messages } = await getDriverDayThread([assignmentId, ...visibleDayRows.map((row) => text(row, "id"))]);
   const dayCallSignIds = [...new Set(visibleDayRows.map((row) => text(row, "call_sign_id")).filter(Boolean))];
   const dayCallSignRows = dayCallSignIds.length ? await sql<Row[]>`select id, call_sign from call_signs where id in ${sql(dayCallSignIds)}` : [];
   const dayCallSignById = new Map(dayCallSignRows.map((row) => [text(row, "id"), text(row, "call_sign")]));

@@ -195,6 +195,52 @@ export async function getDriverIssueMessagesByAssignmentId(assignmentId: string)
   }
 }
 
+// The same, across several jobs — the latest 100, oldest first.
+export async function getDriverIssueMessagesByAssignmentIds(assignmentIds: readonly string[]): Promise<DriverIssueMessage[]> {
+  const ids = [...new Set(assignmentIds)].filter(Boolean);
+  if (!ids.length) return [];
+  const { client } = await resolveReadClient();
+  if (client) {
+    try {
+      const result = await withTimeout(
+        client.from("driver_issue_reports").select("id, message, created_at, issue_type, severity, metadata").in("assignment_id", ids).order("created_at", { ascending: false }).limit(100),
+        2200,
+        "driver issue messages (multi-assignment)"
+      );
+      if (!result.error && Array.isArray(result.data)) return signDriverMessageAttachments((result.data as Row[]).reverse().map(mapIssueMessage));
+    } catch {
+      /* fall through */
+    }
+  }
+  const sql = getPostgresClient();
+  if (!sql) return [];
+  try {
+    const data = await sql<Row[]>`select id, message, created_at, issue_type, severity, metadata from driver_issue_reports where assignment_id in ${sql(ids)} order by created_at desc limit 100`;
+    return signDriverMessageAttachments([...data].reverse().map(mapIssueMessage));
+  } catch {
+    return [];
+  }
+}
+
+// A unit's chat with the centre is one thread for its working day, not one per
+// job. Loading it per job blanked the driver's conversation the moment the next
+// job took over, while the centre's messages sat on the job that had closed.
+export async function getDriverDayThread(assignmentIds: readonly string[]): Promise<{ messages: DriverIssueMessage[]; notifications: DriverNotification[] }> {
+  const ids = [...new Set(assignmentIds)].filter(Boolean);
+  if (ids.length <= 1) {
+    const [messages, notifications] = ids.length
+      ? await Promise.all([getDriverIssueMessagesByAssignmentId(ids[0]), getDriverNotificationsByAssignmentId(ids[0])])
+      : [[], []];
+    return { messages, notifications };
+  }
+  const [messages, byAssignment] = await Promise.all([getDriverIssueMessagesByAssignmentIds(ids), getDriverNotificationsByAssignmentIds(ids)]);
+  const notifications = [...byAssignment.values()]
+    .flat()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 30);
+  return { messages, notifications };
+}
+
 export async function getRouteChangesByAssignmentId(assignmentId: string): Promise<RouteChangeInstruction[]> {
   const { client } = await resolveReadClient();
   if (!client) return getRouteChangesByAssignmentIdViaPostgres(assignmentId);

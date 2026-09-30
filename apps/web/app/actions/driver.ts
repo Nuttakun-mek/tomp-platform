@@ -10,6 +10,7 @@ import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/a
 import { resolveDriverSessionFromCookies } from "@/lib/api/driver-token";
 import { isTrustedDriverScope, type DriverScope, type TrustedDriverScope } from "@/lib/driver/trusted-scope";
 import { extractDriverMessageClientEventId } from "@/lib/driver/message-idempotency";
+import { IN_PROGRESS_STATUSES, isLaterDayJob, NOT_STARTED_STATUSES } from "@/lib/domain/driver-current-job";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { uploadPlatePhoto, uploadVehiclePhoto } from "@/lib/storage/checkin-photos";
 import { createTimelineEvent, TIMELINE_EVENTS } from "@/lib/timeline";
@@ -186,13 +187,62 @@ export async function recordVehicleEvidenceAction(input: unknown, trusted?: Trus
   return actionSuccess({ checkin: row });
 }
 
+// "เริ่มงานนี้" on the driver's plan tab names the job the driver is starting.
+// The session's current job is picked by start time, which is not always the
+// one the driver means (an urgent insert, a reordered day), so an
+// acknowledgement may move the scope to another job of the same unit — one not
+// yet started, and only while nothing else of the unit is under way.
+async function scopeForStartedJob(
+  scope: DriverScope,
+  chosenId: string,
+  client: NonNullable<ReturnType<typeof getSupabaseWriteClient>["client"]>
+): Promise<{ ok: true; scope: DriverScope } | { ok: false; message: string }> {
+  const [{ data: chosen }, { data: current }] = await Promise.all([
+    client.from("assignments").select("id, project_id, call_sign_id, driver_id, status, start_time").eq("id", chosenId).maybeSingle(),
+    client.from("assignments").select("call_sign_id").eq("id", scope.assignmentId).maybeSingle()
+  ]);
+  const unitId = scope.callSignId || (typeof current?.call_sign_id === "string" ? current.call_sign_id : null);
+  if (
+    !chosen ||
+    chosen.project_id !== scope.projectId ||
+    !unitId ||
+    chosen.call_sign_id !== unitId ||
+    (chosen.driver_id && chosen.driver_id !== scope.driverId)
+  ) {
+    return { ok: false, message: "ไม่พบงานนี้ในแผนงานของ Call Sign นี้" };
+  }
+  if (!NOT_STARTED_STATUSES.includes(String(chosen.status))) {
+    return { ok: false, message: "งานนี้เริ่มหรือปิดไปแล้ว" };
+  }
+  if (isLaterDayJob({ status: String(chosen.status), startTime: typeof chosen.start_time === "string" ? chosen.start_time : null })) {
+    return { ok: false, message: "งานนี้เป็นของวันถัดไป เริ่มได้ในวันนั้น" };
+  }
+  const { data: underWay } = await client
+    .from("assignments")
+    .select("id")
+    .eq("project_id", scope.projectId)
+    .eq("call_sign_id", unitId)
+    .in("status", IN_PROGRESS_STATUSES)
+    .neq("id", chosenId)
+    .limit(1);
+  if (underWay?.length) return { ok: false, message: "มีงานที่เริ่มไว้แล้ว กรุณาปิดงานนั้นก่อนเริ่มงานใหม่" };
+  return { ok: true, scope: { ...scope, assignmentId: chosenId, callSignId: unitId } };
+}
+
 export async function assignmentStatusUpdateAction(input: unknown, trusted?: TrustedDriverScope): Promise<ActionResult> {
   const parsed = assignmentStatusUpdateSchema.safeParse(input);
   if (!parsed.success) return actionFailure("Assignment status update validation failed.", parsed.error.flatten().fieldErrors);
-  const scope = await driverScope(trusted);
-  if (!scope) return actionFailure(SESSION_EXPIRED);
+  const sessionScope = await driverScope(trusted);
+  if (!sessionScope) return actionFailure(SESSION_EXPIRED);
   const { client, error, mode } = getSupabaseWriteClient();
   if (!client) return actionFailure(error || "Supabase is not configured for writes.");
+
+  let scope = sessionScope;
+  if (parsed.data.status === "acknowledged" && parsed.data.assignmentId !== sessionScope.assignmentId) {
+    const started = await scopeForStartedJob(sessionScope, parsed.data.assignmentId, client);
+    if (!started.ok) return actionFailure(started.message);
+    scope = started.scope;
+  }
 
   const { data, error: insertError } = await client.from("assignment_status_updates").insert({
     project_id: scope.projectId,

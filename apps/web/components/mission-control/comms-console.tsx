@@ -9,6 +9,7 @@ import type { DriverInboundMessage, DriverOutboundMessage } from "@/lib/data/dri
 import type { DriverMessageAttachment } from "@/lib/data/driver-message-attachments";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { accentFor } from "@/lib/ui/unit-accent";
+import { pickCurrentJob } from "@/lib/domain/driver-current-job";
 import { OPEN_COMMS_EVENT } from "./fleet-board";
 import { useMissionControlFeed } from "./mission-control-feed";
 
@@ -41,23 +42,7 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
     const seen = new Set(comms.outbound.map((message) => `${message.assignmentId}::${message.body}`));
     return [...optimisticOutbound.filter((message) => !seen.has(`${message.assignmentId}::${message.body}`)), ...comms.outbound];
   }, [comms.outbound, optimisticOutbound]);
-  const [filter, setFilter] = useState<string>("all");
-  const [target, setTarget] = useState<string>(assignments[0]?.id ?? "");
   const sectionRef = useRef<HTMLElement>(null);
-
-  // "แชทกับคนขับ" on a fleet card: show that job's thread, address the reply to
-  // it, and bring the console into view.
-  useEffect(() => {
-    function open(event: Event) {
-      const assignmentId = (event as CustomEvent<{ assignmentId?: string }>).detail?.assignmentId;
-      if (!assignmentId) return;
-      setFilter(assignmentId);
-      setTarget(assignmentId);
-      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    window.addEventListener(OPEN_COMMS_EVENT, open);
-    return () => window.removeEventListener(OPEN_COMMS_EVENT, open);
-  }, []);
 
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<PendingPhoto | null>(null);
@@ -70,36 +55,57 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
 
   const callSignById = useMemo(() => new Map(callSigns.map((cs) => [cs.id, cs.callSign])), [callSigns]);
 
-  // The message reaches a driver, and a driver is one unit however many jobs
-  // they hold. Listing one option per job put the same call sign in the list
-  // three times over, identical and unchoosable, so the recipients are units and
-  // each carries the job a message should land on: the one running, or the next
-  // one due.
+  // A conversation is with a unit — one driver, one phone — however many jobs
+  // it holds. Grouping the thread by job put "Van-01" in the chips once per job,
+  // and when the phone moved on to its next job the talk so far stayed behind
+  // under the other chip, as if it had vanished.
+  const unitOf = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const assignment of assignments) map.set(assignment.id, assignment.callSignId || `job:${assignment.id}`);
+    return map;
+  }, [assignments]);
+
+  // Each unit's reply lands on the job its driver's page is on now — the same
+  // rule the phone uses — so the driver sees it in the thread in front of them.
   const recipients = useMemo(() => {
-    const byUnit = new Map<string, { label: string; assignmentId: string; jobs: number }>();
-    const live = assignments.filter((assignment) => !["cancelled", "archived"].includes(assignment.status));
-
-    for (const assignment of live) {
+    const byUnit = new Map<string, Assignment[]>();
+    for (const assignment of assignments) {
+      if (["cancelled", "archived"].includes(assignment.status)) continue;
       const key = assignment.callSignId || `job:${assignment.id}`;
-      const label = callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`;
-      const held = byUnit.get(key);
-      if (!held) {
-        byUnit.set(key, { label, assignmentId: assignment.id, jobs: 1 });
-        continue;
-      }
-      held.jobs += 1;
-      const heldRow = live.find((item) => item.id === held.assignmentId);
-      const preferable =
-        assignment.status === "active" ||
-        (heldRow?.status !== "active" &&
-          (assignment.startTime ?? "") !== "" &&
-          (heldRow?.startTime ?? "") !== "" &&
-          String(assignment.startTime) < String(heldRow?.startTime));
-      if (preferable) held.assignmentId = assignment.id;
+      byUnit.set(key, [...(byUnit.get(key) ?? []), assignment]);
     }
-
-    return [...byUnit.values()].sort((a, b) => a.label.localeCompare(b.label, "th"));
+    return [...byUnit.entries()]
+      .map(([key, jobs]) => {
+        const current = pickCurrentJob(jobs.map((job) => ({ id: job.id, status: job.status, startTime: job.startTime ?? null, createdAt: job.createdAt ?? null }))) ?? { id: jobs[0].id };
+        return {
+          key,
+          label: callSignById.get(jobs[0].callSignId) ?? `งาน ${jobs[0].id.slice(0, 8)}`,
+          assignmentId: current.id,
+          jobs: jobs.length
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, "th"));
   }, [assignments, callSignById]);
+
+  const [filter, setFilter] = useState<string>("all");
+  const [chosenUnit, setChosenUnit] = useState<string | null>(null);
+  const recipient = recipients.find((item) => item.key === chosenUnit) ?? recipients[0] ?? null;
+  const target = recipient?.assignmentId ?? "";
+
+  // "แชทกับคนขับ" on a fleet card: show that unit's thread, address the reply to
+  // it, and bring the console into view.
+  useEffect(() => {
+    function open(event: Event) {
+      const assignmentId = (event as CustomEvent<{ assignmentId?: string }>).detail?.assignmentId;
+      if (!assignmentId) return;
+      const key = unitOf.get(assignmentId) ?? `job:${assignmentId}`;
+      setFilter(key);
+      setChosenUnit(key);
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    window.addEventListener(OPEN_COMMS_EVENT, open);
+    return () => window.removeEventListener(OPEN_COMMS_EVENT, open);
+  }, [unitOf]);
   const assignmentInfo = useMemo(() => {
     const map = new Map<string, { label: string; driverId: string | null; accent: ReturnType<typeof accentFor> }>();
     for (const assignment of assignments) {
@@ -120,20 +126,24 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
     ];
     // oldest first, newest at the bottom — like a normal chat app
     items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
-    const scoped = filter === "all" ? items : items.filter((item) => item.assignmentId === filter);
+    const scoped = filter === "all" ? items : items.filter((item) => (unitOf.get(item.assignmentId) ?? `job:${item.assignmentId}`) === filter);
     return { feed: scoped.slice(-feedLimit), olderCount: Math.max(0, scoped.length - feedLimit) };
-  }, [inbound, outbound, filter, feedLimit]);
+  }, [inbound, outbound, filter, feedLimit, unitOf]);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [feed.length, filter]);
 
-  const usedAssignmentIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const item of [...inbound, ...outbound]) ids.add(item.assignmentId);
-    return ids;
-  }, [inbound, outbound]);
+  // One chip per unit that has talked, in first-message order.
+  const threadChips = useMemo(() => {
+    const chips = new Map<string, string>();
+    for (const item of [...inbound, ...outbound]) {
+      const key = unitOf.get(item.assignmentId) ?? `job:${item.assignmentId}`;
+      if (!chips.has(key)) chips.set(key, assignmentInfo.get(item.assignmentId)?.label ?? `งาน ${item.assignmentId.slice(0, 8)}`);
+    }
+    return [...chips.entries()].sort((a, b) => a[1].localeCompare(b[1], "th"));
+  }, [inbound, outbound, unitOf, assignmentInfo]);
 
   function clearPhoto() {
     setPhoto((current) => {
@@ -254,17 +264,17 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
           <label className="text-xs font-semibold text-slate-600">ส่งถึง Call Sign</label>
           <select
             className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-            value={target}
+            value={recipient?.key ?? ""}
             onChange={(event) => {
-              setTarget(event.target.value);
+              setChosenUnit(event.target.value);
               clearPhoto();
             }}
           >
             {recipients.length ? (
-              recipients.map((recipient) => (
-                <option key={recipient.assignmentId} value={recipient.assignmentId}>
-                  {recipient.label}
-                  {recipient.jobs > 1 ? ` (${recipient.jobs} งาน)` : ""}
+              recipients.map((item) => (
+                <option key={item.key} value={item.key}>
+                  {item.label}
+                  {item.jobs > 1 ? ` (${item.jobs} งาน)` : ""}
                 </option>
               ))
             ) : (
@@ -356,13 +366,11 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
             <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
               ทั้งหมด
             </FilterChip>
-            {assignments
-              .filter((assignment) => usedAssignmentIds.has(assignment.id))
-              .map((assignment) => (
-                <FilterChip key={assignment.id} active={filter === assignment.id} onClick={() => setFilter(assignment.id)}>
-                  {callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`}
-                </FilterChip>
-              ))}
+            {threadChips.map(([key, label]) => (
+              <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)}>
+                {label}
+              </FilterChip>
+            ))}
           </div>
 
           {feed.length ? (
