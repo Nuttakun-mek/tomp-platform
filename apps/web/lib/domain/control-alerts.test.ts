@@ -31,19 +31,23 @@ describe("computeControlAlerts", () => {
     expect(run({ jobs: [active], locations: { j1: { recordedAt: at(-2) } } }).map((a) => a.kind)).not.toContain("gps_silent");
   });
 
-  it("warns 15 minutes before overtime and prices it once it runs", () => {
-    const onClock = { j1: { status: "active", startedAt: at(-600), endedAt: null } };
-    const soon = run({ jobs: [job({ status: "active", startTime: at(-590), endTime: at(10) })], sessions: onClock, locations: { j1: { recordedAt: at(0) } } });
-    expect(soon.map((a) => a.kind)).toEqual(["overtime_soon"]);
+  it("never calls the end of a sub-job overtime — only the unit's scheduled clock-out", () => {
+    // Driver on duty 07:00–17:00, the sub-job ended an hour ago, still clocked in.
+    const onClock = { j1: { status: "active", startedAt: at(-420), endedAt: null } };
+    const alerts = run({ jobs: [job({ status: "active", startTime: at(-120), endTime: at(-60) })], sessions: onClock, locations: { j1: { recordedAt: at(0) } } });
+    expect(alerts.map((a) => a.kind)).not.toContain("overtime");
+  });
 
-    const over = run({
-      jobs: [job({ status: "active", startTime: at(-600), endTime: at(-60), vehicleMetadata: { packageHours: 9, packageAmount: 2700 } })],
-      sessions: onClock,
-      locations: { j1: { recordedAt: at(0) } }
+  it("warns before the scheduled clock-out and flags running overtime, per unit", () => {
+    const window = { start: at(-600), end: at(10) };
+    const day = (state: "on_duty" | "overtime", tone: "warning" | "danger") => ({
+      cost: { state, dutyStart: window.start, dutyEnd: window.end } as never,
+      status: { tone, label: "ใกล้เวลาออกงาน 17:00", detail: "…" }
     });
-    const overtime = over.find((a) => a.kind === "overtime")!;
-    expect(overtime.detail).toContain("OT 1 ชม.");
-    expect(overtime.detail).toContain("300 บ.");
+    const soon = run({ jobs: [], units: [{ unitId: "cs1", label: "CS-01", assignmentId: "j1", day: day("on_duty", "warning") }] });
+    expect(soon.map((a) => a.kind)).toEqual(["overtime_soon"]);
+    const over = run({ jobs: [], units: [{ unitId: "cs1", label: "CS-01", assignmentId: "j1", day: day("overtime", "danger") }] });
+    expect(over.map((a) => [a.kind, a.severity])).toEqual([["overtime", "danger"]]);
   });
 
   it("ignores finished work", () => {

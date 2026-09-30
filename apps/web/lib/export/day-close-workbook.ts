@@ -29,10 +29,10 @@ export async function buildDayCloseWorkbook(input: { projectCode: string; projec
     "ทะเบียน",
     "งานเสร็จ",
     "งานทั้งหมด",
-    "เริ่มตามแผน",
-    "จบตามแผน",
-    "เข้างาน",
-    "ออกงาน",
+    "เข้างาน (กำหนด)",
+    "ออกงาน (กำหนด)",
+    "เข้างานจริง",
+    "ออกงานจริง",
     "ชั่วโมงที่คิด",
     "OT (ชม.)",
     "ค่าบริการ (บ.)",
@@ -53,18 +53,18 @@ export async function buildDayCloseWorkbook(input: { projectCode: string; projec
       row.plate ?? "",
       row.jobsDone,
       row.jobs,
-      timeOnDay(row.plannedStart, input.date),
-      timeOnDay(row.plannedEnd, input.date),
+      timeOnDay(row.cost.dutyStart, input.date),
+      timeOnDay(row.cost.dutyEnd, input.date),
       timeOnDay(row.clockIn, input.date),
       timeOnDay(row.clockOut, input.date),
-      row.cost.billableHours ?? null,
-      row.cost.extraHours ?? 0,
+      row.cost.scheduledHours + row.cost.overtimeHours,
+      row.cost.overtimeHours,
       row.cost.baseAmount ?? null,
-      row.cost.extraAmount ?? null,
-      row.cost.estimatedCost ?? null,
+      row.cost.overtimeAmount ?? null,
+      row.cost.total ?? null,
       row.notes.join(" · ")
     ]);
-    if (row.cost.extraHours && row.cost.extraHours > 0) added.getCell(11).font = { bold: true, color: { argb: "FFB45309" } };
+    if (row.cost.overtimeHours > 0) added.getCell(11).font = { bold: true, color: { argb: "FFB45309" } };
   }
   const totals = sheet.addRow([
     "รวม",

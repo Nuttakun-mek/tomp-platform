@@ -5,9 +5,11 @@ import { getAssignmentsByProjectId } from "@/lib/data/assignments";
 import { getLatestAssignmentStatuses } from "@/lib/data/assignment-status";
 import { getCallSignsByProjectId } from "@/lib/data/call-signs";
 import { getDriverCommsByProjectId } from "@/lib/data/driver-comms";
+import { getMissionsByProjectId } from "@/lib/data/missions";
 import { getProjectDrivers, getProjectVehicles } from "@/lib/data/resources";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 import { summarizeDay, type SessionEvent } from "@/lib/domain/day-close";
+import { readDutySchedule, type DutySchedule } from "@/lib/domain/duty-hours";
 
 export function bangkokToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -51,15 +53,24 @@ async function getSessionEvents(projectId: string, date: string): Promise<Sessio
 }
 
 export async function getDayClose(projectId: string, date: string) {
-  const [assignmentsResult, callSignsResult, drivers, vehicles, reported, comms, sessions] = await Promise.all([
+  const [assignmentsResult, callSignsResult, drivers, vehicles, reported, comms, sessions, missionsResult] = await Promise.all([
     getAssignmentsByProjectId(projectId),
     getCallSignsByProjectId(projectId),
     getProjectDrivers(projectId),
     getProjectVehicles(projectId),
     getLatestAssignmentStatuses(projectId),
     getDriverCommsByProjectId(projectId),
-    getSessionEvents(projectId, date)
+    getSessionEvents(projectId, date),
+    getMissionsByProjectId(projectId)
   ]);
+  // Each unit's clock-in/out comes from the main job it was given in step 1.
+  const missionById = new Map(missionsResult.data.map((mission) => [mission.id, mission]));
+  const schedules: Record<string, DutySchedule> = {};
+  for (const callSign of callSignsResult.data) {
+    const missionId = (callSign.metadata as Record<string, unknown> | undefined)?.missionId;
+    const mission = typeof missionId === "string" ? missionById.get(missionId) : undefined;
+    if (mission) schedules[callSign.id] = readDutySchedule(mission.metadata as Record<string, unknown>);
+  }
   const driverById = new Map(drivers.map((driver) => [driver.id, driver]));
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
   const openIssues: Record<string, number> = {};
@@ -94,6 +105,7 @@ export async function getDayClose(projectId: string, date: string) {
     sessions,
     reported,
     openIssues,
+    schedules,
     now: date === bangkokToday() ? Date.now() : undefined
   });
   const loadError = !assignmentsResult.ok ? assignmentsResult.error : !callSignsResult.ok ? callSignsResult.error : null;

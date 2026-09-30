@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, BellOff, BellRing, ChevronDown, Volume2, VolumeX, X } from "lucide-react";
-import type { Assignment, CallSign, Vehicle } from "@tomp/types/domain";
-import { computeControlAlerts, type ControlAlert } from "@/lib/domain/control-alerts";
+import type { Assignment, CallSign, Mission, Vehicle } from "@tomp/types/domain";
+import { computeControlAlerts, type AlertUnitDay, type ControlAlert } from "@/lib/domain/control-alerts";
+import { readDutySchedule, unitDutyDay } from "@/lib/domain/duty-hours";
 import { useMissionControlFeed } from "./mission-control-feed";
 import { OPEN_COMMS_EVENT } from "./fleet-board";
 
@@ -53,12 +54,14 @@ export function ControlAlerts({
   projectId,
   assignments,
   callSigns,
-  vehicles
+  vehicles,
+  missions = []
 }: {
   projectId: string;
   assignments: Assignment[];
   callSigns: CallSign[];
   vehicles: Vehicle[];
+  missions?: Mission[];
 }) {
   const { locations, comms, now } = useMissionControlFeed();
   const [soundOn, setSoundOn] = useState(false);
@@ -84,7 +87,6 @@ export function ControlAlerts({
       status: assignment.status,
       startTime: assignment.startTime,
       endTime: assignment.endTime,
-      vehicleMetadata: assignment.vehicleId ? vehicleById.get(assignment.vehicleId)?.metadata : null
     }));
     const locationFor: Record<string, { recordedAt: string; sharingEvent?: string | null; metadata?: unknown } | undefined> = {};
     for (const assignment of assignments) {
@@ -93,8 +95,32 @@ export function ControlAlerts({
       const location = byAssignment.get(assignment.id) ?? (assignment.driverId ? byDriver.get(assignment.driverId) : undefined);
       if (location) locationFor[assignment.id] = { recordedAt: location.recordedAt, sharingEvent: location.sharingEvent, metadata: location.metadata };
     }
-    return computeControlAlerts({ jobs, reported: comms.statuses, sessions: comms.workSessions, locations: locationFor, now });
-  }, [assignments, callSigns, comms.statuses, comms.workSessions, locations, now, vehicles]);
+    // Each unit's day today, for overtime against its scheduled clock-out.
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date(now));
+    const missionById = new Map(missions.map((mission) => [mission.id, mission]));
+    const todayByUnit = new Map<string, Assignment[]>();
+    for (const assignment of assignments) {
+      if (!assignment.callSignId || !assignment.startTime || ["cancelled", "archived"].includes(assignment.status)) continue;
+      if (new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date(assignment.startTime)) !== today) continue;
+      todayByUnit.set(assignment.callSignId, [...(todayByUnit.get(assignment.callSignId) ?? []), assignment]);
+    }
+    const units: AlertUnitDay[] = [];
+    for (const [unitId, unitJobs] of todayByUnit) {
+      const first = [...unitJobs].sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)))[0];
+      const mission = first.missionId ? missionById.get(first.missionId) : undefined;
+      const vehicle = first.vehicleId ? vehicleById.get(first.vehicleId) : undefined;
+      const day = unitDutyDay({
+        date: today,
+        schedule: readDutySchedule(mission?.metadata as Record<string, unknown> | undefined),
+        jobs: unitJobs,
+        session: comms.workSessions[first.id],
+        now,
+        vehicleMetadata: vehicle?.metadata as Record<string, unknown> | undefined
+      });
+      if (day) units.push({ unitId, label: callSignById.get(unitId) || unitId.slice(0, 6), assignmentId: first.id, day });
+    }
+    return computeControlAlerts({ jobs, reported: comms.statuses, sessions: comms.workSessions, locations: locationFor, units, now });
+  }, [assignments, callSigns, comms.statuses, comms.workSessions, locations, missions, now, vehicles]);
 
   // Announce each alert once (per browser, for half a day).
   useEffect(() => {

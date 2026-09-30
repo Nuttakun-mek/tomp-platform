@@ -89,7 +89,7 @@ export default async function DayClosePage({ params, searchParams }: { params: P
               <tr>
                 <th className="px-3 py-2">Call Sign</th>
                 <th className="px-3 py-2">งาน</th>
-                <th className="px-3 py-2">ตามแผน</th>
+                <th className="px-3 py-2">เวลางาน (กำหนด)</th>
                 <th className="px-3 py-2">เข้า–ออกงาน</th>
                 <th className="px-3 py-2 text-right">ชม. ที่คิด</th>
                 <th className="px-3 py-2 text-right">OT</th>
@@ -112,20 +112,21 @@ export default async function DayClosePage({ params, searchParams }: { params: P
                     {row.jobsDone}/{row.jobs}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {timeOnDay(row.plannedStart, date)}–{timeOnDay(row.plannedEnd, date)}
+                    {timeOnDay(row.cost.dutyStart, date)}–{timeOnDay(row.cost.dutyEnd, date)}
+                    {row.cost.source === "sub_jobs" ? <span className="block text-[10px] text-amber-700">ตามงานย่อย</span> : null}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {row.clockIn ? timeOnDay(row.clockIn, date) : "—"}–{row.clockOut ? timeOnDay(row.clockOut, date) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{hours(row.cost.billableHours)}</td>
-                  <td className={`px-3 py-2 text-right tabular-nums ${row.cost.extraHours ? "font-semibold text-amber-800" : "text-slate-400"}`}>
-                    {row.cost.extraHours ? hours(row.cost.extraHours) : "—"}
+                  <td className="px-3 py-2 text-right tabular-nums">{hours(row.cost.scheduledHours + row.cost.overtimeHours)}</td>
+                  <td className={`px-3 py-2 text-right tabular-nums ${row.cost.overtimeHours ? "font-semibold text-amber-800" : "text-slate-400"}`}>
+                    {row.cost.overtimeHours ? hours(row.cost.overtimeHours) : "—"}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{money(row.cost.baseAmount)}</td>
-                  <td className={`px-3 py-2 text-right tabular-nums ${row.cost.extraAmount ? "text-amber-800" : "text-slate-400"}`}>
-                    {row.cost.extraAmount ? money(row.cost.extraAmount) : "—"}
+                  <td className={`px-3 py-2 text-right tabular-nums ${row.cost.overtimeAmount ? "text-amber-800" : "text-slate-400"}`}>
+                    {row.cost.overtimeAmount ? money(row.cost.overtimeAmount) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums">{money(row.cost.estimatedCost)}</td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums">{money(row.cost.total)}</td>
                   <td className="px-3 py-2 text-[11px] text-slate-600">{row.notes.length ? row.notes.join(" · ") : <span className="text-emerald-700">ครบ</span>}</td>
                 </tr>
               ))}

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createMissionSchema } from "@tomp/types/schemas";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/action-result";
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
@@ -7,6 +8,7 @@ import { mapMission } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createMissionTimelineEvent } from "@/lib/timeline";
+import { daysBetween, isClock, readDutySchedule } from "@/lib/domain/duty-hours";
 import { checkMainJobDays, mainJobDays } from "@/lib/domain/job-schedule";
 import { assertPlanEditable } from "@/lib/domain/publish-locking";
 
@@ -133,6 +135,12 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
   );
   if (dayProblem) return actionFailure(dayProblem);
 
+  // Clock-in/out for every day of the main job — overtime is measured against these.
+  const days = mainJobDays({ plannedStartTime: parsed.data.plannedStartTime, plannedEndTime: parsed.data.plannedEndTime, metadata: parsed.data.metadata });
+  const duty = readDutySchedule(parsed.data.metadata);
+  const missingDuty = daysBetween(days.from, days.to).filter((day) => !duty[day] || duty[day].start === duty[day].end);
+  if (missingDuty.length) return actionFailure(`กำหนดเวลาเข้า-ออกงานให้ครบทุกวัน (ขาด ${missingDuty.length} วัน)`);
+
   const planningContainer = await ensureMissionPlanningContainer(
     client,
     parsed.data.projectId,
@@ -176,4 +184,32 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
     { mode, mission, timelineEvent: timelineResult.data },
     timelineResult.success ? undefined : `สร้างภารกิจแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`
   );
+}
+
+/** Change one day's clock-in/out on a main job (step 1 set them; days can differ). */
+export async function updateMissionDutyHoursAction(input: { projectId: string; missionId: string; date: string; start: string; end: string }): Promise<ActionResult> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !isClock(input.start) || !isClock(input.end) || input.start === input.end) {
+    return actionFailure("เวลาเข้า-ออกงานไม่ถูกต้อง");
+  }
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+  const permission = await requirePermission(input.projectId, "mission.create");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ภารกิจหลัก");
+
+  const { data: mission, error: readError } = await client
+    .from("missions")
+    .select("id, metadata, planned_start_time, planned_end_time")
+    .eq("id", input.missionId)
+    .eq("project_id", input.projectId)
+    .maybeSingle();
+  if (readError || !mission) return actionFailure("ไม่พบภารกิจหลัก");
+  const metadata = (mission.metadata ?? {}) as Record<string, unknown>;
+  const days = mainJobDays({ plannedStartTime: mission.planned_start_time, plannedEndTime: mission.planned_end_time, metadata });
+  if (input.date < days.from || input.date > days.to) return actionFailure("วันนี้อยู่นอกช่วงของภารกิจหลัก");
+
+  const dutyHours = { ...readDutySchedule(metadata), [input.date]: { start: input.start, end: input.end } };
+  const { error: updateError } = await client.from("missions").update({ metadata: { ...metadata, dutyHours } }).eq("id", input.missionId);
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "บันทึกเวลาเข้า-ออกงานไม่สำเร็จ"));
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+  return actionSuccess({ date: input.date, start: input.start, end: input.end });
 }

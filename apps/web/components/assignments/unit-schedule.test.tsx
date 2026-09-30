@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/actions/assignments", () => ({ setAssignmentOrderAction: vi.fn() }));
+vi.mock("@/app/actions/missions", () => ({ updateMissionDutyHoursAction: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Mission } from "@tomp/types/domain";
 import { UnitSchedule, type ScheduleJob } from "./unit-schedule";
@@ -29,6 +31,8 @@ describe("UnitSchedule", () => {
     expect(screen.getByText(/มีงาน 2\/3 วัน/)).toBeTruthy();
     expect(screen.getByText("ว่าง")).toBeTruthy();
     expect(screen.getByText("2 งาน")).toBeTruthy();
+    // Each day of the main job offers its clock-in/out (none set yet in this fixture).
+    expect(screen.getAllByText("ตั้งเวลาเข้า-ออก")).toHaveLength(3);
   });
 
   it("puts a job outside the main job's days where it can be seen and fixed", () => {

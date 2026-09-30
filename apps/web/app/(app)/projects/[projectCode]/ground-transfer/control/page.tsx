@@ -70,7 +70,7 @@ export default async function ControlPage({ params }: ControlPageProps) {
         initialLocations={locations}
         initialComms={{ inbound: comms.inbound, outbound: comms.outbound, statuses: assignmentStatuses, workSessions, evidence }}
       >
-        <ControlAlerts projectId={project.id} assignments={assignments} callSigns={callSigns} vehicles={vehicles} />
+        <ControlAlerts projectId={project.id} assignments={assignments} callSigns={callSigns} vehicles={vehicles} missions={missions} />
 
         {/* On a wide screen the map takes the width and the fleet board is a
             fixed column of one-card-wide rows beside it (and the map stays in
@@ -92,6 +92,7 @@ export default async function ControlPage({ params }: ControlPageProps) {
             callSigns={callSigns}
             drivers={drivers}
             vehicles={vehicles}
+            missions={missions}
             listView={
               <JobStatusBoard assignments={assignments} missions={missions} callSigns={callSigns} drivers={drivers} vehicles={vehicles} />
             }

@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CarFront, ChevronDown, LocateFixed, MapPin, MessageSquare, Phone, TriangleAlert } from "lucide-react";
-import type { Assignment, CallSign, Driver, DriverLocation, Vehicle } from "@tomp/types/domain";
+import type { Assignment, CallSign, Driver, DriverLocation, Mission, Vehicle } from "@tomp/types/domain";
 import type { DriverInboundMessage } from "@/lib/data/driver-comms";
 import { metaString } from "@/lib/data/location-meta";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
-import { estimateVehicleUsageCost, evaluateVehicleServiceTimeAlert, vehicleUsageCostBreakdown } from "@/lib/domain/vehicle-cost";
+import { readDutySchedule, unitDutyDay, type DutyStatus } from "@/lib/domain/duty-hours";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -22,6 +22,8 @@ interface FleetBoardProps {
   callSigns: CallSign[];
   drivers: Driver[];
   vehicles: Vehicle[];
+  /** For each unit's clock-in/out times (mission metadata.dutyHours). */
+  missions?: Mission[];
   /** The same jobs as a table — shown instead of the cards on "ดูแบบรายการ". */
   listView?: ReactNode;
 }
@@ -54,13 +56,6 @@ const FRESH_LABEL: Record<Freshness, string> = {
 };
 
 const ATTENTION_RANK: Record<Freshness, number> = { none: 0, offline: 1, stopped: 1, slow: 2, idle: 3, live: 3 };
-const SERVICE_ALERT_CLASS = {
-  neutral: "bg-slate-100 text-slate-600",
-  success: "bg-emerald-50 text-emerald-800",
-  warning: "bg-amber-50 text-amber-800",
-  danger: "bg-rose-50 text-rose-700"
-} as const;
-
 const SERVICE_ALERT_COMPACT_CLASS = {
   neutral: "border-slate-200 bg-slate-50 text-slate-600",
   success: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -92,19 +87,16 @@ function formatAssignmentWindow(start?: string | null, end?: string | null) {
   return "ยังไม่ระบุเวลา";
 }
 
-function formatShortCost(cost: ReturnType<typeof estimateVehicleUsageCost>) {
-  if (cost.estimatedCost == null) return "ยังไม่ระบุค่าใช้จ่าย";
-  const hours = cost.billableHours ?? cost.packageHours;
-  const overtime = cost.extraHours && cost.extraHours > 0 ? ` · OT ${cost.extraHours.toLocaleString("th-TH")} ชม.` : "";
-  return `${hours != null ? `${hours.toLocaleString("th-TH")} ชม. / ` : ""}${cost.estimatedCost.toLocaleString("th-TH")} บ.${overtime}`;
-}
+const bangkokDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" });
+const timeLabel = (iso: string) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+const money = (value: number | null | undefined) => (value == null ? "—" : `${value.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บ.`);
 
 function freshnessOf(location: DriverLocation | undefined, now: number): Freshness {
   if (!location) return "none";
   return gpsFreshness(location.recordedAt, location.sharingEvent, now, location.metadata);
 }
 
-export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView }: FleetBoardProps) {
+export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions = [], listView }: FleetBoardProps) {
   const { locations, comms, now } = useMissionControlFeed();
   const { statuses, workSessions, evidence, inbound } = comms;
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -129,6 +121,7 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
   const callSignById = useMemo(() => new Map(callSigns.map((item) => [item.id, item.callSign])), [callSigns]);
   const driverById = useMemo(() => new Map(drivers.map((item) => [item.id, item])), [drivers]);
   const vehicleById = useMemo(() => new Map(vehicles.map((item) => [item.id, item])), [vehicles]);
+  const missionById = useMemo(() => new Map(missions.map((item) => [item.id, item])), [missions]);
   const locationByAssignment = useMemo(() => {
     const map = new Map<string, DriverLocation>();
     for (const location of locations) {
@@ -192,26 +185,6 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
         const meta = assignment.metadata;
         const vehicle = assignment.vehicleId ? vehicleById.get(assignment.vehicleId) : undefined;
         const workSession = workSessions[assignment.id];
-        // A finished job stops counting when it was marked done, even while the
-        // driver's shift (and so the clock-in) carries on into the next job.
-        const doneAt = statuses[assignment.id]?.status === "completed" ? statuses[assignment.id]?.at : null;
-        const cost = estimateVehicleUsageCost({
-          assignmentStart: assignment.startTime,
-          assignmentEnd: assignment.endTime,
-          actualStart: workSession?.startedAt,
-          actualEnd: workSession?.endedAt ?? doneAt,
-          vehicleMetadata: vehicle?.metadata,
-          now: effectiveNow
-        });
-        const serviceAlert = evaluateVehicleServiceTimeAlert({
-          assignmentStart: assignment.startTime,
-          assignmentEnd: assignment.endTime,
-          workSessionStatus: workSession?.status,
-          actualEnd: workSession?.endedAt,
-          extraHours: cost.extraHours,
-          jobCompleted: assignment.status === "completed" || statuses[assignment.id]?.status === "completed",
-          now: effectiveNow
-        });
         return {
           assignment,
           label: callSignById.get(assignment.callSignId) ?? `งาน ${assignment.id.slice(0, 8)}`,
@@ -223,8 +196,6 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
           freshness,
           reported: statuses[assignment.id],
           workSession,
-          cost,
-          serviceAlert,
           messages,
           unread: openMessages.length,
           hasIssue: openMessages.some((message) => message.kind === "issue"),
@@ -282,11 +253,28 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
           .sort((a, b) => new Date(b.location!.recordedAt).getTime() - new Date(a.location!.recordedAt).getTime())[0];
         const messages = list.flatMap((row) => row.messages).sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
         const unread = list.reduce((sum, row) => sum + row.unread, 0);
+
+        // Hours and cost belong to the unit's day, measured against the
+        // clock-in/out set on its main job — never to single sub-jobs.
+        const primary = list[0];
+        const date = primary.assignment.startTime ? bangkokDay.format(new Date(primary.assignment.startTime)) : bangkokDay.format(new Date(effectiveNow));
+        const dayJobs = list.filter((row) => row.assignment.startTime && bangkokDay.format(new Date(row.assignment.startTime)) === date);
+        const mission = primary.assignment.missionId ? missionById.get(primary.assignment.missionId) : undefined;
+        const vehicle = list.find((row) => row.vehicle)?.vehicle;
+        const duty = unitDutyDay({
+          date,
+          schedule: readDutySchedule(mission?.metadata as Record<string, unknown> | undefined),
+          jobs: dayJobs.map((row) => ({ startTime: row.assignment.startTime, endTime: row.assignment.endTime })),
+          session: primary.workSession,
+          now: effectiveNow,
+          vehicleMetadata: vehicle?.metadata as Record<string, unknown> | undefined
+        });
         return {
           key,
           driver: list[0].driver,
-          vehicle: list.find((row) => row.vehicle)?.vehicle,
+          vehicle,
           jobs: list,
+          duty,
           freshness: best.freshness,
           location: located?.location,
           messages,
@@ -302,19 +290,20 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
         if (rank !== 0) return rank;
         return a.title.localeCompare(b.title, "th");
       });
-  }, [evidenceByDriver, rows]);
+  }, [effectiveNow, evidenceByDriver, missionById, rows]);
 
   const alertCount = groups.filter((group) => group.unread).length;
   const liveCount = groups.filter((group) => group.freshness === "live").length;
   const needsAttention = groups.filter((group) => group.unread || group.freshness !== "live").length;
-  const serviceTimeAlertCount = rows.filter((row) => row.serviceAlert.tone === "warning" || row.serviceAlert.tone === "danger").length;
+  const needsHoursAttention = (duty: { status: DutyStatus } | null) => Boolean(duty && (duty.status.tone === "warning" || duty.status.tone === "danger"));
+  const serviceTimeAlertCount = groups.filter((group) => needsHoursAttention(group.duty)).length;
 
   const filteredGroups = useMemo(() => {
     if (!chipFilter) return groups;
     return groups.filter((group) => {
       if (chipFilter === "unread") return group.unread > 0;
       if (chipFilter === "live") return group.freshness === "live";
-      if (chipFilter === "service") return group.jobs.some((job) => job.serviceAlert.tone === "warning" || job.serviceAlert.tone === "danger");
+      if (chipFilter === "service") return needsHoursAttention(group.duty);
       return group.unread > 0 || group.freshness !== "live";
     });
   }, [chipFilter, groups]);
@@ -325,37 +314,35 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
 
   return (
     <section className="enterprise-panel overflow-hidden">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+      <div className="grid gap-3 border-b border-slate-200 px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
             <p className="section-label">ภาพรวมรถในโครงการ</p>
-            <h2 className="mt-1 text-lg font-semibold text-ink">สถานะคนขับรายคน</h2>
+            <h2 className="mt-0.5 text-base font-semibold text-ink">สถานะคนขับรายคน</h2>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <MetricChip label="คนขับทั้งหมด" value={groups.length} active={!chipFilter && view === "cards"} onClick={() => setChipFilter(null)} />
-            <MetricChip label="GPS สด" value={liveCount} tone="success" active={chipFilter === "live"} onClick={() => toggleChip("live")} />
-            <MetricChip label="ต้องติดตาม" value={needsAttention} tone="warning" active={chipFilter === "attention"} onClick={() => toggleChip("attention")} />
-            <MetricChip label="มีข้อความใหม่" value={alertCount} tone={alertCount ? "warning" : "neutral"} active={chipFilter === "unread"} onClick={() => toggleChip("unread")} />
-            <MetricChip
-              label="ใกล้/เกินเวลาบริการ"
-              value={serviceTimeAlertCount}
-              tone={serviceTimeAlertCount ? "warning" : "neutral"}
-              active={chipFilter === "service"}
-              onClick={() => toggleChip("service")}
-            />
+          <div className="flex shrink-0 items-center gap-1.5">
             {listView ? (
               <button
                 type="button"
                 onClick={() => setView((current) => (current === "cards" ? "list" : "cards"))}
-                className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-operation hover:text-operation"
+                className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:border-operation hover:text-operation"
               >
-                {view === "cards" ? `ดูแบบรายการ (${rows.length} งาน)` : "ดูแบบการ์ด"}
+                {view === "cards" ? `รายการ ${rows.length} งาน` : "การ์ด"}
               </button>
             ) : null}
-            <Tooltip content="รายการที่ต้องติดตามรวมรถที่ไม่มี GPS สด รถที่ยังไม่ได้ส่งตำแหน่ง GPS และรถที่มีข้อความยังไม่รับทราบ">
-              <span className="grid h-7 w-7 place-items-center rounded-full border border-slate-300 text-xs font-semibold text-slate-500">?</span>
+            <Tooltip content="กดตัวเลขเพื่อกรองการ์ด · ต้องติดตาม = GPS ไม่สด หรือมีข้อความยังไม่รับทราบ · เวลางาน = ยังไม่เข้างาน ใกล้เวลาออก หรือเข้า OT">
+              <span className="grid h-6 w-6 place-items-center rounded-full border border-slate-300 text-[11px] font-semibold text-slate-500">?</span>
             </Tooltip>
           </div>
+        </div>
+        {/* Tiles, not a row of capsules: a fixed grid reads the same at any
+            width, including the narrow column beside the map. */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
+          <MetricChip label="คนขับ" value={groups.length} active={!chipFilter && view === "cards"} onClick={() => setChipFilter(null)} />
+          <MetricChip label="GPS สด" value={liveCount} tone="success" active={chipFilter === "live"} onClick={() => toggleChip("live")} />
+          <MetricChip label="ต้องติดตาม" value={needsAttention} tone={needsAttention ? "warning" : "neutral"} active={chipFilter === "attention"} onClick={() => toggleChip("attention")} />
+          <MetricChip label="ข้อความใหม่" value={alertCount} tone={alertCount ? "warning" : "neutral"} active={chipFilter === "unread"} onClick={() => toggleChip("unread")} />
+          <MetricChip label="เวลางาน / OT" value={serviceTimeAlertCount} tone={serviceTimeAlertCount ? "warning" : "neutral"} active={chipFilter === "service"} onClick={() => toggleChip("service")} />
         </div>
       </div>
 
@@ -372,10 +359,6 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
             const phone = group.driver?.phone ?? "";
             const hasNext = group.jobs.some((job) => nextAssignmentIds.has(job.assignment.id));
             const primaryJob = group.jobs[0];
-            const serviceFocus =
-              group.jobs.find((job) => job.serviceAlert.tone === "danger") ??
-              group.jobs.find((job) => job.serviceAlert.tone === "warning") ??
-              primaryJob;
             const routeSummary = primaryJob ? `${primaryJob.pickup} → ${primaryJob.dropoff}` : "ยังไม่มีงานที่เปิดใช้งาน";
             const windowSummary = primaryJob ? formatAssignmentWindow(primaryJob.assignment.startTime, primaryJob.assignment.endTime) : "ยังไม่ระบุเวลา";
             const gpsSummary = group.location ? formatRelativeTh(group.location.recordedAt, effectiveNow) : FRESH_LABEL[group.freshness];
@@ -417,38 +400,32 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
                             </span>
                           ) : null}
                         </span>
-                        <span className="block truncate text-xs font-medium text-slate-600">
-                          {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · {gpsSummary} · {windowSummary}
+                        <span className="block truncate text-xs text-slate-500">
+                          {group.vehicle?.plateNumber ?? "ยังไม่ระบุรถ"} · GPS {gpsSummary}
                         </span>
-                        {/* Wraps instead of splitting into two grid columns: the
-                            old split gave the badges their full width and crushed
-                            the route chip to ~16px, whose padding then spilled over
-                            the badge beside it. Now the route keeps at least 8rem
-                            and each badge is its own flex item, so they drop to the
-                            next line one at a time instead of overflowing as a block. */}
-                        <span className="flex min-w-0 flex-wrap items-center gap-1">
-                          <span className="min-w-[8rem] flex-1 truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700" title={routeSummary}>
-                            {routeSummary}
-                          </span>
-                          {hasNext ? (
-                            <span className="shrink-0 rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span>
-                          ) : null}
-                          {serviceFocus ? (
+                        {/* Plain text, not a pill: a pill set to fill the row
+                            stretched with the card and looked like a bar. */}
+                        <span className="block truncate text-[12px] font-medium text-slate-700" title={routeSummary}>
+                          {windowSummary} · {routeSummary}
+                        </span>
+                        <span className="flex flex-wrap items-center gap-1">
+                          {group.duty ? (
                             <span
-                              className={`min-w-0 max-w-full truncate rounded-full border px-2 py-0.5 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[serviceFocus.serviceAlert.tone]}`}
-                              title={serviceFocus.serviceAlert.detail}
+                              className={`w-fit shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${SERVICE_ALERT_COMPACT_CLASS[group.duty.status.tone]}`}
+                              title={group.duty.status.detail}
                             >
-                              {serviceFocus.serviceAlert.label}
+                              {group.duty.status.label}
                             </span>
                           ) : null}
-                          {primaryJob ? (
+                          {group.duty && group.duty.cost.total != null ? (
                             <span
-                              className="shrink-0 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-operation"
-                              title={vehicleUsageCostBreakdown(primaryJob.cost)}
+                              className="w-fit shrink-0 rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-operation"
+                              title={`ค่าบริการ ${money(group.duty.cost.baseAmount)}${group.duty.cost.overtimeHours ? ` + OT ${money(group.duty.cost.overtimeAmount)}` : ""}`}
                             >
-                              {formatShortCost(primaryJob.cost)}
+                              {money(group.duty.cost.total)}
                             </span>
                           ) : null}
+                          {hasNext ? <span className="w-fit shrink-0 rounded-full bg-route px-1.5 py-0.5 text-[10px] font-bold text-white">งานถัดไป</span> : null}
                         </span>
                       </span>
                     </span>
@@ -485,11 +462,30 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
                         name is the card title, the plate and the GPS age are on
                         line two — and the fourth, the phone number, is the
                         โทรหาคนขับ button below. */}
+                    {group.duty ? (
+                      <div className="grid gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold text-ink">
+                            เวลางาน {timeLabel(group.duty.cost.dutyStart)}–{timeLabel(group.duty.cost.dutyEnd)}
+                            {group.duty.cost.source === "sub_jobs" ? <span className="ml-1 font-normal text-amber-700">(ยังไม่ได้ตั้งในขั้นที่ 1)</span> : null}
+                          </span>
+                          <span className="font-bold tabular-nums text-operation">{money(group.duty.cost.total)}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600">
+                          <span>เข้า {group.duty.cost.clockIn ? timeLabel(group.duty.cost.clockIn) : "—"}</span>
+                          <span>ออก {group.duty.cost.clockOut ? timeLabel(group.duty.cost.clockOut) : "—"}</span>
+                          <span>ค่าบริการ {money(group.duty.cost.baseAmount)}</span>
+                          <span className={group.duty.cost.overtimeHours ? "font-semibold text-amber-800" : ""}>
+                            OT {group.duty.cost.overtimeHours.toLocaleString("th-TH")} ชม.{group.duty.cost.overtimeHours ? ` · ${money(group.duty.cost.overtimeAmount)}` : ""}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">{group.duty.status.detail}</p>
+                      </div>
+                    ) : null}
                     <div className="grid gap-1.5">
                       <p className="text-xs font-semibold text-slate-600">งานของคนขับคนนี้ ({group.jobs.length})</p>
                       <div className="grid items-start gap-1.5">
                       {group.jobs.map((job) => {
-                        const hasOt = Boolean(job.cost.extraHours && job.cost.extraHours > 0);
                         return (
                           <div key={job.assignment.id} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -504,20 +500,6 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
                               ) : (
                                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">ยังไม่แจ้งสถานะ</span>
                               )}
-                              {job.workSession?.status === "active" ? (
-                                <span className="rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-800">บันทึกเวลาเข้าแล้ว</span>
-                              ) : job.workSession?.status === "ended" ? (
-                                <span className={`rounded-full px-2 py-0.5 font-semibold ${hasOt ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-600"}`}>
-                                  {hasOt ? "มีค่าล่วงเวลา" : "บันทึกเวลาออกแล้ว"}
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">ยังไม่บันทึกเวลาเข้า</span>
-                              )}
-                              <Tooltip content={job.serviceAlert.detail}>
-                                <span className={`rounded-full px-2 py-0.5 font-semibold ${SERVICE_ALERT_CLASS[job.serviceAlert.tone]}`}>
-                                  {job.serviceAlert.label}
-                                </span>
-                              </Tooltip>
                             </div>
                             <p className="mt-1 text-slate-600">{job.pickup} → {job.dropoff}</p>
                             <div className="mt-1 flex flex-wrap gap-1.5">
@@ -525,15 +507,9 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, listView
                               {!job.reported || formatStatusTh(job.reported.status) !== formatStatusTh(job.assignment.status) ? (
                                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">สถานะงาน: {formatStatusTh(job.assignment.status)}</span>
                               ) : null}
-                              <span className={`rounded-full px-2 py-0.5 font-semibold ${job.cost.estimatedCost != null ? "bg-teal-50 text-operation" : "bg-amber-50 text-amber-800"}`}>
-                                {vehicleUsageCostBreakdown(job.cost)}
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
+                                {formatAssignmentWindow(job.assignment.startTime, job.assignment.endTime)}
                               </span>
-                              {job.workSession?.startedAt ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">เข้า {formatRelativeTh(job.workSession.startedAt, effectiveNow)}</span>
-                              ) : null}
-                              {job.workSession?.endedAt ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">ออก {formatRelativeTh(job.workSession.endedAt, effectiveNow)}</span>
-                              ) : null}
                             </div>
                           </div>
                         );
@@ -642,15 +618,16 @@ function MetricChip({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const className = tone === "success" ? "bg-emerald-50 text-emerald-800" : tone === "warning" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-600";
+  const className = tone === "success" ? "bg-emerald-50 text-emerald-800" : tone === "warning" ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-600";
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full px-3 py-1 text-xs font-semibold transition hover:ring-1 hover:ring-slate-300 ${className} ${active ? "ring-2 ring-operation/50" : ""}`}
+      className={`grid min-w-0 gap-0.5 rounded-xl px-2.5 py-1.5 text-left transition hover:ring-1 hover:ring-slate-300 ${className} ${active ? "ring-2 ring-operation/60" : ""}`}
     >
-      {label}: {value}
+      <span className="truncate text-[10px] font-semibold opacity-80">{label}</span>
+      <span className="text-lg font-bold leading-none tabular-nums">{value}</span>
     </button>
   );
 }

@@ -5,7 +5,9 @@ import { ArrowDown, ArrowUp, Plus } from "lucide-react";
 import type { Mission } from "@tomp/types/domain";
 import { setAssignmentOrderAction } from "@/app/actions/assignments";
 import { JobStatusChip } from "@/components/ui/job-status-chip";
+import { readDutySchedule } from "@/lib/domain/duty-hours";
 import { mainJobDays } from "@/lib/domain/job-schedule";
+import { DutyHoursChip } from "./duty-hours-chip";
 
 export interface ScheduleJob {
   id: string;
@@ -85,6 +87,7 @@ export function UnitSchedule({
   const dirty = order.join("|") !== jobs.map((job) => job.id).join("|") || jobs.some((job) => job.urgent !== urgent.has(job.id));
 
   const main = mission ? mainJobDays(mission) : null;
+  const duty = readDutySchedule(mission?.metadata as Record<string, unknown> | undefined);
   const from = main?.from || projectStartDate || jobs.find((job) => job.day)?.day || "";
   const to = main?.to || projectEndDate || [...jobs].reverse().find((job) => job.day)?.day || from;
   const range = from && to >= from ? daysBetween(from, to) : [];
@@ -194,7 +197,12 @@ export function UnitSchedule({
                 className={`group grid min-w-0 content-start gap-1 rounded-xl border px-2.5 py-1.5 ${dayJobs.length ? "border-slate-200 bg-white" : "border-dashed border-slate-200 bg-slate-50/60"}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`text-[12px] font-bold ${dayJobs.length ? "text-ink" : "text-ink-faint"}`}>{dayLabel.format(noon(day))}</span>
+                  <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <span className={`text-[12px] font-bold ${dayJobs.length ? "text-ink" : "text-ink-faint"}`}>{dayLabel.format(noon(day))}</span>
+                    {mission && main && day >= main.from && day <= main.to ? (
+                      <DutyHoursChip key={`${day}-${duty[day]?.start}-${duty[day]?.end}`} projectId={projectId} missionId={mission.id} date={day} hours={duty[day] ?? null} />
+                    ) : null}
+                  </span>
                   <span className="flex items-center gap-1.5">
                     <span className="text-[10px] font-semibold text-ink-faint">{dayJobs.length ? `${dayJobs.length} งาน` : "ว่าง"}</span>
                     {canAddJobs ? (

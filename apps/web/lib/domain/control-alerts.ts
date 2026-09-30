@@ -1,4 +1,4 @@
-import { estimateVehicleUsageCost } from "./vehicle-cost";
+import type { DutyDayCost, DutyStatus } from "./duty-hours";
 import { gpsFreshness } from "./gps-freshness";
 
 // What the control room should be told before it has to go looking: a vehicle
@@ -13,7 +13,7 @@ export const ALERT_THRESHOLDS = {
   notMovingAfterStartMin: 60,
   /** GPS silent this long during a job, and past the app's own freshness limits. */
   gpsSilentMin: 5,
-  /** Warn this long before the planned end, while the driver is still on the clock. */
+  /** Warn this long before the scheduled clock-out (see duty-hours.ts DUTY_END_WARNING_MIN). */
   overtimeSoonMin: 15
 } as const;
 
@@ -35,7 +35,15 @@ export interface AlertJob {
   status: string;
   startTime?: string | null;
   endTime?: string | null;
-  vehicleMetadata?: Record<string, unknown> | null;
+}
+
+/** One unit's day, already worked out by duty-hours.ts unitDutyDay. */
+export interface AlertUnitDay {
+  unitId: string;
+  label: string;
+  /** A job of the unit, so the alert can open its chat. */
+  assignmentId: string;
+  day: { cost: DutyDayCost; status: DutyStatus };
 }
 
 export interface AlertInputs {
@@ -46,6 +54,8 @@ export interface AlertInputs {
   sessions: Record<string, { status: string; startedAt: string | null; endedAt: string | null } | undefined>;
   /** Latest position per job. */
   locations: Record<string, { recordedAt: string; sharingEvent?: string | null; metadata?: unknown } | undefined>;
+  /** Overtime is the unit's, measured against its scheduled clock-out — not any sub-job's end. */
+  units?: AlertUnitDay[];
   now: number;
 }
 
@@ -55,14 +65,13 @@ const IN_PROGRESS = new Set(["active", "arrived_pickup", "passenger_onboard"]);
 
 const minutes = (ms: number) => Math.round(ms / 60_000);
 
-export function computeControlAlerts({ jobs, reported, sessions, locations, now }: AlertInputs): ControlAlert[] {
+export function computeControlAlerts({ jobs, reported, sessions, locations, units = [], now }: AlertInputs): ControlAlert[] {
   const out: ControlAlert[] = [];
   for (const job of jobs) {
     if (CLOSED.has(job.status)) continue;
     const report = reported[job.id]?.status;
     if (report === "completed") continue;
     const start = job.startTime ? Date.parse(job.startTime) : Number.NaN;
-    const end = job.endTime ? Date.parse(job.endTime) : Number.NaN;
     const session = sessions[job.id];
     const inProgress = IN_PROGRESS.has(job.status) || (report ? IN_PROGRESS.has(report) : false);
 
@@ -104,40 +113,16 @@ export function computeControlAlerts({ jobs, reported, sessions, locations, now 
         });
       }
     }
+  }
 
-    // 3. Overtime: coming up, or already running (with what it costs so far).
-    if (session?.status === "active" && Number.isFinite(end)) {
-      const untilEnd = end - now;
-      if (untilEnd < 0) {
-        const cost = estimateVehicleUsageCost({
-          assignmentStart: job.startTime,
-          assignmentEnd: job.endTime,
-          actualStart: session.startedAt,
-          actualEnd: null,
-          vehicleMetadata: job.vehicleMetadata,
-          now
-        });
-        out.push({
-          id: `overtime:${job.id}`,
-          kind: "overtime",
-          assignmentId: job.id,
-          severity: "danger",
-          title: `${job.label} เข้า OT แล้ว`,
-          detail:
-            cost.extraHours && cost.extraAmount != null
-              ? `เกินเวลา ${minutes(-untilEnd)} นาที · OT ${cost.extraHours.toLocaleString("th-TH")} ชม. ≈ ${cost.extraAmount.toLocaleString("th-TH")} บ.`
-              : `เกินเวลา ${minutes(-untilEnd)} นาที ยังไม่บันทึกเวลาออก`
-        });
-      } else if (untilEnd <= ALERT_THRESHOLDS.overtimeSoonMin * 60_000) {
-        out.push({
-          id: `overtime_soon:${job.id}`,
-          kind: "overtime_soon",
-          assignmentId: job.id,
-          severity: "warning",
-          title: `${job.label} ใกล้ครบเวลาบริการ`,
-          detail: `อีก ${minutes(untilEnd)} นาทีจะเริ่มคิด OT`
-        });
-      }
+  // 3. Overtime, per unit: the scheduled clock-out is close, or has passed with
+  // the driver still clocked in. Clocking in early is never overtime.
+  for (const unit of units) {
+    const { cost, status } = unit.day;
+    if (cost.state === "overtime") {
+      out.push({ id: `overtime:${unit.unitId}:${cost.dutyEnd}`, kind: "overtime", assignmentId: unit.assignmentId, severity: "danger", title: `${unit.label} เข้า OT แล้ว`, detail: status.detail });
+    } else if (cost.state === "on_duty" && status.tone === "warning") {
+      out.push({ id: `overtime_soon:${unit.unitId}:${cost.dutyEnd}`, kind: "overtime_soon", assignmentId: unit.assignmentId, severity: "warning", title: `${unit.label} ${status.label}`, detail: status.detail });
     }
   }
   return out;

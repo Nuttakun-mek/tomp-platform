@@ -29,10 +29,26 @@ describe("summarizeDay", () => {
     });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ jobs: 2, jobsDone: 2 });
-    // Counted from the planned start (07:00) to the clock-out (19:00): 12 h on a 10 h package.
-    expect(rows[0].cost.extraHours).toBe(2);
+    // No duty hours set: the day's sub-jobs (07:00–17:00) stand in; clock-out 19:00 is 2 h over.
+    expect(rows[0].cost.overtimeHours).toBe(2);
     expect(totals.total).toBe(3600);
     expect(totals.overtimeAmount).toBe(600);
+  });
+
+  it("measures overtime against the scheduled clock-out, not the last sub-job", () => {
+    const { rows } = summarizeDay({
+      date: DAY,
+      jobs: [job("a", "13:00", "14:00"), job("b", "14:00", "15:00")],
+      units: [unit],
+      schedules: { cs1: { [DAY]: { start: "07:00", end: "17:00" } } },
+      sessions: [
+        { driverId: "d1", status: "work_started", at: bkk(DAY, "06:40") },
+        { driverId: "d1", status: "work_ended", at: bkk(DAY, "17:00") }
+      ],
+      reported: {},
+      openIssues: {}
+    });
+    expect(rows[0].cost).toMatchObject({ source: "duty_hours", overtimeHours: 0, total: 3000 });
   });
 
   it("uses a clock-out after midnight for the shift that started on the day", () => {
@@ -47,7 +63,7 @@ describe("summarizeDay", () => {
       reported: {},
       openIssues: {}
     });
-    expect(rows[0].cost.extraHours).toBe(1.5);
+    expect(rows[0].cost.overtimeHours).toBe(1.5);
   });
 
   it("notes what is missing instead of guessing silently", () => {

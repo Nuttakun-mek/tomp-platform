@@ -8,6 +8,8 @@ import { assignMissionToCallSignsAction } from "@/app/actions/call-signs";
 import { createMissionAction } from "@/app/actions/missions";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { DateRangeFields, describeThai, todayLocalDate } from "@/components/ui/datetime-field";
+import { buildDutySchedule, isClock, type DutyHours, type DutySchedule } from "@/lib/domain/duty-hours";
+import { DutyHoursFields } from "./duty-hours-fields";
 
 const MISSION_TYPES = ["รับจากสนามบิน", "ส่งสนามบิน", "รับ-ส่งโรงแรม", "รถรับส่งในงาน", "รถรับรอง VIP", "รถสำรอง", "อื่น ๆ"];
 
@@ -72,6 +74,8 @@ export function MissionAssignmentStep({
   const [commitment, setCommitment] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [dutyDefaults, setDutyDefaults] = useState<DutyHours>({ start: "07:00", end: "17:00" });
+  const [dutyOverrides, setDutyOverrides] = useState<DutySchedule>({});
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
   const [isPending, startTransition] = useTransition();
@@ -95,6 +99,7 @@ export function MissionAssignmentStep({
     setCommitment("");
     setStartDate("");
     setEndDate("");
+    setDutyOverrides({});
     setSelected(new Set());
   }
 
@@ -128,6 +133,12 @@ export function MissionAssignmentStep({
       setMessage("วันที่สิ้นสุดอยู่ก่อนวันที่เริ่ม กรุณาตรวจสอบอีกครั้ง");
       return;
     }
+    const dutyHours = buildDutySchedule(from, to, dutyDefaults, dutyOverrides);
+    if (Object.values(dutyHours).some((hours) => !isClock(hours.start) || !isClock(hours.end) || hours.start === hours.end)) {
+      setTone("warning");
+      setMessage("กำหนดเวลาเข้า-ออกงานให้ครบทุกวัน (เวลาเข้าและออกต้องไม่เท่ากัน)");
+      return;
+    }
 
     startTransition(async () => {
       const missionResult = await createMissionAction({
@@ -139,7 +150,7 @@ export function MissionAssignmentStep({
         plannedStartTime: `${from}T00:00`,
         plannedEndTime: `${to}T23:59`,
         instruction: commitment.trim() || null,
-        metadata: { operationDate: from, operationStartDate: from, operationEndDate: to }
+        metadata: { operationDate: from, operationStartDate: from, operationEndDate: to, dutyHours }
       });
 
       if (!missionResult.success) {
@@ -262,6 +273,15 @@ export function MissionAssignmentStep({
           min={minDate}
           max={projectEndDate || undefined}
           required
+        />
+
+        <DutyHoursFields
+          from={startDate}
+          to={endDate || startDate}
+          defaults={dutyDefaults}
+          overrides={dutyOverrides}
+          onDefaults={setDutyDefaults}
+          onOverrides={setDutyOverrides}
         />
 
         <div className="grid gap-3 sm:grid-cols-2">

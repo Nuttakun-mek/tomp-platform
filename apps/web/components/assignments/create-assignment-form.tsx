@@ -8,6 +8,7 @@ import { DateRangeFields, DateTimeField, describeThai } from "@/components/ui/da
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { ConflictWarning } from "@/components/ui/conflict-warning";
 import { ServiceTimeSummary } from "@/components/resources/service-time-summary";
+import { dutyWindow, readDutySchedule } from "@/lib/domain/duty-hours";
 import { checkSubJob, mainJobDays } from "@/lib/domain/job-schedule";
 import { NEW_JOB_EVENT } from "./unit-schedule";
 import { isCallSignCrewed } from "@/lib/domain/call-sign-rules";
@@ -103,6 +104,18 @@ export function CreateAssignmentForm({
   // The same rules the server applies (lib/domain/job-schedule.ts): inside the
   // main job and the project, no overlap with this unit's other jobs. There is
   // no "book it anyway" — back to back is allowed, an overlap is not.
+  // Soft warning only: a job may run past the day's clock-out on purpose — that
+  // part is overtime (duty-hours.ts), so say so before it is booked.
+  const dutyNote = useMemo(() => {
+    if (!mission || !operationDate || !startTime || !endTime) return null;
+    const hours = readDutySchedule(mission.metadata as Record<string, unknown> | undefined)[operationDate];
+    if (!hours) return "ภารกิจหลักยังไม่ได้ตั้งเวลาเข้า-ออกงานของวันนี้ — ตั้งได้ที่การ์ด Call Sign ด้านล่าง";
+    const window = dutyWindow(operationDate, hours);
+    if (Date.parse(endTime) > Date.parse(window.end)) return `งานนี้เลยเวลาออกงาน ${hours.end} — ส่วนที่เกินจะคิดเป็น OT`;
+    if (Date.parse(startTime) < Date.parse(window.start)) return `งานนี้เริ่มก่อนเวลาเข้างาน ${hours.start} — คนขับต้องเข้างานเร็วขึ้น (ไม่คิดเป็น OT)`;
+    return null;
+  }, [endTime, mission, operationDate, startTime]);
+
   const conflicts = useMemo(() => {
     if (!startTime || !endTime || !selectedCallSign) return [];
     const others = existingAssignments.filter(
@@ -320,6 +333,9 @@ export function CreateAssignmentForm({
         />
       ) : null}
       <ConflictWarning conflicts={conflicts} />
+      {dutyNote && !conflicts.length ? (
+        <p className="rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-semibold text-amber-900">{dutyNote}</p>
+      ) : null}
       <ActionFeedback message={message} tone={tone} />
       <button className="w-fit rounded-2xl bg-operation px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:bg-slate-300" disabled={!canCreate || isPending || conflicts.length > 0} type="submit">
         {isPending ? "กำลังเปิดงาน..." : "เปิดงานย่อย"}
