@@ -31,7 +31,7 @@ vi.mock("@/lib/supabase/server-write", () => ({ getSupabaseWriteClient: () => ({
 vi.mock("@/lib/timeline", () => ({ createTimelineEvent: vi.fn(), TIMELINE_EVENTS: {} }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { updateVehicleAction } from "./resources";
+import { updateDriverAction, updateVehicleAction } from "./resources";
 
 const ID = "30000000-0000-4000-8000-000000000001";
 const PROJECT = "10000000-0000-4000-8000-000000000003";
@@ -41,7 +41,7 @@ describe("updateVehicleAction", () => {
   beforeEach(() => {
     writes.length = 0;
     requirePermission.mockClear();
-    row = { id: ID, project_id: PROJECT, metadata: { icon: "van", packageAmount: 3000, operationNote: "keep me" } };
+    row = { id: ID, project_id: PROJECT, metadata: { icon: "van", packageAmount: 3000, operationNote: "keep me", brand: "Toyota", model: "Commuter", colour: "ขาว" } };
   });
 
   it("checks permission on the vehicle's own project, not anything the request says", async () => {
@@ -71,6 +71,39 @@ describe("updateVehicleAction", () => {
   it("refuses a vehicle that does not exist", async () => {
     row = null;
     const result = await updateVehicleAction(input);
+    expect(result.success).toBe(false);
+    expect(writes).toHaveLength(0);
+  });
+});
+
+describe("updateVehicleAction — quick edit from the resource list", () => {
+  beforeEach(() => {
+    writes.length = 0;
+    row = { id: ID, project_id: PROJECT, metadata: { icon: "van", packageHours: 10, packageAmount: 3000, brand: "Toyota", model: "Commuter", colour: "ขาว" } };
+  });
+
+  it("changes the plate and the package without blanking the fields it did not send", async () => {
+    await updateVehicleAction({ id: ID, plateNumber: "1กข 9999", vehicleType: "รถตู้", capacity: 10, packageHours: 12, packageAmount: 3600 });
+    expect(writes[0].patch.metadata).toMatchObject({ brand: "Toyota", model: "Commuter", colour: "ขาว", icon: "van", packageHours: 12, packageAmount: 3600 });
+  });
+});
+
+describe("updateDriverAction", () => {
+  beforeEach(() => {
+    writes.length = 0;
+    requirePermission.mockClear();
+    row = { id: ID, project_id: PROJECT };
+  });
+
+  it("fixes a typo in place, checked against the driver's own project", async () => {
+    const result = await updateDriverAction({ id: ID, fullName: "สมใจ ชายดี", phone: "0895554478", licenseType: "ท.2" });
+    expect(result.success).toBe(true);
+    expect(requirePermission).toHaveBeenCalledWith(PROJECT, "driver.create");
+    expect(writes[0]).toEqual({ id: ID, patch: { full_name: "สมใจ ชายดี", phone: "0895554478", license_type: "ท.2" } });
+  });
+
+  it("refuses an empty name", async () => {
+    const result = await updateDriverAction({ id: ID, fullName: "", phone: "0895554478" });
     expect(result.success).toBe(false);
     expect(writes).toHaveLength(0);
   });

@@ -9,7 +9,7 @@ import { createMissionAction } from "@/app/actions/missions";
 import { ActionFeedback } from "@/components/ui/action-feedback";
 import { DateRangeFields, describeThai, todayLocalDate } from "@/components/ui/datetime-field";
 import { buildDutySchedule, isClock, type DutyHours, type DutySchedule } from "@/lib/domain/duty-hours";
-import { DutyHoursFields } from "./duty-hours-fields";
+import { DutyHoursFields, type DutyMode } from "./duty-hours-fields";
 
 const MISSION_TYPES = ["รับจากสนามบิน", "ส่งสนามบิน", "รับ-ส่งโรงแรม", "รถรับส่งในงาน", "รถรับรอง VIP", "รถสำรอง", "อื่น ๆ"];
 
@@ -76,6 +76,7 @@ export function MissionAssignmentStep({
   const [endDate, setEndDate] = useState("");
   const [dutyDefaults, setDutyDefaults] = useState<DutyHours>({ start: "07:00", end: "17:00" });
   const [dutyOverrides, setDutyOverrides] = useState<DutySchedule>({});
+  const [dutyMode, setDutyMode] = useState<DutyMode>("same");
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
   const [isPending, startTransition] = useTransition();
@@ -100,6 +101,7 @@ export function MissionAssignmentStep({
     setStartDate("");
     setEndDate("");
     setDutyOverrides({});
+    setDutyMode("same");
     setSelected(new Set());
   }
 
@@ -133,7 +135,7 @@ export function MissionAssignmentStep({
       setMessage("วันที่สิ้นสุดอยู่ก่อนวันที่เริ่ม กรุณาตรวจสอบอีกครั้ง");
       return;
     }
-    const dutyHours = buildDutySchedule(from, to, dutyDefaults, dutyOverrides);
+    const dutyHours = buildDutySchedule(from, to, dutyDefaults, dutyMode === "per_day" ? dutyOverrides : {});
     if (Object.values(dutyHours).some((hours) => !isClock(hours.start) || !isClock(hours.end) || hours.start === hours.end)) {
       setTone("warning");
       setMessage("กำหนดเวลาเข้า-ออกงานให้ครบทุกวัน (เวลาเข้าและออกต้องไม่เท่ากัน)");
@@ -278,8 +280,10 @@ export function MissionAssignmentStep({
         <DutyHoursFields
           from={startDate}
           to={endDate || startDate}
+          mode={dutyMode}
           defaults={dutyDefaults}
           overrides={dutyOverrides}
+          onMode={setDutyMode}
           onDefaults={setDutyDefaults}
           onOverrides={setDutyOverrides}
         />

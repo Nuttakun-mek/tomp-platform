@@ -337,7 +337,7 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions
         </div>
         {/* Tiles, not a row of capsules: a fixed grid reads the same at any
             width, including the narrow column beside the map. */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-1">
           <MetricChip label="คนขับ" value={groups.length} active={!chipFilter && view === "cards"} onClick={() => setChipFilter(null)} />
           <MetricChip label="GPS สด" value={liveCount} tone="success" active={chipFilter === "live"} onClick={() => toggleChip("live")} />
           <MetricChip label="ต้องติดตาม" value={needsAttention} tone={needsAttention ? "warning" : "neutral"} active={chipFilter === "attention"} onClick={() => toggleChip("attention")} />
@@ -624,10 +624,11 @@ function MetricChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`grid min-w-0 gap-0.5 rounded-xl px-2.5 py-1.5 text-left transition hover:ring-1 hover:ring-slate-300 ${className} ${active ? "ring-2 ring-operation/60" : ""}`}
+      className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1 text-left transition hover:ring-1 hover:ring-slate-300 ${className} ${active ? "ring-2 ring-operation/60" : ""}`}
     >
-      <span className="truncate text-[10px] font-semibold opacity-80">{label}</span>
-      <span className="text-lg font-bold leading-none tabular-nums">{value}</span>
+      {/* Label and number on one line: a tile per count, no extra row for the number. */}
+      <span className="truncate text-[11px] font-semibold">{label}</span>
+      <span className="text-sm font-bold tabular-nums">{value}</span>
     </button>
   );
 }

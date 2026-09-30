@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CarFront, ChevronDown, Library, Trash2, UserRoundCheck } from "lucide-react";
+import { CarFront, ChevronDown, Library, Pencil, Trash2, UserRoundCheck } from "lucide-react";
 import type { CallSign, Driver, Vehicle } from "@tomp/types/domain";
 import {
   createExistingProjectResourcePairAction,
@@ -12,6 +12,7 @@ import {
   importVehiclesFromLibraryAction
 } from "@/app/actions/resources";
 import { ActionFeedback } from "@/components/ui/action-feedback";
+import { ResourceRowEdit, type ResourceEdit } from "./resource-row-edit";
 import { inferVehicleIcon, vehicleIconLabel } from "@/lib/domain/vehicle-icon";
 
 // A project staffs itself: it holds its own copies of the people and vehicles it
@@ -27,6 +28,8 @@ interface Row {
   secondary: string;
   /** Why this record is not yet usable, or empty when it is fine. */
   missing: string;
+  /** The editable fields, for fixing a typo without deleting the record. */
+  edit: ResourceEdit;
 }
 
 const asDriverRow = (driver: Driver): Row => ({
@@ -35,7 +38,8 @@ const asDriverRow = (driver: Driver): Row => ({
   secondary: [driver.phone, driver.licenseType].filter(Boolean).join(" · ") || "ไม่มีข้อมูลเพิ่มเติม",
   // Dispatch cannot reach a driver with no number, so it is flagged where the
   // record is, rather than on a separate readiness page nobody opened.
-  missing: driver.phone ? "" : "ยังไม่มีเบอร์โทร"
+  missing: driver.phone ? "" : "ยังไม่มีเบอร์โทร",
+  edit: { kind: "driver", fullName: driver.fullName, phone: driver.phone ?? "", licenseType: driver.licenseType ?? "" }
 });
 
 const asVehicleRow = (vehicle: Vehicle): Row => ({
@@ -49,7 +53,15 @@ const asVehicleRow = (vehicle: Vehicle): Row => ({
       ? `ค่าใช้จ่ายในการบริการ ${vehicle.metadata.packageHours.toLocaleString("th-TH")} ชม. ${vehicle.metadata.packageAmount.toLocaleString("th-TH")} บ.`
       : typeof vehicle.metadata.hourlyRate === "number" ? `${vehicle.metadata.hourlyRate.toLocaleString("th-TH")} บ./ชม.` : ""
   ].filter(Boolean).join(" · "),
-  missing: !vehicle.plateNumber ? "ยังไม่มีทะเบียน" : !vehicle.capacity ? "ยังไม่ระบุจำนวนที่นั่ง" : ""
+  missing: !vehicle.plateNumber ? "ยังไม่มีทะเบียน" : !vehicle.capacity ? "ยังไม่ระบุจำนวนที่นั่ง" : "",
+  edit: {
+    kind: "vehicle",
+    plateNumber: vehicle.plateNumber,
+    vehicleType: vehicle.vehicleType ?? "",
+    capacity: vehicle.capacity ?? null,
+    packageHours: typeof vehicle.metadata.packageHours === "number" ? vehicle.metadata.packageHours : null,
+    packageAmount: typeof vehicle.metadata.packageAmount === "number" ? vehicle.metadata.packageAmount : null
+  }
 });
 
 function Section({
@@ -70,6 +82,7 @@ function Section({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [showLibrary, setShowLibrary] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "warning" | "danger">("success");
   const [isPending, startTransition] = useTransition();
@@ -200,6 +213,17 @@ function Section({
                   </span>
                 ) : null}
               </span>
+              <span className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmId(null);
+                  setEditingId(editingId === row.id ? null : row.id);
+                }}
+                className="flex min-h-8 items-center gap-1 rounded-command border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700"
+              >
+                <Pencil className="h-3 w-3" /> แก้ไข
+              </button>
               <button
                 type="button"
                 disabled={isPending}
@@ -211,6 +235,12 @@ function Section({
                 <Trash2 className="h-3 w-3" />
                 {confirmId === row.id ? "ยืนยันลบ" : "ลบ"}
               </button>
+              </span>
+              {editingId === row.id ? (
+                <div className="w-full">
+                  <ResourceRowEdit id={row.id} initial={row.edit} onDone={() => setEditingId(null)} />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

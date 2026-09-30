@@ -16,6 +16,7 @@ export function DutyHoursChip({ projectId, missionId, date, hours }: { projectId
   const [start, setStart] = useState(hours?.start ?? "07:00");
   const [end, setEnd] = useState(hours?.end ?? "17:00");
   const [error, setError] = useState<string | null>(null);
+  const [following, setFollowing] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (!editing) {
@@ -35,7 +36,7 @@ export function DutyHoursChip({ projectId, missionId, date, hours }: { projectId
   function save() {
     setError(null);
     startTransition(async () => {
-      const result = await updateMissionDutyHoursAction({ projectId, missionId, date, start, end });
+      const result = await updateMissionDutyHoursAction({ projectId, missionId, date, start, end, applyToFollowing: following });
       if (!result.success) {
         setError(result.error || "บันทึกไม่สำเร็จ");
         return;
@@ -56,6 +57,10 @@ export function DutyHoursChip({ projectId, missionId, date, hours }: { projectId
       <button type="button" onClick={() => setEditing(false)} aria-label="ยกเลิก" className="grid h-6 w-6 place-items-center rounded-full border border-slate-300 text-ink-soft">
         <X className="h-3 w-3" />
       </button>
+      <label className="flex w-full items-center gap-1 text-ink-soft">
+        <input type="checkbox" checked={following} onChange={(event) => setFollowing(event.target.checked)} />
+        ใช้กับวันนี้และทุกวันถัดไปของภารกิจหลัก
+      </label>
       {error ? <span className="w-full text-rose-700">{error}</span> : null}
     </span>
   );

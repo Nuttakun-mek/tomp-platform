@@ -523,7 +523,10 @@ const updateVehicleSchema = z.object({
   brand: z.string().trim().max(60).optional(),
   model: z.string().trim().max(60).optional(),
   colour: z.string().trim().max(40).optional(),
-  icon: z.string().optional()
+  icon: z.string().optional(),
+  /** The service package (hours and price). Omitted = keep what is there. */
+  packageHours: z.coerce.number().positive().max(48).optional(),
+  packageAmount: z.coerce.number().min(0).max(1_000_000).optional()
 });
 
 /**
@@ -549,12 +552,15 @@ export async function updateVehicleAction(input: unknown): Promise<ActionResult>
   if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขข้อมูลรถ");
 
   const previous = (current.metadata && typeof current.metadata === "object" ? current.metadata : {}) as Record<string, unknown>;
+  // A field left out keeps its value: an edit of the plate must not blank the brand.
   const metadata = {
     ...previous,
-    brand: parsed.data.brand ?? "",
-    model: parsed.data.model ?? "",
-    colour: parsed.data.colour ?? "",
-    icon: normaliseVehicleIcon(parsed.data.icon) ?? previous.icon ?? "van"
+    brand: parsed.data.brand ?? previous.brand ?? "",
+    model: parsed.data.model ?? previous.model ?? "",
+    colour: parsed.data.colour ?? previous.colour ?? "",
+    icon: normaliseVehicleIcon(parsed.data.icon) ?? previous.icon ?? "van",
+    ...(parsed.data.packageHours != null ? { packageHours: parsed.data.packageHours } : {}),
+    ...(parsed.data.packageAmount != null ? { packageAmount: parsed.data.packageAmount } : {})
   };
 
   const { error: updateError } = await client
@@ -568,6 +574,44 @@ export async function updateVehicleAction(input: unknown): Promise<ActionResult>
 
   revalidatePath("/resources");
   revalidatePath(`/resources/vehicles/${parsed.data.id}`);
+  if (projectId) revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+  return actionSuccess({ id: parsed.data.id });
+}
+
+const updateDriverSchema = z.object({
+  id: z.string().uuid(),
+  fullName: z.string().trim().min(2, "กรุณาระบุชื่อคนขับ").max(160),
+  phone: z.string().trim().min(3, "กรุณาระบุเบอร์โทร").max(40),
+  licenseType: z.string().trim().max(60).optional()
+});
+
+/**
+ * Fix a driver typed wrong without deleting and re-adding them (which would
+ * break their Call Sign and jobs). The project comes from the row, and it takes
+ * the same permission as adding a driver there.
+ */
+export async function updateDriverAction(input: unknown): Promise<ActionResult> {
+  const parsed = updateDriverSchema.safeParse(input);
+  if (!parsed.success) return actionFailure("ข้อมูลคนขับไม่ครบถ้วน", parsed.error.flatten().fieldErrors);
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+
+  const { data: current, error: readError } = await client.from("drivers").select("id, project_id").eq("id", parsed.data.id).maybeSingle();
+  if (readError) return actionFailure(getDatabaseErrorMessage(readError, "อ่านข้อมูลคนขับไม่สำเร็จ"));
+  if (!current) return actionFailure("ไม่พบคนขับคนนี้");
+
+  const projectId = typeof current.project_id === "string" ? current.project_id : null;
+  const permission = projectId ? await requirePermission(projectId, "driver.create") : await requirePermission("driver.create");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้ไขข้อมูลคนขับ");
+
+  const { error: updateError } = await client
+    .from("drivers")
+    .update({ full_name: parsed.data.fullName, phone: parsed.data.phone, license_type: parsed.data.licenseType || null })
+    .eq("id", parsed.data.id);
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "บันทึกข้อมูลคนขับไม่สำเร็จ"));
+
+  revalidatePath("/resources");
   if (projectId) revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
   return actionSuccess({ id: parsed.data.id });
 }

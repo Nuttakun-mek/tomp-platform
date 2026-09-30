@@ -187,7 +187,7 @@ export async function createMissionAction(input: unknown): Promise<ActionResult>
 }
 
 /** Change one day's clock-in/out on a main job (step 1 set them; days can differ). */
-export async function updateMissionDutyHoursAction(input: { projectId: string; missionId: string; date: string; start: string; end: string }): Promise<ActionResult> {
+export async function updateMissionDutyHoursAction(input: { projectId: string; missionId: string; date: string; start: string; end: string; applyToFollowing?: boolean }): Promise<ActionResult> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !isClock(input.start) || !isClock(input.end) || input.start === input.end) {
     return actionFailure("เวลาเข้า-ออกงานไม่ถูกต้อง");
   }
@@ -204,12 +204,16 @@ export async function updateMissionDutyHoursAction(input: { projectId: string; m
     .maybeSingle();
   if (readError || !mission) return actionFailure("ไม่พบภารกิจหลัก");
   const metadata = (mission.metadata ?? {}) as Record<string, unknown>;
-  const days = mainJobDays({ plannedStartTime: mission.planned_start_time, plannedEndTime: mission.planned_end_time, metadata });
-  if (input.date < days.from || input.date > days.to) return actionFailure("วันนี้อยู่นอกช่วงของภารกิจหลัก");
+  const range = mainJobDays({ plannedStartTime: mission.planned_start_time, plannedEndTime: mission.planned_end_time, metadata });
+  if (input.date < range.from || input.date > range.to) return actionFailure("วันนี้อยู่นอกช่วงของภารกิจหลัก");
 
-  const dutyHours = { ...readDutySchedule(metadata), [input.date]: { start: input.start, end: input.end } };
+  // A change of plan usually holds from that day on: optionally apply it to
+  // every later day of the main job too, leaving earlier days as they were.
+  const dutyHours = { ...readDutySchedule(metadata) };
+  const days = input.applyToFollowing ? daysBetween(input.date, range.to) : [input.date];
+  for (const day of days) dutyHours[day] = { start: input.start, end: input.end };
   const { error: updateError } = await client.from("missions").update({ metadata: { ...metadata, dutyHours } }).eq("id", input.missionId);
   if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "บันทึกเวลาเข้า-ออกงานไม่สำเร็จ"));
   revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
-  return actionSuccess({ date: input.date, start: input.start, end: input.end });
+  return actionSuccess({ days: days.length, start: input.start, end: input.end });
 }
