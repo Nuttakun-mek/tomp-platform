@@ -51,30 +51,30 @@ export function DutyHoursFields({
   return (
     <fieldset className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3">
       {/* A plain heading, not a <legend>: the fieldset border ran through the legend text. */}
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+      <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-ink">
         <Clock3 className="h-4 w-4 text-operation" /> เวลาเข้า-ออกงานของรถ <span className="field-required-badge">*</span>
         <FieldHelp content="ใช้คิด OT: เข้าก่อนเวลาไม่นับ · ออกหลังเวลาออกงานนับเป็น OT ทุกนาที · แก้ภายหลังได้ที่การ์ด Call Sign ในหน้านี้" />
-      </div>
-
-      <div role="radiogroup" aria-label="รูปแบบเวลาเข้า-ออก" className="inline-flex w-fit rounded-full border border-slate-300 bg-slate-50 p-0.5 text-xs font-semibold">
-        {(
-          [
-            ["same", "เหมือนกันทุกวัน"],
-            ["per_day", `กำหนดแต่ละวัน${days.length > 1 ? ` (${days.length} วัน)` : ""}`]
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={mode === value}
-            disabled={value === "per_day" && days.length === 0}
-            onClick={() => choose(value)}
-            className={`rounded-full px-3 py-1.5 transition disabled:opacity-40 ${mode === value ? "bg-operation text-white shadow-sm" : "text-slate-600 hover:text-ink"}`}
-          >
-            {label}
-          </button>
-        ))}
+        {/* The choice sits on the heading row — one line fewer. */}
+        <div role="radiogroup" aria-label="รูปแบบเวลาเข้า-ออก" className="ml-1 inline-flex w-fit rounded-full border border-slate-300 bg-slate-50 p-0.5 text-xs font-semibold">
+          {(
+            [
+              ["same", "เหมือนกันทุกวัน"],
+              ["per_day", `กำหนดแต่ละวัน${days.length > 1 ? ` (${days.length} วัน)` : ""}`]
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={mode === value}
+              disabled={value === "per_day" && days.length === 0}
+              onClick={() => choose(value)}
+              className={`rounded-full px-3 py-1 transition disabled:opacity-40 ${mode === value ? "bg-operation text-white shadow-sm" : "text-slate-600 hover:text-ink"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {mode === "same" ? (
