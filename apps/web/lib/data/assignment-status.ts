@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { getPostgresClient } from "@/lib/db/postgres";
 import { rowLoose, type Row } from "@/lib/data/row";
+import { inWorkDay, workDayWindow } from "@/lib/domain/work-day";
 import { resolveReadClient } from "@/lib/supabase/scoped-client";
 
 export interface AssignmentStatusUpdate {
@@ -49,7 +50,8 @@ function collapseWorkSessions(rows: Row[]): Record<string, AssignmentWorkSession
     result[assignmentId] = {
       status,
       startedAt: started ? rowLoose(started, "created_at") : null,
-      endedAt: ended ? rowLoose(ended, "created_at") : null,
+      // A clock-out from before the latest clock-in belongs to an earlier session.
+      endedAt: ended && (!started || Date.parse(rowLoose(ended, "created_at")) >= Date.parse(rowLoose(started, "created_at"))) ? rowLoose(ended, "created_at") : null,
       latestAt: latest ? rowLoose(latest, "created_at") : null
     };
   }
@@ -90,35 +92,32 @@ export const getLatestAssignmentStatuses = cache(async function getLatestAssignm
   }
 });
 
-// A clock-in belongs to the driver's shift, not to one job — the driver app
-// reads it that way (lib/data/driver-access.ts), so the control room must too,
-// or the second job of a shift shows "ยังไม่บันทึกเวลาเข้า" while the driver is
-// plainly working. A job with no clock-in rows of its own takes its driver's
-// shift, if that shift started within one shift's length and the job is still
-// open. Jobs keep their own rows where they have them.
-const SHIFT_WINDOW_MS = 18 * 60 * 60 * 1000;
+// A clock-in belongs to the driver's working day, not to one job — the driver
+// app reads it that way (lib/data/driver-access.ts), so the control room must
+// too, or the second job of a day shows "ยังไม่บันทึกเวลาเข้า" while the driver
+// is plainly working. A job with no clock-in rows of its own takes its driver's
+// rows from the job's own working day (lib/domain/work-day.ts), if the job is
+// still open — never yesterday's unclosed clock-in for this morning's job.
+// Jobs keep their own rows where they have them.
 const CLOSED_JOB = new Set(["completed", "cancelled", "archived"]);
 
 export function withDriverShifts(rows: Row[], jobs: Row[], now = Date.now()): Record<string, AssignmentWorkSession> {
   const byAssignment = collapseWorkSessions(rows);
-  const recent = rows.filter((row) => now - new Date(rowLoose(row, "created_at")).getTime() <= SHIFT_WINDOW_MS);
   const byDriver = new Map<string, Row[]>();
-  for (const row of recent) {
+  for (const row of rows) {
     const driverId = rowLoose(row, "driver_id");
     if (!driverId) continue;
     byDriver.set(driverId, [...(byDriver.get(driverId) ?? []), row]);
-  }
-  const shifts = new Map<string, AssignmentWorkSession>();
-  for (const [driverId, list] of byDriver) {
-    // Collapse the driver's rows as if they were one job.
-    const shift = collapseWorkSessions(list.map((row) => ({ ...row, assignment_id: driverId })))[driverId];
-    if (shift) shifts.set(driverId, shift);
   }
   for (const job of jobs) {
     const id = rowLoose(job, "id");
     const driverId = rowLoose(job, "driver_id");
     if (!id || !driverId || byAssignment[id] || CLOSED_JOB.has(rowLoose(job, "status"))) continue;
-    const shift = shifts.get(driverId);
+    const day = workDayWindow(rowLoose(job, "start_time") || null, new Date(now));
+    const list = (byDriver.get(driverId) ?? []).filter((row) => inWorkDay(rowLoose(row, "created_at"), day));
+    if (!list.length) continue;
+    // Collapse the driver's rows for that day as if they were one job.
+    const shift = collapseWorkSessions(list.map((row) => ({ ...row, assignment_id: driverId })))[driverId];
     if (shift) byAssignment[id] = shift;
   }
   return byAssignment;
@@ -135,7 +134,7 @@ export const getAssignmentWorkSessions = cache(async function getAssignmentWorkS
         .in("status", ["work_started", "work_ended"])
         .order("created_at", { ascending: false })
         .limit(500),
-      client.from("assignments").select("id, driver_id, status").eq("project_id", projectId)
+      client.from("assignments").select("id, driver_id, status, start_time").eq("project_id", projectId)
     ]);
     if (!error && data) return withDriverShifts(data as Row[], (jobs || []) as Row[]);
   }
@@ -152,7 +151,7 @@ export const getAssignmentWorkSessions = cache(async function getAssignmentWorkS
         order by created_at desc
         limit 500
       `,
-      sql<Row[]>`select id, driver_id, status from assignments where project_id = ${projectId}`
+      sql<Row[]>`select id, driver_id, status, start_time from assignments where project_id = ${projectId}`
     ]);
     return withDriverShifts(rows, jobs);
   } catch {

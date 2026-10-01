@@ -222,10 +222,11 @@ export async function getDriverIssueMessagesByAssignmentIds(assignmentIds: reado
   }
 }
 
-// A unit's chat with the centre is one thread for its working day, not one per
-// job. Loading it per job blanked the driver's conversation the moment the next
-// job took over, while the centre's messages sat on the job that had closed.
-export async function getDriverDayThread(assignmentIds: readonly string[]): Promise<{ messages: DriverIssueMessage[]; notifications: DriverNotification[] }> {
+// A unit's chat with the centre is one thread across all its jobs, not one per
+// job or per day. Per job blanked the conversation the moment the next job took
+// over; per day blanked it the next morning. The latest 100 messages and 30
+// centre messages are kept.
+export async function getDriverUnitThread(assignmentIds: readonly string[]): Promise<{ messages: DriverIssueMessage[]; notifications: DriverNotification[] }> {
   const ids = [...new Set(assignmentIds)].filter(Boolean);
   if (ids.length <= 1) {
     const [messages, notifications] = ids.length
