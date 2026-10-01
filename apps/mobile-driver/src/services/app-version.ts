@@ -15,15 +15,17 @@ const NATIVE_BUILD =
 // Null while the build's own embedded code is running.
 const OTA = !Updates.isEmbeddedLaunch && Updates.updateId ? { id: Updates.updateId.slice(0, 8), createdAt: Updates.createdAt } : null;
 
+// "02102026-00:30" — day, month, year, then the time the update was published,
+// read like a batch number by the people who look at it.
 function stamp(date: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${pad(date.getDate())}${pad(date.getMonth() + 1)}${date.getFullYear()}-${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 /** "1.0.0+10" or "1.0.0+10~2731979c" — what GPS pings carry, so a gap in the data says which code sent it. */
 export const APP_BUILD = `${NATIVE_BUILD ? `${APP_VERSION}+${NATIVE_BUILD}` : APP_VERSION}${OTA ? `~${OTA.id}` : ""}`;
 
-/** "1.0.0 (10)" or "1.0.0 (10) · อัปเดต 25/09 17:26" — what a person reads on screen. */
+/** "1.0.0 (12)" or "1.0.0 (12) · Batch 02102026-00:30" — what a person reads on screen. */
 export const APP_VERSION_LABEL = `${NATIVE_BUILD ? `${APP_VERSION} (${NATIVE_BUILD})` : APP_VERSION}${
-  OTA ? ` · อัปเดต ${OTA.createdAt ? stamp(OTA.createdAt) : OTA.id}` : ""
+  OTA ? ` · Batch ${OTA.createdAt ? stamp(OTA.createdAt) : OTA.id}` : ""
 }`;

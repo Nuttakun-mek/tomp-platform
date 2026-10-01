@@ -166,6 +166,10 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
   const [currentJobAcknowledged, setCurrentJobAcknowledged] = useState(() => initiallyStarted(driverAccess));
   const [outboxCount, setOutboxCount] = useState(0);
   const [gpsStartRequest, setGpsStartRequest] = useState(0);
+  const [gpsStopRequest, setGpsStopRequest] = useState(0);
+  // Every 15s while a job is under way; once a minute otherwise — waiting for
+  // the next job, or the day is done. Each poll wakes the phone's radio.
+  const pollMs = currentJobAcknowledged && tripStep < TRIP_STEPS.length ? 15_000 : 60_000;
   // Starts false on both server and client so hydration matches the server HTML;
   // the layout effect below corrects it before the first paint, so the
   // browser-only nav never flashes inside the app. Reading window in the
@@ -292,7 +296,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
         // Keep the last known state and let the outbox handle user actions.
       }
     }
-    const timer = window.setInterval(poll, 15000);
+    const timer = window.setInterval(poll, pollMs);
     const onVisible = () => {
       if (document.visibilityState === "visible") void poll();
     };
@@ -303,7 +307,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [driverAccess.token, ids.assignmentId, router, setMeta]);
+  }, [driverAccess.token, ids.assignmentId, pollMs, router, setMeta]);
 
   useLayoutEffect(() => {
     const updateShellState = () => setInsideNativeShell(isInsideMobileShell(window));
@@ -386,7 +390,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
 
   function updateWorkSession(status: WorkSessionStatus) {
     if (status === "work_ended") {
-      const ok = window.confirm("ต้องการบันทึกเวลาสิ้นสุดการปฏิบัติงานหรือไม่ การดำเนินการนี้ใช้สำหรับบันทึกเวลาออก ไม่ใช่การปิดรายการปฏิบัติงาน");
+      const ok = window.confirm("ต้องการบันทึกเวลาสิ้นสุดการปฏิบัติงานหรือไม่ การดำเนินการนี้ใช้สำหรับบันทึกเวลาออก ไม่ใช่การปิดรายการปฏิบัติงาน และจะหยุดส่งตำแหน่ง GPS");
       if (!ok) return;
     }
     const now = new Date().toISOString();
@@ -406,13 +410,15 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
           endedAt: status === "work_ended" ? now : null,
           latestAt: now
         }));
-        setBanner({ tone: "ok", text: status === "work_started" ? "บันทึกเวลาเริ่มปฏิบัติงานแล้ว และเริ่มส่งตำแหน่ง GPS" : "บันทึกเวลาสิ้นสุดปฏิบัติงานแล้ว" });
+        setBanner({ tone: "ok", text: status === "work_started" ? "บันทึกเวลาเริ่มปฏิบัติงานแล้ว และเริ่มส่งตำแหน่ง GPS" : "บันทึกเวลาสิ้นสุดปฏิบัติงานแล้ว และหยุดส่งตำแหน่ง GPS" });
       } else {
         enqueueFailed("status", payload, result.error || "บันทึกเวลาปฏิบัติงานไม่สำเร็จ ระบบจะส่งข้อมูลอีกครั้งเมื่อเชื่อมต่อได้");
       }
       // Sharing starts either way: a clock-in queued for a weak signal still
       // means the driver is on the road now.
       if (status === "work_started") setGpsStartRequest((count) => count + 1);
+      // And stops with the shift, either way: the driver has gone home.
+      if (status === "work_ended") setGpsStopRequest((count) => count + 1);
     });
   }
 
@@ -735,7 +741,7 @@ export function DriverTaskView({ driverAccess, view: initialView = "home" }: { d
             เปิดในแอป TOMP Driver เพื่อส่ง GPS ต่อเนื่องเมื่อปิดจอ
           </a>
         ) : null}
-        <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} startRequest={gpsStartRequest} />
+        <DriverLocationShare driverAccess={driverAccess} onStatusChange={setGpsLight} startRequest={gpsStartRequest} stopRequest={gpsStopRequest} />
       </section> : null}
 
       {showAssignments ? (

@@ -6,12 +6,12 @@ import type { DriverLocationUpdateInput } from "@tomp/types/schemas";
 import {
   decideLocationSend,
   LOCATION_HEARTBEAT_MS,
-  LOCATION_MOVED_METERS,
   shouldReportDiagnostic,
   type LastSentFix
 } from "@tomp/driver-core";
 import { BACKGROUND_GPS_ENABLED, LOCATION_TASK_NAME } from "../config";
 import { submitLocation } from "./driver-api";
+import { ACTIVE_GPS_PRESET } from "./gps-presets";
 import { enqueueOfflineAction } from "./offline-queue";
 import { getMobileDriverSession, type MobileDriverSession } from "./mobile-session-store";
 
@@ -78,7 +78,7 @@ let lastSharedLocation: { latitude: number; longitude: number; accuracy: number 
 // fix is kept, and every tick offers it to the same send rule, which still
 // decides whether anything goes out. Harmless on Android, where the callbacks
 // already arrive; on iOS it is the only thing keeping a parked driver alive.
-const HEARTBEAT_TICK_MS = 30_000;
+const HEARTBEAT_TICK_MS = ACTIVE_GPS_PRESET.heartbeatTickMs;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
 export function resetLocationThrottle() {
@@ -158,6 +158,7 @@ function backgroundLocationPayload(
     metadata: {
       platform: "mobile_driver",
       mode,
+      gpsPreset: ACTIVE_GPS_PRESET.id,
       ...metadata
     }
   };
@@ -378,6 +379,7 @@ async function submitOrQueueLocation(input: Parameters<typeof submitLocation>[0]
       clientEventId: (input.metadata as Record<string, unknown> | undefined)?.clientEventId ?? createLocationClientEventId(input.recordedAt, input.trackingEvent ?? "location_ping"),
       heartbeatMs: LOCATION_HEARTBEAT_MS,
       appBuild: APP_BUILD,
+      gpsPreset: ACTIVE_GPS_PRESET.id,
       ...(idle ? { idle: true } : {})
     }
   };
@@ -436,7 +438,7 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
 
   foregroundWatch = await Location.watchPositionAsync(
     {
-      accuracy: Location.Accuracy.High,
+      accuracy: ACTIVE_GPS_PRESET.foreground.accuracy,
       // Android is time-driven: ask for a tick every 10s and let the send rule
       // throttle it. `distanceInterval: 0` is safe there because `timeInterval`
       // bounds how often the callback fires.
@@ -447,8 +449,8 @@ export async function startForegroundLocationSharing(onLocation: LocationCallbac
       // gets a real distance gate instead, matched to the distance the send rule
       // already treats as movement, and the heartbeat timer covers standing
       // still.
-      distanceInterval: Platform.OS === "ios" ? LOCATION_MOVED_METERS : 0,
-      timeInterval: 10000
+      distanceInterval: Platform.OS === "ios" ? ACTIVE_GPS_PRESET.foreground.iosDistanceMeters : 0,
+      timeInterval: ACTIVE_GPS_PRESET.foreground.timeIntervalMs
     },
     (location) => {
       onLocation(location);
@@ -519,7 +521,7 @@ export async function startBackgroundLocationSharing(): Promise<BackgroundLocati
       // 100m readings repeating the same coordinates for twenty minutes. The web
       // page has always asked for high accuracy, which is why this only appeared
       // when drivers moved from the browser to the app.
-      accuracy: Location.Accuracy.High,
+      accuracy: ACTIVE_GPS_PRESET.background.accuracy,
       // Deliberately 0 on both platforms — the opposite of the foreground
       // watcher, and for a reason that only shows up in the background.
       //
@@ -534,8 +536,8 @@ export async function startBackgroundLocationSharing(): Promise<BackgroundLocati
       // OS may hand us a fix every thirty seconds, but at most one per heartbeat
       // reaches the server while the vehicle stands still. The OS talking to us
       // often is cheap; us talking to the server often is not.
-      distanceInterval: 0,
-      timeInterval: 30000,
+      distanceInterval: ACTIVE_GPS_PRESET.background.distanceMeters,
+      timeInterval: ACTIVE_GPS_PRESET.background.timeIntervalMs,
       // iOS only. Tells CoreLocation this is a vehicle rather than the default
       // "other", which is how it decides when GPS may be powered down, and shows
       // the blue status bar while the app tracks in the background — the driver

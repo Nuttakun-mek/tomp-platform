@@ -39,6 +39,25 @@ describe("DriverLocationShare", () => {
     expect(starts()).toBe(1);
   });
 
+  it("stops sharing when the page signals a clock-out, and never holds the screen on inside the app", () => {
+    const postMessage = installShell();
+    const wakeRequest = vi.fn(async () => ({ release: async () => undefined }));
+    Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: wakeRequest } });
+    // Sharing on (consent stored), then the page comes back into view: a
+    // browser would take a wake lock here; the app must not.
+    const { rerender } = render(<DriverLocationShare driverAccess={access} startRequest={1} stopRequest={0} />);
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(wakeRequest).not.toHaveBeenCalled();
+
+    const stops = () => postMessage.mock.calls.filter(([m]) => m.type === "gps.stop").length;
+    expect(stops()).toBe(0);
+    rerender(<DriverLocationShare driverAccess={access} startRequest={1} stopRequest={1} />);
+    expect(stops()).toBe(1);
+    delete (navigator as { wakeLock?: unknown }).wakeLock;
+  });
+
   it("keeps an 'Always' warning up when the app reports background permission denied", () => {
     installShell("ios");
     render(<DriverLocationShare driverAccess={access} />);

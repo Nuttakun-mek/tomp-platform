@@ -39,6 +39,8 @@ interface DriverLocationShareProps {
   onStatusChange?: (status: LocationSignal) => void;
   /** Bumped by the page when the driver clocks in: start sharing without a second tap. */
   startRequest?: number;
+  /** Bumped when the driver clocks out: sharing stops with the shift. */
+  stopRequest?: number;
 }
 
 function alwaysKey(token: string) {
@@ -118,7 +120,7 @@ function shareStateClasses(state: ShareState) {
   };
 }
 
-export function DriverLocationShare({ driverAccess, onStatusChange, startRequest = 0 }: DriverLocationShareProps) {
+export function DriverLocationShare({ driverAccess, onStatusChange, startRequest = 0, stopRequest = 0 }: DriverLocationShareProps) {
   const [state, setState] = useState<ShareState>("idle");
   const [message, setMessage] = useState("ยังไม่ได้ส่งตำแหน่ง GPS");
   const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
@@ -135,6 +137,7 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
   const [alwaysNeeded, setAlwaysNeeded] = useState(false);
   const [shellPlatform, setShellPlatform] = useState<string | null>(null);
   const handledStartRef = useRef(0);
+  const handledStopRef = useRef(0);
   const lastSentRef = useRef<LastSentFix | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
@@ -151,6 +154,10 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
   );
 
   const requestWakeLock = useCallback(async () => {
+    // Only for a plain browser, where the page itself is the GPS sender and a
+    // dark screen stops it. Inside the app the native service keeps sending
+    // with the screen off, so holding the screen on only burned the battery.
+    if (getMobileShell(window)) return;
     const nav = navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinelLike> } };
     if (!nav.wakeLock || wakeLockRef.current) return;
     try {
@@ -374,6 +381,14 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
     setSignal("off");
     setMessage("หยุดส่งตำแหน่ง GPS แล้ว");
   }, [driverAccess.token, postLocation, releaseWakeLock, setSignal]);
+
+  // Clocking out ends the shift, and GPS with it: a phone left sharing all
+  // night after the last job was the largest avoidable drain on the battery.
+  useEffect(() => {
+    if (!stopRequest || stopRequest === handledStopRef.current) return;
+    handledStopRef.current = stopRequest;
+    void stopSharing();
+  }, [stopRequest, stopSharing]);
 
   useEffect(() => {
     const requestNativeStatus = () => {
