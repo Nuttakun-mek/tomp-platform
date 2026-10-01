@@ -1,16 +1,19 @@
+import { Fragment } from "react";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Download } from "lucide-react";
+import { Download, Filter } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DataUnavailable } from "@/components/ui/data-unavailable";
+import { DAY_CLOSE_COLUMNS, DayCloseHead, DayCloseMetrics, DayCloseRowView, Metric, money, hours } from "@/components/day-close/day-close-table";
 import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/rbac";
-import { bangkokToday, getDayClose } from "@/lib/data/day-close";
+import { bangkokToday, getDayClose, getDayCloseRange, DAY_CLOSE_MAX_DAYS } from "@/lib/data/day-close";
 import { getProjectByCode } from "@/lib/data/projects";
-import { DutyAdjustDialog } from "@/components/day-close/duty-adjust-dialog";
-import { timeOnDay } from "@/lib/export/day-close-workbook";
+import { DAY_CLOSE_FLAGS, filterDayCloseDays, totalsOf, type DayCloseFlag } from "@/lib/domain/day-close";
+import { dayCloseFilterQuery, parseDayCloseFilter } from "@/lib/domain/day-close-filter";
+import { dayLabel } from "@/lib/export/day-close-workbook";
 
-const money = (value: number | null | undefined) => (value == null ? "—" : value.toLocaleString("th-TH", { maximumFractionDigits: 2 }));
-const hours = (value: number | null | undefined) => (value == null ? "—" : value.toLocaleString("th-TH", { maximumFractionDigits: 2 }));
+type Search = Record<string, string | string[] | undefined>;
 
 function shiftDate(date: string, days: number) {
   const at = new Date(`${date}T12:00:00+07:00`);
@@ -18,7 +21,9 @@ function shiftDate(date: string, days: number) {
   return at.toISOString().slice(0, 10);
 }
 
-export default async function DayClosePage({ params, searchParams }: { params: Promise<{ projectCode: string }>; searchParams?: Promise<{ date?: string }> }) {
+const pill = "rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600";
+
+export default async function DayClosePage({ params, searchParams }: { params: Promise<{ projectCode: string }>; searchParams?: Promise<Search> }) {
   const { projectCode } = await params;
   const viewer = await getCurrentUserProfile();
   if (!viewer.authUserId && !viewer.isDevelopmentFallback) redirect("/login");
@@ -28,11 +33,147 @@ export default async function DayClosePage({ params, searchParams }: { params: P
   if (!permission.allowed) notFound();
   const canAdjust = (await requirePermission(project.id, "mission.create")).allowed;
 
-  const query = searchParams ? await searchParams : {};
+  const query: Search = searchParams ? await searchParams : {};
   const today = bangkokToday();
-  const date = query.date && /^\d{4}-\d{2}-\d{2}$/.test(query.date) ? query.date : today;
-  const { rows, totals, loadError } = await getDayClose(project.id, date);
   const base = `/projects/${projectCode}/ground-transfer/day-close`;
+  const rangeView = query.view === "range";
+  const tabs = (
+    <nav aria-label="มุมมองสรุปปิดวัน" className="inline-flex w-fit rounded-full border border-slate-300 bg-white p-0.5 text-[13px] font-semibold">
+      <Link href={base} className={`rounded-full px-3.5 py-1.5 ${rangeView ? "text-slate-600" : "bg-operation text-white"}`} aria-current={rangeView ? undefined : "page"}>
+        รายวัน
+      </Link>
+      <Link href={`${base}?view=range`} className={`rounded-full px-3.5 py-1.5 ${rangeView ? "bg-operation text-white" : "text-slate-600"}`} aria-current={rangeView ? "page" : undefined}>
+        ทั้งโครงการ
+      </Link>
+    </nav>
+  );
+
+  if (rangeView) {
+    const fallback = {
+      from: /^\d{4}-\d{2}-\d{2}$/.test(project.startDate ?? "") ? project.startDate : shiftDate(today, -29),
+      to: /^\d{4}-\d{2}-\d{2}$/.test(project.endDate ?? "") ? project.endDate : today
+    };
+    const filter = parseDayCloseFilter(query, fallback);
+    const range = await getDayCloseRange(project.id, filter.from, filter.to);
+    const days = filterDayCloseDays(range.days, filter);
+    const totals = totalsOf(days.flatMap((day) => day.rows));
+    const filtered = filter.units.length > 0 || filter.flags.length > 0;
+    const unitsInRange = new Set(range.days.flatMap((day) => day.rows.map((row) => row.unitId)));
+    const unitOptions = range.units.filter((unit) => unitsInRange.has(unit.id) || filter.units.includes(unit.id));
+
+    return (
+      <div className="grid gap-4">
+        <PageHeader
+          eyebrow="สรุปปิดวัน · ทั้งโครงการ"
+          title={`${dayLabel(filter.from)} – ${dayLabel(filter.to)}`}
+          description={`${days.length} วันที่มีงาน${filtered ? " ตามตัวกรอง" : ""} · กดวันที่เพื่อดูรายวันและแก้เวลา`}
+          actions={
+            <a href={`${base}/export?${dayCloseFilterQuery(filter)}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-command bg-operation px-3.5 text-[13px] font-semibold text-white shadow-sm">
+              <Download className="h-4 w-4" /> ดาวน์โหลด Excel (แยกแท็บตามวัน)
+            </a>
+          }
+        />
+        {tabs}
+
+        <form method="get" className="grid gap-3 rounded-panel border border-border bg-white p-3 shadow-sm">
+          <input type="hidden" name="view" value="range" />
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid gap-1 text-[11px] font-semibold text-slate-600">
+              ตั้งแต่
+              <input type="date" name="from" defaultValue={filter.from} className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-sm" />
+            </label>
+            <label className="grid gap-1 text-[11px] font-semibold text-slate-600">
+              ถึง
+              <input type="date" name="to" defaultValue={filter.to} className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-sm" />
+            </label>
+            <details className="relative">
+              <summary className="flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700">
+                Call Sign {filter.units.length ? `(${filter.units.length})` : "ทั้งหมด"}
+              </summary>
+              <div className="absolute z-20 mt-1 grid max-h-72 w-80 gap-0.5 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                {unitOptions.length ? (
+                  unitOptions.map((unit) => (
+                    <label key={unit.id} className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-[13px] hover:bg-slate-50">
+                      <input type="checkbox" name="unit" value={unit.id} defaultChecked={filter.units.includes(unit.id)} className="mt-0.5" />
+                      <span>
+                        <span className="font-semibold text-ink">{unit.label}</span>
+                        <span className="block text-[11px] text-slate-500">{[unit.driverName, unit.plate].filter(Boolean).join(" · ") || "—"}</span>
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="px-2 py-1.5 text-[12px] text-slate-500">ยังไม่มีหน่วยที่มีงานในช่วงนี้</p>
+                )}
+              </div>
+            </details>
+            <button type="submit" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-operation px-3.5 text-[13px] font-semibold text-white">
+              <Filter className="h-4 w-4" /> กรอง
+            </button>
+            {filtered ? (
+              <Link href={`${base}?view=range&from=${filter.from}&to=${filter.to}`} className="text-xs font-semibold text-operation hover:underline">
+                ล้างตัวกรอง
+              </Link>
+            ) : null}
+          </div>
+          <fieldset className="flex flex-wrap items-center gap-1.5">
+            <legend className="sr-only">แสดงเฉพาะ</legend>
+            <span className="text-[11px] font-semibold text-slate-500">แสดงเฉพาะ:</span>
+            {(Object.entries(DAY_CLOSE_FLAGS) as Array<[DayCloseFlag, string]>).map(([flag, label]) => (
+              <label key={flag} className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[12px] text-slate-700 has-[:checked]:border-operation has-[:checked]:bg-operation-soft has-[:checked]:text-operation">
+                <input type="checkbox" name="flag" value={flag} defaultChecked={filter.flags.includes(flag)} className="h-3.5 w-3.5" />
+                {label}
+              </label>
+            ))}
+          </fieldset>
+        </form>
+
+        {range.loadError ? <DataUnavailable description="โหลดข้อมูลบางส่วนไม่สำเร็จ" detail={range.loadError} /> : null}
+        {range.truncated ? (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">แสดงได้ครั้งละ {DAY_CLOSE_MAX_DAYS} วัน — เลือกช่วงวันที่ให้สั้นลงเพื่อดูส่วนที่เหลือ</p>
+        ) : null}
+
+        <DayCloseMetrics totals={totals} lead={<Metric label="วันที่มีงาน · หน่วย-วัน" value={`${days.length} วัน · ${totals.units}`} />} />
+
+        {days.length ? (
+          <div className="overflow-x-auto rounded-panel border border-border bg-white shadow-sm">
+            <table className="w-full min-w-[64rem] text-left text-[13px]">
+              <DayCloseHead />
+              <tbody>
+                {days.map((day) => (
+                  <Fragment key={day.date}>
+                    <tr className="border-t-2 border-slate-200 bg-slate-50">
+                      <td colSpan={DAY_CLOSE_COLUMNS} className="px-3 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Link href={`${base}?date=${day.date}`} className="text-[13px] font-bold text-operation hover:underline">
+                            {dayLabel(day.date)}
+                          </Link>
+                          <span className="text-[12px] tabular-nums text-slate-600">
+                            {day.totals.units} หน่วย · งาน {day.totals.jobsDone}/{day.totals.jobs} · {hours(day.totals.hours)} ชม.
+                            {day.totals.overtimeHours ? <span className="font-semibold text-amber-800"> · OT {hours(day.totals.overtimeHours)} ชม.</span> : null}
+                            <span className="font-semibold text-ink"> · {money(day.totals.total)} บ.</span>
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {day.rows.map((row) => (
+                      <DayCloseRowView key={`${day.date}:${row.unitId}`} row={row} date={day.date} projectId={project.id} canAdjust={canAdjust} />
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="rounded-panel border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+            {filtered ? "ไม่มีรายการตามตัวกรองนี้" : "ไม่มีงานในช่วงวันที่นี้"}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const date = typeof query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.date) ? query.date : today;
+  const { rows, totals, loadError } = await getDayClose(project.id, date);
   const label = new Intl.DateTimeFormat("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(
     new Date(`${date}T12:00:00+07:00`)
   );
@@ -44,24 +185,22 @@ export default async function DayClosePage({ params, searchParams }: { params: P
         title={label}
         description={date === today ? "วันนี้ — คนขับที่ยังไม่บันทึกเวลาออกนับถึงตอนนี้" : undefined}
         actions={
-          <a
-            href={`${base}/export?date=${date}`}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-command bg-operation px-3.5 text-[13px] font-semibold text-white shadow-sm"
-          >
+          <a href={`${base}/export?date=${date}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-command bg-operation px-3.5 text-[13px] font-semibold text-white shadow-sm">
             <Download className="h-4 w-4" /> ดาวน์โหลด Excel
           </a>
         }
       />
+      {tabs}
 
       <form method="get" className="flex flex-wrap items-center gap-2">
-        <a href={`${base}?date=${shiftDate(date, -1)}`} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+        <a href={`${base}?date=${shiftDate(date, -1)}`} className={pill}>
           ← วันก่อน
         </a>
         <input type="date" name="date" defaultValue={date} className="h-9 rounded-xl border border-slate-300 bg-white px-3 text-sm" />
-        <button type="submit" className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+        <button type="submit" className={pill}>
           ดูวันนี้
         </button>
-        <a href={`${base}?date=${shiftDate(date, 1)}`} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+        <a href={`${base}?date=${shiftDate(date, 1)}`} className={pill}>
           วันถัดไป →
         </a>
         {date !== today ? (
@@ -73,87 +212,15 @@ export default async function DayClosePage({ params, searchParams }: { params: P
 
       {loadError ? <DataUnavailable description="โหลดข้อมูลบางส่วนไม่สำเร็จ" detail={loadError} /> : null}
 
-      <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        <Metric label="หน่วยที่มีงาน" value={`${totals.units}`} />
-        <Metric label="งานเสร็จ" value={`${totals.jobsDone} / ${totals.jobs}`} />
-        <Metric label="ชั่วโมงที่คิด" value={hours(totals.hours)} />
-        <Metric label="OT" value={`${hours(totals.overtimeHours)} ชม. · ${money(totals.overtimeAmount)} บ.`} tone={totals.overtimeHours ? "warning" : undefined} />
-        <Metric label="ยอดรวมโดยประมาณ" value={`${money(totals.total)} บ.`} tone="strong" />
-      </section>
-      {totals.unpriced ? (
-        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">{totals.unpriced} หน่วยยังไม่มีอัตราค่าบริการที่รถ — ไม่รวมในยอด</p>
-      ) : null}
+      <DayCloseMetrics totals={totals} />
 
       {rows.length ? (
         <div className="overflow-x-auto rounded-panel border border-border bg-white shadow-sm">
           <table className="w-full min-w-[64rem] text-left text-[13px]">
-            <thead className="bg-slate-50 text-[11px] text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Call Sign</th>
-                <th className="px-3 py-2">งาน</th>
-                <th className="px-3 py-2">เวลางาน · เลิกงาน</th>
-                <th className="px-3 py-2">เข้า–ออกงาน</th>
-                <th className="px-3 py-2 text-right">ชม. ที่คิด</th>
-                <th className="px-3 py-2 text-right">OT</th>
-                <th className="px-3 py-2 text-right">ค่าบริการ</th>
-                <th className="px-3 py-2 text-right">ค่า OT</th>
-                <th className="px-3 py-2 text-right">รวม</th>
-                <th className="px-3 py-2">หมายเหตุ</th>
-              </tr>
-            </thead>
+            <DayCloseHead />
             <tbody>
               {rows.map((row) => (
-                <tr key={row.unitId} className="border-t border-slate-100 align-top">
-                  <td className="px-3 py-2">
-                    <span className="font-semibold text-ink">{row.label}</span>
-                    <span className="block text-[11px] text-slate-500">
-                      {[row.driverName, row.plate].filter(Boolean).join(" · ") || "—"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 tabular-nums">
-                    {row.jobsDone}/{row.jobs}
-                  </td>
-                  <td className="px-3 py-2 tabular-nums">
-                    {timeOnDay(row.cost.dutyStart, date)}–{timeOnDay(row.cost.scheduledEnd, date)}
-                    {row.cost.source === "sub_jobs" ? <span className="block text-[10px] text-amber-700">ตามงานย่อย</span> : null}
-                    {row.cost.endBasis !== "scheduled" ? (
-                      <span className={`block text-[11px] font-semibold ${row.cost.endBasis === "adjusted" ? "text-route" : "text-amber-800"}`}>
-                        เลิกงาน {timeOnDay(row.cost.dutyEnd, date)} {row.cost.endBasis === "adjusted" ? "(ศูนย์แก้)" : "(เข้าช้า)"}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 tabular-nums">
-                    {row.clockIn ? timeOnDay(row.clockIn, date) : "—"}–{row.clockOut ? timeOnDay(row.clockOut, date) : "—"}
-                    {row.cost.clockOutAdjusted ? <span className="block text-[10px] font-semibold text-route">ออกงาน: ศูนย์แก้</span> : null}
-                    {canAdjust && !row.unitId.startsWith("job:") ? (
-                      <span className="block">
-                        <DutyAdjustDialog
-                          projectId={project.id}
-                          callSignId={row.unitId}
-                          date={date}
-                          label={row.label}
-                          computedEnd={row.cost.computedEnd}
-                          scheduledEnd={row.cost.scheduledEnd}
-                          dutyEnd={row.cost.dutyEnd}
-                          recordedClockOut={row.cost.recordedClockOut}
-                          clockOut={row.cost.clockOut}
-                          adjusted={Boolean(row.adjustment)}
-                          reason={row.adjustment?.reason ?? null}
-                        />
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{hours(row.cost.scheduledHours + row.cost.overtimeHours)}</td>
-                  <td className={`px-3 py-2 text-right tabular-nums ${row.cost.overtimeHours ? "font-semibold text-amber-800" : "text-slate-400"}`}>
-                    {row.cost.overtimeHours ? hours(row.cost.overtimeHours) : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{money(row.cost.baseAmount)}</td>
-                  <td className={`px-3 py-2 text-right tabular-nums ${row.cost.overtimeAmount ? "text-amber-800" : "text-slate-400"}`}>
-                    {row.cost.overtimeAmount ? money(row.cost.overtimeAmount) : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums">{money(row.cost.total)}</td>
-                  <td className="px-3 py-2 text-[11px] text-slate-600">{row.notes.length ? row.notes.join(" · ") : <span className="text-emerald-700">ครบ</span>}</td>
-                </tr>
+                <DayCloseRowView key={row.unitId} row={row} date={date} projectId={project.id} canAdjust={canAdjust} />
               ))}
             </tbody>
           </table>
@@ -161,15 +228,6 @@ export default async function DayClosePage({ params, searchParams }: { params: P
       ) : (
         <p className="rounded-panel border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">ไม่มีงานในวันนี้</p>
       )}
-    </div>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "warning" | "strong" }) {
-  return (
-    <div className={`rounded-panel border px-3 py-2 ${tone === "warning" ? "border-amber-200 bg-amber-50" : tone === "strong" ? "border-teal-200 bg-teal-50" : "border-border bg-white"}`}>
-      <p className="text-[11px] font-semibold text-slate-500">{label}</p>
-      <p className={`text-base font-bold tabular-nums ${tone === "warning" ? "text-amber-900" : "text-ink"}`}>{value}</p>
     </div>
   );
 }
