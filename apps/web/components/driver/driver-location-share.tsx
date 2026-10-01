@@ -46,6 +46,14 @@ function alwaysKey(token: string) {
 }
 
 // iOS and Android name the setting differently; say it the way the phone does.
+// Neither iOS nor Android offers "Always" in the first location dialog — the
+// driver who looks for it there does not find it, picks "Once", and the second
+// step never comes. Say what each dialog will ask before it does.
+const FIRST_PROMPTS: Record<string, string> = {
+  ios: "ระบบจะถามสิทธิ์ตำแหน่ง 2 ครั้ง: ครั้งแรกเลือก “ขณะใช้แอป” (ไม่ใช่ “ครั้งเดียว”) ครั้งที่สองเลือก “เปลี่ยนเป็นอนุญาตตลอดเวลา” — ถ้าไม่มีครั้งที่สอง ให้ไปตั้งที่ ตั้งค่า → TOMP Driver → ตำแหน่ง → “ตลอดเวลา”",
+  android: "ครั้งแรกเลือก “ขณะใช้แอป” จากนั้นระบบจะพาไปหน้าตั้งค่า ให้เลือก “อนุญาตตลอดเวลา” แล้วกดย้อนกลับมาที่แอป"
+};
+
 const ALWAYS_STEPS: Record<string, string> = {
   ios: "ตั้งค่า → TOMP Driver → ตำแหน่ง → เลือก “ตลอดเวลา” และเปิด “ตำแหน่งที่แม่นยำ”",
   android: "ตั้งค่า → แอป → TOMP Driver → สิทธิ์ → ตำแหน่ง → เลือก “อนุญาตตลอดเวลา” และเปิด “ใช้ตำแหน่งที่แน่นอน”"
@@ -454,6 +462,11 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
 
   useEffect(() => {
     const handleVisibility = () => {
+      // Back from Settings, typically: the app reports whether "Always" now holds.
+      if (document.visibilityState === "visible") {
+        const shell = getMobileShell(window);
+        if (shell?.canBackgroundLocation) shell.postMessage(buildBridgeMessage("gps.status.request", { reason: "page_visible" }));
+      }
       if (document.visibilityState === "visible" && window.localStorage.getItem(consentKey(driverAccess.token)) === "1") {
         void requestWakeLock();
         if (watchIdRef.current == null) void startSharing();
@@ -556,7 +569,21 @@ export function DriverLocationShare({ driverAccess, onStatusChange, startRequest
           <p>ตอนนี้ส่งตำแหน่งได้เฉพาะตอนเปิดแอป เมื่อปิดจอหรือสลับแอป ศูนย์ควบคุมจะไม่เห็นรถของคุณ</p>
           <p className="font-semibold">{ALWAYS_STEPS[shellPlatform] ?? ALWAYS_STEPS.ios}</p>
           <p>กดปุ่ม “ตั้งค่าอุปกรณ์” ด้านบนเพื่อไปที่การตั้งค่าได้ทันที</p>
+          <button
+            type="button"
+            onClick={() => {
+              // A repeat start is where the app picks up a new "Always" grant.
+              getMobileShell(window)?.postMessage(buildBridgeMessage("gps.start", { reason: "always_recheck" }));
+              setMessage("กำลังตรวจสิทธิ์ตำแหน่งอีกครั้ง");
+            }}
+            className="mt-1 min-h-10 rounded-lg border border-amber-400 bg-white px-3 text-[13px] font-bold text-amber-900"
+          >
+            ตั้งค่าแล้ว ตรวจอีกครั้ง
+          </button>
+          <p className="text-[11px] text-amber-800">ถ้าคำเตือนยังไม่หาย ให้กด “ขอหยุดส่งตำแหน่ง” แล้วเริ่มส่งใหม่หนึ่งครั้ง</p>
         </div>
+      ) : shellPlatform && !isSharing ? (
+        <p className="mx-3.5 mb-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-[12px] leading-5 text-blue-900">{FIRST_PROMPTS[shellPlatform] ?? FIRST_PROMPTS.ios}</p>
       ) : null}
 
       {cardOpen ? (

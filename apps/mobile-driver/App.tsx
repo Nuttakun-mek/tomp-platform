@@ -230,18 +230,43 @@ function DriverShell() {
     `);
   }, []);
 
+  // Background sharing starts the moment the OS allows it, not only on a fresh
+  // "share": iOS never offers "Always" in its first prompt, so the driver sets
+  // it in Settings afterwards — and the app used to notice only after sharing
+  // was stopped and started again, while the page kept its "ตั้งค่าเป็น
+  // ตลอดเวลา" warning up. Starting is safe to repeat: it checks the live grant
+  // and shows no dialog. Null when nothing is being shared.
+  const backgroundStartRef = useRef<ReturnType<typeof startBackgroundLocationSharing> | null>(null);
+  const ensureBackgroundSharing = useCallback(async () => {
+    if (isForegroundSharing()) {
+      // A page load asks twice, 600ms apart: one start at a time.
+      backgroundStartRef.current ??= startBackgroundLocationSharing().finally(() => {
+        backgroundStartRef.current = null;
+      });
+      const result = await backgroundStartRef.current;
+      if (result.started && result.reason === "started") void promptBatteryExemptionOnce();
+      return result;
+    }
+    if (await isLocationSharingActive()) return { started: true, reason: "already_started" as const, message: "เปิด GPS เบื้องหลังไว้แล้ว" };
+    return null;
+  }, []);
+
+  // The answer to "are you sharing?". Foreground-only sharing (before "Always"
+  // is granted) is sharing too — it used to be reported as stopped — and every
+  // answer carries the background result, so the page's warning follows the
+  // phone's real setting.
   const postLocationSharingStatus = useCallback(async () => {
-    if (await isLocationSharingActive()) {
+    const backgroundGps = await ensureBackgroundSharing();
+    if (backgroundGps) {
       const lastLocation = getLastSharedLocation();
-      postStatusToWeb(
-        "gps_sharing",
-        "กำลังส่งตำแหน่ง GPS จากแอปอยู่",
-        lastLocation ? { ...lastLocation, source: "native_last_shared_location" } : undefined
-      );
+      postStatusToWeb("gps_sharing", backgroundGps.started ? "กำลังส่งตำแหน่ง GPS จากแอปอยู่" : backgroundGps.message, {
+        ...(lastLocation ? { ...lastLocation, source: "native_last_shared_location" } : {}),
+        backgroundGps
+      });
     } else {
       postStatusToWeb("gps_stopped", "ยังไม่ได้เริ่มส่งตำแหน่ง GPS");
     }
-  }, [postStatusToWeb]);
+  }, [ensureBackgroundSharing, postStatusToWeb]);
 
   const flushOutbox = useCallback(async () => {
     const session = await getMobileDriverSession();
@@ -423,10 +448,11 @@ function DriverShell() {
       }
 
       // A repeat gps.start (the web "share again" button) must not stack a
-      // second watcher on top of the running one.
+      // second watcher on top of the running one — but it is the moment to
+      // pick up an "Always" the driver has just granted in Settings.
       if (isForegroundSharing()) {
         setLocationSharingActive(true);
-        postStatusToWeb("gps_sharing", "กำลังส่งตำแหน่ง GPS จากแอปอยู่แล้ว");
+        await postLocationSharingStatus();
         return;
       }
 
@@ -618,6 +644,9 @@ function DriverShell() {
         backgroundedAtRef.current = null;
         if (away > 10 * 60 * 1000) webViewRef.current?.reload();
         void flushOutbox();
+        // Back from Settings, typically: start background sharing if "Always"
+        // was just granted, and tell the page either way.
+        if (isForegroundSharing()) void postLocationSharingStatus();
         // The driver is looking at the app, so anything still queued in the
         // shade has been seen. Clearing it here is what actually brings the
         // launcher badge back down.
@@ -634,7 +663,7 @@ function DriverShell() {
       appStateSubscription.remove();
       clearInterval(interval);
     };
-  }, [flushOutbox]);
+  }, [flushOutbox, postLocationSharingStatus]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
