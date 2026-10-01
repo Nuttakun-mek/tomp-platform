@@ -181,7 +181,9 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions
         const location = locationByAssignment.get(assignment.id);
         const freshness = freshnessOf(location, effectiveNow);
         const messages = inboundByAssignment.get(assignment.id) ?? [];
+        // New = not yet seen in the chat; a problem report stays a problem until closed.
         const openMessages = messages.filter((message) => message.status !== "closed");
+        const newMessages = messages.filter((message) => message.status === "open");
         const meta = assignment.metadata;
         const vehicle = assignment.vehicleId ? vehicleById.get(assignment.vehicleId) : undefined;
         const workSession = workSessions[assignment.id];
@@ -197,7 +199,7 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions
           reported: statuses[assignment.id],
           workSession,
           messages,
-          unread: openMessages.length,
+          unread: newMessages.length,
           hasIssue: openMessages.some((message) => message.kind === "issue"),
           evidence: evidence[assignment.id]
         };
@@ -314,8 +316,10 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions
   const { visible: visibleGroups, hidden, hasMore, expanded: allShown, showAll, reset } = useVisibleSlice(filteredGroups, 15);
 
   return (
-    <section className="enterprise-panel overflow-hidden">
-      <div className="grid gap-3 border-b border-slate-200 px-4 py-3">
+    // Beside the map (2xl) the board is one screen tall: the header and tiles stay,
+    // the cards scroll inside it, so a driver with many jobs cannot stretch the page.
+    <section className="enterprise-panel overflow-hidden 2xl:sticky 2xl:top-20 2xl:flex 2xl:max-h-[calc(100vh-6rem)] 2xl:flex-col">
+      <div className="grid shrink-0 gap-3 border-b border-slate-200 px-4 py-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="section-label">ภาพรวมรถในโครงการ</p>
@@ -348,13 +352,13 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions
       </div>
 
       {view === "list" && listView ? (
-        <div className="p-3 sm:p-4">{listView}</div>
+        <div className="p-3 sm:p-4 2xl:min-h-0 2xl:overflow-y-auto">{listView}</div>
       ) : filteredGroups.length ? (
         // Cards stretch to fill the row (1fr) rather than capping at 24rem, which
         // left wide screens mostly empty and truncated card text. An open card
         // spans the whole row so its detail lays out sideways; dense packing fills
         // the gap it leaves behind.
-        <div className="grid grid-flow-row-dense grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start gap-2 p-3 sm:p-4">
+        <div className="grid grid-flow-row-dense grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start gap-2 p-3 sm:p-4 2xl:min-h-0 2xl:overflow-y-auto">
           {visibleGroups.map((group) => {
             const open = expanded === group.key;
             const phone = group.driver?.phone ?? "";
@@ -485,7 +489,7 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions
                     ) : null}
                     <div className="grid gap-1.5">
                       <p className="text-xs font-semibold text-slate-600">งานของคนขับคนนี้ ({group.jobs.length})</p>
-                      <div className="grid items-start gap-1.5">
+                      <div className="grid max-h-80 items-start gap-1.5 overflow-y-auto pr-1">
                       {group.jobs.map((job) => {
                         return (
                           <div key={job.assignment.id} className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs">

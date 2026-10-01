@@ -10,7 +10,7 @@ import { useMissionControlFeed } from "./mission-control-feed";
  */
 export function CommsJumpButton() {
   const { comms } = useMissionControlFeed();
-  const waiting = comms.inbound.filter((message) => message.status !== "closed").length;
+  const waiting = comms.inbound.filter((message) => message.status === "open").length;
   return (
     <button
       type="button"

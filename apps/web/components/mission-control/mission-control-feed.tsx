@@ -6,6 +6,7 @@ import type { AssignmentStatusUpdate, AssignmentWorkSession } from "@/lib/data/a
 import type { DriverInboundMessage, DriverOutboundMessage } from "@/lib/data/driver-comms";
 import type { VehicleEvidence } from "@/lib/data/vehicle-evidence";
 import { subscribeToDriverLocations, unsubscribeMissionControl } from "@/lib/realtime/mission-control";
+import { markDriverMessagesSeenAction } from "@/app/actions/driver-notifications";
 
 // One live feed for the whole control room. The map, the fleet board and the
 // comms console each used to poll on their own timer, so /locations and /comms
@@ -30,6 +31,8 @@ export interface MissionControlFeed {
   lastCheckedAt: string | null;
   lastError: string | null;
   now: number;
+  /** The control room has seen these driver messages: they stop counting as new. */
+  markSeen: (messageIds: string[]) => void;
 }
 
 const FeedContext = createContext<MissionControlFeed | null>(null);
@@ -52,6 +55,23 @@ export function MissionControlFeedProvider({ projectId, initialLocations, initia
   const [now, setNow] = useState(0);
 
   const liveRef = useRef(false);
+  // Seen here but maybe not yet saved: a poll that lands first must not bring
+  // the red count back for a moment.
+  const seenRef = useRef(new Set<string>());
+
+  const markSeen = useCallback(
+    (messageIds: string[]) => {
+      const fresh = messageIds.filter((id) => !seenRef.current.has(id));
+      if (!fresh.length) return;
+      for (const id of fresh) seenRef.current.add(id);
+      setComms((prev) => ({
+        ...prev,
+        inbound: prev.inbound.map((message) => (fresh.includes(message.id) && message.status === "open" ? { ...message, status: "acknowledged" } : message))
+      }));
+      void markDriverMessagesSeenAction({ projectId, messageIds: fresh }).catch(() => undefined);
+    },
+    [projectId]
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -70,7 +90,11 @@ export function MissionControlFeedProvider({ projectId, initialLocations, initia
 
       if (commsRes?.success && commsRes.data) {
         setComms((prev) => ({
-          inbound: Array.isArray(commsRes.data.inbound) ? (commsRes.data.inbound as DriverInboundMessage[]) : prev.inbound,
+          inbound: Array.isArray(commsRes.data.inbound)
+            ? (commsRes.data.inbound as DriverInboundMessage[]).map((message) =>
+                message.status === "open" && seenRef.current.has(message.id) ? { ...message, status: "acknowledged" } : message
+              )
+            : prev.inbound,
           outbound: Array.isArray(commsRes.data.outbound) ? (commsRes.data.outbound as DriverOutboundMessage[]) : prev.outbound,
           statuses: commsRes.data.statuses ? { ...prev.statuses, ...(commsRes.data.statuses as Record<string, AssignmentStatusUpdate>) } : prev.statuses,
           workSessions: commsRes.data.workSessions ? { ...prev.workSessions, ...(commsRes.data.workSessions as Record<string, AssignmentWorkSession>) } : prev.workSessions,
@@ -129,7 +153,7 @@ export function MissionControlFeedProvider({ projectId, initialLocations, initia
     };
   }, [projectId, refresh]);
 
-  const value: MissionControlFeed = { locations, comms, connection, lastCheckedAt, lastError, now };
+  const value: MissionControlFeed = { locations, comms, connection, lastCheckedAt, lastError, now, markSeen };
   return <FeedContext.Provider value={value}>{children}</FeedContext.Provider>;
 }
 

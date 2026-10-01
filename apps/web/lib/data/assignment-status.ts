@@ -94,12 +94,13 @@ export const getLatestAssignmentStatuses = cache(async function getLatestAssignm
 
 // A clock-in belongs to the driver's working day, not to one job — the driver
 // app reads it that way (lib/data/driver-access.ts), so the control room must
-// too, or the second job of a day shows "ยังไม่บันทึกเวลาเข้า" while the driver
-// is plainly working. A job with no clock-in rows of its own takes its driver's
-// rows from the job's own working day (lib/domain/work-day.ts), if the job is
-// still open — never yesterday's unclosed clock-in for this morning's job.
-// Jobs keep their own rows where they have them.
-const CLOSED_JOB = new Set(["completed", "cancelled", "archived"]);
+// too. Every job of a driver reads the driver's rows from the job's own working
+// day (lib/domain/work-day.ts), whichever job each row was saved on: the
+// clock-in lands on the morning's job and the clock-out on whichever job is
+// current in the evening, and reading the first job alone left the day "still
+// on the clock" with overtime running after the driver had clocked out. Never
+// yesterday's unclosed clock-in for this morning's job.
+const DROPPED_JOB = new Set(["cancelled", "archived"]);
 
 export function withDriverShifts(rows: Row[], jobs: Row[], now = Date.now()): Record<string, AssignmentWorkSession> {
   const byAssignment = collapseWorkSessions(rows);
@@ -112,10 +113,13 @@ export function withDriverShifts(rows: Row[], jobs: Row[], now = Date.now()): Re
   for (const job of jobs) {
     const id = rowLoose(job, "id");
     const driverId = rowLoose(job, "driver_id");
-    if (!id || !driverId || byAssignment[id] || CLOSED_JOB.has(rowLoose(job, "status"))) continue;
+    if (!id || !driverId || DROPPED_JOB.has(rowLoose(job, "status"))) continue;
     const day = workDayWindow(rowLoose(job, "start_time") || null, new Date(now));
     const list = (byDriver.get(driverId) ?? []).filter((row) => inWorkDay(rowLoose(row, "created_at"), day));
-    if (!list.length) continue;
+    if (!list.length) {
+      delete byAssignment[id];
+      continue;
+    }
     // Collapse the driver's rows for that day as if they were one job.
     const shift = collapseWorkSessions(list.map((row) => ({ ...row, assignment_id: driverId })))[driverId];
     if (shift) byAssignment[id] = shift;

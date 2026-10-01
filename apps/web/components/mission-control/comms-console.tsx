@@ -34,7 +34,7 @@ type FeedItem =
 type PendingPhoto = DriverMessageAttachment & { previewUrl?: string | null; fileName?: string | null };
 
 export function CommsConsole({ projectId, assignments, callSigns }: CommsConsoleProps) {
-  const { comms, now } = useMissionControlFeed();
+  const { comms, now, markSeen } = useMissionControlFeed();
   const inbound = comms.inbound;
   // Optimistic echoes of messages we just sent, dropped once the feed catches up.
   const [optimisticOutbound, setOptimisticOutbound] = useState<DriverOutboundMessage[]>([]);
@@ -134,6 +134,24 @@ export function CommsConsole({ projectId, assignments, callSigns }: CommsConsole
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [feed.length, filter]);
+
+  // A driver message counts as seen once it has been on screen here: the
+  // fleet card's red count goes when the thread it belongs to has been read.
+  const [onScreen, setOnScreen] = useState(false);
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setOnScreen(entry.isIntersecting), { threshold: 0.25 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!onScreen || typeof document === "undefined" || document.visibilityState !== "visible") return;
+    const ids = feed.filter((item) => item.direction === "in" && item.status === "open").map((item) => item.id);
+    if (!ids.length) return;
+    const timer = window.setTimeout(() => markSeen(ids), 1500);
+    return () => window.clearTimeout(timer);
+  }, [feed, markSeen, onScreen]);
 
   // One chip per unit that has talked, in first-message order.
   const threadChips = useMemo(() => {

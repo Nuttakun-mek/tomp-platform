@@ -203,3 +203,25 @@ export async function sendDriverNotificationAction(input: {
 
   return actionSuccess({ notification: data, timelineEvent: timelineResult.data, pushSent: push.sent }, timelineResult.success ? undefined : `ส่งข้อความแล้ว แต่บันทึก Timeline ไม่สำเร็จ: ${timelineResult.error}`);
 }
+
+/**
+ * The control room has seen these driver messages: "open" → "acknowledged".
+ * That is what clears the red count on the fleet card. A problem report stays
+ * flagged as a problem until it is closed; only its "new" mark goes.
+ */
+export async function markDriverMessagesSeenAction(input: { projectId: string; messageIds: string[] }): Promise<ActionResult> {
+  const ids = [...new Set((input.messageIds ?? []).filter((id) => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 200);
+  if (!ids.length) return actionSuccess({ updated: 0 });
+  const permission = await requirePermission(input.projectId, "assignment.read");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์");
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+  const { error: updateError } = await client
+    .from("driver_issue_reports")
+    .update({ status: "acknowledged" })
+    .eq("project_id", input.projectId)
+    .eq("status", "open")
+    .in("id", ids);
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "บันทึกว่าอ่านแล้วไม่สำเร็จ"));
+  return actionSuccess({ updated: ids.length });
+}

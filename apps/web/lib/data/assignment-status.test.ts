@@ -40,6 +40,23 @@ describe("withDriverShifts", () => {
     expect(sessions.job3).toBeUndefined();
   });
 
+  it("ends the day for every job when the clock-out was saved on a later job (1 Oct: in 07:59 on job 1, out 18:23 on job 4)", () => {
+    const at = (bkk: string) => new Date(`${bkk}+07:00`).toISOString();
+    const sessions = withDriverShifts(
+      [
+        { assignment_id: "job4", driver_id: "d1", status: "work_ended", created_at: at("2026-10-01T18:23:00") },
+        { assignment_id: "job1", driver_id: "d1", status: "work_started", created_at: at("2026-10-01T07:59:00") }
+      ],
+      [
+        { id: "job1", driver_id: "d1", status: "completed", start_time: at("2026-10-01T08:00:00") },
+        { id: "job4", driver_id: "d1", status: "completed", start_time: at("2026-10-01T15:00:00") }
+      ],
+      Date.parse(at("2026-10-01T22:00:00"))
+    );
+    expect(sessions.job1).toMatchObject({ status: "ended", startedAt: at("2026-10-01T07:59:00"), endedAt: at("2026-10-01T18:23:00") });
+    expect(sessions.job4?.status).toBe("ended");
+  });
+
   it("does not put yesterday's unclosed clock-in on this morning's job", () => {
     // Van-01: clocked in 30 Sep 17:56, never clocked out; 1 Oct 08:00 job, pre-start check at 07:27.
     const at = (bkk: string) => new Date(`${bkk}+07:00`).toISOString();
