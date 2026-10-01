@@ -103,6 +103,16 @@ describe("late clock-in and the control room's corrections (2026-10-01)", () => 
     expect(late.overtimeHours).toBe(0.17);
   });
 
+  it("prices a short day by its hours, not the whole package (30 Sep: 18:00–19:00, out 20:00)", () => {
+    const evening = dutyWindow(DAY, { start: "18:00", end: "19:00" });
+    const short = dutyDayCost({ window: evening, source: "duty_hours", clockIn: bkk(DAY, "17:56"), clockOut: bkk(DAY, "20:00"), vehicleMetadata: van });
+    expect(short.baseAmount).toBe(300);
+    expect(short.overtimeAmount).toBe(300);
+    expect(short.total).toBe(600);
+    // A full package day is still the package amount.
+    expect(cost("08:00", "18:00").baseAmount).toBe(3000);
+  });
+
   it("keeps the scheduled end for an early clock-in", () => {
     const early = cost("07:40", "18:30");
     expect(early.dutyEnd).toBe(bkk(DAY, "18:00"));

@@ -135,9 +135,10 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null);
 
 /**
- * What a unit's day costs. The base is the duty day (a package covers it; a
- * longer duty day than the package is paid by the hour at the package rate);
- * overtime is only the time between the scheduled clock-out and the real one.
+ * What a unit's day costs. The base is the scheduled duty day paid by the hour
+ * at the package rate (package amount ÷ package hours) — shorter and longer
+ * days alike; overtime is only the time past the day's end (duty-hours rules
+ * above), at the same rate.
  */
 export function dutyDayCost(input: {
   window: { start: string; end: string };
@@ -171,12 +172,15 @@ export function dutyDayCost(input: {
   const actualEndMs = clockOut ? Date.parse(clockOut) : running ? input.now! : null;
   const overtimeHours = input.clockIn && actualEndMs != null ? round2(Math.max(0, actualEndMs - dutyEndMs) / 3_600_000) : 0;
 
+  // The scheduled hours at the package's hourly rate (owner, 2026-10-01): a
+  // 1-hour day is one hour, not the whole 10-hour package. A day exactly the
+  // package's length is the package amount, without rounding drift.
   const baseAmount =
     rate == null
       ? null
-      : packageAmount != null && packageHours != null && scheduledHours <= packageHours
+      : packageAmount != null && packageHours != null && scheduledHours === packageHours
         ? packageAmount
-        : round2(Math.max(scheduledHours, packageHours ?? 0) * rate);
+        : round2(scheduledHours * rate);
   const overtimeAmount = rate == null ? null : round2(overtimeHours * rate);
 
   const state: DutyDayCost["state"] = !input.clockIn
