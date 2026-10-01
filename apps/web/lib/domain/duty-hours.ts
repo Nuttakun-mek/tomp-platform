@@ -3,9 +3,15 @@
 // these, never against sub-job times — a driver who works 13:00–14:00 then
 // 14:00–15:00 inside a 07:00–17:00 day is not on overtime at 14:01.
 //
-// Owner's rules (2026-09-30):
-//   - clocking in before the scheduled start is not overtime;
-//   - clocking out after the scheduled end is, for every minute past it.
+// Owner's rules (2026-09-30, 2026-10-01):
+//   - clocking in before the scheduled start is not overtime, and the day
+//     still ends at the scheduled end;
+//   - clocking in late moves the end out by the same amount, so the driver
+//     still works the day's full scheduled length (08:00–18:00, in at 08:30,
+//     out at 18:30) — overtime starts after that;
+//   - every minute past the end is overtime;
+//   - the control room can set a unit's end, or its real clock-out, for a day
+//     on the day-close page (a DutyAdjustment), with a reason.
 
 export interface DutyHours {
   /** "HH:MM", Bangkok time. */
@@ -33,6 +39,38 @@ export function readDutySchedule(metadata: Record<string, unknown> | null | unde
     if (isClock(start) && isClock(end)) out[date] = { start, end };
   }
   return out;
+}
+
+/** The control room's correction of one unit's day, kept on its main job. */
+export interface DutyAdjustment {
+  /** When overtime starts, instead of the computed end. */
+  endAt?: string | null;
+  /** The real clock-out, when the driver's is missing or wrong. */
+  clockOutAt?: string | null;
+  reason?: string;
+  by?: string | null;
+  at?: string;
+}
+
+/** metadata.dutyAdjustments[date][unitId] — per day, per Call Sign. */
+export function readDutyAdjustment(metadata: Record<string, unknown> | null | undefined, date: string, unitId: string | null | undefined): DutyAdjustment | null {
+  if (!unitId) return null;
+  const all = metadata?.dutyAdjustments;
+  if (!all || typeof all !== "object" || Array.isArray(all)) return null;
+  const day = (all as Record<string, unknown>)[date];
+  if (!day || typeof day !== "object" || Array.isArray(day)) return null;
+  const entry = (day as Record<string, unknown>)[unitId];
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+  const value = entry as Record<string, unknown>;
+  const iso = (v: unknown) => (typeof v === "string" && Number.isFinite(Date.parse(v)) ? v : null);
+  const adjustment: DutyAdjustment = {
+    endAt: iso(value.endAt),
+    clockOutAt: iso(value.clockOutAt),
+    reason: typeof value.reason === "string" ? value.reason : undefined,
+    by: typeof value.by === "string" ? value.by : null,
+    at: typeof value.at === "string" ? value.at : undefined
+  };
+  return adjustment.endAt || adjustment.clockOutAt ? adjustment : null;
 }
 
 /** Every day from `from` to `to`, each with `hours` unless `overrides` says otherwise. */
@@ -68,7 +106,16 @@ export function dutyLengthHours(hours: DutyHours): number {
 
 export interface DutyDayCost {
   dutyStart: string;
+  /** When overtime starts: the scheduled end, moved out for a late clock-in, or set by the control room. */
   dutyEnd: string;
+  /** The day's end as scheduled. */
+  scheduledEnd: string;
+  /** The end the rules give (scheduled, or moved out for a late clock-in), before any correction. */
+  computedEnd: string;
+  endBasis: "scheduled" | "late_start" | "adjusted";
+  /** The driver's own clock-out, when the control room replaced it. */
+  recordedClockOut: string | null;
+  clockOutAdjusted: boolean;
   /** Where the window came from: the mission's duty hours, or (not set) the day's first and last sub-job. */
   source: "duty_hours" | "sub_jobs";
   scheduledHours: number;
@@ -100,6 +147,7 @@ export function dutyDayCost(input: {
   /** Given for today: a driver still clocked in is counted to now. */
   now?: number;
   vehicleMetadata?: Record<string, unknown> | null;
+  adjustment?: DutyAdjustment | null;
 }): DutyDayCost {
   const meta = input.vehicleMetadata ?? {};
   const packageHours = num(meta.packageHours) ?? num(meta.minimumHours);
@@ -107,11 +155,20 @@ export function dutyDayCost(input: {
   const rate = packageAmount != null && packageHours ? packageAmount / packageHours : num(meta.hourlyRate);
 
   const dutyStartMs = Date.parse(input.window.start);
-  const dutyEndMs = Date.parse(input.window.end);
-  const scheduledHours = round2((dutyEndMs - dutyStartMs) / 3_600_000);
+  const scheduledEndMs = Date.parse(input.window.end);
+  const scheduledHours = round2((scheduledEndMs - dutyStartMs) / 3_600_000);
 
-  const running = Boolean(input.clockIn && !input.clockOut && input.now != null);
-  const actualEndMs = input.clockOut ? Date.parse(input.clockOut) : running ? input.now! : null;
+  // Late in, late out: the day keeps its scheduled length from the real clock-in.
+  const clockInMs = input.clockIn ? Date.parse(input.clockIn) : Number.NaN;
+  const lateBy = Number.isFinite(clockInMs) ? Math.max(0, clockInMs - dutyStartMs) : 0;
+  const adjustedEnd = input.adjustment?.endAt ?? null;
+  const dutyEndMs = adjustedEnd ? Date.parse(adjustedEnd) : scheduledEndMs + lateBy;
+  const endBasis: DutyDayCost["endBasis"] = adjustedEnd ? "adjusted" : lateBy > 0 ? "late_start" : "scheduled";
+
+  const clockOutAdjusted = Boolean(input.adjustment?.clockOutAt);
+  const clockOut = input.adjustment?.clockOutAt ?? input.clockOut;
+  const running = Boolean(input.clockIn && !clockOut && input.now != null);
+  const actualEndMs = clockOut ? Date.parse(clockOut) : running ? input.now! : null;
   const overtimeHours = input.clockIn && actualEndMs != null ? round2(Math.max(0, actualEndMs - dutyEndMs) / 3_600_000) : 0;
 
   const baseAmount =
@@ -124,7 +181,7 @@ export function dutyDayCost(input: {
 
   const state: DutyDayCost["state"] = !input.clockIn
     ? "not_started"
-    : input.clockOut
+    : clockOut
       ? "done"
       : running
         ? overtimeHours > 0
@@ -134,11 +191,16 @@ export function dutyDayCost(input: {
 
   return {
     dutyStart: input.window.start,
-    dutyEnd: input.window.end,
+    dutyEnd: new Date(dutyEndMs).toISOString(),
+    scheduledEnd: input.window.end,
+    computedEnd: new Date(scheduledEndMs + lateBy).toISOString(),
+    endBasis,
+    recordedClockOut: input.clockOut,
+    clockOutAdjusted,
     source: input.source,
     scheduledHours,
     clockIn: input.clockIn,
-    clockOut: input.clockOut,
+    clockOut,
     running,
     overtimeHours,
     rate: rate == null ? null : round2(rate),
@@ -192,6 +254,7 @@ export function unitDutyDay(input: {
   session: { startedAt: string | null; endedAt: string | null } | null | undefined;
   now?: number;
   vehicleMetadata?: Record<string, unknown> | null;
+  adjustment?: DutyAdjustment | null;
 }): { cost: DutyDayCost; status: DutyStatus } | null {
   const resolved = resolveDutyWindow(input.date, input.schedule, input.jobs);
   if (!resolved) return null;
@@ -203,10 +266,16 @@ export function unitDutyDay(input: {
   const clockIn = Number.isFinite(startedAt) && startedAt >= windowStart - 12 * 3_600_000 && startedAt <= windowEnd ? input.session!.startedAt : null;
   const clockOut = clockIn && input.session?.endedAt && Date.parse(input.session.endedAt) > startedAt ? input.session.endedAt : null;
 
-  const cost = dutyDayCost({ window: resolved.window, source: resolved.source, clockIn, clockOut, now: input.now, vehicleMetadata: input.vehicleMetadata });
+  const cost = dutyDayCost({ window: resolved.window, source: resolved.source, clockIn, clockOut, now: input.now, vehicleMetadata: input.vehicleMetadata, adjustment: input.adjustment });
+  const endMs = Date.parse(cost.dutyEnd);
   const hhmm = (iso: string) => clock.format(new Date(iso));
   const money = (n: number | null) => (n == null ? "" : ` ≈ ${n.toLocaleString("th-TH")} บ.`);
-  const fallback = resolved.source === "sub_jobs" ? " (ยังไม่ได้ตั้งเวลาเข้า-ออก ใช้ช่วงงานย่อยแทน)" : "";
+  const fallback =
+    (cost.endBasis === "late_start"
+      ? ` · เข้าช้า เลื่อนเวลาออกจาก ${hhmm(cost.scheduledEnd)} เป็น ${hhmm(cost.dutyEnd)}`
+      : cost.endBasis === "adjusted"
+        ? ` · ศูนย์กำหนดเวลาออก ${hhmm(cost.dutyEnd)}`
+        : "") + (resolved.source === "sub_jobs" ? " (ยังไม่ได้ตั้งเวลาเข้า-ออก ใช้ช่วงงานย่อยแทน)" : "");
   const now = input.now ?? Date.now();
 
   let status: DutyStatus;
@@ -216,19 +285,19 @@ export function unitDutyDay(input: {
       ? { tone: "warning", label: "ยังไม่เข้างาน", detail: `เลยเวลาเข้างาน ${hhmm(resolved.window.start)} มาแล้ว${fallback}` }
       : { tone: "neutral", label: `เข้างาน ${hhmm(resolved.window.start)}`, detail: `เวลางาน ${formatDutyWindow(resolved.window)}${fallback}` };
   } else if (cost.state === "on_duty") {
-    const untilEnd = windowEnd - now;
+    const untilEnd = endMs - now;
     status =
       untilEnd <= DUTY_END_WARNING_MIN * 60_000
-        ? { tone: "warning", label: `ใกล้เวลาออกงาน ${hhmm(resolved.window.end)}`, detail: `อีก ${Math.max(0, Math.round(untilEnd / 60_000))} นาทีจะเริ่มคิด OT${fallback}` }
-        : { tone: "success", label: `ในเวลางาน ถึง ${hhmm(resolved.window.end)}`, detail: `เวลางาน ${formatDutyWindow(resolved.window)}${fallback}` };
+        ? { tone: "warning", label: `ใกล้เวลาออกงาน ${hhmm(cost.dutyEnd)}`, detail: `อีก ${Math.max(0, Math.round(untilEnd / 60_000))} นาทีจะเริ่มคิด OT${fallback}` }
+        : { tone: "success", label: `ในเวลางาน ถึง ${hhmm(cost.dutyEnd)}`, detail: `เวลางาน ${formatDutyWindow(resolved.window)}${fallback}` };
   } else if (cost.state === "overtime") {
-    status = { tone: "danger", label: `OT ${cost.overtimeHours.toLocaleString("th-TH")} ชม.`, detail: `เลยเวลาออกงาน ${hhmm(resolved.window.end)} ยังไม่บันทึกเวลาออก${money(cost.overtimeAmount)}${fallback}` };
+    status = { tone: "danger", label: `OT ${cost.overtimeHours.toLocaleString("th-TH")} ชม.`, detail: `เลยเวลาออกงาน ${hhmm(cost.dutyEnd)} ยังไม่บันทึกเวลาออก${money(cost.overtimeAmount)}${fallback}` };
   } else if (cost.state === "done") {
     status = cost.overtimeHours
-      ? { tone: "warning", label: `ออกงานแล้ว · OT ${cost.overtimeHours.toLocaleString("th-TH")} ชม.`, detail: `ออก ${hhmm(clockOut!)} หลังเวลาออกงาน ${hhmm(resolved.window.end)}${money(cost.overtimeAmount)}${fallback}` }
-      : { tone: "success", label: "ออกงานตรงเวลา", detail: `ออก ${hhmm(clockOut!)} · เวลางาน ${formatDutyWindow(resolved.window)}${fallback}` };
+      ? { tone: "warning", label: `ออกงานแล้ว · OT ${cost.overtimeHours.toLocaleString("th-TH")} ชม.`, detail: `ออก ${hhmm(cost.clockOut!)} หลังเวลาออกงาน ${hhmm(cost.dutyEnd)}${money(cost.overtimeAmount)}${fallback}` }
+      : { tone: "success", label: "ออกงานตรงเวลา", detail: `ออก ${hhmm(cost.clockOut!)} · เวลางาน ${formatDutyWindow(resolved.window)}${fallback}` };
   } else {
-    status = { tone: "warning", label: "ไม่ได้บันทึกเวลาออก", detail: `คิดตามเวลาออกงาน ${hhmm(resolved.window.end)} ไปก่อน${fallback}` };
+    status = { tone: "warning", label: "ไม่ได้บันทึกเวลาออก", detail: `คิดตามเวลาออกงาน ${hhmm(cost.dutyEnd)} ไปก่อน${fallback}` };
   }
   return { cost, status };
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, BellOff, BellRing, ChevronDown, Volume2, VolumeX, X } from "lucide-react";
 import type { Assignment, CallSign, Mission, Vehicle } from "@tomp/types/domain";
 import { computeControlAlerts, type AlertUnitDay, type ControlAlert } from "@/lib/domain/control-alerts";
-import { readDutySchedule, unitDutyDay } from "@/lib/domain/duty-hours";
+import { readDutyAdjustment, readDutySchedule, unitDutyDay } from "@/lib/domain/duty-hours";
 import { useMissionControlFeed } from "./mission-control-feed";
 import { OPEN_COMMS_EVENT } from "./fleet-board";
 
@@ -115,7 +115,8 @@ export function ControlAlerts({
         jobs: unitJobs,
         session: comms.workSessions[first.id],
         now,
-        vehicleMetadata: vehicle?.metadata as Record<string, unknown> | undefined
+        vehicleMetadata: vehicle?.metadata as Record<string, unknown> | undefined,
+        adjustment: readDutyAdjustment(mission?.metadata as Record<string, unknown> | undefined, today, unitId)
       });
       if (day) units.push({ unitId, label: callSignById.get(unitId) || unitId.slice(0, 6), assignmentId: first.id, day });
     }

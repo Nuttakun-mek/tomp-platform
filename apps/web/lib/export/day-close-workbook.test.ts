@@ -26,9 +26,9 @@ describe("day close export", () => {
     await book.xlsx.load(buffer as unknown as ArrayBuffer);
     const sheet = book.worksheets[0];
     expect(sheet.getRow(4).getCell(1).value).toBe("CS-01");
-    expect(sheet.getRow(4).getCell(11).value).toBe(1); // OT hours
+    expect(sheet.getRow(4).getCell(12).value).toBe(1); // OT hours
     expect(sheet.getRow(5).getCell(1).value).toBe("รวม");
-    expect(sheet.getRow(5).getCell(14).value).toBe(3300);
+    expect(sheet.getRow(5).getCell(15).value).toBe(3300);
   });
 
   it("names the day when a time falls after midnight", () => {

@@ -6,6 +6,7 @@ import { actionFailure, actionSuccess, type ActionResult } from "@/lib/actions/a
 import { getDatabaseErrorMessage } from "@/lib/actions/db-error";
 import { mapMission } from "@/lib/data/mappers";
 import { requirePermission } from "@/lib/auth/rbac";
+import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { getSupabaseWriteClient } from "@/lib/supabase/server-write";
 import { createMissionTimelineEvent } from "@/lib/timeline";
 import { daysBetween, isClock, readDutySchedule } from "@/lib/domain/duty-hours";
@@ -216,4 +217,70 @@ export async function updateMissionDutyHoursAction(input: { projectId: string; m
   if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "บันทึกเวลาเข้า-ออกงานไม่สำเร็จ"));
   revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
   return actionSuccess({ days: days.length, start: input.start, end: input.end });
+}
+
+const isInstant = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
+
+/**
+ * The control room's correction of one unit's day, from the day-close page:
+ * when overtime starts (`endAt`), and/or the real clock-out (`clockOutAt`),
+ * with a reason. Both null clears the correction. Kept on the unit's main job
+ * as metadata.dutyAdjustments[date][callSignId], each change keeping what it
+ * replaced; the driver's own clock-in/out rows are never rewritten.
+ */
+export async function adjustDutyDayAction(input: {
+  projectId: string;
+  callSignId: string;
+  date: string;
+  endAt: string | null;
+  clockOutAt: string | null;
+  reason: string;
+}): Promise<ActionResult> {
+  const reason = (input.reason ?? "").trim();
+  const clearing = !input.endAt && !input.clockOutAt;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return actionFailure("วันที่ไม่ถูกต้อง");
+  if ((input.endAt && !isInstant(input.endAt)) || (input.clockOutAt && !isInstant(input.clockOutAt))) return actionFailure("เวลาไม่ถูกต้อง");
+  if (!clearing && reason.length < 3) return actionFailure("กรุณาระบุเหตุผลที่แก้เวลา");
+
+  const { client, error } = getSupabaseWriteClient();
+  if (!client) return actionFailure(error || "ยังไม่ได้ตั้งค่าการบันทึกข้อมูล");
+  const permission = await requirePermission(input.projectId, "mission.create");
+  if (!permission.allowed) return actionFailure(permission.reason || "ไม่มีสิทธิ์แก้เวลางาน");
+
+  const { data: callSign } = await client
+    .from("call_signs")
+    .select("id, metadata")
+    .eq("id", input.callSignId)
+    .eq("project_id", input.projectId)
+    .maybeSingle();
+  const missionId = (callSign?.metadata as Record<string, unknown> | null)?.missionId;
+  if (typeof missionId !== "string") return actionFailure("หน่วยนี้ยังไม่มีภารกิจหลัก จึงยังแก้เวลาไม่ได้");
+  const { data: mission, error: readError } = await client
+    .from("missions")
+    .select("id, metadata")
+    .eq("id", missionId)
+    .eq("project_id", input.projectId)
+    .maybeSingle();
+  if (readError || !mission) return actionFailure("ไม่พบภารกิจหลักของหน่วยนี้");
+
+  const metadata = (mission.metadata ?? {}) as Record<string, unknown>;
+  const all = { ...((metadata.dutyAdjustments as Record<string, Record<string, Record<string, unknown>>> | undefined) ?? {}) };
+  const day = { ...(all[input.date] ?? {}) };
+  const previous = day[input.callSignId] ?? null;
+  const history = Array.isArray(previous?.history) ? (previous.history as unknown[]) : [];
+  const profile = await getCurrentUserProfile().catch(() => null);
+  day[input.callSignId] = {
+    endAt: input.endAt || null,
+    clockOutAt: input.clockOutAt || null,
+    reason: clearing ? reason || "คืนค่าตามระบบ" : reason,
+    by: profile?.fullName || profile?.email || profile?.id || null,
+    at: new Date().toISOString(),
+    history: previous ? [...history, { endAt: previous.endAt ?? null, clockOutAt: previous.clockOutAt ?? null, reason: previous.reason ?? null, by: previous.by ?? null, at: previous.at ?? null }].slice(-20) : []
+  };
+  all[input.date] = day;
+
+  const { error: updateError } = await client.from("missions").update({ metadata: { ...metadata, dutyAdjustments: all } }).eq("id", mission.id);
+  if (updateError) return actionFailure(getDatabaseErrorMessage(updateError, "บันทึกเวลาไม่สำเร็จ"));
+  revalidatePath("/projects/[projectCode]/ground-transfer", "layout");
+  return actionSuccess({ cleared: clearing });
 }

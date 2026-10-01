@@ -6,6 +6,7 @@ import { getCurrentUserProfile } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/rbac";
 import { bangkokToday, getDayClose } from "@/lib/data/day-close";
 import { getProjectByCode } from "@/lib/data/projects";
+import { DutyAdjustDialog } from "@/components/day-close/duty-adjust-dialog";
 import { timeOnDay } from "@/lib/export/day-close-workbook";
 
 const money = (value: number | null | undefined) => (value == null ? "—" : value.toLocaleString("th-TH", { maximumFractionDigits: 2 }));
@@ -25,6 +26,7 @@ export default async function DayClosePage({ params, searchParams }: { params: P
   if (!project) notFound();
   const permission = await requirePermission(project.id, "assignment.read");
   if (!permission.allowed) notFound();
+  const canAdjust = (await requirePermission(project.id, "mission.create")).allowed;
 
   const query = searchParams ? await searchParams : {};
   const today = bangkokToday();
@@ -89,7 +91,7 @@ export default async function DayClosePage({ params, searchParams }: { params: P
               <tr>
                 <th className="px-3 py-2">Call Sign</th>
                 <th className="px-3 py-2">งาน</th>
-                <th className="px-3 py-2">เวลางาน (กำหนด)</th>
+                <th className="px-3 py-2">เวลางาน · เลิกงาน</th>
                 <th className="px-3 py-2">เข้า–ออกงาน</th>
                 <th className="px-3 py-2 text-right">ชม. ที่คิด</th>
                 <th className="px-3 py-2 text-right">OT</th>
@@ -112,11 +114,34 @@ export default async function DayClosePage({ params, searchParams }: { params: P
                     {row.jobsDone}/{row.jobs}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {timeOnDay(row.cost.dutyStart, date)}–{timeOnDay(row.cost.dutyEnd, date)}
+                    {timeOnDay(row.cost.dutyStart, date)}–{timeOnDay(row.cost.scheduledEnd, date)}
                     {row.cost.source === "sub_jobs" ? <span className="block text-[10px] text-amber-700">ตามงานย่อย</span> : null}
+                    {row.cost.endBasis !== "scheduled" ? (
+                      <span className={`block text-[11px] font-semibold ${row.cost.endBasis === "adjusted" ? "text-route" : "text-amber-800"}`}>
+                        เลิกงาน {timeOnDay(row.cost.dutyEnd, date)} {row.cost.endBasis === "adjusted" ? "(ศูนย์แก้)" : "(เข้าช้า)"}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {row.clockIn ? timeOnDay(row.clockIn, date) : "—"}–{row.clockOut ? timeOnDay(row.clockOut, date) : "—"}
+                    {row.cost.clockOutAdjusted ? <span className="block text-[10px] font-semibold text-route">ออกงาน: ศูนย์แก้</span> : null}
+                    {canAdjust && !row.unitId.startsWith("job:") ? (
+                      <span className="block">
+                        <DutyAdjustDialog
+                          projectId={project.id}
+                          callSignId={row.unitId}
+                          date={date}
+                          label={row.label}
+                          computedEnd={row.cost.computedEnd}
+                          scheduledEnd={row.cost.scheduledEnd}
+                          dutyEnd={row.cost.dutyEnd}
+                          recordedClockOut={row.cost.recordedClockOut}
+                          clockOut={row.cost.clockOut}
+                          adjusted={Boolean(row.adjustment)}
+                          reason={row.adjustment?.reason ?? null}
+                        />
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{hours(row.cost.scheduledHours + row.cost.overtimeHours)}</td>
                   <td className={`px-3 py-2 text-right tabular-nums ${row.cost.overtimeHours ? "font-semibold text-amber-800" : "text-slate-400"}`}>

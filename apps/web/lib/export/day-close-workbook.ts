@@ -31,6 +31,7 @@ export async function buildDayCloseWorkbook(input: { projectCode: string; projec
     "งานทั้งหมด",
     "เข้างาน (กำหนด)",
     "ออกงาน (กำหนด)",
+    "เลิกงาน (คิด OT หลังเวลานี้)",
     "เข้างานจริง",
     "ออกงานจริง",
     "ชั่วโมงที่คิด",
@@ -54,6 +55,7 @@ export async function buildDayCloseWorkbook(input: { projectCode: string; projec
       row.jobsDone,
       row.jobs,
       timeOnDay(row.cost.dutyStart, input.date),
+      timeOnDay(row.cost.scheduledEnd, input.date),
       timeOnDay(row.cost.dutyEnd, input.date),
       timeOnDay(row.clockIn, input.date),
       timeOnDay(row.clockOut, input.date),
@@ -64,7 +66,7 @@ export async function buildDayCloseWorkbook(input: { projectCode: string; projec
       row.cost.total ?? null,
       row.notes.join(" · ")
     ]);
-    if (row.cost.overtimeHours > 0) added.getCell(11).font = { bold: true, color: { argb: "FFB45309" } };
+    if (row.cost.overtimeHours > 0) added.getCell(12).font = { bold: true, color: { argb: "FFB45309" } };
   }
   const totals = sheet.addRow([
     "รวม",
@@ -72,6 +74,7 @@ export async function buildDayCloseWorkbook(input: { projectCode: string; projec
     "",
     input.totals.jobsDone,
     input.totals.jobs,
+    "",
     "",
     "",
     "",
@@ -86,10 +89,10 @@ export async function buildDayCloseWorkbook(input: { projectCode: string; projec
   totals.font = { bold: true };
   totals.eachCell((cell) => (cell.border = { top: { style: "thin" } }));
 
-  const widths = [14, 20, 12, 9, 10, 11, 11, 11, 11, 11, 9, 13, 11, 13, 48];
+  const widths = [14, 20, 12, 9, 10, 11, 11, 13, 11, 11, 11, 9, 13, 11, 13, 48];
   widths.forEach((width, index) => (sheet.getColumn(index + 1).width = width));
-  for (const column of [10, 11]) sheet.getColumn(column).numFmt = "0.00";
-  for (const column of [12, 13, 14]) sheet.getColumn(column).numFmt = "#,##0.00";
+  for (const column of [11, 12]) sheet.getColumn(column).numFmt = "0.00";
+  for (const column of [13, 14, 15]) sheet.getColumn(column).numFmt = "#,##0.00";
 
   return Buffer.from(await book.xlsx.writeBuffer());
 }

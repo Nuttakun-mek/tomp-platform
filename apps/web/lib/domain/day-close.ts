@@ -1,4 +1,4 @@
-import { dutyDayCost, resolveDutyWindow, type DutyDayCost, type DutySchedule } from "./duty-hours";
+import { dutyDayCost, resolveDutyWindow, type DutyAdjustment, type DutyDayCost, type DutySchedule } from "./duty-hours";
 
 // The end-of-day summary for one project and one Bangkok calendar day: per
 // unit (Call Sign), its scheduled clock-in/out (the main job's duty hours for
@@ -45,6 +45,8 @@ export interface DayCloseRow {
   clockOut: string | null;
   openIssues: number;
   cost: DutyDayCost;
+  /** The control room's correction for this unit and day, if any. */
+  adjustment: DutyAdjustment | null;
   notes: string[];
 }
 
@@ -64,6 +66,7 @@ const bangkokDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", 
 export const bangkokDateOf = (iso: string) => bangkokDay.format(new Date(iso));
 
 const CLOSED = new Set(["cancelled", "archived"]);
+const clockLabel = (iso: string) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export function summarizeDay(input: {
@@ -77,6 +80,8 @@ export function summarizeDay(input: {
   openIssues: Record<string, number>;
   /** Each unit's duty hours (its main job's metadata.dutyHours), by unit id. */
   schedules?: Record<string, DutySchedule>;
+  /** The control room's corrections for this day, by unit id. */
+  adjustments?: Record<string, DutyAdjustment | null | undefined>;
   /** Given when the day is today: a driver still on the clock is counted to now. */
   now?: number;
 }): { rows: DayCloseRow[]; totals: DayCloseTotals } {
@@ -121,14 +126,18 @@ export function summarizeDay(input: {
     const clockIn = clockInEvent?.at ?? null;
     const clockOut = clockOutEvent?.at ?? null;
 
-    const cost = dutyDayCost({ window: resolved.window, source: resolved.source, clockIn, clockOut, now: input.now, vehicleMetadata: unit?.vehicleMetadata ?? null });
+    const adjustment = input.adjustments?.[unitId] ?? null;
+    const cost = dutyDayCost({ window: resolved.window, source: resolved.source, clockIn, clockOut, now: input.now, vehicleMetadata: unit?.vehicleMetadata ?? null, adjustment });
 
     const jobsDone = jobs.filter((job) => job.status === "completed" || input.reported[job.id]?.status === "completed").length;
     const openIssues = jobs.reduce((sum, job) => sum + (input.openIssues[job.id] ?? 0), 0);
     const notes: string[] = [];
     if (resolved.source === "sub_jobs") notes.push("ยังไม่ได้ตั้งเวลาเข้า-ออกในขั้นที่ 1 — ใช้ช่วงงานย่อยแทน");
     if (!clockIn) notes.push("ไม่ได้บันทึกเวลาเข้า");
-    else if (!clockOut) notes.push(input.now ? "ยังไม่บันทึกเวลาออก — นับถึงตอนนี้" : "ไม่ได้บันทึกเวลาออก — ไม่คิด OT");
+    else if (!cost.clockOut) notes.push(input.now ? "ยังไม่บันทึกเวลาออก — นับถึงตอนนี้" : "ไม่ได้บันทึกเวลาออก — ไม่คิด OT");
+    if (cost.endBasis === "late_start") notes.push(`เข้าช้า — เวลาออกเลื่อนเป็น ${clockLabel(cost.dutyEnd)} ให้ครบ ${cost.scheduledHours} ชม.`);
+    if (cost.endBasis === "adjusted") notes.push(`ศูนย์กำหนดเวลาออก ${clockLabel(cost.dutyEnd)}${adjustment?.reason ? ` — ${adjustment.reason}` : ""}`);
+    if (cost.clockOutAdjusted) notes.push(`ศูนย์แก้เวลาออกงานจริงเป็น ${clockLabel(cost.clockOut!)}${cost.recordedClockOut ? ` (คนขับกด ${clockLabel(cost.recordedClockOut)})` : ""}${adjustment?.reason && cost.endBasis !== "adjusted" ? ` — ${adjustment.reason}` : ""}`);
     if (jobsDone < jobs.length) notes.push(`งานยังไม่ปิด ${jobs.length - jobsDone} งาน`);
     if (openIssues) notes.push(`เหตุขัดข้องค้าง ${openIssues} รายการ`);
     if (cost.total == null) notes.push("รถยังไม่มีอัตราค่าบริการ");
@@ -143,9 +152,10 @@ export function summarizeDay(input: {
       plannedStart,
       plannedEnd,
       clockIn,
-      clockOut,
+      clockOut: cost.clockOut,
       openIssues,
       cost,
+      adjustment,
       notes
     });
   }

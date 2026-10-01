@@ -9,7 +9,7 @@ import { metaString } from "@/lib/data/location-meta";
 import { isUrgentMeta, orderDriverJobs } from "@/lib/domain/driver-day-order";
 import { latestEvidenceByDriver } from "@/lib/domain/driver-evidence";
 import { gpsFreshness, type GpsFreshness } from "@/lib/domain/gps-freshness";
-import { readDutySchedule, unitDutyDay, type DutyStatus } from "@/lib/domain/duty-hours";
+import { readDutyAdjustment, readDutySchedule, unitDutyDay, type DutyStatus } from "@/lib/domain/duty-hours";
 import { formatStatusTh } from "@/lib/i18n/status-th";
 import { formatRelativeTh } from "@/lib/format/relative-time-th";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -267,7 +267,8 @@ export function FleetBoard({ assignments, callSigns, drivers, vehicles, missions
           jobs: dayJobs.map((row) => ({ startTime: row.assignment.startTime, endTime: row.assignment.endTime })),
           session: primary.workSession,
           now: effectiveNow,
-          vehicleMetadata: vehicle?.metadata as Record<string, unknown> | undefined
+          vehicleMetadata: vehicle?.metadata as Record<string, unknown> | undefined,
+          adjustment: readDutyAdjustment(mission?.metadata as Record<string, unknown> | undefined, date, primary.assignment.callSignId)
         });
         return {
           key,
